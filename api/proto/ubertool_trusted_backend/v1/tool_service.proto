@@ -129,7 +129,7 @@ message Tool {
   string name = 2;
   string description = 3;
   repeated string categories = 4;
-  // Prices stored as cents (e.g., 550 = 5.50 credits)
+  // Prices stored as cents (e.g., 550 = $5.50)
   // int32 supports up to $21 million (more than enough for max $1000)
   int32 price_per_day_cents = 5;
   int32 price_per_week_cents = 6;

@@ -14,6 +14,7 @@ CREATE TYPE rental_status_enum AS ENUM ('PENDING', 'APPROVED', 'SCHEDULED', 'ACT
 CREATE TABLE orgs (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
+    description TEXT,
     address TEXT,
     metro TEXT,
     admin_phone_number TEXT,
@@ -38,7 +39,7 @@ CREATE TABLE users_orgs (
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     org_id INTEGER REFERENCES orgs(id) ON DELETE CASCADE,
     joined_on DATE DEFAULT CURRENT_DATE,
-    balance_credits INTEGER DEFAULT 0,
+    balance_cents INTEGER DEFAULT 0,
     status user_org_status_enum NOT NULL DEFAULT 'ACTIVE',
     role user_org_role_enum NOT NULL DEFAULT 'MEMBER',
     PRIMARY KEY (user_id, org_id)
@@ -69,16 +70,15 @@ CREATE TABLE tools (
     id SERIAL PRIMARY KEY,
     owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    info TEXT, -- Description/Details
-    category TEXT NOT NULL,
-    daily_rental_price INTEGER NOT NULL DEFAULT 0,
-    weekly_rental_price INTEGER NOT NULL DEFAULT 0,
-    monthly_rental_price INTEGER NOT NULL DEFAULT 0,
-    replacement_price INTEGER,
+    description TEXT, -- Description/Details
+    categories TEXT[], -- Array of categories
+    price_per_day_cents INTEGER NOT NULL DEFAULT 0,
+    price_per_week_cents INTEGER NOT NULL DEFAULT 0,
+    price_per_month_cents INTEGER NOT NULL DEFAULT 0,
+    replacement_cost_cents INTEGER,
     duration_unit tool_duration_unit_enum NOT NULL DEFAULT 'day',
     condition tool_condition_enum NOT NULL DEFAULT 'GOOD',
     metro TEXT, -- Optional location indicator
-    location_string TEXT, 
     status tool_status_enum NOT NULL DEFAULT 'AVAILABLE',
     created_on DATE DEFAULT CURRENT_DATE,
     deleted_on DATE
@@ -101,7 +101,7 @@ CREATE TABLE rentals (
     start_date DATE NOT NULL,
     scheduled_end_date DATE NOT NULL, -- Expected return
     end_date DATE, -- Actual return date
-    total_cost_credits INTEGER NOT NULL,
+    total_cost_cents INTEGER NOT NULL,
     status rental_status_enum NOT NULL DEFAULT 'PENDING',
     pickup_note TEXT,
     created_on DATE DEFAULT CURRENT_DATE,
@@ -121,10 +121,22 @@ CREATE TABLE ledger_transactions (
     created_on DATE DEFAULT CURRENT_DATE
 );
 
+-- 6. Notifications
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    org_id INTEGER REFERENCES orgs(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    attributes JSONB, -- For metadata map
+    created_on DATE DEFAULT CURRENT_DATE
+);
+
 -- Function to update balance on insert
 CREATE OR REPLACE FUNCTION update_user_balance() RETURNS TRIGGER AS $$
 BEGIN
-    UPDATE users_orgs SET balance_credits = balance_credits + NEW.amount WHERE user_id = NEW.user_id AND org_id = NEW.org_id;
+    UPDATE users_orgs SET balance_cents = balance_cents + NEW.amount WHERE user_id = NEW.user_id AND org_id = NEW.org_id;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

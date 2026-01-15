@@ -46,11 +46,14 @@ Build a secure, maintainable backend using **Go (Golang)** microservices.
 - Password reset flow.
 
 **API Endpoints (gRPC Definitions):**
-- `ValidateInvite(token)`
-- `Register(token, email, phone_number, password, name)`
+- `ValidateInvite(invitation_code, email)`
+- `UserSignup(invitation_code, name, email, phone, password)`
 - `Login(email, password)`
-- `RequestJoin(email, name, note)`
-- `AdminApproveJoin(requestId)` [Admin Only]
+- `Verify2FA(session_id, code)`
+- `RequestToJoinOrganization(organization_id, name, email, message)`
+- `RefreshToken(refresh_token)`
+- `Logout(user_id)`
+- **Admin Service:** `ApproveRequestToJoin(user_id, organization_id, applicant_email)`
 
 ### 3.3 Search & Discovery (Multi-Org Logic)
 1.  **Initial Context:** User selects a "Current Org" (e.g., Church A) to start searching.
@@ -61,7 +64,7 @@ Build a secure, maintainable backend using **Go (Golang)** microservices.
     - **No Map View.** Location is indicated by text (e.g., "North Metro").
 5.  **Context Switching Alert:**
     - If a user selects a tool from "Church B" while browsing in "Church A" context:
-    - **System Prompt:** *"You are selecting a tool from [Church B]. Please confirm to switch context for pickup and billing."*
+    - **System Prompt:** *"The owner of this tool is in [Church B]. To rent it, we need to switch your dashboard context to that organization."*
 
 ### 3.4 Core Services
 1.  **Auth Service:** Invitation handling, Login, Registration.
@@ -90,13 +93,20 @@ Build a secure, maintainable backend using **Go (Golang)** microservices.
 
 **Data Model (Ledger):**
 - `user_id`
-- `balance` (integer, cents or points)
+- `balance` (integer, cents)
 - `transactions`: `[id, user_id, amount, type (DEBIT/CREDIT), related_rental_id, timestamp]`
 
 **API Endpoints:**
-- `GetBalance(userId)`
-- `GetTransactionHistory(userId)`
-- `AdminAdjustBalance(userId, amount, reason)`
+- **Ledger Service:**
+    - `GetBalance(user_id, organization_id)`
+    - `GetTransactions(user_id, organization_id, page, page_size)`
+    - `GetLedgerSummary(user_id, organization_id)`
+- **User Service:**
+    - `GetUser(user_id)`
+    - `UpdateProfile(user_id, name, email, phone, avatar_url)`
+- **Admin Service:**
+    - `AdminAdjustBalance(user_id, organization_id, amount, reason)`
+    - `AdminBlockUserAccount(user_id, organization_id, reason)`
 
 ### 4.2 Tool Management & Search (List View)
 **Priority:** P0 (MVP)
@@ -112,9 +122,15 @@ Build a secure, maintainable backend using **Go (Golang)** microservices.
 - **Filters:** Condition (New, Good, Fair), Max Price.
 
 **API Endpoints:**
-- `SearchTools(query, filters, sort_order)`
-- `GetToolDetails(toolId)`
-- `CreateTool(...)` - same as original but simpler location data (just string "City/Area" is fine).
+- `SearchTools(organization_id, query, categories, max_price, condition)`
+- `GetTool(tool_id)`
+- `ListTools(organization_id, user_id)`
+- `AddTool(user_id, name, description, categories, price_per_day_cents, ...)`
+- `UpdateTool(tool_id, ...)`
+- `DeleteTool(tool_id)`
+- `ListToolCategories()` (Returns all system categories)
+
+**Note:** All prices are stored and transmitted in **cents** (USD) to avoid floating point errors.
 
 ### 4.4 Rental Workflow
 **Priority:** P0 (MVP)
@@ -125,23 +141,28 @@ Build a secure, maintainable backend using **Go (Golang)** microservices.
 
 **Flow:**
 1.  **User Selects Tool:** Views costs (Day/Week).
-2.  **Request:** User submits dates.
+2.  **Request:** User submits dates (`CreateRentalRequest`).
 3.  **Hold:** System notifies Owner (Email/In-app).
     *   **Alert Content:** *"John wants 'Drill' for Jan 15-17 (via [Org Name])".*
-    *   Tool status shows "Pending" for those dates.
-4.  **Confirm:** Owner accepts.
-    *   **Notification:** User notified (Email/In-app).
+    *   Tool status shows "Pending".
+4.  **Confirm (Owner):** Owner accepts (`ApproveRentalRequest`).
     *   **Note:** Owner adds "Pickup Instructions" (Time/Location) in confirmation.
-5.  **Ledger Update:** Upon "Pickup" or "Completion" (depending on business rule, likely Completion for MVP), transaction recorded. Debit Renter / Credit Owner.
-6.  **Return:** Owner marks as returned. System checks for overdue (based on end date).
+5.  **Finalize (Renter):** Renter views approval and pickup instructions, then confirms intent to proceed (`FinalizeRentalRequest`).
+    *   **Status Update:** Rental becomes "Scheduled" or "Active".
+6.  **Ledger Update:** Upon "Completion", transaction recorded. Debit Renter / Credit Owner.
+7.  **Return:** Owner marks as returned (`CompleteRental`). System checks for overdue.
 
 **Reminders:**
 - System cron job checks for overdue rentals daily. Sends email reminder to Renter.
 
 **API Endpoints:**
-- `RequestRental(toolId, dates)`
-- `RespondRental(rentalId, status [ACCEPT/REJECT], pickupNote)`
-- `CompleteRental(rentalId)` [Owner Only]
+- `CreateRentalRequest(tool_id, start_date, end_date, organization_id)`
+- `ApproveRentalRequest(request_id, pickup_instructions)` [Owner]
+- `RejectRentalRequest(request_id, reason)` [Owner]
+- `FinalizeRentalRequest(request_id)` [Renter]
+- `CompleteRental(request_id)` [Owner]
+- `ListMyRentals(...)`
+- `ListMyLendings(...)`
 
 ### 4.5 Notifications
 **Priority:** P0 (MVP)

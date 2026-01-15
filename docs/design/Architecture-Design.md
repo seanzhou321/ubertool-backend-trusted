@@ -22,6 +22,7 @@ graph TD
         NotifSvc[Notification Service]
         ImageStorageSvc[Image Storage Service]
         OrgSvc[Organization Service]
+        AdminSvc[Admin Service]
     end
     
     subgraph "Infrastructure"
@@ -38,6 +39,7 @@ graph TD
     AuthGW --> RentalSvc
     AuthGW --> ImageStorageSvc
     AuthGW --> OrgSvc
+    AuthGW --> AdminSvc
     
     AuthSvc --> DB
     UserSvc --> DB
@@ -46,6 +48,7 @@ graph TD
     NotifSvc --> DB
     ImageStorageSvc --> S3
     OrgSvc --> DB
+    AdminSvc --> DB
     
     RentalSvc -->|Async Event| NotifSvc
     NotifSvc --> Email
@@ -68,7 +71,8 @@ graph TD
     - Verify Invitation Tokens.
     - User Registration/Login.
     - JWT Token Generation & Validation.
-    - Handle "Request to Join" workflow.
+    - Handle "Request to Join" workflow (`RequestToJoinOrganization`).
+    - 2FA Verification.
 - **Data:** `users` table (auth fields), `invitations` table (linked to `orgs`).
 
 ### 4.2 User & Ledger Service (`pkg/user`, `pkg/ledger`)
@@ -88,7 +92,7 @@ graph TD
 
 ### 4.4 Rental Service (`pkg/rental`)
 - **Responsibilities:**
-    - Request lifecycle: Request -> Owner Confirm -> Rental Active -> Return -> Complete.
+    - Request lifecycle: Request -> Owner Confirm -> Renter Finalize -> Rental Scheduled -> Active -> Return -> Complete.
     - **Overdue Check:** Daily cron to check `end_date < now` and status != `Returned`.
     - Trigger Ledger updates on Completion.
 - **Data:** `rentals` table.
@@ -103,8 +107,15 @@ graph TD
 - **Responsibilities:**
     - Manage Organization profiles (Church A, Church B).
     - Handle Organization Metrics/Metro.
-    - Mange User Memberships (`JoinOrg`, `ListUserOrgs`).
+    - Manage User Memberships (`JoinOrg`, `ListUserOrgs`).
 - **Data:** `orgs`, `users_orgs`.
+
+### 4.7 Admin Service (`pkg/admin`)
+- **Responsibilities:**
+    - Approve "Request to Join".
+    - Adjust User Balances (Correction/Refund).
+    - Suspend/Block User Accounts.
+- **Data:** `join_requests`, `users_orgs`, `users`.
 
 ## 5. Data Flow Examples
 
@@ -115,14 +126,16 @@ graph TD
 4.  Service creates User, invalidates Token, returns JWT.
 
 ### 5.2 Rental Request & Ledger
-1.  Renter calls `RequestRental(toolId, dates)`.
+1.  Renter calls `CreateRentalRequest(toolId, dates)`.
 2.  Service creates Rental (Status: PENDING). Notifies Owner.
-3.  Owner calls `RespondRental(rentalId, ACCEPT)`.
-4.  Service updates Rental (Status: ACCEPTED). Notifies Renter.
-5.  ... Time passes ...
-6.  Owner calls `CompleteRental(rentalId)`.
-7.  Service updates Status: COMPLETED.
-8.  Service calls `Ledger.Transfer(Renter, Owner, Amount)`.
+3.  Owner calls `ApproveRentalRequest(rentalId, instructions)`.
+4.  Service updates Rental (Status: APPROVED). Notifies Renter.
+5.  Renter calls `FinalizeRentalRequest(rentalId)`.
+6.  Service updates Rental (Status: SCHEDULED/ACTIVE). Rental is now confirmed.
+7.  ... Time passes ...
+8.  Owner calls `CompleteRental(rentalId)`.
+9.  Service updates Status: COMPLETED.
+10. Service calls `Ledger.Transfer(Renter, Owner, Amount)`.
 
 ## 6. Security Considerations
 - **Trust Model:** App is strictly invite-only. High trust environment, but auth is still rigid.

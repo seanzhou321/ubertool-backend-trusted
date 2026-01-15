@@ -7,6 +7,7 @@ erDiagram
     ORGS {
         INT id PK
         TEXT name
+        TEXT description
         TEXT address
         TEXT metro
         TEXT admin_phone_number
@@ -30,7 +31,7 @@ erDiagram
         INT user_id PK,FK
         INT org_id PK,FK
         DATE joined_on
-        INT balance_credits
+        INT balance_cents
         TEXT status
         TEXT role
     }
@@ -58,10 +59,12 @@ erDiagram
         INT id PK
         INT owner_id FK
         TEXT name
-        TEXT info
-        TEXT category
-        INT rental_price
-        INT replacement_price
+        TEXT description
+        TEXT[] categories
+        INT price_per_day_cents
+        INT price_per_week_cents
+        INT price_per_month_cents
+        INT replacement_cost_cents
         TEXT duration_unit
         TEXT condition
         TEXT metro
@@ -85,7 +88,7 @@ erDiagram
         DATE start_date
         DATE scheduled_end_date
         DATE end_date
-        INT total_cost_credits
+        INT total_cost_cents
         TEXT status
         DATE created_on
         DATE updated_on
@@ -99,6 +102,17 @@ erDiagram
         TEXT type
         INT related_rental_id FK
         DATE charged_on
+        DATE created_on
+    }
+
+    NOTIFICATIONS {
+        INT id PK
+        INT user_id FK
+        INT org_id FK
+        TEXT title
+        TEXT message
+        BOOLEAN is_read
+        JSONB attributes
         DATE created_on
     }
 
@@ -118,4 +132,7 @@ erDiagram
     TOOLS ||--o{ RENTALS : "is rented in"
     
     RENTALS ||--o{ LEDGER_TRANSACTIONS : "triggers"
+    
+    USERS ||--o{ NOTIFICATIONS : receives
+    ORGS ||--o{ NOTIFICATIONS : "context for"
 ```
