@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package ubertool.trusted.api.v1;
 
+option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
+
+
 import "ubertool_trusted_backend/v1/user_service.proto";
 import "ubertool_trusted_backend/v1/organization_service.proto";
 

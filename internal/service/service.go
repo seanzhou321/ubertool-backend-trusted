@@ -1,0 +1,63 @@
+package service
+
+import (
+	"context"
+	"ubertool-backend-trusted/internal/domain"
+)
+
+type AuthService interface {
+	ValidateInvite(ctx context.Context, token string) (*domain.Invitation, error)
+	RequestToJoin(ctx context.Context, orgID int32, name, email, note string) error
+	Signup(ctx context.Context, inviteToken, name, email, phone, password string) (*domain.User, string, string, error)
+	Login(ctx context.Context, email, password string) (string, string, error)
+	Verify2FA(ctx context.Context, email, code string) (string, string, error)
+	RefreshToken(ctx context.Context, refresh string) (string, string, error)
+	Logout(ctx context.Context, refresh string) error
+}
+
+type UserService interface {
+	GetUserProfile(ctx context.Context, userID int32) (*domain.User, []domain.UserOrg, error)
+	UpdateProfile(ctx context.Context, userID int32, name, avatarURL string) error
+}
+
+type OrganizationService interface {
+	ListOrganizations(ctx context.Context) ([]domain.Organization, error)
+	GetOrganization(ctx context.Context, id int32) (*domain.Organization, error)
+	SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error)
+}
+
+type ToolService interface {
+	AddTool(ctx context.Context, tool *domain.Tool, images []string) error
+	GetTool(ctx context.Context, id int32) (*domain.Tool, []domain.ToolImage, error)
+	UpdateTool(ctx context.Context, tool *domain.Tool) error
+	DeleteTool(ctx context.Context, id int32) error
+	ListTools(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error)
+	SearchTools(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
+	ListCategories(ctx context.Context) ([]string, error)
+}
+
+type RentalService interface {
+	CreateRentalRequest(ctx context.Context, renterID, toolID, orgID int32, startDate, endDate string) (*domain.Rental, error)
+	ApproveRentalRequest(ctx context.Context, ownerID, rentalID int32, pickupNote string) error
+	RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) error
+	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) error
+	CompleteRental(ctx context.Context, ownerID, rentalID int32) error
+	ListRentals(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
+	ListLendings(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
+}
+
+type LedgerService interface {
+	GetBalance(ctx context.Context, userID, orgID int32) (int32, error)
+	GetTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error)
+}
+
+type NotificationService interface {
+	GetNotifications(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Notification, int32, error)
+	MarkAsRead(ctx context.Context, userID, notificationID int32) error
+}
+
+type AdminService interface {
+	ApproveJoinRequest(ctx context.Context, adminID, requestID int32) error
+	AdjustBalance(ctx context.Context, adminID, userID, orgID, amount int32, reason string) error
+	BlockUser(ctx context.Context, adminID, userID, orgID int32) error
+}

@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package ubertool.trusted.api.v1;
 
+option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
+
+
 option java_multiple_files = true;
 option java_package = "com.ubertool.trusted.api.v1";
 option java_outer_classname = "ToolServiceProto";

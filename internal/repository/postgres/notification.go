@@ -1,0 +1,69 @@
+package postgres
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"time"
+
+	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/repository"
+)
+
+type notificationRepository struct {
+	db *sql.DB
+}
+
+func NewNotificationRepository(db *sql.DB) repository.NotificationRepository {
+	return &notificationRepository{db: db}
+}
+
+func (r *notificationRepository) Create(ctx context.Context, n *domain.Notification) error {
+	attrs, err := json.Marshal(n.Attributes)
+	if err != nil {
+		return err
+	}
+
+	query := `INSERT INTO notifications (user_id, org_id, title, message, is_read, attributes, created_on) 
+	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	return r.db.QueryRowContext(ctx, query, n.UserID, n.OrgID, n.Title, n.Message, n.IsRead, attrs, time.Now()).Scan(&n.ID)
+}
+
+func (r *notificationRepository) List(ctx context.Context, userID int32, limit, offset int32) ([]domain.Notification, int32, error) {
+	query := `SELECT id, user_id, org_id, title, message, is_read, attributes, created_on 
+	          FROM notifications WHERE user_id = $1 ORDER BY created_on DESC LIMIT $2 OFFSET $3`
+	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var count int32
+	countQuery := `SELECT count(*) FROM notifications WHERE user_id = $1`
+	err = r.db.QueryRowContext(ctx, countQuery, userID).Scan(&count)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var notes []domain.Notification
+	for rows.Next() {
+		var n domain.Notification
+		var attrs []byte
+		if err := rows.Scan(&n.ID, &n.UserID, &n.OrgID, &n.Title, &n.Message, &n.IsRead, &attrs, &n.CreatedOn); err != nil {
+			return nil, 0, err
+		}
+		if len(attrs) > 0 {
+			if err := json.Unmarshal(attrs, &n.Attributes); err != nil {
+				return nil, 0, err
+			}
+		}
+		notes = append(notes, n)
+	}
+	return notes, count, nil
+}
+
+func (r *notificationRepository) MarkAsRead(ctx context.Context, id, userID int32) error {
+	query := `UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2`
+	_, err := r.db.ExecContext(ctx, query, id, userID)
+	return err
+}
