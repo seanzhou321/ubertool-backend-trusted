@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package ubertool.trusted.api.v1;
+
+import "ubertool_trusted_backend/v1/user_service.proto";
+import "ubertool_trusted_backend/v1/organization_service.proto";
+
+option java_multiple_files = true;
+option java_package = "com.ubertool.trusted.api.v1";
+option java_outer_classname = "AuthServiceProto";
+
+// Authentication service
+service AuthService {
+  // Validate invitation code before signup
+  // No access_token required
+  rpc ValidateInvite(ValidateInviteRequest) returns (ValidateInviteResponse);
+
+  // Request to join organization
+  // No access_token required
+  rpc RequestToJoinOrganization(RequestToJoinRequest) returns (RequestToJoinResponse);
+
+  // User register after invitation and signup an organization
+  // No access_token required
+  rpc UserSignup(SignupRequest) returns (SignupResponse);
+
+  // Login with email and password
+  // No access_token required
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // Verify 2FA code
+  // No access_token required
+  rpc Verify2FA(Verify2FARequest) returns (Verify2FAResponse);
+
+  // Refresh access token
+  // No access_token required
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+
+  // Logout
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+}
+
+// Validate invitation request
+message ValidateInviteRequest {
+  string invitation_code = 1;
+  string email = 2;
+}
+
+// Validate invitation response
+message ValidateInviteResponse {
+  bool valid = 1;
+}
+
+// Login request
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+// Login response
+message LoginResponse {
+  string session_id = 1;
+  bool requires_2fa = 2;
+}
+
+// 2FA verification request
+message Verify2FARequest {
+  string session_id = 1;
+  string code = 2;
+}
+
+// 2FA verification response
+message Verify2FAResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  User user = 3;
+}
+
+// Signup request
+message SignupRequest {
+  string invitation_code = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  string password = 5;
+}
+
+// Signup response
+message SignupResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  User user = 3;
+}
+
+// Refresh token request
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// Refresh token response
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+// Logout request
+message LogoutRequest {
+  int32 user_id = 1;
+}
+
+// Logout response
+message LogoutResponse {
+  bool success = 1;
+}
+
+// Request to join request
+message RequestToJoinRequest {
+  int32 organization_id = 1;
+  string name = 2;
+  string email = 3;
+  string message = 4;
+}
+
+// Request to join response
+message RequestToJoinResponse {
+  bool success = 1;
+  string message = 2;
+}
+

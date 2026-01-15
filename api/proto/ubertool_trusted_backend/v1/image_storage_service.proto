@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package ubertool.trusted.api.v1;
+
+option java_multiple_files = true;
+option java_package = "com.ubertool.trusted.api.v1";
+option java_outer_classname = "ImageStorageServiceProto";
+
+// Image storage service for uploading tool images and avatars
+service ImageStorageService {
+  // Get a presigned upload URL for image upload
+  rpc GetUploadUrl(GetUploadUrlRequest) returns (GetUploadUrlResponse);
+}
+
+// Get upload URL request
+message GetUploadUrlRequest {
+  string filename = 1;
+  string content_type = 2;
+}
+
+// Get upload URL response
+message GetUploadUrlResponse {
+  string upload_url = 1;
+  string download_url = 2;
+}
+

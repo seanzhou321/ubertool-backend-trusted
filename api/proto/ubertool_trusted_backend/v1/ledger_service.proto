@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package ubertool.trusted.api.v1;
+
+option java_multiple_files = true;
+option java_package = "com.ubertool.trusted.api.v1";
+option java_outer_classname = "LedgerServiceProto";
+
+// Ledger service
+service LedgerService {
+  // Get user balance in an organization
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+
+  // Get transaction history
+  rpc GetTransactions(GetTransactionsRequest) returns (GetTransactionsResponse);
+
+  // Get ledger summary for dashboard
+  rpc GetLedgerSummary(GetLedgerSummaryRequest) returns (GetLedgerSummaryResponse);
+}
+
+// Get balance request
+message GetBalanceRequest {
+  int32 user_id = 1;
+  int32 organization_id = 2;
+}
+
+// Get balance response
+message GetBalanceResponse {
+  int32 balance = 1;
+  string last_updated_on = 2; // Date string YYYY-MM-DD
+}
+
+// Get transactions request
+message GetTransactionsRequest {
+  int32 user_id = 1;
+  int32 organization_id = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// Get transactions response
+message GetTransactionsResponse {
+  repeated Transaction transactions = 1;
+  int32 total_count = 2;
+}
+
+// Get ledger summary request
+message GetLedgerSummaryRequest {
+  int32 user_id = 1;
+  int32 organization_id = 2;
+}
+
+// Get ledger summary response
+message GetLedgerSummaryResponse {
+  int32 balance = 1;
+  repeated Transaction recent_transactions = 2;
+  int32 active_rentals_count = 3;
+  int32 active_lendings_count = 4;
+  int32 pending_requests_count = 5;
+}
+
+// Transaction message
+message Transaction {
+  int32 id = 1;
+  int32 user_id = 2;
+  int32 organization_id = 3;
+  int32 amount = 4; // positive for credit, negative for debit
+  TransactionType type = 5;
+  int32 related_rental_id = 6;
+  string description = 7;
+  string charged_on = 8; // Date string YYYY-MM-DD
+}
+
+// Transaction type enum
+enum TransactionType {
+  TRANSACTION_TYPE_UNSPECIFIED = 0;
+  TRANSACTION_TYPE_RENTAL_DEBIT = 1;
+  TRANSACTION_TYPE_LENDING_CREDIT = 2;
+  TRANSACTION_TYPE_REFUND = 3;
+  TRANSACTION_TYPE_ADJUSTMENT = 4;
+}
+

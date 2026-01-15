@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package ubertool.trusted.api.v1;
+
+option java_multiple_files = true;
+option java_package = "com.ubertool.trusted.api.v1";
+option java_outer_classname = "AdminServiceProto";
+
+// Ledger service
+service AdminService {
+  // Approve request
+  rpc ApproveRequestToJoin(ApproveRequestToJoinRequest) returns (ApproveRequestToJoinResponse);
+
+  // Admin: Adjust user balance
+  // configurable service. default=inactive
+  rpc AdminAdjustBalance(AdminAdjustBalanceRequest) returns (AdminAdjustBalanceResponse);
+
+  // Admin: Suspend user account
+  rpc AdminBlockUserAccount(AdminBlockUserAccountRequest) returns (AdminBlockUserAccountResponse);
+}
+
+message ApproveRequestToJoinRequest {
+  int32 user_id = 1;
+  int32 organization_id = 2;
+  string applicant_email = 3;
+  string applicant_name = 4;
+}
+
+message ApproveRequestToJoinResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Admin adjust balance request
+message AdminAdjustBalanceRequest {
+  int32 user_id = 1;
+  int32 organization_id = 2;
+  int32 amount = 3; // Amount in cents (positive for credit, negative for debit)
+  string reason = 4;
+}
+
+// Admin adjust balance response
+message AdminAdjustBalanceResponse {
+  int32 new_balance = 1; // New balance in cents
+}
+
+message AdminBlockUserAccountRequest {
+  int32 user_id = 1;
+  int32 organization_id = 2;
+  string reason = 3;
+}
+
+message AdminBlockUserAccountResponse {
+  bool success = 1;
+  string error_message = 2;
+}

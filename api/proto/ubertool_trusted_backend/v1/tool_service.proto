@@ -1,0 +1,173 @@
+syntax = "proto3";
+
+package ubertool.trusted.api.v1;
+
+option java_multiple_files = true;
+option java_package = "com.ubertool.trusted.api.v1";
+option java_outer_classname = "ToolServiceProto";
+
+// Tool service
+service ToolService {
+  // List tools in an organization
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+
+  // Get tool details
+  rpc GetTool(GetToolRequest) returns (GetToolResponse);
+
+  // Add a new tool
+  rpc AddTool(AddToolRequest) returns (AddToolResponse);
+
+  // Update tool
+  rpc UpdateTool(UpdateToolRequest) returns (UpdateToolResponse);
+
+  // Delete tool
+  rpc DeleteTool(DeleteToolRequest) returns (DeleteToolResponse);
+
+  // Search tools
+  rpc SearchTools(SearchToolsRequest) returns (SearchToolsResponse);
+
+  // Get tool categories (returns all categories used in the system)
+  rpc ListToolCategories(ListToolCategoriesRequest) returns (ListToolCategoriesResponse);
+}
+
+// List tools request
+message ListToolsRequest {
+  int32 organization_id = 1;
+  int32 user_id = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// List tools response
+message ListToolsResponse {
+  repeated Tool tools = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// Get tool request
+message GetToolRequest {
+  int32 tool_id = 1;
+}
+
+// Get tool response
+message GetToolResponse {
+  Tool tool = 1;
+}
+
+// Add tool request
+message AddToolRequest {
+  int32 user_id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string categories = 4;
+  // Prices stored as cents (int32 max = $21M, requirement max = $1000)
+  int32 price_per_day_cents = 5;
+  int32 price_per_week_cents = 6;
+  int32 price_per_month_cents = 7;
+  int32 replacement_cost_cents = 8;
+  ToolCondition condition = 9;
+  string image_url = 10;
+}
+
+// Add tool response
+message AddToolResponse {
+  Tool tool = 1;
+}
+
+// Update tool request
+message UpdateToolRequest {
+  int32 tool_id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string categories = 4;
+  // Prices stored as cents (int32 max = $21M, requirement max = $1000)
+  int32 price_per_day_cents = 5;
+  int32 price_per_week_cents = 6;
+  int32 price_per_month_cents = 7;
+  int32 replacement_cost_cents = 8;
+  ToolCondition condition = 9;
+  string image_url = 10;
+}
+
+// Update tool response
+message UpdateToolResponse {
+  Tool tool = 1;
+}
+
+// Delete tool request
+message DeleteToolRequest {
+  int32 tool_id = 1;
+}
+
+// Delete tool response
+message DeleteToolResponse {
+  bool success = 1;
+}
+
+// Search tools request
+message SearchToolsRequest {
+  int32 organization_id = 1;
+  string query = 2;
+  repeated string categories = 3;
+  int32 max_price = 4;
+  ToolCondition condition = 5;
+  int32 page = 6;
+  int32 page_size = 7;
+}
+
+// Search tools response
+message SearchToolsResponse {
+  repeated Tool tools = 1;
+  int32 total_count = 2;
+}
+
+// Tool message
+message Tool {
+  int32 id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string categories = 4;
+  // Prices stored as cents (e.g., 550 = 5.50 credits)
+  // int32 supports up to $21 million (more than enough for max $1000)
+  int32 price_per_day_cents = 5;
+  int32 price_per_week_cents = 6;
+  int32 price_per_month_cents = 7;
+  int32 replacement_cost_cents = 8;
+  ToolCondition condition = 9;
+  int32 owner_id = 10;
+  string owner_name = 11;
+  ToolStatus status = 12;
+  string metro = 14;
+  repeated string image_url = 15;
+  string created_on = 16; // Date string YYYY-MM-DD
+  string updated_on = 17; // Date string YYYY-MM-DD
+}
+
+// Tool condition enum
+enum ToolCondition {
+  TOOL_CONDITION_UNSPECIFIED = 0;
+  TOOL_CONDITION_EXCELLENT = 1;
+  TOOL_CONDITION_GOOD = 2;
+  TOOL_CONDITION_ACCEPTABLE = 3;
+  TOOL_CONDITION_DAMAGED__NEEDS_REPAIR = 4;
+}
+
+enum ToolStatus {
+  TOOL_STATUS_UNSPECIFIED = 0;
+  TOOL_STATUS_AVAILABLE = 1; // Not rented
+  TOOL_STATUS_UNAVAILABLE = 2;  // Not available for rent
+  TOOL_STATUS_RENTED = 3;  // rented to a user now and/or scheduled to be rented later
+}
+
+// List tool categories request (no parameters needed)
+message ListToolCategoriesRequest {
+  // Empty - no input parameters required
+  // Returns all categories currently used in the system
+}
+
+// List tool categories response
+message ListToolCategoriesResponse {
+  repeated string categories = 1;  // All unique categories from user-created tools
+}
