@@ -1,0 +1,7 @@
+FROM postgres:15
+
+# Copy schema file to initialization directory
+COPY ubertool_schema_trusted.sql /docker-entrypoint-initdb.d/
+
+# Expose postgres port
+EXPOSE 5432

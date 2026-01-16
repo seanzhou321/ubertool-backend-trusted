@@ -24,7 +24,7 @@ func (h *RentalHandler) CreateRentalRequest(ctx context.Context, req *pb.CreateR
 	if err != nil {
 		return nil, err
 	}
-	return &pb.CreateRentalRequestResponse{RentalRequest: mapDomainRentalToProto(rt)}, nil
+	return &pb.CreateRentalRequestResponse{RentalRequest: MapDomainRentalToProto(rt)}, nil
 }
 
 func (h *RentalHandler) ApproveRentalRequest(ctx context.Context, req *pb.ApproveRentalRequestRequest) (*pb.ApproveRentalRequestResponse, error) {
@@ -80,7 +80,7 @@ func (h *RentalHandler) ListMyRentals(ctx context.Context, req *pb.ListMyRentals
 	}
 	protoRentals := make([]*pb.RentalRequest, len(rentals))
 	for i, r := range rentals {
-		protoRentals[i] = mapDomainRentalToProto(&r)
+		protoRentals[i] = MapDomainRentalToProto(&r)
 	}
 	return &pb.ListRentalsResponse{
 		Rentals:    protoRentals,
@@ -97,7 +97,7 @@ func (h *RentalHandler) ListMyLendings(ctx context.Context, req *pb.ListMyLendin
 	}
 	protoRentals := make([]*pb.RentalRequest, len(rentals))
 	for i, r := range rentals {
-		protoRentals[i] = mapDomainRentalToProto(&r)
+		protoRentals[i] = MapDomainRentalToProto(&r)
 	}
 	return &pb.ListRentalsResponse{
 		Rentals:    protoRentals,

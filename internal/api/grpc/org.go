@@ -23,7 +23,7 @@ func (h *OrganizationHandler) ListMyOrganizations(ctx context.Context, req *pb.L
 	}
 	protoOrgs := make([]*pb.Organization, len(orgs))
 	for i, o := range orgs {
-		protoOrgs[i] = mapDomainOrgToProto(&o)
+		protoOrgs[i] = MapDomainOrgToProto(&o)
 	}
 	return &pb.ListOrganizationsResponse{Organizations: protoOrgs}, nil
 }
@@ -33,7 +33,7 @@ func (h *OrganizationHandler) GetOrganization(ctx context.Context, req *pb.GetOr
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetOrganizationResponse{Organization: mapDomainOrgToProto(org)}, nil
+	return &pb.GetOrganizationResponse{Organization: MapDomainOrgToProto(org)}, nil
 }
 
 func (h *OrganizationHandler) SearchOrganizations(ctx context.Context, req *pb.SearchOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {
@@ -43,7 +43,7 @@ func (h *OrganizationHandler) SearchOrganizations(ctx context.Context, req *pb.S
 	}
 	protoOrgs := make([]*pb.Organization, len(orgs))
 	for i, o := range orgs {
-		protoOrgs[i] = mapDomainOrgToProto(&o)
+		protoOrgs[i] = MapDomainOrgToProto(&o)
 	}
 	return &pb.ListOrganizationsResponse{Organizations: protoOrgs}, nil
 }

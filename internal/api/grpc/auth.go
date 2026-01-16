@@ -38,7 +38,7 @@ func (h *AuthHandler) UserSignup(ctx context.Context, req *pb.SignupRequest) (*p
 		return nil, err
 	}
 	return &pb.SignupResponse{
-		User:         mapDomainUserToProto(user),
+		User:         MapDomainUserToProto(user),
 		AccessToken:  access,
 		RefreshToken: refresh,
 	}, nil

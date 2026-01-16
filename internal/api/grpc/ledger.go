@@ -33,7 +33,7 @@ func (h *LedgerHandler) GetTransactions(ctx context.Context, req *pb.GetTransact
 	}
 	protoTxs := make([]*pb.Transaction, len(txs))
 	for i, t := range txs {
-		protoTxs[i] = mapDomainTransactionToProto(&t)
+		protoTxs[i] = MapDomainTransactionToProto(&t)
 	}
 	return &pb.GetTransactionsResponse{
 		Transactions: protoTxs,

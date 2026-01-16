@@ -27,7 +27,7 @@ func (h *NotificationHandler) GetNotifications(ctx context.Context, req *pb.GetN
 	}
 	protoNotes := make([]*pb.Notification, len(notes))
 	for i, n := range notes {
-		protoNotes[i] = mapDomainNotificationToProto(&n)
+		protoNotes[i] = MapDomainNotificationToProto(&n)
 	}
 	return &pb.GetNotificationsResponse{
 		Notifications: protoNotes,

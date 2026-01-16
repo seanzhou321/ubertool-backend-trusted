@@ -34,7 +34,7 @@ func (h *ToolHandler) AddTool(ctx context.Context, req *pb.AddToolRequest) (*pb.
 	if err != nil {
 		return nil, err
 	}
-	return &pb.AddToolResponse{Tool: mapDomainToolToProto(tool)}, nil
+	return &pb.AddToolResponse{Tool: MapDomainToolToProto(tool)}, nil
 }
 
 func (h *ToolHandler) GetTool(ctx context.Context, req *pb.GetToolRequest) (*pb.GetToolResponse, error) {
@@ -43,7 +43,7 @@ func (h *ToolHandler) GetTool(ctx context.Context, req *pb.GetToolRequest) (*pb.
 		return nil, err
 	}
 	return &pb.GetToolResponse{
-		Tool: mapDomainToolToProto(tool),
+		Tool: MapDomainToolToProto(tool),
 	}, nil
 }
 
@@ -63,7 +63,7 @@ func (h *ToolHandler) UpdateTool(ctx context.Context, req *pb.UpdateToolRequest)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.UpdateToolResponse{Tool: mapDomainToolToProto(tool)}, nil
+	return &pb.UpdateToolResponse{Tool: MapDomainToolToProto(tool)}, nil
 }
 
 func (h *ToolHandler) DeleteTool(ctx context.Context, req *pb.DeleteToolRequest) (*pb.DeleteToolResponse, error) {
@@ -81,7 +81,7 @@ func (h *ToolHandler) ListTools(ctx context.Context, req *pb.ListToolsRequest) (
 	}
 	protoTools := make([]*pb.Tool, len(tools))
 	for i, t := range tools {
-		protoTools[i] = mapDomainToolToProto(&t)
+		protoTools[i] = MapDomainToolToProto(&t)
 	}
 	return &pb.ListToolsResponse{
 		Tools:      protoTools,
@@ -92,13 +92,13 @@ func (h *ToolHandler) ListTools(ctx context.Context, req *pb.ListToolsRequest) (
 }
 
 func (h *ToolHandler) SearchTools(ctx context.Context, req *pb.SearchToolsRequest) (*pb.SearchToolsResponse, error) {
-	tools, count, err := h.toolSvc.SearchTools(ctx, req.OrganizationId, req.Query, req.Categories, req.MaxPrice, string(req.Condition), req.Page, req.PageSize)
+	tools, count, err := h.toolSvc.SearchTools(ctx, req.OrganizationId, req.Query, req.Categories, req.MaxPrice, req.Condition.String(), req.Page, req.PageSize)
 	if err != nil {
 		return nil, err
 	}
 	protoTools := make([]*pb.Tool, len(tools))
 	for i, t := range tools {
-		protoTools[i] = mapDomainToolToProto(&t)
+		protoTools[i] = MapDomainToolToProto(&t)
 	}
 	return &pb.SearchToolsResponse{
 		Tools:      protoTools,

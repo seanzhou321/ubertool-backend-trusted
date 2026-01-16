@@ -5,7 +5,7 @@ import (
 	"ubertool-backend-trusted/internal/domain"
 )
 
-func mapDomainUserToProto(u *domain.User) *pb.User {
+func MapDomainUserToProto(u *domain.User) *pb.User {
 	if u == nil {
 		return nil
 	}
@@ -19,7 +19,7 @@ func mapDomainUserToProto(u *domain.User) *pb.User {
 	}
 }
 
-func mapDomainOrgToProto(o *domain.Organization) *pb.Organization {
+func MapDomainOrgToProto(o *domain.Organization) *pb.Organization {
 	if o == nil {
 		return nil
 	}
@@ -33,7 +33,7 @@ func mapDomainOrgToProto(o *domain.Organization) *pb.Organization {
 	}
 }
 
-func mapDomainToolToProto(t *domain.Tool) *pb.Tool {
+func MapDomainToolToProto(t *domain.Tool) *pb.Tool {
 	if t == nil {
 		return nil
 	}
@@ -47,15 +47,15 @@ func mapDomainToolToProto(t *domain.Tool) *pb.Tool {
 		PricePerWeekCents:   t.PricePerWeekCents,
 		PricePerMonthCents:  t.PricePerMonthCents,
 		ReplacementCostCents: t.ReplacementCostCents,
-		Condition:            mapDomainToolConditionToProto(t.Condition),
+		Condition:            MapDomainToolConditionToProto(t.Condition),
 		Metro:                t.Metro,
-		Status:               mapDomainToolStatusToProto(t.Status),
+		Status:               MapDomainToolStatusToProto(t.Status),
 		CreatedOn:            t.CreatedOn.Format("2006-01-02"),
 		UpdatedOn:            t.CreatedOn.Format("2006-01-02"),
 	}
 }
 
-func mapDomainToolConditionToProto(c domain.ToolCondition) pb.ToolCondition {
+func MapDomainToolConditionToProto(c domain.ToolCondition) pb.ToolCondition {
 	switch c {
 	case domain.ToolConditionExcellent:
 		return pb.ToolCondition_TOOL_CONDITION_EXCELLENT
@@ -70,7 +70,7 @@ func mapDomainToolConditionToProto(c domain.ToolCondition) pb.ToolCondition {
 	}
 }
 
-func mapDomainToolStatusToProto(s domain.ToolStatus) pb.ToolStatus {
+func MapDomainToolStatusToProto(s domain.ToolStatus) pb.ToolStatus {
 	switch s {
 	case domain.ToolStatusAvailable:
 		return pb.ToolStatus_TOOL_STATUS_AVAILABLE
@@ -83,7 +83,7 @@ func mapDomainToolStatusToProto(s domain.ToolStatus) pb.ToolStatus {
 	}
 }
 
-func mapDomainRentalToProto(r *domain.Rental) *pb.RentalRequest {
+func MapDomainRentalToProto(r *domain.Rental) *pb.RentalRequest {
 	if r == nil {
 		return nil
 	}
@@ -96,7 +96,7 @@ func mapDomainRentalToProto(r *domain.Rental) *pb.RentalRequest {
 		StartDate:          r.StartDate.Format("2006-01-02"),
 		EndDate:            r.ScheduledEndDate.Format("2006-01-02"),
 		TotalCost:          r.TotalCostCents,
-		Status:             mapDomainRentalStatusToProto(r.Status),
+		Status:             MapDomainRentalStatusToProto(r.Status),
 		PickupInstructions: r.PickupNote,
 		CreatedOn:          r.CreatedOn.Format("2006-01-02"),
 		UpdatedOn:          r.UpdatedOn.Format("2006-01-02"),
@@ -104,7 +104,7 @@ func mapDomainRentalToProto(r *domain.Rental) *pb.RentalRequest {
 	return proto
 }
 
-func mapDomainRentalStatusToProto(s domain.RentalStatus) pb.RentalStatus {
+func MapDomainRentalStatusToProto(s domain.RentalStatus) pb.RentalStatus {
 	switch s {
 	case domain.RentalStatusPending:
 		return pb.RentalStatus_RENTAL_STATUS_PENDING
@@ -123,7 +123,7 @@ func mapDomainRentalStatusToProto(s domain.RentalStatus) pb.RentalStatus {
 	}
 }
 
-func mapDomainTransactionToProto(t *domain.LedgerTransaction) *pb.Transaction {
+func MapDomainTransactionToProto(t *domain.LedgerTransaction) *pb.Transaction {
 	if t == nil {
 		return nil
 	}
@@ -132,7 +132,7 @@ func mapDomainTransactionToProto(t *domain.LedgerTransaction) *pb.Transaction {
 		OrganizationId: t.OrgID,
 		UserId:         t.UserID,
 		Amount:         t.Amount,
-		Type:           mapDomainTransactionTypeToProto(t.Type),
+		Type:           MapDomainTransactionTypeToProto(t.Type),
 		Description:    t.Description,
 		ChargedOn:      t.ChargedOn.Format("2006-01-02"),
 	}
@@ -142,7 +142,7 @@ func mapDomainTransactionToProto(t *domain.LedgerTransaction) *pb.Transaction {
 	return proto
 }
 
-func mapDomainTransactionTypeToProto(t domain.TransactionType) pb.TransactionType {
+func MapDomainTransactionTypeToProto(t domain.TransactionType) pb.TransactionType {
 	switch t {
 	case domain.TransactionTypeRentalDebit:
 		return pb.TransactionType_TRANSACTION_TYPE_RENTAL_DEBIT
@@ -157,7 +157,7 @@ func mapDomainTransactionTypeToProto(t domain.TransactionType) pb.TransactionTyp
 	}
 }
 
-func mapDomainNotificationToProto(n *domain.Notification) *pb.Notification {
+func MapDomainNotificationToProto(n *domain.Notification) *pb.Notification {
 	if n == nil {
 		return nil
 	}

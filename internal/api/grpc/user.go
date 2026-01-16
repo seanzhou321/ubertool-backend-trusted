@@ -28,7 +28,7 @@ func (h *UserHandler) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 	}
 
 	return &pb.GetUserResponse{
-		User: mapDomainUserToProto(user),
+		User: MapDomainUserToProto(user),
 	}, nil
 }
 
@@ -42,5 +42,5 @@ func (h *UserHandler) UpdateProfile(ctx context.Context, req *pb.UpdateProfileRe
 	if err != nil {
 		return nil, err
 	}
-	return &pb.UpdateProfileResponse{User: mapDomainUserToProto(user)}, nil
+	return &pb.UpdateProfileResponse{User: MapDomainUserToProto(user)}, nil
 }
