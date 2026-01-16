@@ -14,12 +14,17 @@ service AdminService {
   // Approve request
   rpc ApproveRequestToJoin(ApproveRequestToJoinRequest) returns (ApproveRequestToJoinResponse);
 
-  // Admin: Adjust user balance
-  // configurable service. default=inactive
-  rpc AdminAdjustBalance(AdminAdjustBalanceRequest) returns (AdminAdjustBalanceResponse);
-
   // Admin: Suspend user account
   rpc AdminBlockUserAccount(AdminBlockUserAccountRequest) returns (AdminBlockUserAccountResponse);
+
+  // Admin: List all members of an organization
+  rpc ListMembers(ListMembersRequest) returns (ListMembersResponse);
+
+  // Admin: Search users within an organization
+  rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);
+
+  // Admin: List pending join requests
+  rpc ListJoinRequests(ListJoinRequestsRequest) returns (ListJoinRequestsResponse);
 }
 
 message ApproveRequestToJoinRequest {
@@ -34,19 +39,6 @@ message ApproveRequestToJoinResponse {
   string message = 2;
 }
 
-// Admin adjust balance request
-message AdminAdjustBalanceRequest {
-  int32 user_id = 1;
-  int32 organization_id = 2;
-  int32 amount = 3; // Amount in cents (positive for credit, negative for debit)
-  string reason = 4;
-}
-
-// Admin adjust balance response
-message AdminAdjustBalanceResponse {
-  int32 new_balance = 1; // New balance in cents
-}
-
 message AdminBlockUserAccountRequest {
   int32 user_id = 1;
   int32 organization_id = 2;
@@ -56,4 +48,49 @@ message AdminBlockUserAccountRequest {
 message AdminBlockUserAccountResponse {
   bool success = 1;
   string error_message = 2;
+}
+
+message ListMembersRequest {
+  int32 organization_id = 1;
+}
+
+message MemberProfile {
+  int32 user_id = 1;
+  string name = 2;
+  string email = 3;
+  int32 balance = 4;
+  string member_since = 5;
+  bool is_blocked = 6;
+  string blocked_date = 7;
+  string block_reason = 8;
+}
+
+message ListMembersResponse {
+  repeated MemberProfile members = 1;
+}
+
+message SearchUsersRequest {
+  int32 organization_id = 1;
+  string query = 2;
+}
+
+message SearchUsersResponse {
+  repeated MemberProfile users = 1;
+}
+
+message ListJoinRequestsRequest {
+  int32 organization_id = 1;
+}
+
+message JoinRequestProfile {
+  int32 request_id = 1;
+  int32 user_id = 2; // Added user_id
+  string name = 3;
+  string email = 4;
+  string message = 5;
+  string request_date = 6;
+}
+
+message ListJoinRequestsResponse {
+  repeated JoinRequestProfile requests = 1;
 }

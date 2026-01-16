@@ -18,15 +18,15 @@ func NewJoinRequestRepository(db *sql.DB) repository.JoinRequestRepository {
 }
 
 func (r *joinRequestRepository) Create(ctx context.Context, req *domain.JoinRequest) error {
-	query := `INSERT INTO join_requests (org_id, name, email, note, status, created_on) 
-	          VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
-	return r.db.QueryRowContext(ctx, query, req.OrgID, req.Name, req.Email, req.Note, req.Status, time.Now()).Scan(&req.ID)
+	query := `INSERT INTO join_requests (org_id, user_id, name, email, note, status, created_on) 
+	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	return r.db.QueryRowContext(ctx, query, req.OrgID, req.UserID, req.Name, req.Email, req.Note, req.Status, time.Now()).Scan(&req.ID)
 }
 
 func (r *joinRequestRepository) GetByID(ctx context.Context, id int32) (*domain.JoinRequest, error) {
 	req := &domain.JoinRequest{}
-	query := `SELECT id, org_id, name, email, note, status, created_on FROM join_requests WHERE id = $1`
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&req.ID, &req.OrgID, &req.Name, &req.Email, &req.Note, &req.Status, &req.CreatedOn)
+	query := `SELECT id, org_id, user_id, name, email, note, status, created_on FROM join_requests WHERE id = $1`
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &req.CreatedOn)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (r *joinRequestRepository) Update(ctx context.Context, req *domain.JoinRequ
 }
 
 func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]domain.JoinRequest, error) {
-	query := `SELECT id, org_id, name, email, note, status, created_on FROM join_requests WHERE org_id = $1`
+	query := `SELECT id, org_id, user_id, name, email, note, status, created_on FROM join_requests WHERE org_id = $1`
 	rows, err := r.db.QueryContext(ctx, query, orgID)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]d
 	var reqs []domain.JoinRequest
 	for rows.Next() {
 		var req domain.JoinRequest
-		if err := rows.Scan(&req.ID, &req.OrgID, &req.Name, &req.Email, &req.Note, &req.Status, &req.CreatedOn); err != nil {
+		if err := rows.Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &req.CreatedOn); err != nil {
 			return nil, err
 		}
 		reqs = append(reqs, req)

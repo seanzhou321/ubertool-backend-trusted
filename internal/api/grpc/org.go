@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pb "ubertool-backend-trusted/api/gen/v1"
+	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
 )
 
@@ -46,4 +47,20 @@ func (h *OrganizationHandler) SearchOrganizations(ctx context.Context, req *pb.S
 		protoOrgs[i] = MapDomainOrgToProto(&o)
 	}
 	return &pb.ListOrganizationsResponse{Organizations: protoOrgs}, nil
+}
+func (h *OrganizationHandler) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {
+	org := &domain.Organization{
+		ID:               req.OrganizationId,
+		Name:             req.Name,
+		Description:      req.Description,
+		Address:          req.Address,
+		Metro:            req.Metro,
+		AdminEmail:       req.AdminEmail,
+		AdminPhoneNumber: req.AdminPhone,
+	}
+	err := h.orgSvc.UpdateOrganization(ctx, org)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.UpdateOrganizationResponse{Organization: MapDomainOrgToProto(org)}, nil
 }

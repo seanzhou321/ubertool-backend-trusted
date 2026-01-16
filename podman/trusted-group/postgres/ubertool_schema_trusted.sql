@@ -42,6 +42,8 @@ CREATE TABLE users_orgs (
     balance_cents INTEGER DEFAULT 0,
     status user_org_status_enum NOT NULL DEFAULT 'ACTIVE',
     role user_org_role_enum NOT NULL DEFAULT 'MEMBER',
+    blocked_date DATE,
+    block_reason TEXT,
     PRIMARY KEY (user_id, org_id)
 );
 
@@ -58,6 +60,7 @@ CREATE TABLE invitations (
 CREATE TABLE join_requests (
     id SERIAL PRIMARY KEY,
     org_id INTEGER REFERENCES orgs(id),
+    user_id INTEGER REFERENCES users(id),
     name TEXT NOT NULL,
     email TEXT NOT NULL,
     note TEXT,

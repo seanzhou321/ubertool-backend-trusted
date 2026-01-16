@@ -51,16 +51,16 @@ func (r *userRepository) Update(ctx context.Context, u *domain.User) error {
 }
 
 func (r *userRepository) AddUserToOrg(ctx context.Context, uo *domain.UserOrg) error {
-	query := `INSERT INTO users_orgs (user_id, org_id, joined_on, balance_cents, status, role) 
-	          VALUES ($1, $2, $3, $4, $5, $6)`
-	_, err := r.db.ExecContext(ctx, query, uo.UserID, uo.OrgID, time.Now(), uo.BalanceCents, uo.Status, uo.Role)
+	query := `INSERT INTO users_orgs (user_id, org_id, joined_on, balance_cents, status, role, blocked_date, block_reason) 
+	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+	_, err := r.db.ExecContext(ctx, query, uo.UserID, uo.OrgID, time.Now(), uo.BalanceCents, uo.Status, uo.Role, uo.BlockedDate, uo.BlockReason)
 	return err
 }
 
 func (r *userRepository) GetUserOrg(ctx context.Context, userID, orgID int32) (*domain.UserOrg, error) {
 	uo := &domain.UserOrg{}
-	query := `SELECT user_id, org_id, joined_on, balance_cents, status, role FROM users_orgs WHERE user_id = $1 AND org_id = $2`
-	err := r.db.QueryRowContext(ctx, query, userID, orgID).Scan(&uo.UserID, &uo.OrgID, &uo.JoinedOn, &uo.BalanceCents, &uo.Status, &uo.Role)
+	query := `SELECT user_id, org_id, joined_on, balance_cents, status, role, blocked_date, block_reason FROM users_orgs WHERE user_id = $1 AND org_id = $2`
+	err := r.db.QueryRowContext(ctx, query, userID, orgID).Scan(&uo.UserID, &uo.OrgID, &uo.JoinedOn, &uo.BalanceCents, &uo.Status, &uo.Role, &uo.BlockedDate, &uo.BlockReason)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (r *userRepository) GetUserOrg(ctx context.Context, userID, orgID int32) (*
 }
 
 func (r *userRepository) ListUserOrgs(ctx context.Context, userID int32) ([]domain.UserOrg, error) {
-	query := `SELECT user_id, org_id, joined_on, balance_cents, status, role FROM users_orgs WHERE user_id = $1`
+	query := `SELECT user_id, org_id, joined_on, balance_cents, status, role, blocked_date, block_reason FROM users_orgs WHERE user_id = $1`
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (r *userRepository) ListUserOrgs(ctx context.Context, userID int32) ([]doma
 	var orgs []domain.UserOrg
 	for rows.Next() {
 		var uo domain.UserOrg
-		if err := rows.Scan(&uo.UserID, &uo.OrgID, &uo.JoinedOn, &uo.BalanceCents, &uo.Status, &uo.Role); err != nil {
+		if err := rows.Scan(&uo.UserID, &uo.OrgID, &uo.JoinedOn, &uo.BalanceCents, &uo.Status, &uo.Role, &uo.BlockedDate, &uo.BlockReason); err != nil {
 			return nil, err
 		}
 		orgs = append(orgs, uo)
@@ -87,7 +87,67 @@ func (r *userRepository) ListUserOrgs(ctx context.Context, userID int32) ([]doma
 }
 
 func (r *userRepository) UpdateUserOrg(ctx context.Context, uo *domain.UserOrg) error {
-	query := `UPDATE users_orgs SET balance_cents=$1, status=$2, role=$3 WHERE user_id=$4 AND org_id=$5`
-	_, err := r.db.ExecContext(ctx, query, uo.BalanceCents, uo.Status, uo.Role, uo.UserID, uo.OrgID)
+	query := `UPDATE users_orgs SET balance_cents=$1, status=$2, role=$3, blocked_date=$4, block_reason=$5 WHERE user_id=$6 AND org_id=$7`
+	_, err := r.db.ExecContext(ctx, query, uo.BalanceCents, uo.Status, uo.Role, uo.BlockedDate, uo.BlockReason, uo.UserID, uo.OrgID)
 	return err
+}
+
+func (r *userRepository) ListMembersByOrg(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error) {
+	query := `SELECT u.id, u.email, u.phone_number, u.password_hash, u.name, u.avatar_url, u.created_on, u.updated_on,
+	                 uo.user_id, uo.org_id, uo.joined_on, uo.balance_cents, uo.status, uo.role, uo.blocked_date, uo.block_reason
+	          FROM users u
+	          JOIN users_orgs uo ON u.id = uo.user_id
+	          WHERE uo.org_id = $1`
+	rows, err := r.db.QueryContext(ctx, query, orgID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var users []domain.User
+	var uos []domain.UserOrg
+	for rows.Next() {
+		var u domain.User
+		var uo domain.UserOrg
+		err := rows.Scan(
+			&u.ID, &u.Email, &u.PhoneNumber, &u.PasswordHash, &u.Name, &u.AvatarURL, &u.CreatedOn, &u.UpdatedOn,
+			&uo.UserID, &uo.OrgID, &uo.JoinedOn, &uo.BalanceCents, &uo.Status, &uo.Role, &uo.BlockedDate, &uo.BlockReason,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		users = append(users, u)
+		uos = append(uos, uo)
+	}
+	return users, uos, nil
+}
+
+func (r *userRepository) SearchMembersByOrg(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error) {
+	sqlQuery := `SELECT u.id, u.email, u.phone_number, u.password_hash, u.name, u.avatar_url, u.created_on, u.updated_on,
+	                 uo.user_id, uo.org_id, uo.joined_on, uo.balance_cents, uo.status, uo.role, uo.blocked_date, uo.block_reason
+	          FROM users u
+	          JOIN users_orgs uo ON u.id = uo.user_id
+	          WHERE uo.org_id = $1 AND (u.name ILIKE $2 OR u.email ILIKE $2)`
+	rows, err := r.db.QueryContext(ctx, sqlQuery, orgID, "%"+query+"%")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var users []domain.User
+	var uos []domain.UserOrg
+	for rows.Next() {
+		var u domain.User
+		var uo domain.UserOrg
+		err := rows.Scan(
+			&u.ID, &u.Email, &u.PhoneNumber, &u.PasswordHash, &u.Name, &u.AvatarURL, &u.CreatedOn, &u.UpdatedOn,
+			&uo.UserID, &uo.OrgID, &uo.JoinedOn, &uo.BalanceCents, &uo.Status, &uo.Role, &uo.BlockedDate, &uo.BlockReason,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		users = append(users, u)
+		uos = append(uos, uo)
+	}
+	return users, uos, nil
 }

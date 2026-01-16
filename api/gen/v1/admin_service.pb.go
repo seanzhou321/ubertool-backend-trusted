@@ -141,120 +141,6 @@ func (x *ApproveRequestToJoinResponse) GetMessage() string {
 	return ""
 }
 
-// Admin adjust balance request
-type AdminAdjustBalanceRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	Amount         int32                  `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"` // Amount in cents (positive for credit, negative for debit)
-	Reason         string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *AdminAdjustBalanceRequest) Reset() {
-	*x = AdminAdjustBalanceRequest{}
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AdminAdjustBalanceRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AdminAdjustBalanceRequest) ProtoMessage() {}
-
-func (x *AdminAdjustBalanceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AdminAdjustBalanceRequest.ProtoReflect.Descriptor instead.
-func (*AdminAdjustBalanceRequest) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *AdminAdjustBalanceRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
-}
-
-func (x *AdminAdjustBalanceRequest) GetOrganizationId() int32 {
-	if x != nil {
-		return x.OrganizationId
-	}
-	return 0
-}
-
-func (x *AdminAdjustBalanceRequest) GetAmount() int32 {
-	if x != nil {
-		return x.Amount
-	}
-	return 0
-}
-
-func (x *AdminAdjustBalanceRequest) GetReason() string {
-	if x != nil {
-		return x.Reason
-	}
-	return ""
-}
-
-// Admin adjust balance response
-type AdminAdjustBalanceResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	NewBalance    int32                  `protobuf:"varint,1,opt,name=new_balance,json=newBalance,proto3" json:"new_balance,omitempty"` // New balance in cents
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AdminAdjustBalanceResponse) Reset() {
-	*x = AdminAdjustBalanceResponse{}
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AdminAdjustBalanceResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AdminAdjustBalanceResponse) ProtoMessage() {}
-
-func (x *AdminAdjustBalanceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AdminAdjustBalanceResponse.ProtoReflect.Descriptor instead.
-func (*AdminAdjustBalanceResponse) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *AdminAdjustBalanceResponse) GetNewBalance() int32 {
-	if x != nil {
-		return x.NewBalance
-	}
-	return 0
-}
-
 type AdminBlockUserAccountRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	UserId         int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -266,7 +152,7 @@ type AdminBlockUserAccountRequest struct {
 
 func (x *AdminBlockUserAccountRequest) Reset() {
 	*x = AdminBlockUserAccountRequest{}
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[4]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -278,7 +164,7 @@ func (x *AdminBlockUserAccountRequest) String() string {
 func (*AdminBlockUserAccountRequest) ProtoMessage() {}
 
 func (x *AdminBlockUserAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[4]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -291,7 +177,7 @@ func (x *AdminBlockUserAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminBlockUserAccountRequest.ProtoReflect.Descriptor instead.
 func (*AdminBlockUserAccountRequest) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{4}
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AdminBlockUserAccountRequest) GetUserId() int32 {
@@ -325,7 +211,7 @@ type AdminBlockUserAccountResponse struct {
 
 func (x *AdminBlockUserAccountResponse) Reset() {
 	*x = AdminBlockUserAccountResponse{}
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[5]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -337,7 +223,7 @@ func (x *AdminBlockUserAccountResponse) String() string {
 func (*AdminBlockUserAccountResponse) ProtoMessage() {}
 
 func (x *AdminBlockUserAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[5]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -350,7 +236,7 @@ func (x *AdminBlockUserAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminBlockUserAccountResponse.ProtoReflect.Descriptor instead.
 func (*AdminBlockUserAccountResponse) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{5}
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AdminBlockUserAccountResponse) GetSuccess() bool {
@@ -367,6 +253,462 @@ func (x *AdminBlockUserAccountResponse) GetErrorMessage() string {
 	return ""
 }
 
+type ListMembersRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListMembersRequest) Reset() {
+	*x = ListMembersRequest{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersRequest) ProtoMessage() {}
+
+func (x *ListMembersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersRequest.ProtoReflect.Descriptor instead.
+func (*ListMembersRequest) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListMembersRequest) GetOrganizationId() int32 {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return 0
+}
+
+type MemberProfile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	Balance       int32                  `protobuf:"varint,4,opt,name=balance,proto3" json:"balance,omitempty"`
+	MemberSince   string                 `protobuf:"bytes,5,opt,name=member_since,json=memberSince,proto3" json:"member_since,omitempty"`
+	IsBlocked     bool                   `protobuf:"varint,6,opt,name=is_blocked,json=isBlocked,proto3" json:"is_blocked,omitempty"`
+	BlockedDate   string                 `protobuf:"bytes,7,opt,name=blocked_date,json=blockedDate,proto3" json:"blocked_date,omitempty"`
+	BlockReason   string                 `protobuf:"bytes,8,opt,name=block_reason,json=blockReason,proto3" json:"block_reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MemberProfile) Reset() {
+	*x = MemberProfile{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MemberProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MemberProfile) ProtoMessage() {}
+
+func (x *MemberProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MemberProfile.ProtoReflect.Descriptor instead.
+func (*MemberProfile) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *MemberProfile) GetUserId() int32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *MemberProfile) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetBalance() int32 {
+	if x != nil {
+		return x.Balance
+	}
+	return 0
+}
+
+func (x *MemberProfile) GetMemberSince() string {
+	if x != nil {
+		return x.MemberSince
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetIsBlocked() bool {
+	if x != nil {
+		return x.IsBlocked
+	}
+	return false
+}
+
+func (x *MemberProfile) GetBlockedDate() string {
+	if x != nil {
+		return x.BlockedDate
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetBlockReason() string {
+	if x != nil {
+		return x.BlockReason
+	}
+	return ""
+}
+
+type ListMembersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Members       []*MemberProfile       `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMembersResponse) Reset() {
+	*x = ListMembersResponse{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMembersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMembersResponse) ProtoMessage() {}
+
+func (x *ListMembersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMembersResponse.ProtoReflect.Descriptor instead.
+func (*ListMembersResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListMembersResponse) GetMembers() []*MemberProfile {
+	if x != nil {
+		return x.Members
+	}
+	return nil
+}
+
+type SearchUsersRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Query          string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SearchUsersRequest) Reset() {
+	*x = SearchUsersRequest{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchUsersRequest) ProtoMessage() {}
+
+func (x *SearchUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchUsersRequest.ProtoReflect.Descriptor instead.
+func (*SearchUsersRequest) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SearchUsersRequest) GetOrganizationId() int32 {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return 0
+}
+
+func (x *SearchUsersRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+type SearchUsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Users         []*MemberProfile       `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchUsersResponse) Reset() {
+	*x = SearchUsersResponse{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchUsersResponse) ProtoMessage() {}
+
+func (x *SearchUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchUsersResponse.ProtoReflect.Descriptor instead.
+func (*SearchUsersResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SearchUsersResponse) GetUsers() []*MemberProfile {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+type ListJoinRequestsRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListJoinRequestsRequest) Reset() {
+	*x = ListJoinRequestsRequest{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListJoinRequestsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListJoinRequestsRequest) ProtoMessage() {}
+
+func (x *ListJoinRequestsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListJoinRequestsRequest.ProtoReflect.Descriptor instead.
+func (*ListJoinRequestsRequest) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListJoinRequestsRequest) GetOrganizationId() int32 {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return 0
+}
+
+type JoinRequestProfile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     int32                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	UserId        int32                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Added user_id
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
+	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
+	RequestDate   string                 `protobuf:"bytes,6,opt,name=request_date,json=requestDate,proto3" json:"request_date,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *JoinRequestProfile) Reset() {
+	*x = JoinRequestProfile{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JoinRequestProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JoinRequestProfile) ProtoMessage() {}
+
+func (x *JoinRequestProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JoinRequestProfile.ProtoReflect.Descriptor instead.
+func (*JoinRequestProfile) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *JoinRequestProfile) GetRequestId() int32 {
+	if x != nil {
+		return x.RequestId
+	}
+	return 0
+}
+
+func (x *JoinRequestProfile) GetUserId() int32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *JoinRequestProfile) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *JoinRequestProfile) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *JoinRequestProfile) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *JoinRequestProfile) GetRequestDate() string {
+	if x != nil {
+		return x.RequestDate
+	}
+	return ""
+}
+
+type ListJoinRequestsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Requests      []*JoinRequestProfile  `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListJoinRequestsResponse) Reset() {
+	*x = ListJoinRequestsResponse{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListJoinRequestsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListJoinRequestsResponse) ProtoMessage() {}
+
+func (x *ListJoinRequestsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListJoinRequestsResponse.ProtoReflect.Descriptor instead.
+func (*ListJoinRequestsResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ListJoinRequestsResponse) GetRequests() []*JoinRequestProfile {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
+}
+
 var File_ubertool_trusted_backend_v1_admin_service_proto protoreflect.FileDescriptor
 
 const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
@@ -379,26 +721,51 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x0eapplicant_name\x18\x04 \x01(\tR\rapplicantName\"R\n" +
 	"\x1cApproveRequestToJoinResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x8d\x01\n" +
-	"\x19AdminAdjustBalanceRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12\x16\n" +
-	"\x06amount\x18\x03 \x01(\x05R\x06amount\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason\"=\n" +
-	"\x1aAdminAdjustBalanceResponse\x12\x1f\n" +
-	"\vnew_balance\x18\x01 \x01(\x05R\n" +
-	"newBalance\"x\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"x\n" +
 	"\x1cAdminBlockUserAccountRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\"^\n" +
 	"\x1dAdminBlockUserAccountResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage2\x9c\x03\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"=\n" +
+	"\x12ListMembersRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"\xf4\x01\n" +
+	"\rMemberProfile\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x18\n" +
+	"\abalance\x18\x04 \x01(\x05R\abalance\x12!\n" +
+	"\fmember_since\x18\x05 \x01(\tR\vmemberSince\x12\x1d\n" +
+	"\n" +
+	"is_blocked\x18\x06 \x01(\bR\tisBlocked\x12!\n" +
+	"\fblocked_date\x18\a \x01(\tR\vblockedDate\x12!\n" +
+	"\fblock_reason\x18\b \x01(\tR\vblockReason\"W\n" +
+	"\x13ListMembersResponse\x12@\n" +
+	"\amembers\x18\x01 \x03(\v2&.ubertool.trusted.api.v1.MemberProfileR\amembers\"S\n" +
+	"\x12SearchUsersRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12\x14\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\"S\n" +
+	"\x13SearchUsersResponse\x12<\n" +
+	"\x05users\x18\x01 \x03(\v2&.ubertool.trusted.api.v1.MemberProfileR\x05users\"B\n" +
+	"\x17ListJoinRequestsRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"\xb3\x01\n" +
+	"\x12JoinRequestProfile\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\x05R\trequestId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\x05R\x06userId\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\x12\x18\n" +
+	"\amessage\x18\x05 \x01(\tR\amessage\x12!\n" +
+	"\frequest_date\x18\x06 \x01(\tR\vrequestDate\"c\n" +
+	"\x18ListJoinRequestsResponse\x12G\n" +
+	"\brequests\x18\x01 \x03(\v2+.ubertool.trusted.api.v1.JoinRequestProfileR\brequests2\xea\x04\n" +
 	"\fAdminService\x12\x83\x01\n" +
-	"\x14ApproveRequestToJoin\x124.ubertool.trusted.api.v1.ApproveRequestToJoinRequest\x1a5.ubertool.trusted.api.v1.ApproveRequestToJoinResponse\x12}\n" +
-	"\x12AdminAdjustBalance\x122.ubertool.trusted.api.v1.AdminAdjustBalanceRequest\x1a3.ubertool.trusted.api.v1.AdminAdjustBalanceResponse\x12\x86\x01\n" +
-	"\x15AdminBlockUserAccount\x125.ubertool.trusted.api.v1.AdminBlockUserAccountRequest\x1a6.ubertool.trusted.api.v1.AdminBlockUserAccountResponseBc\n" +
+	"\x14ApproveRequestToJoin\x124.ubertool.trusted.api.v1.ApproveRequestToJoinRequest\x1a5.ubertool.trusted.api.v1.ApproveRequestToJoinResponse\x12\x86\x01\n" +
+	"\x15AdminBlockUserAccount\x125.ubertool.trusted.api.v1.AdminBlockUserAccountRequest\x1a6.ubertool.trusted.api.v1.AdminBlockUserAccountResponse\x12h\n" +
+	"\vListMembers\x12+.ubertool.trusted.api.v1.ListMembersRequest\x1a,.ubertool.trusted.api.v1.ListMembersResponse\x12h\n" +
+	"\vSearchUsers\x12+.ubertool.trusted.api.v1.SearchUsersRequest\x1a,.ubertool.trusted.api.v1.SearchUsersResponse\x12w\n" +
+	"\x10ListJoinRequests\x120.ubertool.trusted.api.v1.ListJoinRequestsRequest\x1a1.ubertool.trusted.api.v1.ListJoinRequestsResponseBc\n" +
 	"\x1bcom.ubertool.trusted.api.v1B\x11AdminServiceProtoP\x01Z/ubertool-backend-trusted/api/gen/v1;ubertool_v1b\x06proto3"
 
 var (
@@ -413,27 +780,40 @@ func file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP() []byte {
 	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescData
 }
 
-var file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_ubertool_trusted_backend_v1_admin_service_proto_goTypes = []any{
 	(*ApproveRequestToJoinRequest)(nil),   // 0: ubertool.trusted.api.v1.ApproveRequestToJoinRequest
 	(*ApproveRequestToJoinResponse)(nil),  // 1: ubertool.trusted.api.v1.ApproveRequestToJoinResponse
-	(*AdminAdjustBalanceRequest)(nil),     // 2: ubertool.trusted.api.v1.AdminAdjustBalanceRequest
-	(*AdminAdjustBalanceResponse)(nil),    // 3: ubertool.trusted.api.v1.AdminAdjustBalanceResponse
-	(*AdminBlockUserAccountRequest)(nil),  // 4: ubertool.trusted.api.v1.AdminBlockUserAccountRequest
-	(*AdminBlockUserAccountResponse)(nil), // 5: ubertool.trusted.api.v1.AdminBlockUserAccountResponse
+	(*AdminBlockUserAccountRequest)(nil),  // 2: ubertool.trusted.api.v1.AdminBlockUserAccountRequest
+	(*AdminBlockUserAccountResponse)(nil), // 3: ubertool.trusted.api.v1.AdminBlockUserAccountResponse
+	(*ListMembersRequest)(nil),            // 4: ubertool.trusted.api.v1.ListMembersRequest
+	(*MemberProfile)(nil),                 // 5: ubertool.trusted.api.v1.MemberProfile
+	(*ListMembersResponse)(nil),           // 6: ubertool.trusted.api.v1.ListMembersResponse
+	(*SearchUsersRequest)(nil),            // 7: ubertool.trusted.api.v1.SearchUsersRequest
+	(*SearchUsersResponse)(nil),           // 8: ubertool.trusted.api.v1.SearchUsersResponse
+	(*ListJoinRequestsRequest)(nil),       // 9: ubertool.trusted.api.v1.ListJoinRequestsRequest
+	(*JoinRequestProfile)(nil),            // 10: ubertool.trusted.api.v1.JoinRequestProfile
+	(*ListJoinRequestsResponse)(nil),      // 11: ubertool.trusted.api.v1.ListJoinRequestsResponse
 }
 var file_ubertool_trusted_backend_v1_admin_service_proto_depIdxs = []int32{
-	0, // 0: ubertool.trusted.api.v1.AdminService.ApproveRequestToJoin:input_type -> ubertool.trusted.api.v1.ApproveRequestToJoinRequest
-	2, // 1: ubertool.trusted.api.v1.AdminService.AdminAdjustBalance:input_type -> ubertool.trusted.api.v1.AdminAdjustBalanceRequest
-	4, // 2: ubertool.trusted.api.v1.AdminService.AdminBlockUserAccount:input_type -> ubertool.trusted.api.v1.AdminBlockUserAccountRequest
-	1, // 3: ubertool.trusted.api.v1.AdminService.ApproveRequestToJoin:output_type -> ubertool.trusted.api.v1.ApproveRequestToJoinResponse
-	3, // 4: ubertool.trusted.api.v1.AdminService.AdminAdjustBalance:output_type -> ubertool.trusted.api.v1.AdminAdjustBalanceResponse
-	5, // 5: ubertool.trusted.api.v1.AdminService.AdminBlockUserAccount:output_type -> ubertool.trusted.api.v1.AdminBlockUserAccountResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	5,  // 0: ubertool.trusted.api.v1.ListMembersResponse.members:type_name -> ubertool.trusted.api.v1.MemberProfile
+	5,  // 1: ubertool.trusted.api.v1.SearchUsersResponse.users:type_name -> ubertool.trusted.api.v1.MemberProfile
+	10, // 2: ubertool.trusted.api.v1.ListJoinRequestsResponse.requests:type_name -> ubertool.trusted.api.v1.JoinRequestProfile
+	0,  // 3: ubertool.trusted.api.v1.AdminService.ApproveRequestToJoin:input_type -> ubertool.trusted.api.v1.ApproveRequestToJoinRequest
+	2,  // 4: ubertool.trusted.api.v1.AdminService.AdminBlockUserAccount:input_type -> ubertool.trusted.api.v1.AdminBlockUserAccountRequest
+	4,  // 5: ubertool.trusted.api.v1.AdminService.ListMembers:input_type -> ubertool.trusted.api.v1.ListMembersRequest
+	7,  // 6: ubertool.trusted.api.v1.AdminService.SearchUsers:input_type -> ubertool.trusted.api.v1.SearchUsersRequest
+	9,  // 7: ubertool.trusted.api.v1.AdminService.ListJoinRequests:input_type -> ubertool.trusted.api.v1.ListJoinRequestsRequest
+	1,  // 8: ubertool.trusted.api.v1.AdminService.ApproveRequestToJoin:output_type -> ubertool.trusted.api.v1.ApproveRequestToJoinResponse
+	3,  // 9: ubertool.trusted.api.v1.AdminService.AdminBlockUserAccount:output_type -> ubertool.trusted.api.v1.AdminBlockUserAccountResponse
+	6,  // 10: ubertool.trusted.api.v1.AdminService.ListMembers:output_type -> ubertool.trusted.api.v1.ListMembersResponse
+	8,  // 11: ubertool.trusted.api.v1.AdminService.SearchUsers:output_type -> ubertool.trusted.api.v1.SearchUsersResponse
+	11, // 12: ubertool.trusted.api.v1.AdminService.ListJoinRequests:output_type -> ubertool.trusted.api.v1.ListJoinRequestsResponse
+	8,  // [8:13] is the sub-list for method output_type
+	3,  // [3:8] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_admin_service_proto_init() }
@@ -447,7 +827,7 @@ func file_ubertool_trusted_backend_v1_admin_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc), len(file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

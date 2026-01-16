@@ -20,8 +20,10 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	AdminService_ApproveRequestToJoin_FullMethodName  = "/ubertool.trusted.api.v1.AdminService/ApproveRequestToJoin"
-	AdminService_AdminAdjustBalance_FullMethodName    = "/ubertool.trusted.api.v1.AdminService/AdminAdjustBalance"
 	AdminService_AdminBlockUserAccount_FullMethodName = "/ubertool.trusted.api.v1.AdminService/AdminBlockUserAccount"
+	AdminService_ListMembers_FullMethodName           = "/ubertool.trusted.api.v1.AdminService/ListMembers"
+	AdminService_SearchUsers_FullMethodName           = "/ubertool.trusted.api.v1.AdminService/SearchUsers"
+	AdminService_ListJoinRequests_FullMethodName      = "/ubertool.trusted.api.v1.AdminService/ListJoinRequests"
 )
 
 // AdminServiceClient is the client API for AdminService service.
@@ -32,11 +34,14 @@ const (
 type AdminServiceClient interface {
 	// Approve request
 	ApproveRequestToJoin(ctx context.Context, in *ApproveRequestToJoinRequest, opts ...grpc.CallOption) (*ApproveRequestToJoinResponse, error)
-	// Admin: Adjust user balance
-	// configurable service. default=inactive
-	AdminAdjustBalance(ctx context.Context, in *AdminAdjustBalanceRequest, opts ...grpc.CallOption) (*AdminAdjustBalanceResponse, error)
 	// Admin: Suspend user account
 	AdminBlockUserAccount(ctx context.Context, in *AdminBlockUserAccountRequest, opts ...grpc.CallOption) (*AdminBlockUserAccountResponse, error)
+	// Admin: List all members of an organization
+	ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error)
+	// Admin: Search users within an organization
+	SearchUsers(ctx context.Context, in *SearchUsersRequest, opts ...grpc.CallOption) (*SearchUsersResponse, error)
+	// Admin: List pending join requests
+	ListJoinRequests(ctx context.Context, in *ListJoinRequestsRequest, opts ...grpc.CallOption) (*ListJoinRequestsResponse, error)
 }
 
 type adminServiceClient struct {
@@ -57,20 +62,40 @@ func (c *adminServiceClient) ApproveRequestToJoin(ctx context.Context, in *Appro
 	return out, nil
 }
 
-func (c *adminServiceClient) AdminAdjustBalance(ctx context.Context, in *AdminAdjustBalanceRequest, opts ...grpc.CallOption) (*AdminAdjustBalanceResponse, error) {
+func (c *adminServiceClient) AdminBlockUserAccount(ctx context.Context, in *AdminBlockUserAccountRequest, opts ...grpc.CallOption) (*AdminBlockUserAccountResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AdminAdjustBalanceResponse)
-	err := c.cc.Invoke(ctx, AdminService_AdminAdjustBalance_FullMethodName, in, out, cOpts...)
+	out := new(AdminBlockUserAccountResponse)
+	err := c.cc.Invoke(ctx, AdminService_AdminBlockUserAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *adminServiceClient) AdminBlockUserAccount(ctx context.Context, in *AdminBlockUserAccountRequest, opts ...grpc.CallOption) (*AdminBlockUserAccountResponse, error) {
+func (c *adminServiceClient) ListMembers(ctx context.Context, in *ListMembersRequest, opts ...grpc.CallOption) (*ListMembersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AdminBlockUserAccountResponse)
-	err := c.cc.Invoke(ctx, AdminService_AdminBlockUserAccount_FullMethodName, in, out, cOpts...)
+	out := new(ListMembersResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) SearchUsers(ctx context.Context, in *SearchUsersRequest, opts ...grpc.CallOption) (*SearchUsersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchUsersResponse)
+	err := c.cc.Invoke(ctx, AdminService_SearchUsers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) ListJoinRequests(ctx context.Context, in *ListJoinRequestsRequest, opts ...grpc.CallOption) (*ListJoinRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListJoinRequestsResponse)
+	err := c.cc.Invoke(ctx, AdminService_ListJoinRequests_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,11 +110,14 @@ func (c *adminServiceClient) AdminBlockUserAccount(ctx context.Context, in *Admi
 type AdminServiceServer interface {
 	// Approve request
 	ApproveRequestToJoin(context.Context, *ApproveRequestToJoinRequest) (*ApproveRequestToJoinResponse, error)
-	// Admin: Adjust user balance
-	// configurable service. default=inactive
-	AdminAdjustBalance(context.Context, *AdminAdjustBalanceRequest) (*AdminAdjustBalanceResponse, error)
 	// Admin: Suspend user account
 	AdminBlockUserAccount(context.Context, *AdminBlockUserAccountRequest) (*AdminBlockUserAccountResponse, error)
+	// Admin: List all members of an organization
+	ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error)
+	// Admin: Search users within an organization
+	SearchUsers(context.Context, *SearchUsersRequest) (*SearchUsersResponse, error)
+	// Admin: List pending join requests
+	ListJoinRequests(context.Context, *ListJoinRequestsRequest) (*ListJoinRequestsResponse, error)
 	mustEmbedUnimplementedAdminServiceServer()
 }
 
@@ -103,11 +131,17 @@ type UnimplementedAdminServiceServer struct{}
 func (UnimplementedAdminServiceServer) ApproveRequestToJoin(context.Context, *ApproveRequestToJoinRequest) (*ApproveRequestToJoinResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ApproveRequestToJoin not implemented")
 }
-func (UnimplementedAdminServiceServer) AdminAdjustBalance(context.Context, *AdminAdjustBalanceRequest) (*AdminAdjustBalanceResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AdminAdjustBalance not implemented")
-}
 func (UnimplementedAdminServiceServer) AdminBlockUserAccount(context.Context, *AdminBlockUserAccountRequest) (*AdminBlockUserAccountResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AdminBlockUserAccount not implemented")
+}
+func (UnimplementedAdminServiceServer) ListMembers(context.Context, *ListMembersRequest) (*ListMembersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMembers not implemented")
+}
+func (UnimplementedAdminServiceServer) SearchUsers(context.Context, *SearchUsersRequest) (*SearchUsersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SearchUsers not implemented")
+}
+func (UnimplementedAdminServiceServer) ListJoinRequests(context.Context, *ListJoinRequestsRequest) (*ListJoinRequestsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListJoinRequests not implemented")
 }
 func (UnimplementedAdminServiceServer) mustEmbedUnimplementedAdminServiceServer() {}
 func (UnimplementedAdminServiceServer) testEmbeddedByValue()                      {}
@@ -148,24 +182,6 @@ func _AdminService_ApproveRequestToJoin_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AdminService_AdminAdjustBalance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AdminAdjustBalanceRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AdminServiceServer).AdminAdjustBalance(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AdminService_AdminAdjustBalance_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AdminServiceServer).AdminAdjustBalance(ctx, req.(*AdminAdjustBalanceRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _AdminService_AdminBlockUserAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AdminBlockUserAccountRequest)
 	if err := dec(in); err != nil {
@@ -184,6 +200,60 @@ func _AdminService_AdminBlockUserAccount_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminService_ListMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ListMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ListMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ListMembers(ctx, req.(*ListMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_SearchUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).SearchUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_SearchUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).SearchUsers(ctx, req.(*SearchUsersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_ListJoinRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListJoinRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ListJoinRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ListJoinRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ListJoinRequests(ctx, req.(*ListJoinRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AdminService_ServiceDesc is the grpc.ServiceDesc for AdminService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -196,12 +266,20 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AdminService_ApproveRequestToJoin_Handler,
 		},
 		{
-			MethodName: "AdminAdjustBalance",
-			Handler:    _AdminService_AdminAdjustBalance_Handler,
-		},
-		{
 			MethodName: "AdminBlockUserAccount",
 			Handler:    _AdminService_AdminBlockUserAccount_Handler,
+		},
+		{
+			MethodName: "ListMembers",
+			Handler:    _AdminService_ListMembers_Handler,
+		},
+		{
+			MethodName: "SearchUsers",
+			Handler:    _AdminService_SearchUsers_Handler,
+		},
+		{
+			MethodName: "ListJoinRequests",
+			Handler:    _AdminService_ListJoinRequests_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

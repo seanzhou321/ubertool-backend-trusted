@@ -29,6 +29,8 @@ func MapDomainOrgToProto(o *domain.Organization) *pb.Organization {
 		Description:      o.Description,
 		Address:          o.Address,
 		Metro:            o.Metro,
+		AdminEmail:       o.AdminEmail,
+		AdminPhone:       o.AdminPhoneNumber,
 		CreatedOn:        o.CreatedOn.Format("2006-01-02"),
 	}
 }
@@ -171,4 +173,37 @@ func MapDomainNotificationToProto(n *domain.Notification) *pb.Notification {
 		Attributes:     n.Attributes,
 		CreatedOn:      n.CreatedOn.Format("2006-01-02"),
 	}
+}
+
+func MapDomainMemberProfileToProto(u domain.User, uo domain.UserOrg) *pb.MemberProfile {
+	proto := &pb.MemberProfile{
+		UserId:      u.ID,
+		Name:        u.Name,
+		Email:       u.Email,
+		Balance:     uo.BalanceCents,
+		MemberSince: uo.JoinedOn.Format("2006-01-02"),
+		IsBlocked:   uo.Status == domain.UserOrgStatusBlock,
+		BlockReason: uo.BlockReason,
+	}
+	if uo.BlockedDate != nil {
+		proto.BlockedDate = uo.BlockedDate.Format("2006-01-02")
+	}
+	return proto
+}
+
+func MapDomainJoinRequestProfileToProto(jr *domain.JoinRequest) *pb.JoinRequestProfile {
+	if jr == nil {
+		return nil
+	}
+	proto := &pb.JoinRequestProfile{
+		RequestId:   jr.ID,
+		Name:        jr.Name,
+		Email:       jr.Email,
+		Message:     jr.Note,
+		RequestDate: jr.CreatedOn.Format("2006-01-02"),
+	}
+	if jr.UserID != nil {
+		proto.UserId = *jr.UserID
+	}
+	return proto
 }

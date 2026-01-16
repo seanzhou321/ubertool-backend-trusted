@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
@@ -59,22 +58,26 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, requestI
 	return s.reqRepo.Update(ctx, req)
 }
 
-func (s *adminService) AdjustBalance(ctx context.Context, adminID, userID, orgID, amount int32, reason string) error {
-	tx := &domain.LedgerTransaction{
-		OrgID:       orgID,
-		UserID:      userID,
-		Amount:      amount,
-		Type:        domain.TransactionTypeAdjustment,
-		Description: fmt.Sprintf("Admin Adjustment (%d): %s", adminID, reason),
-	}
-	return s.ledgerRepo.CreateTransaction(ctx, tx)
-}
-
-func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int32) error {
+func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int32, reason string) error {
 	uo, err := s.userRepo.GetUserOrg(ctx, userID, orgID)
 	if err != nil {
 		return err
 	}
 	uo.Status = domain.UserOrgStatusBlock
+	uo.BlockReason = reason
+	now := time.Now()
+	uo.BlockedDate = &now
 	return s.userRepo.UpdateUserOrg(ctx, uo)
+}
+
+func (s *adminService) ListMembers(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error) {
+	return s.userRepo.ListMembersByOrg(ctx, orgID)
+}
+
+func (s *adminService) SearchUsers(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error) {
+	return s.userRepo.SearchMembersByOrg(ctx, orgID, query)
+}
+
+func (s *adminService) ListJoinRequests(ctx context.Context, orgID int32) ([]domain.JoinRequest, error) {
+	return s.reqRepo.ListByOrg(ctx, orgID)
 }

@@ -16,6 +16,8 @@ type UserRepository interface {
 	GetUserOrg(ctx context.Context, userID, orgID int32) (*domain.UserOrg, error)
 	ListUserOrgs(ctx context.Context, userID int32) ([]domain.UserOrg, error)
 	UpdateUserOrg(ctx context.Context, userOrg *domain.UserOrg) error
+	ListMembersByOrg(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error)
+	SearchMembersByOrg(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error)
 }
 
 type OrganizationRepository interface {
@@ -23,6 +25,7 @@ type OrganizationRepository interface {
 	GetByID(ctx context.Context, id int32) (*domain.Organization, error)
 	List(ctx context.Context) ([]domain.Organization, error)
 	Search(ctx context.Context, name, metro string) ([]domain.Organization, error)
+	Update(ctx context.Context, org *domain.Organization) error
 }
 
 type ToolRepository interface {

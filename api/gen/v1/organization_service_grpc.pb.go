@@ -23,6 +23,7 @@ const (
 	OrganizationService_GetOrganization_FullMethodName     = "/ubertool.trusted.api.v1.OrganizationService/GetOrganization"
 	OrganizationService_CreateOrganization_FullMethodName  = "/ubertool.trusted.api.v1.OrganizationService/CreateOrganization"
 	OrganizationService_SearchOrganizations_FullMethodName = "/ubertool.trusted.api.v1.OrganizationService/SearchOrganizations"
+	OrganizationService_UpdateOrganization_FullMethodName  = "/ubertool.trusted.api.v1.OrganizationService/UpdateOrganization"
 )
 
 // OrganizationServiceClient is the client API for OrganizationService service.
@@ -40,6 +41,8 @@ type OrganizationServiceClient interface {
 	// Search organization
 	// No access_token required
 	SearchOrganizations(ctx context.Context, in *SearchOrganizationsRequest, opts ...grpc.CallOption) (*ListOrganizationsResponse, error)
+	// Update organization details
+	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*UpdateOrganizationResponse, error)
 }
 
 type organizationServiceClient struct {
@@ -90,6 +93,16 @@ func (c *organizationServiceClient) SearchOrganizations(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *organizationServiceClient) UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*UpdateOrganizationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateOrganizationResponse)
+	err := c.cc.Invoke(ctx, OrganizationService_UpdateOrganization_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrganizationServiceServer is the server API for OrganizationService service.
 // All implementations must embed UnimplementedOrganizationServiceServer
 // for forward compatibility.
@@ -105,6 +118,8 @@ type OrganizationServiceServer interface {
 	// Search organization
 	// No access_token required
 	SearchOrganizations(context.Context, *SearchOrganizationsRequest) (*ListOrganizationsResponse, error)
+	// Update organization details
+	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*UpdateOrganizationResponse, error)
 	mustEmbedUnimplementedOrganizationServiceServer()
 }
 
@@ -126,6 +141,9 @@ func (UnimplementedOrganizationServiceServer) CreateOrganization(context.Context
 }
 func (UnimplementedOrganizationServiceServer) SearchOrganizations(context.Context, *SearchOrganizationsRequest) (*ListOrganizationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SearchOrganizations not implemented")
+}
+func (UnimplementedOrganizationServiceServer) UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*UpdateOrganizationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateOrganization not implemented")
 }
 func (UnimplementedOrganizationServiceServer) mustEmbedUnimplementedOrganizationServiceServer() {}
 func (UnimplementedOrganizationServiceServer) testEmbeddedByValue()                             {}
@@ -220,6 +238,24 @@ func _OrganizationService_SearchOrganizations_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrganizationService_UpdateOrganization_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).UpdateOrganization(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_UpdateOrganization_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).UpdateOrganization(ctx, req.(*UpdateOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrganizationService_ServiceDesc is the grpc.ServiceDesc for OrganizationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -242,6 +278,10 @@ var OrganizationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchOrganizations",
 			Handler:    _OrganizationService_SearchOrganizations_Handler,
+		},
+		{
+			MethodName: "UpdateOrganization",
+			Handler:    _OrganizationService_UpdateOrganization_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

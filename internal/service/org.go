@@ -25,3 +25,7 @@ func (s *organizationService) GetOrganization(ctx context.Context, id int32) (*d
 func (s *organizationService) SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error) {
 	return s.orgRepo.Search(ctx, name, metro)
 }
+
+func (s *organizationService) UpdateOrganization(ctx context.Context, org *domain.Organization) error {
+	return s.orgRepo.Update(ctx, org)
+}

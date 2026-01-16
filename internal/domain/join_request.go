@@ -13,6 +13,7 @@ const (
 type JoinRequest struct {
 	ID        int32             `json:"id"`
 	OrgID     int32             `json:"org_id"`
+	UserID    *int32            `json:"user_id"`
 	Name      string            `json:"name"`
 	Email     string            `json:"email"`
 	Note      string            `json:"note"`

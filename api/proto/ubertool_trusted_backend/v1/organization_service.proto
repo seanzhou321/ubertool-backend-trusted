@@ -23,6 +23,9 @@ service OrganizationService {
   // Search organization
   // No access_token required
   rpc SearchOrganizations(SearchOrganizationsRequest) returns (ListOrganizationsResponse);
+
+  // Update organization details
+  rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse);
 }
 
 // List my organizations request
@@ -65,6 +68,20 @@ message SearchOrganizationsRequest {
   string metro = 2;
 }
 
+message UpdateOrganizationRequest {
+  int32 organization_id = 1;
+  string name = 2;
+  string description = 3;
+  string address = 4;
+  string metro = 5;
+  string admin_email = 6;
+  string admin_phone = 7;
+}
+
+message UpdateOrganizationResponse {
+  Organization organization = 1;
+}
+
 // Organization message
 message Organization {
   int32 id = 1;
@@ -77,5 +94,6 @@ message Organization {
   int32 user_balance = 8; // User's balance in this org (cents)
   int32 active_items = 9; // User's active rentals/lendings
   string created_on = 10; // Date string YYYY-MM-DD
+  string admin_email = 11;
+  string admin_phone = 12;
 }
-

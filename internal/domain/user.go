@@ -36,4 +36,6 @@ type UserOrg struct {
 	BalanceCents int32         `json:"balance_cents"`
 	Status       UserOrgStatus `json:"status"`
 	Role         UserOrgRole   `json:"role"`
+	BlockedDate  *time.Time    `json:"blocked_date"`
+	BlockReason  string        `json:"block_reason"`
 }

@@ -73,3 +73,54 @@ func TestUserRepository_Create(t *testing.T) {
 		assert.Equal(t, int32(1), u.ID)
 	})
 }
+func TestUserRepository_ListMembersByOrg(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	repo := postgres.NewUserRepository(db)
+	ctx := context.Background()
+
+	t.Run("Success", func(t *testing.T) {
+		rows := sqlmock.NewRows([]string{"id", "email", "phone_number", "password_hash", "name", "avatar_url", "created_on", "updated_on",
+			"user_id", "org_id", "joined_on", "balance_cents", "status", "role", "blocked_date", "block_reason"}).
+			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, "ACTIVE", "MEMBER", nil, "")
+
+		mock.ExpectQuery("SELECT (.+) FROM users u JOIN users_orgs uo").
+			WithArgs(int32(1)).
+			WillReturnRows(rows)
+
+		users, uos, err := repo.ListMembersByOrg(ctx, 1)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(users))
+		assert.Equal(t, int32(1), users[0].ID)
+		assert.Equal(t, int32(100), uos[0].BalanceCents)
+	})
+}
+
+func TestUserRepository_SearchMembersByOrg(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	repo := postgres.NewUserRepository(db)
+	ctx := context.Background()
+
+	t.Run("Success", func(t *testing.T) {
+		rows := sqlmock.NewRows([]string{"id", "email", "phone_number", "password_hash", "name", "avatar_url", "created_on", "updated_on",
+			"user_id", "org_id", "joined_on", "balance_cents", "status", "role", "blocked_date", "block_reason"}).
+			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, "ACTIVE", "MEMBER", nil, "")
+
+		mock.ExpectQuery("SELECT (.+) FROM users u JOIN users_orgs uo").
+			WithArgs(int32(1), "%search%").
+			WillReturnRows(rows)
+
+		users, _, err := repo.SearchMembersByOrg(ctx, 1, "search")
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(users))
+	})
+}

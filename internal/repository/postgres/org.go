@@ -71,3 +71,8 @@ func (r *organizationRepository) Search(ctx context.Context, name, metro string)
 	}
 	return orgs, nil
 }
+func (r *organizationRepository) Update(ctx context.Context, o *domain.Organization) error {
+	query := `UPDATE orgs SET name = $1, description = $2, address = $3, metro = $4, admin_phone_number = $5, admin_email = $6 WHERE id = $7`
+	_, err := r.db.ExecContext(ctx, query, o.Name, o.Description, o.Address, o.Metro, o.AdminPhoneNumber, o.AdminEmail, o.ID)
+	return err
+}

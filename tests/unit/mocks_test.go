@@ -53,6 +53,43 @@ func (m *MockUserRepo) UpdateUserOrg(ctx context.Context, userOrg *domain.UserOr
 	args := m.Called(ctx, userOrg)
 	return args.Error(0)
 }
+func (m *MockUserRepo) ListMembersByOrg(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error) {
+	args := m.Called(ctx, orgID)
+	return args.Get(0).([]domain.User), args.Get(1).([]domain.UserOrg), args.Error(2)
+}
+func (m *MockUserRepo) SearchMembersByOrg(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error) {
+	args := m.Called(ctx, orgID, query)
+	return args.Get(0).([]domain.User), args.Get(1).([]domain.UserOrg), args.Error(2)
+}
+
+// MockOrganizationRepo
+type MockOrganizationRepo struct {
+	mock.Mock
+}
+
+func (m *MockOrganizationRepo) Create(ctx context.Context, org *domain.Organization) error {
+	args := m.Called(ctx, org)
+	return args.Error(0)
+}
+func (m *MockOrganizationRepo) GetByID(ctx context.Context, id int32) (*domain.Organization, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Organization), args.Error(1)
+}
+func (m *MockOrganizationRepo) List(ctx context.Context) ([]domain.Organization, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]domain.Organization), args.Error(1)
+}
+func (m *MockOrganizationRepo) Search(ctx context.Context, name, metro string) ([]domain.Organization, error) {
+	args := m.Called(ctx, name, metro)
+	return args.Get(0).([]domain.Organization), args.Error(1)
+}
+func (m *MockOrganizationRepo) Update(ctx context.Context, org *domain.Organization) error {
+	args := m.Called(ctx, org)
+	return args.Error(0)
+}
 
 // MockInviteRepo
 type MockInviteRepo struct {

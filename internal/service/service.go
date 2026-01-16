@@ -24,6 +24,7 @@ type OrganizationService interface {
 	ListOrganizations(ctx context.Context) ([]domain.Organization, error)
 	GetOrganization(ctx context.Context, id int32) (*domain.Organization, error)
 	SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error)
+	UpdateOrganization(ctx context.Context, org *domain.Organization) error
 }
 
 type ToolService interface {
@@ -58,6 +59,8 @@ type NotificationService interface {
 
 type AdminService interface {
 	ApproveJoinRequest(ctx context.Context, adminID, requestID int32) error
-	AdjustBalance(ctx context.Context, adminID, userID, orgID, amount int32, reason string) error
-	BlockUser(ctx context.Context, adminID, userID, orgID int32) error
+	BlockUser(ctx context.Context, adminID, userID, orgID int32, reason string) error
+	ListMembers(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error)
+	SearchUsers(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error)
+	ListJoinRequests(ctx context.Context, orgID int32) ([]domain.JoinRequest, error)
 }
