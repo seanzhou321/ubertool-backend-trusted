@@ -30,7 +30,6 @@ service OrganizationService {
 
 // List my organizations request
 message ListMyOrganizationsRequest {
-  int32 user_id = 1;
 }
 
 // List my organizations response

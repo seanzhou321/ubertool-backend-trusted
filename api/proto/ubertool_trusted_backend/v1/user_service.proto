@@ -22,7 +22,6 @@ service UserService {
 
 // Get user request
 message GetUserRequest {
-  int32 user_id = 1;
 }
 
 // Get user response
@@ -32,11 +31,10 @@ message GetUserResponse {
 
 // Update profile request
 message UpdateProfileRequest {
-  int32 user_id = 1;
-  string name = 2;
-  string email = 3;
-  string phone = 4;
-  string avatar_url = 5;
+  string name = 1;
+  string email = 2;
+  string phone = 3;
+  string avatar_url = 4;
 }
 
 // Update profile response

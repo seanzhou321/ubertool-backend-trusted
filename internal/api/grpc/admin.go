@@ -17,11 +17,11 @@ func NewAdminHandler(adminSvc service.AdminService) *AdminHandler {
 }
 
 func (h *AdminHandler) ApproveRequestToJoin(ctx context.Context, req *pb.ApproveRequestToJoinRequest) (*pb.ApproveRequestToJoinResponse, error) {
-	adminID := int32(1) // Placeholder
-	// Service expects requestID, but proto has userID/email/name. 
-	// This is a disconnect. I'll use a placeholder for requestID or update service.
-	// For now, I'll pass 0 as requestID if it's not present.
-	err := h.adminSvc.ApproveJoinRequest(ctx, adminID, 0) 
+	adminID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = h.adminSvc.ApproveJoinRequest(ctx, adminID, req.OrganizationId, req.ApplicantEmail, req.ApplicantName)
 	if err != nil {
 		return nil, err
 	}
@@ -29,8 +29,11 @@ func (h *AdminHandler) ApproveRequestToJoin(ctx context.Context, req *pb.Approve
 }
 
 func (h *AdminHandler) AdminBlockUserAccount(ctx context.Context, req *pb.AdminBlockUserAccountRequest) (*pb.AdminBlockUserAccountResponse, error) {
-	adminID := int32(1) // Placeholder
-	err := h.adminSvc.BlockUser(ctx, adminID, req.UserId, req.OrganizationId, req.Reason)
+	adminID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = h.adminSvc.BlockUser(ctx, adminID, req.BlockedUserId, req.OrganizationId, req.IsBlock, req.Reason)
 	if err != nil {
 		return nil, err
 	}

@@ -36,9 +36,8 @@ service ToolService {
 // List tools request
 message ListToolsRequest {
   int32 organization_id = 1;
-  int32 user_id = 2;
-  int32 page = 3;
-  int32 page_size = 4;
+  int32 page = 2;
+  int32 page_size = 3;
 }
 
 // List tools response
@@ -61,17 +60,16 @@ message GetToolResponse {
 
 // Add tool request
 message AddToolRequest {
-  int32 user_id = 1;
-  string name = 2;
-  string description = 3;
-  repeated string categories = 4;
+  string name = 1;
+  string description = 2;
+  repeated string categories = 3;
   // Prices stored as cents (int32 max = $21M, requirement max = $1000)
-  int32 price_per_day_cents = 5;
-  int32 price_per_week_cents = 6;
-  int32 price_per_month_cents = 7;
-  int32 replacement_cost_cents = 8;
-  ToolCondition condition = 9;
-  string image_url = 10;
+  int32 price_per_day_cents = 4;
+  int32 price_per_week_cents = 5;
+  int32 price_per_month_cents = 6;
+  int32 replacement_cost_cents = 7;
+  ToolCondition condition = 8;
+  string image_url = 9;
 }
 
 // Add tool response

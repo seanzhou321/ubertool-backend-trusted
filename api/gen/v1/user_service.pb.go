@@ -24,7 +24,6 @@ const (
 // Get user request
 type GetUserRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -57,13 +56,6 @@ func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetUserRequest.ProtoReflect.Descriptor instead.
 func (*GetUserRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_user_service_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *GetUserRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 // Get user response
@@ -114,11 +106,10 @@ func (x *GetUserResponse) GetUser() *User {
 // Update profile request
 type UpdateProfileRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
-	Phone         string                 `protobuf:"bytes,4,opt,name=phone,proto3" json:"phone,omitempty"`
-	AvatarUrl     string                 `protobuf:"bytes,5,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	Phone         string                 `protobuf:"bytes,3,opt,name=phone,proto3" json:"phone,omitempty"`
+	AvatarUrl     string                 `protobuf:"bytes,4,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -151,13 +142,6 @@ func (x *UpdateProfileRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use UpdateProfileRequest.ProtoReflect.Descriptor instead.
 func (*UpdateProfileRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_user_service_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *UpdateProfileRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 func (x *UpdateProfileRequest) GetName() string {
@@ -330,18 +314,16 @@ var File_ubertool_trusted_backend_v1_user_service_proto protoreflect.FileDescrip
 
 const file_ubertool_trusted_backend_v1_user_service_proto_rawDesc = "" +
 	"\n" +
-	".ubertool_trusted_backend/v1/user_service.proto\x12\x17ubertool.trusted.api.v1\x1a6ubertool_trusted_backend/v1/organization_service.proto\")\n" +
-	"\x0eGetUserRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\"D\n" +
+	".ubertool_trusted_backend/v1/user_service.proto\x12\x17ubertool.trusted.api.v1\x1a6ubertool_trusted_backend/v1/organization_service.proto\"\x10\n" +
+	"\x0eGetUserRequest\"D\n" +
 	"\x0fGetUserResponse\x121\n" +
-	"\x04user\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user\"\x8e\x01\n" +
-	"\x14UpdateProfileRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
-	"\x05phone\x18\x04 \x01(\tR\x05phone\x12\x1d\n" +
+	"\x04user\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user\"u\n" +
+	"\x14UpdateProfileRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12\x14\n" +
+	"\x05phone\x18\x03 \x01(\tR\x05phone\x12\x1d\n" +
 	"\n" +
-	"avatar_url\x18\x05 \x01(\tR\tavatarUrl\"J\n" +
+	"avatar_url\x18\x04 \x01(\tR\tavatarUrl\"J\n" +
 	"\x15UpdateProfileResponse\x121\n" +
 	"\x04user\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user\"\xcf\x01\n" +
 	"\x04User\x12\x0e\n" +

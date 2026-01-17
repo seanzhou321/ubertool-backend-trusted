@@ -2,13 +2,13 @@
 -- Compatible with PostgreSQL 15+
 
 -- 0. Global Types & Enums
-CREATE TYPE user_org_status_enum AS ENUM ('ACTIVE', 'SUSPEND', 'BLOCK');
-CREATE TYPE user_org_role_enum AS ENUM ('SUPER_ADMIN', 'ADMIN', 'MEMBER');
-CREATE TYPE tool_duration_unit_enum AS ENUM ('day', 'week', 'month');
-CREATE TYPE tool_status_enum AS ENUM ('AVAILABLE', 'UNAVAILABLE', 'RENTED');
-CREATE TYPE tool_condition_enum AS ENUM ('EXCELLENT', 'GOOD', 'ACCEPTABLE', 'DAMAGED/NEEDS_REPAIR');
-CREATE TYPE ledger_transaction_type_enum AS ENUM ('RENTAL_DEBIT', 'LENDING_CREDIT', 'REFUND', 'ADJUSTMENT');
-CREATE TYPE rental_status_enum AS ENUM ('PENDING', 'APPROVED', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'OVERDUE');
+-- CREATE TYPE user_org_status_enum AS ENUM ('ACTIVE', 'SUSPEND', 'BLOCK');
+-- CREATE TYPE user_org_role_enum AS ENUM ('SUPER_ADMIN', 'ADMIN', 'MEMBER');
+-- CREATE TYPE tool_duration_unit_enum AS ENUM ('day', 'week', 'month');
+-- CREATE TYPE tool_status_enum AS ENUM ('AVAILABLE', 'UNAVAILABLE', 'RENTED');
+-- CREATE TYPE tool_condition_enum AS ENUM ('EXCELLENT', 'GOOD', 'ACCEPTABLE', 'DAMAGED/NEEDS_REPAIR');
+-- CREATE TYPE ledger_transaction_type_enum AS ENUM ('RENTAL_DEBIT', 'LENDING_CREDIT', 'REFUND', 'ADJUSTMENT');
+-- CREATE TYPE rental_status_enum AS ENUM ('PENDING', 'APPROVED', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'OVERDUE');
 
 -- 1. Organizations (Community/Church Groups)
 CREATE TABLE orgs (
@@ -40,8 +40,8 @@ CREATE TABLE users_orgs (
     org_id INTEGER REFERENCES orgs(id) ON DELETE CASCADE,
     joined_on DATE DEFAULT CURRENT_DATE,
     balance_cents INTEGER DEFAULT 0,
-    status user_org_status_enum NOT NULL DEFAULT 'ACTIVE',
-    role user_org_role_enum NOT NULL DEFAULT 'MEMBER',
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    role TEXT NOT NULL DEFAULT 'MEMBER',
     blocked_date DATE,
     block_reason TEXT,
     PRIMARY KEY (user_id, org_id)
@@ -79,10 +79,10 @@ CREATE TABLE tools (
     price_per_week_cents INTEGER NOT NULL DEFAULT 0,
     price_per_month_cents INTEGER NOT NULL DEFAULT 0,
     replacement_cost_cents INTEGER,
-    duration_unit tool_duration_unit_enum NOT NULL DEFAULT 'day',
-    condition tool_condition_enum NOT NULL DEFAULT 'GOOD',
+    duration_unit TEXT NOT NULL DEFAULT 'day',
+    condition TEXT NOT NULL DEFAULT 'GOOD',
     metro TEXT, -- Optional location indicator
-    status tool_status_enum NOT NULL DEFAULT 'AVAILABLE',
+    status TEXT NOT NULL DEFAULT 'AVAILABLE',
     created_on DATE DEFAULT CURRENT_DATE,
     deleted_on DATE
 );
@@ -105,7 +105,7 @@ CREATE TABLE rentals (
     scheduled_end_date DATE NOT NULL, -- Expected return
     end_date DATE, -- Actual return date
     total_cost_cents INTEGER NOT NULL,
-    status rental_status_enum NOT NULL DEFAULT 'PENDING',
+    status TEXT NOT NULL DEFAULT 'PENDING',
     pickup_note TEXT,
     created_on DATE DEFAULT CURRENT_DATE,
     updated_on DATE DEFAULT CURRENT_DATE
@@ -117,7 +117,7 @@ CREATE TABLE ledger_transactions (
     org_id INTEGER REFERENCES orgs(id),
     user_id INTEGER REFERENCES users(id),
     amount INTEGER NOT NULL,
-    type ledger_transaction_type_enum NOT NULL,
+    type TEXT NOT NULL,
     related_rental_id INTEGER REFERENCES rentals(id),
     description TEXT,
     charged_on DATE DEFAULT CURRENT_DATE,

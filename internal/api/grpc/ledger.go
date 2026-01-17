@@ -17,7 +17,10 @@ func NewLedgerHandler(ledgerSvc service.LedgerService) *LedgerHandler {
 }
 
 func (h *LedgerHandler) GetBalance(ctx context.Context, req *pb.GetBalanceRequest) (*pb.GetBalanceResponse, error) {
-	userID := int32(1) // Placeholder
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	balance, err := h.ledgerSvc.GetBalance(ctx, userID, req.OrganizationId)
 	if err != nil {
 		return nil, err
@@ -26,7 +29,10 @@ func (h *LedgerHandler) GetBalance(ctx context.Context, req *pb.GetBalanceReques
 }
 
 func (h *LedgerHandler) GetTransactions(ctx context.Context, req *pb.GetTransactionsRequest) (*pb.GetTransactionsResponse, error) {
-	userID := int32(1) // Placeholder
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	txs, count, err := h.ledgerSvc.GetTransactions(ctx, userID, req.OrganizationId, req.Page, req.PageSize)
 	if err != nil {
 		return nil, err
@@ -42,5 +48,13 @@ func (h *LedgerHandler) GetTransactions(ctx context.Context, req *pb.GetTransact
 }
 
 func (h *LedgerHandler) GetLedgerSummary(ctx context.Context, req *pb.GetLedgerSummaryRequest) (*pb.GetLedgerSummaryResponse, error) {
-	return &pb.GetLedgerSummaryResponse{}, nil
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	summary, err := h.ledgerSvc.GetLedgerSummary(ctx, userID, req.OrganizationId)
+	if err != nil {
+		return nil, err
+	}
+	return MapDomainLedgerSummaryToProto(summary), nil
 }

@@ -23,8 +23,7 @@ service LedgerService {
 
 // Get balance request
 message GetBalanceRequest {
-  int32 user_id = 1;
-  int32 organization_id = 2;
+  int32 organization_id = 1;
 }
 
 // Get balance response
@@ -35,10 +34,9 @@ message GetBalanceResponse {
 
 // Get transactions request
 message GetTransactionsRequest {
-  int32 user_id = 1;
-  int32 organization_id = 2;
-  int32 page = 3;
-  int32 page_size = 4;
+  int32 organization_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
 }
 
 // Get transactions response
@@ -49,8 +47,7 @@ message GetTransactionsResponse {
 
 // Get ledger summary request
 message GetLedgerSummaryRequest {
-  int32 user_id = 1;
-  int32 organization_id = 2;
+  int32 organization_id = 1;
 }
 
 // Get ledger summary response

@@ -18,8 +18,12 @@ func NewToolHandler(toolSvc service.ToolService) *ToolHandler {
 }
 
 func (h *ToolHandler) AddTool(ctx context.Context, req *pb.AddToolRequest) (*pb.AddToolResponse, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	tool := &domain.Tool{
-		OwnerID:              req.UserId,
+		OwnerID:              userID,
 		Name:                 req.Name,
 		Description:          req.Description,
 		Categories:           req.Categories,
@@ -30,7 +34,7 @@ func (h *ToolHandler) AddTool(ctx context.Context, req *pb.AddToolRequest) (*pb.
 		Condition:            domain.ToolCondition(req.Condition),
 		Status:               domain.ToolStatusAvailable,
 	}
-	err := h.toolSvc.AddTool(ctx, tool, []string{req.ImageUrl})
+	err = h.toolSvc.AddTool(ctx, tool, []string{req.ImageUrl})
 	if err != nil {
 		return nil, err
 	}

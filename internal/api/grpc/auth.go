@@ -81,5 +81,6 @@ func (h *AuthHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequ
 }
 
 func (h *AuthHandler) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
+	_, _ = GetUserIDFromContext(ctx) // Extract but maybe not needed for simple logout
 	return &pb.LogoutResponse{Success: true}, nil
 }

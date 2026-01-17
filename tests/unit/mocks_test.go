@@ -224,3 +224,18 @@ func (m *MockLedgerRepo) ListTransactions(ctx context.Context, userID, orgID int
 	args := m.Called(ctx, userID, orgID, page, pageSize)
 	return args.Get(0).([]domain.LedgerTransaction), args.Get(1).(int32), args.Error(2)
 }
+
+// MockEmailService
+type MockEmailService struct {
+	mock.Mock
+}
+
+func (m *MockEmailService) SendInvitation(ctx context.Context, email, name, token string, orgName string) error {
+	args := m.Called(ctx, email, name, token, orgName)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendAccountStatusNotification(ctx context.Context, email, name, orgName, status, reason string) error {
+	args := m.Called(ctx, email, name, orgName, status, reason)
+	return args.Error(0)
+}

@@ -52,6 +52,7 @@ type LedgerRepository interface {
 	CreateTransaction(ctx context.Context, tx *domain.LedgerTransaction) error
 	GetBalance(ctx context.Context, userID, orgID int32) (int32, error)
 	ListTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error)
+	GetSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error)
 }
 
 type NotificationRepository interface {

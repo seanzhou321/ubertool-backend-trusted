@@ -28,10 +28,9 @@ service AdminService {
 }
 
 message ApproveRequestToJoinRequest {
-  int32 user_id = 1;
-  int32 organization_id = 2;
-  string applicant_email = 3;
-  string applicant_name = 4;
+  int32 organization_id = 1;
+  string applicant_email = 2;
+  string applicant_name = 3;
 }
 
 message ApproveRequestToJoinResponse {
@@ -40,9 +39,10 @@ message ApproveRequestToJoinResponse {
 }
 
 message AdminBlockUserAccountRequest {
-  int32 user_id = 1;
+  int32 blocked_user_id = 1;
   int32 organization_id = 2;
-  string reason = 3;
+  bool is_block = 3;
+  string reason = 4;
 }
 
 message AdminBlockUserAccountResponse {

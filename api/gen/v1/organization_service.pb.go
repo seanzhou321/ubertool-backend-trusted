@@ -24,7 +24,6 @@ const (
 // List my organizations request
 type ListMyOrganizationsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -57,13 +56,6 @@ func (x *ListMyOrganizationsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListMyOrganizationsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyOrganizationsRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_organization_service_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *ListMyOrganizationsRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 // List my organizations response
@@ -656,9 +648,8 @@ var File_ubertool_trusted_backend_v1_organization_service_proto protoreflect.Fil
 
 const file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc = "" +
 	"\n" +
-	"6ubertool_trusted_backend/v1/organization_service.proto\x12\x17ubertool.trusted.api.v1\"5\n" +
-	"\x1aListMyOrganizationsRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\"h\n" +
+	"6ubertool_trusted_backend/v1/organization_service.proto\x12\x17ubertool.trusted.api.v1\"\x1c\n" +
+	"\x1aListMyOrganizationsRequest\"h\n" +
 	"\x19ListOrganizationsResponse\x12K\n" +
 	"\rorganizations\x18\x01 \x03(\v2%.ubertool.trusted.api.v1.OrganizationR\rorganizations\"A\n" +
 	"\x16GetOrganizationRequest\x12'\n" +

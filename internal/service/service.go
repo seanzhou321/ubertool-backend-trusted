@@ -39,17 +39,19 @@ type ToolService interface {
 
 type RentalService interface {
 	CreateRentalRequest(ctx context.Context, renterID, toolID, orgID int32, startDate, endDate string) (*domain.Rental, error)
-	ApproveRentalRequest(ctx context.Context, ownerID, rentalID int32, pickupNote string) error
-	RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) error
-	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) error
-	CompleteRental(ctx context.Context, ownerID, rentalID int32) error
+	ApproveRentalRequest(ctx context.Context, ownerID, rentalID int32, pickupNote string) (*domain.Rental, error)
+	RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
+	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error)
+	CompleteRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
 	ListRentals(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListLendings(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
+	GetRental(ctx context.Context, userID, rentalID int32) (*domain.Rental, error)
 }
 
 type LedgerService interface {
 	GetBalance(ctx context.Context, userID, orgID int32) (int32, error)
 	GetTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error)
+	GetLedgerSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error)
 }
 
 type NotificationService interface {
@@ -58,9 +60,14 @@ type NotificationService interface {
 }
 
 type AdminService interface {
-	ApproveJoinRequest(ctx context.Context, adminID, requestID int32) error
-	BlockUser(ctx context.Context, adminID, userID, orgID int32, reason string) error
+	ApproveJoinRequest(ctx context.Context, adminID, orgID int32, email, name string) error
+	BlockUser(ctx context.Context, adminID, userID, orgID int32, isBlock bool, reason string) error
 	ListMembers(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error)
 	SearchUsers(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error)
 	ListJoinRequests(ctx context.Context, orgID int32) ([]domain.JoinRequest, error)
+}
+
+type EmailService interface {
+	SendInvitation(ctx context.Context, email, name, token string, orgName string) error
+	SendAccountStatusNotification(ctx context.Context, email, name, orgName, status, reason string) error
 }

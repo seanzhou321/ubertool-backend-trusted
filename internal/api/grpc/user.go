@@ -17,28 +17,31 @@ func NewUserHandler(userSvc service.UserService) *UserHandler {
 }
 
 func (h *UserHandler) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.GetUserResponse, error) {
-	user, userOrgs, err := h.userSvc.GetUserProfile(ctx, req.UserId)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	user, _, err := h.userSvc.GetUserProfile(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	
-	protoOrgs := make([]*pb.Organization, len(userOrgs))
-	for i, uo := range userOrgs {
-		protoOrgs[i] = &pb.Organization{Id: uo.OrgID}
-	}
-
 	return &pb.GetUserResponse{
 		User: MapDomainUserToProto(user),
 	}, nil
 }
 
 func (h *UserHandler) UpdateProfile(ctx context.Context, req *pb.UpdateProfileRequest) (*pb.UpdateProfileResponse, error) {
-	err := h.userSvc.UpdateProfile(ctx, req.UserId, req.Name, req.AvatarUrl)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = h.userSvc.UpdateProfile(ctx, userID, req.Name, req.AvatarUrl)
 	if err != nil {
 		return nil, err
 	}
 	// Fetch updated user to return it
-	user, _, err := h.userSvc.GetUserProfile(ctx, req.UserId)
+	user, _, err := h.userSvc.GetUserProfile(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

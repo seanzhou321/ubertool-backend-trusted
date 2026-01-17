@@ -18,6 +18,10 @@ func NewOrganizationHandler(orgSvc service.OrganizationService) *OrganizationHan
 }
 
 func (h *OrganizationHandler) ListMyOrganizations(ctx context.Context, req *pb.ListMyOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {
+	_, err := GetUserIDFromContext(ctx) // userID not used yet in service, but check auth
+	if err != nil {
+		return nil, err
+	}
 	orgs, err := h.orgSvc.ListOrganizations(ctx)
 	if err != nil {
 		return nil, err

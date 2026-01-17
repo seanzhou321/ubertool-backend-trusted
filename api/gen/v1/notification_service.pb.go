@@ -24,9 +24,8 @@ const (
 // Get notifications request
 type GetNotificationsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
-	Offset        int32                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -59,13 +58,6 @@ func (x *GetNotificationsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetNotificationsRequest.ProtoReflect.Descriptor instead.
 func (*GetNotificationsRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_notification_service_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *GetNotificationsRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 func (x *GetNotificationsRequest) GetLimit() int32 {
@@ -139,7 +131,6 @@ func (x *GetNotificationsResponse) GetTotalCount() int32 {
 type MarkNotificationReadRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	NotificationId int32                  `protobuf:"varint,1,opt,name=notification_id,json=notificationId,proto3" json:"notification_id,omitempty"`
-	UserId         int32                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -177,13 +168,6 @@ func (*MarkNotificationReadRequest) Descriptor() ([]byte, []int) {
 func (x *MarkNotificationReadRequest) GetNotificationId() int32 {
 	if x != nil {
 		return x.NotificationId
-	}
-	return 0
-}
-
-func (x *MarkNotificationReadRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
 	}
 	return 0
 }
@@ -338,18 +322,16 @@ var File_ubertool_trusted_backend_v1_notification_service_proto protoreflect.Fil
 
 const file_ubertool_trusted_backend_v1_notification_service_proto_rawDesc = "" +
 	"\n" +
-	"6ubertool_trusted_backend/v1/notification_service.proto\x12\x17ubertool.trusted.api.v1\"`\n" +
-	"\x17GetNotificationsRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x14\n" +
-	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x03 \x01(\x05R\x06offset\"\x88\x01\n" +
+	"6ubertool_trusted_backend/v1/notification_service.proto\x12\x17ubertool.trusted.api.v1\"G\n" +
+	"\x17GetNotificationsRequest\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x05R\x06offset\"\x88\x01\n" +
 	"\x18GetNotificationsResponse\x12K\n" +
 	"\rnotifications\x18\x01 \x03(\v2%.ubertool.trusted.api.v1.NotificationR\rnotifications\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
-	"totalCount\"_\n" +
+	"totalCount\"F\n" +
 	"\x1bMarkNotificationReadRequest\x12'\n" +
-	"\x0fnotification_id\x18\x01 \x01(\x05R\x0enotificationId\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\x05R\x06userId\"8\n" +
+	"\x0fnotification_id\x18\x01 \x01(\x05R\x0enotificationId\"8\n" +
 	"\x1cMarkNotificationReadResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"\xd9\x02\n" +
 	"\fNotification\x12\x0e\n" +

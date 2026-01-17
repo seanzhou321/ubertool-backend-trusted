@@ -21,3 +21,7 @@ func (s *ledgerService) GetBalance(ctx context.Context, userID, orgID int32) (in
 func (s *ledgerService) GetTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error) {
 	return s.ledgerRepo.ListTransactions(ctx, userID, orgID, page, pageSize)
 }
+
+func (s *ledgerService) GetLedgerSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error) {
+	return s.ledgerRepo.GetSummary(ctx, userID, orgID)
+}

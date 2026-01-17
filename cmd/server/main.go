@@ -34,7 +34,16 @@ func main() {
 	ledgerSvc := service.NewLedgerService(store.LedgerRepository)
 	noteSvc := service.NewNotificationService(store.NotificationRepository)
 	rentalSvc := service.NewRentalService(store.RentalRepository, store.ToolRepository, store.LedgerRepository, store.UserRepository)
-	adminSvc := service.NewAdminService(store.JoinRequestRepository, store.UserRepository, store.LedgerRepository)
+	
+	// Gmail Configuration from Environment Variables
+	smtpHost := "smtp.gmail.com"
+	smtpPort := "587"
+	smtpUser := "your-email@gmail.com" // Replace or use env
+	smtpPass := "your-app-password"    // Replace or use env
+	smtpFrom := "your-email@gmail.com" // Replace or use env
+	
+	emailSvc := service.NewEmailService(smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom)
+	adminSvc := service.NewAdminService(store.JoinRequestRepository, store.UserRepository, store.LedgerRepository, store.OrganizationRepository, store.InvitationRepository, emailSvc)
 
 	// Initialize gRPC handlers
 	authHandler := api.NewAuthHandler(authSvc)

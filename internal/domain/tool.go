@@ -19,21 +19,30 @@ const (
 	ToolConditionDamaged   ToolCondition = "DAMAGED/NEEDS_REPAIR"
 )
 
+type ToolDurationUnit string
+
+const (
+	ToolDurationUnitDay ToolDurationUnit = "day"
+	ToolDurationUnitWeek ToolDurationUnit = "week"
+	ToolDurationUnitMonth ToolDurationUnit = "month"
+)
+
 type Tool struct {
-	ID                   int32         `json:"id"`
-	OwnerID              int32         `json:"owner_id"`
-	Name                 string        `json:"name"`
-	Description          string        `json:"description"`
-	Categories           []string      `json:"categories"`
-	PricePerDayCents     int32         `json:"price_per_day_cents"`
-	PricePerWeekCents    int32         `json:"price_per_week_cents"`
-	PricePerMonthCents   int32         `json:"price_per_month_cents"`
-	ReplacementCostCents int32         `json:"replacement_cost_cents"`
-	Condition            ToolCondition `json:"condition"`
-	Metro                string        `json:"metro"`
-	Status               ToolStatus    `json:"status"`
-	CreatedOn            time.Time     `json:"created_on"`
-	DeletedOn            *time.Time    `json:"deleted_on,omitempty"`
+	ID                   int32         		`json:"id"`
+	OwnerID              int32         		`json:"owner_id"`
+	Name                 string        		`json:"name"`
+	Description          string        		`json:"description"`
+	Categories           []string      		`json:"categories"`
+	PricePerDayCents     int32         		`json:"price_per_day_cents"`
+	PricePerWeekCents    int32         		`json:"price_per_week_cents"`
+	PricePerMonthCents   int32         		`json:"price_per_month_cents"`
+	ReplacementCostCents int32         		`json:"replacement_cost_cents"`
+	DurationUnit         ToolDurationUnit 	`json:"duration_unit"`
+	Condition            ToolCondition 		`json:"condition"`
+	Metro                string        		`json:"metro"`
+	Status               ToolStatus    		`json:"status"`
+	CreatedOn            time.Time     		`json:"created_on"`
+	DeletedOn            *time.Time    		`json:"deleted_on,omitempty"`
 }
 
 type ToolImage struct {

@@ -22,7 +22,6 @@ erDiagram
         TEXT password_hash
         TEXT name
         TEXT avatar_url
-
         DATE created_on
         DATE updated_on
     }
@@ -34,6 +33,8 @@ erDiagram
         INT balance_cents
         TEXT status
         TEXT role
+        TEXT block_reason
+        DATE blocked_date
     }
 
     INVITATIONS {

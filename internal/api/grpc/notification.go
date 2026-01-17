@@ -17,11 +17,18 @@ func NewNotificationHandler(noteSvc service.NotificationService) *NotificationHa
 }
 
 func (h *NotificationHandler) GetNotifications(ctx context.Context, req *pb.GetNotificationsRequest) (*pb.GetNotificationsResponse, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	// Map limit/offset to page/pageSize if needed, or update service
-	page := (req.Offset / req.Limit) + 1
+	page := int32(1)
+	if req.Limit > 0 {
+		page = (req.Offset / req.Limit) + 1
+	}
 	pageSize := req.Limit
 	
-	notes, count, err := h.noteSvc.GetNotifications(ctx, req.UserId, page, pageSize)
+	notes, count, err := h.noteSvc.GetNotifications(ctx, userID, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +43,11 @@ func (h *NotificationHandler) GetNotifications(ctx context.Context, req *pb.GetN
 }
 
 func (h *NotificationHandler) MarkNotificationRead(ctx context.Context, req *pb.MarkNotificationReadRequest) (*pb.MarkNotificationReadResponse, error) {
-	err := h.noteSvc.MarkAsRead(ctx, req.UserId, req.NotificationId)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = h.noteSvc.MarkAsRead(ctx, userID, req.NotificationId)
 	if err != nil {
 		return nil, err
 	}

@@ -69,11 +69,12 @@ message RejectRentalRequestRequest {
 // Reject rental request response
 message RejectRentalRequestResponse {
   bool success = 1;
+  RentalRequest rental_request = 2;
 }
 
 // Complete rental
 message CompleteRentalRequest {
-  string request_id = 1;
+  int32 request_id = 1;
 }
 
 // Complete rental response
@@ -83,7 +84,7 @@ message CompleteRentalResponse {
 
 // Get rental request
 message GetRentalRequest {
-  string request_id = 1;
+  int32 request_id = 1;
 }
 
 // Get rental response
@@ -93,11 +94,10 @@ message GetRentalResponse {
 
 // List my rentals request
 message ListMyRentalsRequest {
-  int32 user_id = 1;                   // Renter's user ID
-  int32 organization_id = 2;           // Organization context
-  RentalStatus status = 3;             // Filter by status (optional, 0 = all)
-  int32 page = 4;
-  int32 page_size = 5;
+  int32 organization_id = 1;           // Organization context
+  RentalStatus status = 2;             // Filter by status (optional, 0 = all)
+  int32 page = 3;
+  int32 page_size = 4;
 }
 
 // List my rentals response
@@ -108,11 +108,10 @@ message ListRentalsResponse {
 
 // List my lendings request
 message ListMyLendingsRequest {
-  int32 user_id = 1;                   // Owner's user ID
-  int32 organization_id = 2;           // Organization context
-  RentalStatus status = 3;             // Filter by status (optional, 0 = all)
-  int32 page = 4;
-  int32 page_size = 5;
+  int32 organization_id = 1;           // Organization context
+  RentalStatus status = 2;             // Filter by status (optional, 0 = all)
+  int32 page = 3;
+  int32 page_size = 4;
 }
 
 message FinalizeRentalRequestRequest {

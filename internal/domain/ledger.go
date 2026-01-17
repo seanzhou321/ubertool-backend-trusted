@@ -22,3 +22,10 @@ type LedgerTransaction struct {
 	ChargedOn       time.Time       `json:"charged_on"`
 	CreatedOn       time.Time       `json:"created_on"`
 }
+
+type LedgerSummary struct {
+	Balance              int32 `json:"balance"`
+	ActiveRentalsCount   int32 `json:"active_rentals_count"`
+	ActiveLendingsCount  int32 `json:"active_lendings_count"`
+	PendingRequestsCount int32 `json:"pending_requests_count"`
+}

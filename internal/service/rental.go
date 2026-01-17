@@ -76,59 +76,68 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 	return rental, nil
 }
 
-func (s *rentalService) ApproveRentalRequest(ctx context.Context, ownerID, rentalID int32, pickupNote string) error {
+func (s *rentalService) ApproveRentalRequest(ctx context.Context, ownerID, rentalID int32, pickupNote string) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if rt.OwnerID != ownerID {
-		return errors.New("unauthorized")
+		return nil, errors.New("unauthorized")
 	}
 	if rt.Status != domain.RentalStatusPending {
-		return errors.New("rental is not pending")
+		return nil, errors.New("rental is not pending")
 	}
 
 	rt.Status = domain.RentalStatusApproved
 	rt.PickupNote = pickupNote
-	return s.rentalRepo.Update(ctx, rt)
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+	return rt, nil
 }
 
-func (s *rentalService) RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) error {
+func (s *rentalService) RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if rt.OwnerID != ownerID {
-		return errors.New("unauthorized")
+		return nil, errors.New("unauthorized")
 	}
 
 	rt.Status = domain.RentalStatusCancelled
-	return s.rentalRepo.Update(ctx, rt)
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+	return rt, nil
 }
 
-func (s *rentalService) FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) error {
+func (s *rentalService) FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if rt.RenterID != renterID {
-		return errors.New("unauthorized")
+		return nil, errors.New("unauthorized")
 	}
 	if rt.Status != domain.RentalStatusApproved {
-		return errors.New("rental is not approved by owner")
+		return nil, errors.New("rental is not approved by owner")
 	}
 
 	rt.Status = domain.RentalStatusScheduled
-	return s.rentalRepo.Update(ctx, rt)
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+	return rt, nil
 }
 
-func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32) error {
+func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if rt.OwnerID != ownerID {
-		return errors.New("unauthorized")
+		return nil, errors.New("unauthorized")
 	}
 	
 	// Transaction: Renter -> Owner
@@ -141,7 +150,7 @@ func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID in
 		Description:     fmt.Sprintf("Rental for tool %d", rt.ToolID),
 	}
 	if err := s.ledgerRepo.CreateTransaction(ctx, debit); err != nil {
-		return err
+		return nil, err
 	}
 
 	credit := &domain.LedgerTransaction{
@@ -153,13 +162,16 @@ func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID in
 		Description:     fmt.Sprintf("Lending for tool %d", rt.ToolID),
 	}
 	if err := s.ledgerRepo.CreateTransaction(ctx, credit); err != nil {
-		return err
+		return nil, err
 	}
 
 	now := time.Now()
 	rt.EndDate = &now
 	rt.Status = domain.RentalStatusCompleted
-	return s.rentalRepo.Update(ctx, rt)
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+	return rt, nil
 }
 
 func (s *rentalService) ListRentals(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
@@ -168,4 +180,15 @@ func (s *rentalService) ListRentals(ctx context.Context, userID, orgID int32, st
 
 func (s *rentalService) ListLendings(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	return s.rentalRepo.ListByOwner(ctx, userID, orgID, status, page, pageSize)
+}
+
+func (s *rentalService) GetRental(ctx context.Context, userID, rentalID int32) (*domain.Rental, error) {
+	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
+	if err != nil {
+		return nil, err
+	}
+	if rt.RenterID != userID && rt.OwnerID != userID {
+		return nil, errors.New("unauthorized")
+	}
+	return rt, nil
 }

@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/service"
@@ -18,8 +17,10 @@ func NewRentalHandler(rentalSvc service.RentalService) *RentalHandler {
 }
 
 func (h *RentalHandler) CreateRentalRequest(ctx context.Context, req *pb.CreateRentalRequestRequest) (*pb.CreateRentalRequestResponse, error) {
-	// Need userID from context in real app
-	userID := int32(1) // Placeholder
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	rt, err := h.rentalSvc.CreateRentalRequest(ctx, userID, req.ToolId, req.OrganizationId, req.StartDate, req.EndDate)
 	if err != nil {
 		return nil, err
@@ -28,52 +29,62 @@ func (h *RentalHandler) CreateRentalRequest(ctx context.Context, req *pb.CreateR
 }
 
 func (h *RentalHandler) ApproveRentalRequest(ctx context.Context, req *pb.ApproveRentalRequestRequest) (*pb.ApproveRentalRequestResponse, error) {
-	userID := int32(1) // Placeholder
-	err := h.rentalSvc.ApproveRentalRequest(ctx, userID, req.RequestId, req.PickupInstructions)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// Note: proto expects the updated request back, but service doesn't return it yet.
-	// For now we'll just return a success stub or fetch it.
-	return &pb.ApproveRentalRequestResponse{}, nil
+	rt, err := h.rentalSvc.ApproveRentalRequest(ctx, userID, req.RequestId, req.PickupInstructions)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.ApproveRentalRequestResponse{RentalRequest: MapDomainRentalToProto(rt)}, nil
 }
 
 func (h *RentalHandler) RejectRentalRequest(ctx context.Context, req *pb.RejectRentalRequestRequest) (*pb.RejectRentalRequestResponse, error) {
-	userID := int32(1) // Placeholder
-	err := h.rentalSvc.RejectRentalRequest(ctx, userID, req.RequestId)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.RejectRentalRequestResponse{Success: true}, nil
+	rt, err := h.rentalSvc.RejectRentalRequest(ctx, userID, req.RequestId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.RejectRentalRequestResponse{
+		Success:       true,
+		RentalRequest: MapDomainRentalToProto(rt),
+	}, nil
 }
 
 func (h *RentalHandler) FinalizeRentalRequest(ctx context.Context, req *pb.FinalizeRentalRequestRequest) (*pb.FinalizeRentalRequestResponse, error) {
-	userID := int32(1) // Placeholder
-	err := h.rentalSvc.FinalizeRentalRequest(ctx, userID, req.RequestId)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.FinalizeRentalRequestResponse{}, nil
+	rt, err := h.rentalSvc.FinalizeRentalRequest(ctx, userID, req.RequestId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.FinalizeRentalRequestResponse{RentalRequest: MapDomainRentalToProto(rt)}, nil
 }
 
 func (h *RentalHandler) CompleteRental(ctx context.Context, req *pb.CompleteRentalRequest) (*pb.CompleteRentalResponse, error) {
-	userID := int32(1) // Placeholder
-	// request_id is string in proto for some reason in CompleteRentalRequest? 
-	// Let's check proto again. Row 76. Yes, string.
-	// We'll convert it.
-	var rid int32
-	fmt.Sscanf(req.RequestId, "%d", &rid)
-	
-	err := h.rentalSvc.CompleteRental(ctx, userID, rid)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.CompleteRentalResponse{}, nil
+	rt, err := h.rentalSvc.CompleteRental(ctx, userID, req.RequestId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.CompleteRentalResponse{RentalRequest: MapDomainRentalToProto(rt)}, nil
 }
 
 func (h *RentalHandler) ListMyRentals(ctx context.Context, req *pb.ListMyRentalsRequest) (*pb.ListRentalsResponse, error) {
-	userID := int32(1) // Placeholder
-	statusStr := "" // Map req.Status to string if needed
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	statusStr := MapProtoRentalStatusToDomain(req.Status)
 	rentals, count, err := h.rentalSvc.ListRentals(ctx, userID, req.OrganizationId, statusStr, req.Page, req.PageSize)
 	if err != nil {
 		return nil, err
@@ -89,8 +100,11 @@ func (h *RentalHandler) ListMyRentals(ctx context.Context, req *pb.ListMyRentals
 }
 
 func (h *RentalHandler) ListMyLendings(ctx context.Context, req *pb.ListMyLendingsRequest) (*pb.ListRentalsResponse, error) {
-	userID := int32(1) // Placeholder
-	statusStr := ""
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	statusStr := MapProtoRentalStatusToDomain(req.Status)
 	rentals, count, err := h.rentalSvc.ListLendings(ctx, userID, req.OrganizationId, statusStr, req.Page, req.PageSize)
 	if err != nil {
 		return nil, err
@@ -106,5 +120,14 @@ func (h *RentalHandler) ListMyLendings(ctx context.Context, req *pb.ListMyLendin
 }
 
 func (h *RentalHandler) GetRental(ctx context.Context, req *pb.GetRentalRequest) (*pb.GetRentalResponse, error) {
-	return &pb.GetRentalResponse{}, nil
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rt, err := h.rentalSvc.GetRental(ctx, userID, req.RequestId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetRentalResponse{RentalRequest: MapDomainRentalToProto(rt)}, nil
 }

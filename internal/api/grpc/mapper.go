@@ -120,8 +120,31 @@ func MapDomainRentalStatusToProto(s domain.RentalStatus) pb.RentalStatus {
 		return pb.RentalStatus_RENTAL_STATUS_COMPLETED
 	case domain.RentalStatusCancelled:
 		return pb.RentalStatus_RENTAL_STATUS_CANCELLED
+	case domain.RentalStatusOverdue:
+		return pb.RentalStatus_RENTAL_STATUS_OVERDUE
 	default:
 		return pb.RentalStatus_RENTAL_STATUS_UNSPECIFIED
+	}
+}
+
+func MapProtoRentalStatusToDomain(s pb.RentalStatus) string {
+	switch s {
+	case pb.RentalStatus_RENTAL_STATUS_PENDING:
+		return string(domain.RentalStatusPending)
+	case pb.RentalStatus_RENTAL_STATUS_APPROVED:
+		return string(domain.RentalStatusApproved)
+	case pb.RentalStatus_RENTAL_STATUS_SCHEDULED:
+		return string(domain.RentalStatusScheduled)
+	case pb.RentalStatus_RENTAL_STATUS_ACTIVE:
+		return string(domain.RentalStatusActive)
+	case pb.RentalStatus_RENTAL_STATUS_COMPLETED:
+		return string(domain.RentalStatusCompleted)
+	case pb.RentalStatus_RENTAL_STATUS_CANCELLED:
+		return string(domain.RentalStatusCancelled)
+	case pb.RentalStatus_RENTAL_STATUS_OVERDUE:
+		return string(domain.RentalStatusOverdue)
+	default:
+		return ""
 	}
 }
 
@@ -206,4 +229,16 @@ func MapDomainJoinRequestProfileToProto(jr *domain.JoinRequest) *pb.JoinRequestP
 		proto.UserId = *jr.UserID
 	}
 	return proto
+}
+
+func MapDomainLedgerSummaryToProto(s *domain.LedgerSummary) *pb.GetLedgerSummaryResponse {
+	if s == nil {
+		return &pb.GetLedgerSummaryResponse{}
+	}
+	return &pb.GetLedgerSummaryResponse{
+		Balance:              s.Balance,
+		ActiveRentalsCount:   s.ActiveRentalsCount,
+		ActiveLendingsCount:  s.ActiveLendingsCount,
+		PendingRequestsCount: s.PendingRequestsCount,
+	}
 }

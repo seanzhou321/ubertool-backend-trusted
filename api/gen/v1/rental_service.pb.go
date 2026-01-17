@@ -355,6 +355,7 @@ func (x *RejectRentalRequestRequest) GetReason() string {
 type RejectRentalRequestResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	RentalRequest *RentalRequest         `protobuf:"bytes,2,opt,name=rental_request,json=rentalRequest,proto3" json:"rental_request,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -396,10 +397,17 @@ func (x *RejectRentalRequestResponse) GetSuccess() bool {
 	return false
 }
 
+func (x *RejectRentalRequestResponse) GetRentalRequest() *RentalRequest {
+	if x != nil {
+		return x.RentalRequest
+	}
+	return nil
+}
+
 // Complete rental
 type CompleteRentalRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	RequestId     int32                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -434,11 +442,11 @@ func (*CompleteRentalRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_rental_service_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *CompleteRentalRequest) GetRequestId() string {
+func (x *CompleteRentalRequest) GetRequestId() int32 {
 	if x != nil {
 		return x.RequestId
 	}
-	return ""
+	return 0
 }
 
 // Complete rental response
@@ -489,7 +497,7 @@ func (x *CompleteRentalResponse) GetRentalRequest() *RentalRequest {
 // Get rental request
 type GetRentalRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	RequestId     int32                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -524,11 +532,11 @@ func (*GetRentalRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_rental_service_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *GetRentalRequest) GetRequestId() string {
+func (x *GetRentalRequest) GetRequestId() int32 {
 	if x != nil {
 		return x.RequestId
 	}
-	return ""
+	return 0
 }
 
 // Get rental response
@@ -579,11 +587,10 @@ func (x *GetRentalResponse) GetRentalRequest() *RentalRequest {
 // List my rentals request
 type ListMyRentalsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`                             // Renter's user ID
-	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`     // Organization context
-	Status         RentalStatus           `protobuf:"varint,3,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"` // Filter by status (optional, 0 = all)
-	Page           int32                  `protobuf:"varint,4,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize       int32                  `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`     // Organization context
+	Status         RentalStatus           `protobuf:"varint,2,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"` // Filter by status (optional, 0 = all)
+	Page           int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize       int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -616,13 +623,6 @@ func (x *ListMyRentalsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListMyRentalsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyRentalsRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_rental_service_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *ListMyRentalsRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 func (x *ListMyRentalsRequest) GetOrganizationId() int32 {
@@ -709,11 +709,10 @@ func (x *ListRentalsResponse) GetTotalCount() int32 {
 // List my lendings request
 type ListMyLendingsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`                             // Owner's user ID
-	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`     // Organization context
-	Status         RentalStatus           `protobuf:"varint,3,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"` // Filter by status (optional, 0 = all)
-	Page           int32                  `protobuf:"varint,4,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize       int32                  `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`     // Organization context
+	Status         RentalStatus           `protobuf:"varint,2,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"` // Filter by status (optional, 0 = all)
+	Page           int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize       int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -746,13 +745,6 @@ func (x *ListMyLendingsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListMyLendingsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyLendingsRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_rental_service_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *ListMyLendingsRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 func (x *ListMyLendingsRequest) GetOrganizationId() int32 {
@@ -1058,35 +1050,34 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\x1aRejectRentalRequestRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"7\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x86\x01\n" +
 	"\x1bRejectRentalRequestResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"6\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12M\n" +
+	"\x0erental_request\x18\x02 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"6\n" +
 	"\x15CompleteRentalRequest\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"g\n" +
+	"request_id\x18\x01 \x01(\x05R\trequestId\"g\n" +
 	"\x16CompleteRentalResponse\x12M\n" +
 	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"1\n" +
 	"\x10GetRentalRequest\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"b\n" +
+	"request_id\x18\x01 \x01(\x05R\trequestId\"b\n" +
 	"\x11GetRentalResponse\x12M\n" +
-	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xc8\x01\n" +
-	"\x14ListMyRentalsRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12=\n" +
-	"\x06status\x18\x03 \x01(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
-	"\x04page\x18\x04 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x05 \x01(\x05R\bpageSize\"x\n" +
+	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xaf\x01\n" +
+	"\x14ListMyRentalsRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12=\n" +
+	"\x06status\x18\x02 \x01(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"x\n" +
 	"\x13ListRentalsResponse\x12@\n" +
 	"\arentals\x18\x01 \x03(\v2&.ubertool.trusted.api.v1.RentalRequestR\arentals\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
-	"totalCount\"\xc9\x01\n" +
-	"\x15ListMyLendingsRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12=\n" +
-	"\x06status\x18\x03 \x01(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
-	"\x04page\x18\x04 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x05 \x01(\x05R\bpageSize\"V\n" +
+	"totalCount\"\xb0\x01\n" +
+	"\x15ListMyLendingsRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12=\n" +
+	"\x06status\x18\x02 \x01(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"V\n" +
 	"\x1cFinalizeRentalRequestRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\x12\x17\n" +
@@ -1172,34 +1163,35 @@ var file_ubertool_trusted_backend_v1_rental_service_proto_goTypes = []any{
 var file_ubertool_trusted_backend_v1_rental_service_proto_depIdxs = []int32{
 	16, // 0: ubertool.trusted.api.v1.CreateRentalRequestResponse.rental_request:type_name -> ubertool.trusted.api.v1.RentalRequest
 	16, // 1: ubertool.trusted.api.v1.ApproveRentalRequestResponse.rental_request:type_name -> ubertool.trusted.api.v1.RentalRequest
-	16, // 2: ubertool.trusted.api.v1.CompleteRentalResponse.rental_request:type_name -> ubertool.trusted.api.v1.RentalRequest
-	16, // 3: ubertool.trusted.api.v1.GetRentalResponse.rental_request:type_name -> ubertool.trusted.api.v1.RentalRequest
-	0,  // 4: ubertool.trusted.api.v1.ListMyRentalsRequest.status:type_name -> ubertool.trusted.api.v1.RentalStatus
-	16, // 5: ubertool.trusted.api.v1.ListRentalsResponse.rentals:type_name -> ubertool.trusted.api.v1.RentalRequest
-	0,  // 6: ubertool.trusted.api.v1.ListMyLendingsRequest.status:type_name -> ubertool.trusted.api.v1.RentalStatus
-	16, // 7: ubertool.trusted.api.v1.FinalizeRentalRequestResponse.rental_request:type_name -> ubertool.trusted.api.v1.RentalRequest
-	0,  // 8: ubertool.trusted.api.v1.RentalRequest.status:type_name -> ubertool.trusted.api.v1.RentalStatus
-	3,  // 9: ubertool.trusted.api.v1.RentalService.ApproveRentalRequest:input_type -> ubertool.trusted.api.v1.ApproveRentalRequestRequest
-	5,  // 10: ubertool.trusted.api.v1.RentalService.RejectRentalRequest:input_type -> ubertool.trusted.api.v1.RejectRentalRequestRequest
-	13, // 11: ubertool.trusted.api.v1.RentalService.ListMyLendings:input_type -> ubertool.trusted.api.v1.ListMyLendingsRequest
-	7,  // 12: ubertool.trusted.api.v1.RentalService.CompleteRental:input_type -> ubertool.trusted.api.v1.CompleteRentalRequest
-	9,  // 13: ubertool.trusted.api.v1.RentalService.GetRental:input_type -> ubertool.trusted.api.v1.GetRentalRequest
-	1,  // 14: ubertool.trusted.api.v1.RentalService.CreateRentalRequest:input_type -> ubertool.trusted.api.v1.CreateRentalRequestRequest
-	14, // 15: ubertool.trusted.api.v1.RentalService.FinalizeRentalRequest:input_type -> ubertool.trusted.api.v1.FinalizeRentalRequestRequest
-	11, // 16: ubertool.trusted.api.v1.RentalService.ListMyRentals:input_type -> ubertool.trusted.api.v1.ListMyRentalsRequest
-	4,  // 17: ubertool.trusted.api.v1.RentalService.ApproveRentalRequest:output_type -> ubertool.trusted.api.v1.ApproveRentalRequestResponse
-	6,  // 18: ubertool.trusted.api.v1.RentalService.RejectRentalRequest:output_type -> ubertool.trusted.api.v1.RejectRentalRequestResponse
-	12, // 19: ubertool.trusted.api.v1.RentalService.ListMyLendings:output_type -> ubertool.trusted.api.v1.ListRentalsResponse
-	8,  // 20: ubertool.trusted.api.v1.RentalService.CompleteRental:output_type -> ubertool.trusted.api.v1.CompleteRentalResponse
-	10, // 21: ubertool.trusted.api.v1.RentalService.GetRental:output_type -> ubertool.trusted.api.v1.GetRentalResponse
-	2,  // 22: ubertool.trusted.api.v1.RentalService.CreateRentalRequest:output_type -> ubertool.trusted.api.v1.CreateRentalRequestResponse
-	15, // 23: ubertool.trusted.api.v1.RentalService.FinalizeRentalRequest:output_type -> ubertool.trusted.api.v1.FinalizeRentalRequestResponse
-	12, // 24: ubertool.trusted.api.v1.RentalService.ListMyRentals:output_type -> ubertool.trusted.api.v1.ListRentalsResponse
-	17, // [17:25] is the sub-list for method output_type
-	9,  // [9:17] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	16, // 2: ubertool.trusted.api.v1.RejectRentalRequestResponse.rental_request:type_name -> ubertool.trusted.api.v1.RentalRequest
+	16, // 3: ubertool.trusted.api.v1.CompleteRentalResponse.rental_request:type_name -> ubertool.trusted.api.v1.RentalRequest
+	16, // 4: ubertool.trusted.api.v1.GetRentalResponse.rental_request:type_name -> ubertool.trusted.api.v1.RentalRequest
+	0,  // 5: ubertool.trusted.api.v1.ListMyRentalsRequest.status:type_name -> ubertool.trusted.api.v1.RentalStatus
+	16, // 6: ubertool.trusted.api.v1.ListRentalsResponse.rentals:type_name -> ubertool.trusted.api.v1.RentalRequest
+	0,  // 7: ubertool.trusted.api.v1.ListMyLendingsRequest.status:type_name -> ubertool.trusted.api.v1.RentalStatus
+	16, // 8: ubertool.trusted.api.v1.FinalizeRentalRequestResponse.rental_request:type_name -> ubertool.trusted.api.v1.RentalRequest
+	0,  // 9: ubertool.trusted.api.v1.RentalRequest.status:type_name -> ubertool.trusted.api.v1.RentalStatus
+	3,  // 10: ubertool.trusted.api.v1.RentalService.ApproveRentalRequest:input_type -> ubertool.trusted.api.v1.ApproveRentalRequestRequest
+	5,  // 11: ubertool.trusted.api.v1.RentalService.RejectRentalRequest:input_type -> ubertool.trusted.api.v1.RejectRentalRequestRequest
+	13, // 12: ubertool.trusted.api.v1.RentalService.ListMyLendings:input_type -> ubertool.trusted.api.v1.ListMyLendingsRequest
+	7,  // 13: ubertool.trusted.api.v1.RentalService.CompleteRental:input_type -> ubertool.trusted.api.v1.CompleteRentalRequest
+	9,  // 14: ubertool.trusted.api.v1.RentalService.GetRental:input_type -> ubertool.trusted.api.v1.GetRentalRequest
+	1,  // 15: ubertool.trusted.api.v1.RentalService.CreateRentalRequest:input_type -> ubertool.trusted.api.v1.CreateRentalRequestRequest
+	14, // 16: ubertool.trusted.api.v1.RentalService.FinalizeRentalRequest:input_type -> ubertool.trusted.api.v1.FinalizeRentalRequestRequest
+	11, // 17: ubertool.trusted.api.v1.RentalService.ListMyRentals:input_type -> ubertool.trusted.api.v1.ListMyRentalsRequest
+	4,  // 18: ubertool.trusted.api.v1.RentalService.ApproveRentalRequest:output_type -> ubertool.trusted.api.v1.ApproveRentalRequestResponse
+	6,  // 19: ubertool.trusted.api.v1.RentalService.RejectRentalRequest:output_type -> ubertool.trusted.api.v1.RejectRentalRequestResponse
+	12, // 20: ubertool.trusted.api.v1.RentalService.ListMyLendings:output_type -> ubertool.trusted.api.v1.ListRentalsResponse
+	8,  // 21: ubertool.trusted.api.v1.RentalService.CompleteRental:output_type -> ubertool.trusted.api.v1.CompleteRentalResponse
+	10, // 22: ubertool.trusted.api.v1.RentalService.GetRental:output_type -> ubertool.trusted.api.v1.GetRentalResponse
+	2,  // 23: ubertool.trusted.api.v1.RentalService.CreateRentalRequest:output_type -> ubertool.trusted.api.v1.CreateRentalRequestResponse
+	15, // 24: ubertool.trusted.api.v1.RentalService.FinalizeRentalRequest:output_type -> ubertool.trusted.api.v1.FinalizeRentalRequestResponse
+	12, // 25: ubertool.trusted.api.v1.RentalService.ListMyRentals:output_type -> ubertool.trusted.api.v1.ListRentalsResponse
+	18, // [18:26] is the sub-list for method output_type
+	10, // [10:18] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_rental_service_proto_init() }

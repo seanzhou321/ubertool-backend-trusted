@@ -57,3 +57,33 @@ func (r *ledgerRepository) ListTransactions(ctx context.Context, userID, orgID i
 	}
 	return txs, count, nil
 }
+func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error) {
+	summary := &domain.LedgerSummary{}
+	
+	// Balance
+	balance, err := r.GetBalance(ctx, userID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	summary.Balance = balance
+
+	// Active Rentals Count
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE renter_id = $1 AND org_id = $2 AND status = 'ACTIVE'", userID, orgID).Scan(&summary.ActiveRentalsCount)
+	if err != nil {
+		return nil, err
+	}
+
+	// Active Lendings Count
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE owner_id = $1 AND org_id = $2 AND status = 'ACTIVE'", userID, orgID).Scan(&summary.ActiveLendingsCount)
+	if err != nil {
+		return nil, err
+	}
+
+	// Pending Requests Count
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE (renter_id = $1 OR owner_id = $1) AND org_id = $2 AND status = 'PENDING'", userID, orgID).Scan(&summary.PendingRequestsCount)
+	if err != nil {
+		return nil, err
+	}
+
+	return summary, nil
+}

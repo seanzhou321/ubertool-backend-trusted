@@ -6,7 +6,6 @@ option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
 
 import "ubertool_trusted_backend/v1/user_service.proto";
-import "ubertool_trusted_backend/v1/organization_service.proto";
 
 option java_multiple_files = true;
 option java_package = "com.ubertool.trusted.api.v1";
@@ -107,7 +106,6 @@ message RefreshTokenResponse {
 
 // Logout request
 message LogoutRequest {
-  int32 user_id = 1;
 }
 
 // Logout response

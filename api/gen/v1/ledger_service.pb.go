@@ -80,8 +80,7 @@ func (TransactionType) EnumDescriptor() ([]byte, []int) {
 // Get balance request
 type GetBalanceRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -114,13 +113,6 @@ func (x *GetBalanceRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetBalanceRequest.ProtoReflect.Descriptor instead.
 func (*GetBalanceRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_ledger_service_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *GetBalanceRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 func (x *GetBalanceRequest) GetOrganizationId() int32 {
@@ -186,10 +178,9 @@ func (x *GetBalanceResponse) GetLastUpdatedOn() string {
 // Get transactions request
 type GetTransactionsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	Page           int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize       int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Page           int32                  `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize       int32                  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -222,13 +213,6 @@ func (x *GetTransactionsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetTransactionsRequest.ProtoReflect.Descriptor instead.
 func (*GetTransactionsRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_ledger_service_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *GetTransactionsRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 func (x *GetTransactionsRequest) GetOrganizationId() int32 {
@@ -308,8 +292,7 @@ func (x *GetTransactionsResponse) GetTotalCount() int32 {
 // Get ledger summary request
 type GetLedgerSummaryRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -342,13 +325,6 @@ func (x *GetLedgerSummaryRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetLedgerSummaryRequest.ProtoReflect.Descriptor instead.
 func (*GetLedgerSummaryRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_ledger_service_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *GetLedgerSummaryRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 func (x *GetLedgerSummaryRequest) GetOrganizationId() int32 {
@@ -540,25 +516,22 @@ var File_ubertool_trusted_backend_v1_ledger_service_proto protoreflect.FileDescr
 
 const file_ubertool_trusted_backend_v1_ledger_service_proto_rawDesc = "" +
 	"\n" +
-	"0ubertool_trusted_backend/v1/ledger_service.proto\x12\x17ubertool.trusted.api.v1\"U\n" +
-	"\x11GetBalanceRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\"V\n" +
+	"0ubertool_trusted_backend/v1/ledger_service.proto\x12\x17ubertool.trusted.api.v1\"<\n" +
+	"\x11GetBalanceRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"V\n" +
 	"\x12GetBalanceResponse\x12\x18\n" +
 	"\abalance\x18\x01 \x01(\x05R\abalance\x12&\n" +
-	"\x0flast_updated_on\x18\x02 \x01(\tR\rlastUpdatedOn\"\x8b\x01\n" +
-	"\x16GetTransactionsRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12\x12\n" +
-	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\x84\x01\n" +
+	"\x0flast_updated_on\x18\x02 \x01(\tR\rlastUpdatedOn\"r\n" +
+	"\x16GetTransactionsRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12\x12\n" +
+	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"\x84\x01\n" +
 	"\x17GetTransactionsResponse\x12H\n" +
 	"\ftransactions\x18\x01 \x03(\v2$.ubertool.trusted.api.v1.TransactionR\ftransactions\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
-	"totalCount\"[\n" +
-	"\x17GetLedgerSummaryRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\"\xa7\x02\n" +
+	"totalCount\"B\n" +
+	"\x17GetLedgerSummaryRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"\xa7\x02\n" +
 	"\x18GetLedgerSummaryResponse\x12\x18\n" +
 	"\abalance\x18\x01 \x01(\x05R\abalance\x12U\n" +
 	"\x13recent_transactions\x18\x02 \x03(\v2$.ubertool.trusted.api.v1.TransactionR\x12recentTransactions\x120\n" +

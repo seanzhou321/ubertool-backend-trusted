@@ -578,7 +578,6 @@ func (x *RefreshTokenResponse) GetRefreshToken() string {
 // Logout request
 type LogoutRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -611,13 +610,6 @@ func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use LogoutRequest.ProtoReflect.Descriptor instead.
 func (*LogoutRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_auth_service_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *LogoutRequest) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
 }
 
 // Logout response
@@ -791,7 +783,7 @@ var File_ubertool_trusted_backend_v1_auth_service_proto protoreflect.FileDescrip
 
 const file_ubertool_trusted_backend_v1_auth_service_proto_rawDesc = "" +
 	"\n" +
-	".ubertool_trusted_backend/v1/auth_service.proto\x12\x17ubertool.trusted.api.v1\x1a.ubertool_trusted_backend/v1/user_service.proto\x1a6ubertool_trusted_backend/v1/organization_service.proto\"V\n" +
+	".ubertool_trusted_backend/v1/auth_service.proto\x12\x17ubertool.trusted.api.v1\x1a.ubertool_trusted_backend/v1/user_service.proto\"V\n" +
 	"\x15ValidateInviteRequest\x12'\n" +
 	"\x0finvitation_code\x18\x01 \x01(\tR\x0einvitationCode\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\".\n" +
@@ -826,9 +818,8 @@ const file_ubertool_trusted_backend_v1_auth_service_proto_rawDesc = "" +
 	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"^\n" +
 	"\x14RefreshTokenResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
-	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"(\n" +
-	"\rLogoutRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\"*\n" +
+	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"\x0f\n" +
+	"\rLogoutRequest\"*\n" +
 	"\x0eLogoutResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x83\x01\n" +
 	"\x14RequestToJoinRequest\x12'\n" +
@@ -910,7 +901,6 @@ func file_ubertool_trusted_backend_v1_auth_service_proto_init() {
 		return
 	}
 	file_ubertool_trusted_backend_v1_user_service_proto_init()
-	file_ubertool_trusted_backend_v1_organization_service_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
