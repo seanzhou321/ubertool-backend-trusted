@@ -7,8 +7,8 @@ import (
 
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/repository"
+	"ubertool-backend-trusted/internal/security"
 
-	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -17,13 +17,14 @@ var (
 	ErrInviteExpired      = errors.New("invitation has expired")
 	ErrInviteUsed         = errors.New("invitation already used")
 	ErrInvalidToken       = errors.New("invalid token")
+	ErrInvalid2FACode     = errors.New("invalid 2fa code")
 )
 
 type authService struct {
 	userRepo   repository.UserRepository
 	inviteRepo repository.InvitationRepository
 	reqRepo    repository.JoinRequestRepository
-	jwtSecret  []byte
+	tm         security.TokenManager
 }
 
 func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, secret string) AuthService {
@@ -31,7 +32,7 @@ func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.In
 		userRepo:   userRepo,
 		inviteRepo: inviteRepo,
 		reqRepo:    reqRepo,
-		jwtSecret:  []byte(secret),
+		tm:         security.NewTokenManager(secret),
 	}
 }
 
@@ -101,84 +102,102 @@ func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phon
 		return nil, "", "", err
 	}
 
-	access, refresh, err := s.generateTokens(user.ID)
-	return user, access, refresh, err
+	access, err := s.tm.GenerateAccessToken(user.ID, []string{"user"})
+	if err != nil {
+		return nil, "", "", err
+	}
+	refresh, err := s.tm.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	return user, access, refresh, nil
 }
 
-func (s *authService) Login(ctx context.Context, email, password string) (string, string, error) {
+func (s *authService) Login(ctx context.Context, email, password string) (string, string, string, bool, error) {
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
-		return "", "", ErrInvalidCredentials
+		return "", "", "", false, ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return "", "", ErrInvalidCredentials
+		return "", "", "", false, ErrInvalidCredentials
 	}
 
-	return s.generateTokens(user.ID)
+	// Assume 2FA is always enabled for trusted backend
+	requires2FA := true
+
+	if requires2FA {
+		sessionToken, err := s.tm.Generate2FAToken(user.ID, "email")
+		if err != nil {
+			return "", "", "", false, err
+		}
+		// In a real implementation, we would send the email here.
+		// emailService.Send2FACode(user.Email, generatedCode)
+		return "", "", sessionToken, true, nil
+	}
+
+	access, err := s.tm.GenerateAccessToken(user.ID, []string{"user"}) // Retrieve roles
+	if err != nil {
+		return "", "", "", false, err
+	}
+	refresh, err := s.tm.GenerateRefreshToken(user.ID)
+	if err != nil {
+		return "", "", "", false, err
+	}
+
+	return access, refresh, "", false, nil
 }
 
-func (s *authService) Verify2FA(ctx context.Context, email, code string) (string, string, error) {
-	// Mock 2FA verification - for demonstration, "123456" is always valid
+func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) (string, string, error) {
+	// Mock 2FA verification
 	if code != "123456" {
-		return "", "", errors.New("invalid 2fa code")
+		return "", "", ErrInvalid2FACode
 	}
 
-	user, err := s.userRepo.GetByEmail(ctx, email)
+	// Verify user still exists
+	_, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return "", "", err
 	}
 
-	return s.generateTokens(user.ID)
-}
-
-func (s *authService) RefreshToken(ctx context.Context, refresh string) (string, string, error) {
-	token, err := jwt.Parse(refresh, func(token *jwt.Token) (interface{}, error) {
-		return s.jwtSecret, nil
-	})
-
-	if err != nil || !token.Valid {
-		return "", "", ErrInvalidToken
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || claims["type"] != "refresh" {
-		return "", "", ErrInvalidToken
-	}
-
-	userID := int32(claims["sub"].(float64))
-	return s.generateTokens(userID)
-}
-
-func (s *authService) Logout(ctx context.Context, refresh string) error {
-	// In a real app, we might blacklist the refresh token
-	return nil
-}
-
-func (s *authService) generateTokens(userID int32) (string, string, error) {
-	// Access Token (15 mins)
-	accessClaims := jwt.MapClaims{
-		"sub":  userID,
-		"exp":  time.Now().Add(time.Minute * 15).Unix(),
-		"type": "access",
-	}
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	access, err := accessToken.SignedString(s.jwtSecret)
+	// Generate tokens
+	access, err := s.tm.GenerateAccessToken(userID, []string{"user"})
 	if err != nil {
 		return "", "", err
 	}
-
-	// Refresh Token (7 days)
-	refreshClaims := jwt.MapClaims{
-		"sub":  userID,
-		"exp":  time.Now().Add(time.Hour * 24 * 7).Unix(),
-		"type": "refresh",
-	}
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refresh, err := refreshToken.SignedString(s.jwtSecret)
+	refresh, err := s.tm.GenerateRefreshToken(userID)
 	if err != nil {
 		return "", "", err
 	}
 
 	return access, refresh, nil
+}
+
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+	claims, err := s.tm.ValidateToken(refreshToken)
+	if err != nil {
+		return "", "", err
+	}
+
+	if claims.Type != security.TokenTypeRefresh {
+		return "", "", ErrInvalidToken
+	}
+
+	access, err := s.tm.GenerateAccessToken(claims.UserID, claims.Roles)
+	if err != nil {
+		return "", "", err
+	}
+
+	refresh, err := s.tm.GenerateRefreshToken(claims.UserID)
+	if err != nil {
+		return "", "", err
+	}
+
+	return access, refresh, nil
+}
+
+func (s *authService) Logout(ctx context.Context, refresh string) error {
+	// In a real app, we might blacklist the refresh token
+	return nil
 }

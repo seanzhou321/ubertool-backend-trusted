@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net"
 
@@ -9,9 +10,11 @@ import (
 
 	pb "ubertool-backend-trusted/api/gen/v1"
 	api "ubertool-backend-trusted/internal/api/grpc"
+	"ubertool-backend-trusted/internal/api/grpc/interceptor"
 	"ubertool-backend-trusted/internal/repository/postgres"
+	"ubertool-backend-trusted/internal/security"
 	"ubertool-backend-trusted/internal/service"
-	"database/sql"
+
 	_ "github.com/lib/pq"
 )
 
@@ -26,22 +29,28 @@ func main() {
 	// Initialize Repositories
 	store := postgres.NewStore(db)
 
+	jwtSecret := "secret"
+
+	// Initialize Security
+	tokenManager := security.NewTokenManager(jwtSecret)
+	authInterceptor := interceptor.NewAuthInterceptor(tokenManager)
+
 	// Initialize Services
-	authSvc := service.NewAuthService(store.UserRepository, store.InvitationRepository, store.JoinRequestRepository, "secret")
+	authSvc := service.NewAuthService(store.UserRepository, store.InvitationRepository, store.JoinRequestRepository, jwtSecret)
 	userSvc := service.NewUserService(store.UserRepository)
 	orgSvc := service.NewOrganizationService(store.OrganizationRepository)
 	toolSvc := service.NewToolService(store.ToolRepository)
 	ledgerSvc := service.NewLedgerService(store.LedgerRepository)
 	noteSvc := service.NewNotificationService(store.NotificationRepository)
 	rentalSvc := service.NewRentalService(store.RentalRepository, store.ToolRepository, store.LedgerRepository, store.UserRepository)
-	
+
 	// Gmail Configuration from Environment Variables
 	smtpHost := "smtp.gmail.com"
 	smtpPort := "587"
 	smtpUser := "your-email@gmail.com" // Replace or use env
 	smtpPass := "your-app-password"    // Replace or use env
 	smtpFrom := "your-email@gmail.com" // Replace or use env
-	
+
 	emailSvc := service.NewEmailService(smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom)
 	adminSvc := service.NewAdminService(store.JoinRequestRepository, store.UserRepository, store.LedgerRepository, store.OrganizationRepository, store.InvitationRepository, emailSvc)
 
@@ -61,7 +70,9 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		grpc.UnaryInterceptor(authInterceptor.Unary()),
+	)
 	pb.RegisterAuthServiceServer(s, authHandler)
 	pb.RegisterUserServiceServer(s, userHandler)
 	pb.RegisterOrganizationServiceServer(s, orgHandler)

@@ -30,14 +30,15 @@ service AuthService {
   rpc Login(LoginRequest) returns (LoginResponse);
 
   // Verify 2FA code
-  // No access_token required
+  // 2FA token required
   rpc Verify2FA(Verify2FARequest) returns (Verify2FAResponse);
 
   // Refresh access token
-  // No access_token required
+  // RefreshToken sent in metadata
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
 
   // Logout
+  // AccessToken required
   rpc Logout(LogoutRequest) returns (LogoutResponse);
 }
 
@@ -50,6 +51,7 @@ message ValidateInviteRequest {
 // Validate invitation response
 message ValidateInviteResponse {
   bool valid = 1;
+  string message = 2;
 }
 
 // Login request
@@ -60,14 +62,13 @@ message LoginRequest {
 
 // Login response
 message LoginResponse {
-  string session_id = 1;
-  bool requires_2fa = 2;
+  string two_fa_token = 1;
+  int64 expires_at = 2;
 }
 
 // 2FA verification request
 message Verify2FARequest {
-  string session_id = 1;
-  string code = 2;
+  string code = 1;
 }
 
 // 2FA verification response
@@ -95,7 +96,7 @@ message SignupResponse {
 
 // Refresh token request
 message RefreshTokenRequest {
-  string refresh_token = 1;
+  // refresh_token sent in metadata
 }
 
 // Refresh token response

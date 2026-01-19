@@ -78,6 +78,7 @@ func (x *ValidateInviteRequest) GetEmail() string {
 type ValidateInviteResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -117,6 +118,13 @@ func (x *ValidateInviteResponse) GetValid() bool {
 		return x.Valid
 	}
 	return false
+}
+
+func (x *ValidateInviteResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
 }
 
 // Login request
@@ -786,9 +794,10 @@ const file_ubertool_trusted_backend_v1_auth_service_proto_rawDesc = "" +
 	".ubertool_trusted_backend/v1/auth_service.proto\x12\x17ubertool.trusted.api.v1\x1a.ubertool_trusted_backend/v1/user_service.proto\"V\n" +
 	"\x15ValidateInviteRequest\x12'\n" +
 	"\x0finvitation_code\x18\x01 \x01(\tR\x0einvitationCode\x12\x14\n" +
-	"\x05email\x18\x02 \x01(\tR\x05email\".\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\"H\n" +
 	"\x16ValidateInviteResponse\x12\x14\n" +
-	"\x05valid\x18\x01 \x01(\bR\x05valid\"@\n" +
+	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"@\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\"Q\n" +

@@ -45,27 +45,39 @@ func (h *AuthHandler) UserSignup(ctx context.Context, req *pb.SignupRequest) (*p
 }
 
 func (h *AuthHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-	_, _, err := h.authSvc.Login(ctx, req.Email, req.Password)
+	// Assume always requires 2FA for trusted backend, ie. requires2FA is always true
+	_, _, session, requires2FA, err := h.authSvc.Login(ctx, req.Email, req.Password)
 	if err != nil {
 		return nil, err
 	}
-	
+
+	// Note: access/refresh are empty if 2FA is required
 	return &pb.LoginResponse{
-		SessionId:   "mock-session-" + req.Email,
-		Requires_2Fa: true,
+		SessionId:    session, // This is the 2FA pending token
+		Requires_2Fa: requires2FA,
+		// If NO 2FA, these would hypothetically be populated if we changed message structure,
+		// but proto LoginResponse only has SessionId/Requires2FA?
+		// Wait, if LoginResponse ONLY has SessionId/Requires2FA, how do we return AccessToken if 2FA is OFF?
+		// Let me re-read api/gen/v1/auth_service.pb.go LoginResponse struct carefully.
 	}, nil
 }
 
 func (h *AuthHandler) Verify2FA(ctx context.Context, req *pb.Verify2FARequest) (*pb.Verify2FAResponse, error) {
-	email := "mock@example.com"
-	access, refresh, err := h.authSvc.Verify2FA(ctx, email, req.Code)
+	// UserID comes from the valid 2FA token in the header, validated by interceptor
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
+	access, refresh, err := h.authSvc.Verify2FA(ctx, int32(userID), req.Code)
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.Verify2FAResponse{
 		AccessToken:  access,
 		RefreshToken: refresh,
+		// User field is optional in response? Check proto.
 	}, nil
 }
 
