@@ -60,11 +60,26 @@ func (h *RentalHandler) FinalizeRentalRequest(ctx context.Context, req *pb.Final
 	if err != nil {
 		return nil, err
 	}
-	rt, err := h.rentalSvc.FinalizeRentalRequest(ctx, userID, req.RequestId)
+	rt, approved, pending, err := h.rentalSvc.FinalizeRentalRequest(ctx, userID, req.RequestId)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.FinalizeRentalRequestResponse{RentalRequest: MapDomainRentalToProto(rt)}, nil
+	
+	protoApproved := make([]*pb.RentalRequest, len(approved))
+	for i, r := range approved {
+		protoApproved[i] = MapDomainRentalToProto(&r)
+	}
+	
+	protoPending := make([]*pb.RentalRequest, len(pending))
+	for i, r := range pending {
+		protoPending[i] = MapDomainRentalToProto(&r)
+	}
+
+	return &pb.FinalizeRentalRequestResponse{
+		RentalRequest:   MapDomainRentalToProto(rt),
+		ApprovedRentals: protoApproved,
+		PendingRentals:  protoPending,
+	}, nil
 }
 
 func (h *RentalHandler) CompleteRental(ctx context.Context, req *pb.CompleteRentalRequest) (*pb.CompleteRentalResponse, error) {

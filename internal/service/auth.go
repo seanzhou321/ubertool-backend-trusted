@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
@@ -18,20 +19,27 @@ var (
 	ErrInviteUsed         = errors.New("invitation already used")
 	ErrInvalidToken       = errors.New("invalid token")
 	ErrInvalid2FACode     = errors.New("invalid 2fa code")
+	ErrOrgNotFound        = errors.New("organization not found")
 )
 
 type authService struct {
 	userRepo   repository.UserRepository
 	inviteRepo repository.InvitationRepository
 	reqRepo    repository.JoinRequestRepository
+	orgRepo    repository.OrganizationRepository
+	noteRepo   repository.NotificationRepository
+	emailSvc   EmailService
 	tm         security.TokenManager
 }
 
-func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, secret string) AuthService {
+func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteRepo repository.NotificationRepository, emailSvc EmailService, secret string) AuthService {
 	return &authService{
 		userRepo:   userRepo,
 		inviteRepo: inviteRepo,
 		reqRepo:    reqRepo,
+		orgRepo:    orgRepo,
+		noteRepo:   noteRepo,
+		emailSvc:   emailSvc,
 		tm:         security.NewTokenManager(secret),
 	}
 }
@@ -51,14 +59,70 @@ func (s *authService) ValidateInvite(ctx context.Context, token string) (*domain
 }
 
 func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, email, note string) error {
+	// 1. Verify org exists
+	org, err := s.orgRepo.GetByID(ctx, orgID)
+	if err != nil {
+		return err // Could verify if err is NotFound and return ErrOrgNotFound
+	}
+	if org == nil {
+		return ErrOrgNotFound
+	}
+
+	// 2. Search user by email
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	var userID *int32
+	if err == nil && user != nil {
+		userID = &user.ID
+	}
+
+	// 3. Create join request
 	req := &domain.JoinRequest{
 		OrgID:  orgID,
+		UserID: userID,
 		Name:   name,
 		Email:  email,
 		Note:   note,
 		Status: domain.JoinRequestStatusPending,
 	}
-	return s.reqRepo.Create(ctx, req)
+	if err := s.reqRepo.Create(ctx, req); err != nil {
+		return err
+	}
+
+	// 4. Find admin users to notify
+	users, userOrgs, err := s.userRepo.ListMembersByOrg(ctx, orgID)
+	if err != nil {
+		// Log error but don't fail the request? Or fail? Better to fail or log.
+		// For prototype, returning error is safer to detect issues.
+		return fmt.Errorf("failed to list admins for notification: %w", err)
+	}
+
+	for i, u := range users {
+		uo := userOrgs[i]
+		if uo.Role == domain.UserOrgRoleAdmin || uo.Role == domain.UserOrgRoleSuperAdmin {
+			// 5. Send Email
+			subject := fmt.Sprintf("New Join Request for %s", org.Name)
+			message := fmt.Sprintf("User %s (%s) has requested to join %s.\nMessage: %s", name, email, org.Name, note)
+			// We act on best effort for notifications?
+			_ = s.emailSvc.SendAdminNotification(ctx, u.Email, subject, message)
+
+			// 6. Create Notification
+			notif := &domain.Notification{
+				UserID:  u.ID,
+				OrgID:   orgID,
+				Title:   "New Join Request",
+				Message: fmt.Sprintf("%s requested to join %s", name, org.Name),
+				IsRead:  false,
+				Attributes: map[string]string{
+					"type":      "JOIN_REQUEST",
+					"reference": fmt.Sprintf("join_request:%d", req.ID),
+				},
+				CreatedOn: time.Now(),
+			}
+			_ = s.noteRepo.Create(ctx, notif)
+		}
+	}
+
+	return nil
 }
 
 func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phone, password string) (*domain.User, string, string, error) {
@@ -132,8 +196,17 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		if err != nil {
 			return "", "", "", false, err
 		}
-		// In a real implementation, we would send the email here.
-		// emailService.Send2FACode(user.Email, generatedCode)
+		
+		// Send 2FA code via email
+		// For prototype, we might hardcode or log it.
+		// "123456" is hardcoded in Verify2FA currently.
+		// Real implementation should generate random code and store it in Redis/Session.
+		// For now, we can send the hardcoded code via email to demonstrate flow.
+		code := "123456" 
+		subject := "Your 2FA Code"
+		message := fmt.Sprintf("Your login code is: %s", code)
+		_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message)
+
 		return "", "", sessionToken, true, nil
 	}
 

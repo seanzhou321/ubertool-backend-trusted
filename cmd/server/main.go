@@ -35,15 +35,6 @@ func main() {
 	tokenManager := security.NewTokenManager(jwtSecret)
 	authInterceptor := interceptor.NewAuthInterceptor(tokenManager)
 
-	// Initialize Services
-	authSvc := service.NewAuthService(store.UserRepository, store.InvitationRepository, store.JoinRequestRepository, jwtSecret)
-	userSvc := service.NewUserService(store.UserRepository)
-	orgSvc := service.NewOrganizationService(store.OrganizationRepository)
-	toolSvc := service.NewToolService(store.ToolRepository)
-	ledgerSvc := service.NewLedgerService(store.LedgerRepository)
-	noteSvc := service.NewNotificationService(store.NotificationRepository)
-	rentalSvc := service.NewRentalService(store.RentalRepository, store.ToolRepository, store.LedgerRepository, store.UserRepository)
-	
 	// Create uploads directory if not exists
 	uploadDir := "./uploads"
 	imageSvc := service.NewImageStorageService(store.ToolRepository, uploadDir)
@@ -56,6 +47,15 @@ func main() {
 	smtpFrom := "your-email@gmail.com" // Replace or use env
 
 	emailSvc := service.NewEmailService(smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom)
+
+	// Initialize Services
+	authSvc := service.NewAuthService(store.UserRepository, store.InvitationRepository, store.JoinRequestRepository, store.OrganizationRepository, store.NotificationRepository, emailSvc, jwtSecret)
+	userSvc := service.NewUserService(store.UserRepository)
+	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository)
+	toolSvc := service.NewToolService(store.ToolRepository, store.UserRepository)
+	ledgerSvc := service.NewLedgerService(store.LedgerRepository)
+	noteSvc := service.NewNotificationService(store.NotificationRepository)
+	rentalSvc := service.NewRentalService(store.RentalRepository, store.ToolRepository, store.LedgerRepository, store.UserRepository, emailSvc, store.NotificationRepository)
 	adminSvc := service.NewAdminService(store.JoinRequestRepository, store.UserRepository, store.LedgerRepository, store.OrganizationRepository, store.InvitationRepository, emailSvc)
 
 	// Initialize gRPC handlers

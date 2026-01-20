@@ -3,67 +3,159 @@ package service
 import (
 	"context"
 	"fmt"
-	"strconv"
-
-	"gopkg.in/gomail.v2"
+	"net/smtp"
+	"strings"
 )
 
 type emailService struct {
-	host     string
-	port     int
-	username string
-	password string
-	from     string
+	smtpHost    string
+	smtpPort    string
+	senderEmail string
+	senderPass  string
+	senderName  string
 }
 
-func NewEmailService(host, port, username, password, from string) EmailService {
-	p, _ := strconv.Atoi(port)
+func NewEmailService(host, port, email, password, name string) EmailService {
 	return &emailService{
-		host:     host,
-		port:     p,
-		username: username,
-		password: password,
-		from:     from,
+		smtpHost:    host,
+		smtpPort:    port,
+		senderEmail: email,
+		senderPass:  password,
+		senderName:  name,
 	}
+}
+
+// EmailMessage represents an email to be sent
+type EmailMessage struct {
+	To      []string
+	Subject string
+	Body    string
+	IsHTML  bool
+}
+
+// SendEmail sends an email using SMTP (internal helper)
+func (s *emailService) sendEmail(msg EmailMessage) error {
+	auth := smtp.PlainAuth("", s.senderEmail, s.senderPass, s.smtpHost)
+
+	// Build email headers
+	headers := make(map[string]string)
+	headers["From"] = fmt.Sprintf("%s <%s>", s.senderName, s.senderEmail)
+	headers["To"] = strings.Join(msg.To, ", ")
+	headers["Subject"] = msg.Subject
+
+	if msg.IsHTML {
+		headers["MIME-Version"] = "1.0"
+		headers["Content-Type"] = "text/html; charset=UTF-8"
+	}
+
+	// Construct message
+	var emailBody strings.Builder
+	for k, v := range headers {
+		emailBody.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+	}
+	emailBody.WriteString("\r\n")
+	emailBody.WriteString(msg.Body)
+
+	// Send email
+	addr := fmt.Sprintf("%s:%s", s.smtpHost, s.smtpPort)
+	return smtp.SendMail(addr, auth, s.senderEmail, msg.To, []byte(emailBody.String()))
 }
 
 func (s *emailService) SendInvitation(ctx context.Context, email, name, token string, orgName string) error {
-	m := gomail.NewMessage()
-	m.SetHeader("From", s.from)
-	m.SetHeader("To", email)
-	m.SetHeader("Subject", fmt.Sprintf("Invitation to join %s", orgName))
-	
-	body := fmt.Sprintf("Hello %s,\n\nYou have been invited to join the organization: %s.\n\nPlease use the following token to complete your registration:\n\n%s\n\nBest regards,\nThe Ubertool Team", name, orgName, token)
-	m.SetBody("text/plain", body)
-
-	d := gomail.NewDialer(s.host, s.port, s.username, s.password)
-
-	if err := d.DialAndSend(m); err != nil {
-		return fmt.Errorf("failed to send email via gomail: %w", err)
-	}
-
-	return nil
+	subject := fmt.Sprintf("Invitation to join %s", orgName)
+	body := fmt.Sprintf("Hello %s,\n\nYou have been invited to join %s.\nYour invitation code is: %s\n\nPlease use this code to sign up.", name, orgName, token)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
 }
 
 func (s *emailService) SendAccountStatusNotification(ctx context.Context, email, name, orgName, status, reason string) error {
-	m := gomail.NewMessage()
-	m.SetHeader("From", s.from)
-	m.SetHeader("To", email)
-	m.SetHeader("Subject", fmt.Sprintf("Account Status Update - %s", orgName))
+	subject := fmt.Sprintf("Account Status Update for %s", orgName)
+	body := fmt.Sprintf("Hello %s,\n\nYour account status in %s has been updated to: %s.\nReason: %s", name, orgName, status, reason)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
 
-	body := fmt.Sprintf("Hello %s,\n\nYour account status in the organization '%s' has been updated to: %s.", name, orgName, status)
-	if reason != "" {
-		body += fmt.Sprintf("\n\nReason: %s", reason)
-	}
-	body += "\n\nBest regards,\nThe Ubertool Team"
+// Rental notifications
 
-	m.SetBody("text/plain", body)
+func (s *emailService) SendRentalRequestNotification(ctx context.Context, ownerEmail, renterName, toolName string) error {
+	subject := fmt.Sprintf("New Rental Request for %s", toolName)
+	body := fmt.Sprintf("Hello,\n\n%s has requested to rent your tool: %s.\nPlease log in to approve or reject the request.", renterName, toolName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{ownerEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
 
-	d := gomail.NewDialer(s.host, s.port, s.username, s.password)
+func (s *emailService) SendRentalApprovalNotification(ctx context.Context, renterEmail, toolName, ownerName, pickupNote string) error {
+	subject := fmt.Sprintf("Rental Request Approved: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\nYour rental request for %s has been approved by %s.\n\nPickup Instructions:\n%s", toolName, ownerName, pickupNote)
+	return s.sendEmail(EmailMessage{
+		To:      []string{renterEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
 
-	if err := d.DialAndSend(m); err != nil {
-		return fmt.Errorf("failed to send account status notification: %w", err)
-	}
+func (s *emailService) SendRentalRejectionNotification(ctx context.Context, renterEmail, toolName, ownerName string) error {
+	subject := fmt.Sprintf("Rental Request Rejected: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\nYour rental request for %s has been rejected by %s.", toolName, ownerName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{renterEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
 
-	return nil
+func (s *emailService) SendRentalConfirmationNotification(ctx context.Context, ownerEmail, renterName, toolName string) error {
+	subject := fmt.Sprintf("Rental Confirmed: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\n%s has confirmed the rental for %s. The transaction is now scheduled.", renterName, toolName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{ownerEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *emailService) SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string) error {
+	subject := fmt.Sprintf("Rental Canceled: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\n%s has canceled the rental request for %s.\nReason: %s", renterName, toolName, reason)
+	return s.sendEmail(EmailMessage{
+		To:      []string{ownerEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *emailService) SendRentalCompletionNotification(ctx context.Context, email, role, toolName string, amount int32) error {
+	subject := fmt.Sprintf("Rental Completed: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\nThe rental for %s has been completed.\nAmount: %d cents\nRole: %s", toolName, amount, role)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *emailService) SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error {
+	return s.sendEmail(EmailMessage{
+		To:      []string{adminEmail},
+		Subject: subject,
+		Body:    message,
+		IsHTML:  false,
+	})
 }

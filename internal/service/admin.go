@@ -37,28 +37,63 @@ func NewAdminService(
 }
 
 func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID int32, email, name string) error {
-	// 1. Get Organization for the email context
+	// 1. Get Organization
 	org, err := s.orgRepo.GetByID(ctx, orgID)
 	if err != nil {
 		return fmt.Errorf("failed to get organization: %w", err)
 	}
 
-	// 2. Generate and Create Invitation
-	inv := &domain.Invitation{
-		OrgID:     orgID,
-		Email:     email,
-		CreatedBy: adminID,
-		ExpiresOn: time.Now().Add(7 * 24 * time.Hour), // 7 days expiry
-	}
-	if err := s.inviteRepo.Create(ctx, inv); err != nil {
-		return fmt.Errorf("failed to create invitation: %w", err)
+	// 2. Check if user already exists
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err == nil && user != nil {
+		// User exists, add to org
+		userOrg := &domain.UserOrg{
+			UserID:       user.ID,
+			OrgID:        orgID,
+			JoinedOn:     time.Now(),
+			Status:       domain.UserOrgStatusActive,
+			Role:         domain.UserOrgRoleMember,
+			BalanceCents: 0,
+		}
+		if err := s.userRepo.AddUserToOrg(ctx, userOrg); err != nil {
+			return fmt.Errorf("failed to add existing user to org: %w", err)
+		}
+		
+		// Notify user
+		_ = s.emailSvc.SendAccountStatusNotification(ctx, email, name, org.Name, "APPROVED", "Your join request has been approved.")
+
+	} else {
+		// User does not exist, Invite
+		inv := &domain.Invitation{
+			OrgID:     orgID,
+			Email:     email,
+			CreatedBy: adminID,
+			ExpiresOn: time.Now().Add(7 * 24 * time.Hour),
+		}
+		if err := s.inviteRepo.Create(ctx, inv); err != nil {
+			return fmt.Errorf("failed to create invitation: %w", err)
+		}
+
+		if err := s.emailSvc.SendInvitation(ctx, email, name, inv.Token, org.Name); err != nil {
+			return fmt.Errorf("failed to send invitation email: %w", err)
+		}
 	}
 
-	// 3. Send Email
-	if err := s.emailSvc.SendInvitation(ctx, email, name, inv.Token, org.Name); err != nil {
-		// We might want to log this but not necessarily fail the whole transaction?
-		// But for now, let's return error if email fails if that's critical.
-		return fmt.Errorf("failed to send invitation email: %w", err)
+	// 3. Update Join Request Status (if we can find it by email/org or passed ID? Interface passes email/name/orgID)
+	// The interface `ApproveJoinRequest` doesn't take RequestID. 
+	// But `JoinRequestRepository` likely has `GetByOrg` or we might need to search pending requests.
+	// `ListByOrg` exists.
+	// Optimization: Ideally `reqID` should be passed. But sticking to interface for now.
+	// We will search for pending requests for this email/org and update them.
+	
+	reqs, err := s.reqRepo.ListByOrg(ctx, orgID)
+	if err == nil {
+		for _, req := range reqs {
+			if req.Email == email && req.Status == domain.JoinRequestStatusPending {
+				req.Status = domain.JoinRequestStatusApproved
+				_ = s.reqRepo.Update(ctx, &req)
+			}
+		}
 	}
 
 	return nil

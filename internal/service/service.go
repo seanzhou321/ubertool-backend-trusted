@@ -23,9 +23,10 @@ type UserService interface {
 type OrganizationService interface {
 	ListOrganizations(ctx context.Context) ([]domain.Organization, error)
 	GetOrganization(ctx context.Context, id int32) (*domain.Organization, error)
-	CreateOrganization(ctx context.Context, org *domain.Organization) error
+	CreateOrganization(ctx context.Context, userID int32, org *domain.Organization) error
 	SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error)
 	UpdateOrganization(ctx context.Context, org *domain.Organization) error
+	ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, error)
 }
 
 type ImageStorageService interface {
@@ -43,7 +44,7 @@ type ToolService interface {
 	DeleteTool(ctx context.Context, id int32) error
 	ListTools(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	ListMyTools(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Tool, int32, error)
-	SearchTools(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
+	SearchTools(ctx context.Context, userID, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
 	ListCategories(ctx context.Context) ([]string, error)
 }
 
@@ -52,7 +53,7 @@ type RentalService interface {
 	ApproveRentalRequest(ctx context.Context, ownerID, rentalID int32, pickupNote string) (*domain.Rental, error)
 	RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
 	CancelRental(ctx context.Context, renterID, rentalID int32, reason string) (*domain.Rental, error)
-	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error)
+	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, []domain.Rental, []domain.Rental, error)
 	CompleteRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
 	ListRentals(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListLendings(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
@@ -81,4 +82,15 @@ type AdminService interface {
 type EmailService interface {
 	SendInvitation(ctx context.Context, email, name, token string, orgName string) error
 	SendAccountStatusNotification(ctx context.Context, email, name, orgName, status, reason string) error
+
+	// Rental Notifications
+	SendRentalRequestNotification(ctx context.Context, ownerEmail, renterName, toolName string) error
+	SendRentalApprovalNotification(ctx context.Context, renterEmail, toolName, ownerName, pickupNote string) error
+	SendRentalRejectionNotification(ctx context.Context, renterEmail, toolName, ownerName string) error
+	SendRentalConfirmationNotification(ctx context.Context, ownerEmail, renterName, toolName string) error
+	SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string) error
+	SendRentalCompletionNotification(ctx context.Context, email, role, toolName string, amount int32) error
+
+	// Admin Notifications
+	SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error
 }

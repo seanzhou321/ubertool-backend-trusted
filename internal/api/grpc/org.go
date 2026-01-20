@@ -18,11 +18,11 @@ func NewOrganizationHandler(orgSvc service.OrganizationService) *OrganizationHan
 }
 
 func (h *OrganizationHandler) ListMyOrganizations(ctx context.Context, req *pb.ListMyOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {
-	_, err := GetUserIDFromContext(ctx) // userID not used yet in service, but check auth
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	orgs, err := h.orgSvc.ListOrganizations(ctx)
+	orgs, err := h.orgSvc.ListMyOrganizations(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,11 @@ func (h *OrganizationHandler) CreateOrganization(ctx context.Context, req *pb.Cr
 		AdminEmail:       req.AdminEmail,
 		AdminPhoneNumber: req.AdminPhone,
 	}
-	err := h.orgSvc.CreateOrganization(ctx, org)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = h.orgSvc.CreateOrganization(ctx, userID, org)
 	if err != nil {
 		return nil, err
 	}

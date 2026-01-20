@@ -2,16 +2,21 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/repository"
 )
 
 type toolService struct {
 	toolRepo repository.ToolRepository
+	userRepo repository.UserRepository
 }
 
-func NewToolService(toolRepo repository.ToolRepository) ToolService {
-	return &toolService{toolRepo: toolRepo}
+func NewToolService(toolRepo repository.ToolRepository, userRepo repository.UserRepository) ToolService {
+	return &toolService{
+		toolRepo: toolRepo,
+		userRepo: userRepo,
+	}
 }
 
 func (s *toolService) AddTool(ctx context.Context, tool *domain.Tool, images []string) error {
@@ -61,7 +66,15 @@ func (s *toolService) ListMyTools(ctx context.Context, userID int32, page, pageS
 	return s.toolRepo.ListByOwner(ctx, userID, page, pageSize)
 }
 
-func (s *toolService) SearchTools(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
+func (s *toolService) SearchTools(ctx context.Context, userID, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
+	if orgID != 0 {
+		// verify user belongs to this organization
+		// Assuming GetUserOrg checks existence/active status
+		_, err := s.userRepo.GetUserOrg(ctx, userID, orgID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("user does not belong to organization %d: %w", orgID, err)
+		}
+	}
 	return s.toolRepo.Search(ctx, orgID, query, categories, maxPrice, condition, page, pageSize)
 }
 

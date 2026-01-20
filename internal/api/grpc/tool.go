@@ -100,7 +100,16 @@ func (h *ToolHandler) ListTools(ctx context.Context, req *pb.ListToolsRequest) (
 }
 
 func (h *ToolHandler) SearchTools(ctx context.Context, req *pb.SearchToolsRequest) (*pb.SearchToolsResponse, error) {
-	tools, count, err := h.toolSvc.SearchTools(ctx, req.OrganizationId, req.Query, req.Categories, req.MaxPrice, req.Condition.String(), req.Page, req.PageSize)
+	userID, err := GetUserIDFromContext(ctx) // Optional? No, required for org check
+	if err != nil {
+		// For search, maybe allow public search if orgID is not set? 
+		// But interface requires userID now.
+		// If orgID is set, we need userID. If not, maybe pass 0?
+		// Design says "Input: organization_id, query... Business Logic: if organization_id is given, verify user_id..."
+		// So if orgID is missing, userID might not be strictly needed for check, but authentication is usually required for API.
+		return nil, err
+	}
+	tools, count, err := h.toolSvc.SearchTools(ctx, userID, req.OrganizationId, req.Query, req.Categories, req.MaxPrice, req.Condition.String(), req.Page, req.PageSize)
 	if err != nil {
 		return nil, err
 	}
