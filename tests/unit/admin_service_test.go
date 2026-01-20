@@ -75,7 +75,11 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	mockOrgRepo := new(MockOrganizationRepo)
 	mockInviteRepo := new(MockInviteRepo)
 	mockEmailSvc := new(MockEmailService)
-	svc := service.NewAdminService(nil, mockUserRepo, nil, mockOrgRepo, mockInviteRepo, mockEmailSvc)
+	// Add other missing repos: reqRepo, ledgerRepo
+	mockJoinRepo := new(MockJoinRequestRepo)
+	mockLedgerRepo := new(MockLedgerRepo)
+	
+	svc := service.NewAdminService(mockJoinRepo, mockUserRepo, mockLedgerRepo, mockOrgRepo, mockInviteRepo, mockEmailSvc)
 	ctx := context.Background()
 
 	adminID := int32(1)
@@ -84,6 +88,9 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	name := "Applicant"
 
 	mockOrgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Test Org"}, nil)
+	// Mock Check if user exists (false for this test case)
+	mockUserRepo.On("GetByEmail", ctx, email).Return(nil, nil)
+	
 	mockInviteRepo.On("Create", ctx, mock.MatchedBy(func(inv *domain.Invitation) bool {
 		return inv.OrgID == orgID && inv.Email == email && inv.CreatedBy == adminID
 	})).Run(func(args mock.Arguments) {
@@ -91,6 +98,9 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 		inv.Token = "uuid-token"
 	}).Return(nil)
 	mockEmailSvc.On("SendInvitation", ctx, email, name, "uuid-token", "Test Org").Return(nil)
+	
+	// Mock ListJoinRequests lookup update
+	mockJoinRepo.On("ListByOrg", ctx, orgID).Return([]domain.JoinRequest{}, nil)
 
 	err := svc.ApproveJoinRequest(ctx, adminID, orgID, email, name)
 	assert.NoError(t, err)

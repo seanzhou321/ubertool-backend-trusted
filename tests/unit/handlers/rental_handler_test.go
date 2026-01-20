@@ -7,6 +7,7 @@ import (
 	"ubertool-backend-trusted/internal/api/grpc"
 	"ubertool-backend-trusted/internal/domain"
 	pb "ubertool-backend-trusted/api/gen/v1"
+	"google.golang.org/grpc/metadata"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,6 +17,8 @@ func TestRentalHandler_CreateRentalRequest(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
+		md := metadata.Pairs("user-id", "1")
+		ctx = metadata.NewIncomingContext(ctx, md)
 		req := &pb.CreateRentalRequestRequest{
 			ToolId: 2,
 			OrganizationId: 3,
@@ -40,12 +43,15 @@ func TestRentalHandler_ApproveRentalRequest(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
+		md := metadata.Pairs("user-id", "1")
+		ctx = metadata.NewIncomingContext(ctx, md)
 		req := &pb.ApproveRentalRequestRequest{
 			RequestId: 1,
 			PickupInstructions: "Note",
 		}
 
-		svc.On("ApproveRentalRequest", ctx, int32(1), int32(1), "Note").Return(nil)
+		rental := &domain.Rental{ID: 1, Status: domain.RentalStatusApproved}
+		svc.On("ApproveRentalRequest", ctx, int32(1), int32(1), "Note").Return(rental, nil)
 
 		res, err := handler.ApproveRentalRequest(ctx, req)
 		assert.NoError(t, err)

@@ -146,6 +146,10 @@ func (m *MockToolRepo) Create(ctx context.Context, tool *domain.Tool) error {
 	args := m.Called(ctx, tool)
 	return args.Error(0)
 }
+func (m *MockToolRepo) ListByOwner(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Tool, int32, error) {
+	args := m.Called(ctx, userID, page, pageSize)
+	return args.Get(0).([]domain.Tool), args.Get(1).(int32), args.Error(2)
+}
 func (m *MockToolRepo) GetByID(ctx context.Context, id int32) (*domain.Tool, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
@@ -176,6 +180,14 @@ func (m *MockToolRepo) AddImage(ctx context.Context, image *domain.ToolImage) er
 func (m *MockToolRepo) GetImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error) {
 	args := m.Called(ctx, toolID)
 	return args.Get(0).([]domain.ToolImage), args.Error(1)
+}
+func (m *MockToolRepo) DeleteImage(ctx context.Context, imageID int32) error {
+	args := m.Called(ctx, imageID)
+	return args.Error(0)
+}
+func (m *MockToolRepo) SetPrimaryImage(ctx context.Context, toolID, imageID int32) error {
+	args := m.Called(ctx, toolID, imageID)
+	return args.Error(0)
 }
 
 // MockRentalRepo
@@ -224,6 +236,13 @@ func (m *MockLedgerRepo) ListTransactions(ctx context.Context, userID, orgID int
 	args := m.Called(ctx, userID, orgID, page, pageSize)
 	return args.Get(0).([]domain.LedgerTransaction), args.Get(1).(int32), args.Error(2)
 }
+func (m *MockLedgerRepo) GetSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error) {
+	args := m.Called(ctx, userID, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.LedgerSummary), args.Error(1)
+}
 
 // MockEmailService
 type MockEmailService struct {
@@ -237,5 +256,60 @@ func (m *MockEmailService) SendInvitation(ctx context.Context, email, name, toke
 
 func (m *MockEmailService) SendAccountStatusNotification(ctx context.Context, email, name, orgName, status, reason string) error {
 	args := m.Called(ctx, email, name, orgName, status, reason)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendRentalRequestNotification(ctx context.Context, ownerEmail, renterName, toolName string) error {
+	args := m.Called(ctx, ownerEmail, renterName, toolName)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendRentalApprovalNotification(ctx context.Context, renterEmail, toolName, ownerName, pickupNote string) error {
+	args := m.Called(ctx, renterEmail, toolName, ownerName, pickupNote)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendRentalRejectionNotification(ctx context.Context, renterEmail, toolName, ownerName string) error {
+	args := m.Called(ctx, renterEmail, toolName, ownerName)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendRentalConfirmationNotification(ctx context.Context, ownerEmail, renterName, toolName string) error {
+	args := m.Called(ctx, ownerEmail, renterName, toolName)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string) error {
+	args := m.Called(ctx, ownerEmail, renterName, toolName, reason)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendRentalCompletionNotification(ctx context.Context, email, role, toolName string, amount int32) error {
+	args := m.Called(ctx, email, role, toolName, amount)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error {
+	args := m.Called(ctx, adminEmail, subject, message)
+	return args.Error(0)
+}
+
+// MockNotificationRepo
+type MockNotificationRepo struct {
+	mock.Mock
+}
+
+func (m *MockNotificationRepo) Create(ctx context.Context, note *domain.Notification) error {
+	args := m.Called(ctx, note)
+	return args.Error(0)
+}
+
+func (m *MockNotificationRepo) List(ctx context.Context, userID, limit, offset int32) ([]domain.Notification, int32, error) {
+	args := m.Called(ctx, userID, limit, offset)
+	return args.Get(0).([]domain.Notification), args.Get(1).(int32), args.Error(2)
+}
+
+func (m *MockNotificationRepo) MarkAsRead(ctx context.Context, id, userID int32) error {
+	args := m.Called(ctx, id, userID)
 	return args.Error(0)
 }

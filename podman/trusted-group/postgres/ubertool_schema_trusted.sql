@@ -119,6 +119,7 @@ CREATE TABLE rentals (
     renter_id INTEGER REFERENCES users(id),
     owner_id INTEGER REFERENCES users(id),
     start_date DATE NOT NULL,
+    scheduled_end_date DATE NOT NULL, -- Scheduled return date
     end_date DATE, -- Actual return date
     total_cost_cents INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING',
@@ -135,7 +136,7 @@ CREATE TABLE ledger_transactions (
     user_id INTEGER REFERENCES users(id),
     amount INTEGER NOT NULL,
     type TEXT NOT NULL,
-    related_rental_id INTEGER REFERENCES rentals(id),
+    related_rental_id INTEGER REFERENCES rentals(id), -- Nullable, immutable record
     description TEXT,
     charged_on DATE DEFAULT CURRENT_DATE,
     created_on DATE DEFAULT CURRENT_DATE

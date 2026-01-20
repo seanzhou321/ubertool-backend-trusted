@@ -1,4 +1,4 @@
-.PHONY: proto-gen build run tidy clean
+.PHONY: proto-gen build run tidy clean test-unit test-integration
 
 PROTO_SRC_DIR = api/proto
 PROTO_DEST_DIR = .
@@ -24,3 +24,9 @@ tidy:
 clean:
 	@if exist "bin" rmdir /s /q bin
 	@if exist "api\gen" rmdir /s /q api\gen
+
+test-unit:
+	go test -v ./tests/unit/...
+
+test-integration:
+	go test -v ./tests/integration/...

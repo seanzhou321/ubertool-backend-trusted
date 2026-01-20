@@ -16,7 +16,10 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 	toolRepo := new(MockToolRepo)
 	ledgerRepo := new(MockLedgerRepo)
 	userRepo := new(MockUserRepo)
-	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo)
+	emailSvc := new(MockEmailService)
+	noteRepo := new(MockNotificationRepo)
+	
+	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
 
 	ctx := context.Background()
 	renterID := int32(1)
@@ -27,6 +30,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 
 	tool := &domain.Tool{
 		ID:               toolID,
+		Name:             "Tool",
 		OwnerID:          10,
 		PricePerDayCents: 1000,
 	}
@@ -36,12 +40,19 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		ledgerRepo.On("GetBalance", ctx, renterID, orgID).Return(int32(5000), nil)
 		rentalRepo.On("Create", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
 
+
+		// Setup expectations for email notification
+		userRepo.On("GetByID", ctx, int32(10)).Return(&domain.User{ID: 10, Email: "owner@test.com", Name: "Owner"}, nil)
+		userRepo.On("GetByID", ctx, renterID).Return(&domain.User{ID: renterID, Email: "renter@test.com", Name: "Renter"}, nil)
+		emailSvc.On("SendRentalRequestNotification", ctx, "owner@test.com", "Renter", "Tool").Return(nil)
+		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
+
 		res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, startDate, endDate)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.Equal(t, toolID, res.ToolID)
 		assert.Equal(t, renterID, res.RenterID)
-		assert.Equal(t, int32(1000), res.TotalCostCents) // 1 day * 1000
+		assert.Equal(t, int32(2000), res.TotalCostCents) // 2 days inclusive (24h to 48h) * 1000
 	})
 
 	t.Run("Insufficient Balance", func(t *testing.T) {
@@ -62,7 +73,9 @@ func TestRentalService_CompleteRental(t *testing.T) {
 	toolRepo := new(MockToolRepo)
 	ledgerRepo := new(MockLedgerRepo)
 	userRepo := new(MockUserRepo)
-	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo)
+	emailSvc := new(MockEmailService)
+	noteRepo := new(MockNotificationRepo)
+	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
 
 	ctx := context.Background()
 	ownerID := int32(10)
@@ -81,11 +94,18 @@ func TestRentalService_CompleteRental(t *testing.T) {
 		rentalRepo.On("GetByID", ctx, rentalID).Return(rental, nil)
 		ledgerRepo.On("CreateTransaction", ctx, mock.AnythingOfType("*domain.LedgerTransaction")).Return(nil)
 		rentalRepo.On("Update", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
+		toolRepo.On("GetByID", ctx, int32(0)).Return(&domain.Tool{Name: "Tool"}, nil) // ToolID is 0 in setup
+		toolRepo.On("Update", ctx, mock.AnythingOfType("*domain.Tool")).Return(nil)
 
-		err := svc.CompleteRental(ctx, ownerID, rentalID)
+		userRepo.On("GetByID", ctx, int32(1)).Return(&domain.User{Email: "renter@test.com"}, nil)
+		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{Email: "owner@test.com"}, nil)
+		emailSvc.On("SendRentalCompletionNotification", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+		res, err := svc.CompleteRental(ctx, ownerID, rentalID)
 		assert.NoError(t, err)
+		assert.NotNil(t, res)
 		
-		// Two transactions should be created: debit renter, credit owner
-		ledgerRepo.AssertNumberOfCalls(t, "CreateTransaction", 2)
+		// One transaction should be created: credit owner (debit was at finalize)
+		ledgerRepo.AssertNumberOfCalls(t, "CreateTransaction", 1)
 	})
 }

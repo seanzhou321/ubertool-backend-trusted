@@ -11,7 +11,8 @@ import (
 
 func TestToolService_AddTool(t *testing.T) {
 	repo := new(MockToolRepo)
-	svc := service.NewToolService(repo)
+	userRepo := new(MockUserRepo)
+	svc := service.NewToolService(repo, userRepo)
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
@@ -25,7 +26,8 @@ func TestToolService_AddTool(t *testing.T) {
 
 func TestToolService_SearchTools(t *testing.T) {
 	repo := new(MockToolRepo)
-	svc := service.NewToolService(repo)
+	userRepo := new(MockUserRepo) // Need user repo now
+	svc := service.NewToolService(repo, userRepo)
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
@@ -33,7 +35,12 @@ func TestToolService_SearchTools(t *testing.T) {
 		repo.On("Search", ctx, int32(1), "query", []string{"cat"}, int32(100), "condition", int32(1), int32(10)).
 			Return(tools, int32(1), nil)
 		
-		res, total, err := svc.SearchTools(ctx, 1, "query", []string{"cat"}, 100, "condition", 1, 10)
+		// Mock GetUserOrg logic if orgID != 0
+		if 1 != 0 {
+			userRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(&domain.UserOrg{}, nil)
+		}
+
+		res, total, err := svc.SearchTools(ctx, 1, 1, "query", []string{"cat"}, 100, "condition", 1, 10)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(1), total)
 		assert.Equal(t, "Hammer", res[0].Name)

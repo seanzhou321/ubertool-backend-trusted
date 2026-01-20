@@ -11,7 +11,8 @@ import (
 
 func TestOrganizationService_UpdateOrganization(t *testing.T) {
 	mockRepo := new(MockOrganizationRepo)
-	svc := service.NewOrganizationService(mockRepo)
+	mockUserRepo := new(MockUserRepo)
+	svc := service.NewOrganizationService(mockRepo, mockUserRepo)
 	ctx := context.Background()
 
 	org := &domain.Organization{ID: 1, Name: "Updated"}

@@ -14,7 +14,7 @@ import (
 )
 
 func prepareDB(t *testing.T) *sql.DB {
-	connStr := "postgres://ubertool_trusted:ubertool123@localhost:5432/ubertool_db?sslmode=disable"
+	connStr := "postgres://ubertool_trusted:ubertool123@localhost:5454/ubertool_db?sslmode=disable"
 	var db *sql.DB
 	var err error
 

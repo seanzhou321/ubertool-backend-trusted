@@ -15,7 +15,10 @@ func TestAuthService_ValidateInvite(t *testing.T) {
 	userRepo := new(MockUserRepo)
 	inviteRepo := new(MockInviteRepo)
 	reqRepo := new(MockJoinRequestRepo)
-	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, "secret")
+	orgRepo := new(MockOrganizationRepo)
+	noteRepo := new(MockNotificationRepo)
+	emailSvc := new(MockEmailService)
+	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret")
 
 	ctx := context.Background()
 	token := "valid-token"
@@ -68,13 +71,25 @@ func TestAuthService_RequestToJoin(t *testing.T) {
 	userRepo := new(MockUserRepo)
 	inviteRepo := new(MockInviteRepo)
 	reqRepo := new(MockJoinRequestRepo)
-	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, "secret")
+	orgRepo := new(MockOrganizationRepo)
+	noteRepo := new(MockNotificationRepo)
+	emailSvc := new(MockEmailService)
+	
+	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret")
 
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
+		orgID := int32(1)
+		email := "email@test.com"
+		orgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Org"}, nil)
+		userRepo.On("GetByEmail", ctx, email).Return(nil, nil)
 		reqRepo.On("Create", ctx, mock.AnythingOfType("*domain.JoinRequest")).Return(nil)
-		err := svc.RequestToJoin(ctx, 1, "Name", "email@test.com", "Note")
+		
+		// Mock ListUsers for admin notification logic
+		userRepo.On("ListMembersByOrg", ctx, orgID).Return([]domain.User{}, []domain.UserOrg{}, nil)
+
+		err := svc.RequestToJoin(ctx, orgID, "Name", email, "Note")
 		assert.NoError(t, err)
 	})
 }
