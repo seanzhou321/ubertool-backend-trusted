@@ -29,7 +29,7 @@ if ($containerExists) {
 Write-Host "Running PostgreSQL container..."
 podman run -d `
   --name $CONTAINER_NAME `
-  -p 5432:5432 `
+  -p 5454:5432 `
   -e POSTGRES_PASSWORD=$DB_PASSWORD `
   -e POSTGRES_USER=$DB_USER `
   -e POSTGRES_DB=$DB_NAME `
@@ -38,10 +38,10 @@ podman run -d `
 
 Write-Host ""
 Write-Host "Database deployed successfully!"
-Write-Host "PostgreSQL is running on localhost:5432"
+Write-Host "PostgreSQL is running on localhost:5454 (mapped to container:5432)"
 Write-Host "Database: $DB_NAME"
 Write-Host "User: $DB_USER"
 Write-Host "Password: $DB_PASSWORD"
 Write-Host ""
 Write-Host "To connect:"
-Write-Host "psql -h localhost -p 5432 -U $DB_USER -d $DB_NAME"
+Write-Host "psql -h localhost -p 5454 -U $DB_USER -d $DB_NAME"

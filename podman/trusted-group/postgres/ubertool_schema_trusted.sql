@@ -94,17 +94,18 @@ CREATE TABLE tool_images (
     file_name TEXT NOT NULL,
     file_path TEXT NOT NULL,
     thumbnail_path TEXT NOT NULL,
-    file_size int32 NOT NULL,
+    file_size INTEGER NOT NULL,
     mime_type TEXT NOT NULL,
-    width int32 NOT NULL,
-    height int32 NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
     display_order INTEGER DEFAULT 0,
     created_on DATE DEFAULT CURRENT_DATE,
-    deleted_on DATE
-    CONSTRAINT unique_primary_per_tool UNIQUE (tool_id, is_primary) WHERE is_primary = TRUE
+    deleted_on DATE,
     CONSTRAINT unique_filename_per_tool UNIQUE (tool_id, file_name)
 );
+
+CREATE UNIQUE INDEX idx_tool_images_primary_unique ON tool_images(tool_id) WHERE is_primary = TRUE;
 
 -- Index for fast queries
 CREATE INDEX idx_tool_images_tool_id ON tool_images(tool_id);
@@ -122,7 +123,7 @@ CREATE TABLE rentals (
     total_cost_cents INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING',
     pickup_note TEXT,
-    completed_by int32,
+    completed_by INTEGER,
     created_on DATE DEFAULT CURRENT_DATE,
     updated_on DATE DEFAULT CURRENT_DATE
 );
