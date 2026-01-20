@@ -7,6 +7,7 @@ type RentalStatus string
 const (
 	RentalStatusPending   RentalStatus = "PENDING"
 	RentalStatusApproved  RentalStatus = "APPROVED"
+	RentalStatusRejected  RentalStatus = "REJECTED"
 	RentalStatusScheduled RentalStatus = "SCHEDULED"
 	RentalStatusActive    RentalStatus = "ACTIVE"
 	RentalStatusCompleted RentalStatus = "COMPLETED"
@@ -25,6 +26,7 @@ type Rental struct {
 	EndDate          *time.Time   `json:"end_date,omitempty"`
 	TotalCostCents   int32        `json:"total_cost_cents"`
 	Status           RentalStatus `json:"status"`
+	CompletedBy      *int32       `json:"completed_by,omitempty"`
 	PickupNote       string       `json:"pickup_note"`
 	CreatedOn        time.Time    `json:"created_on"`
 	UpdatedOn        time.Time    `json:"updated_on"`

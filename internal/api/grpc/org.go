@@ -68,3 +68,18 @@ func (h *OrganizationHandler) UpdateOrganization(ctx context.Context, req *pb.Up
 	}
 	return &pb.UpdateOrganizationResponse{Organization: MapDomainOrgToProto(org)}, nil
 }
+func (h *OrganizationHandler) CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) (*pb.CreateOrganizationResponse, error) {
+	org := &domain.Organization{
+		Name:             req.Name,
+		Description:      req.Description,
+		Address:          req.Address,
+		Metro:            req.Metro,
+		AdminEmail:       req.AdminEmail,
+		AdminPhoneNumber: req.AdminPhone,
+	}
+	err := h.orgSvc.CreateOrganization(ctx, org)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.CreateOrganizationResponse{Organization: MapDomainOrgToProto(org)}, nil
+}

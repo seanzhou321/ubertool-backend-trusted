@@ -89,6 +89,34 @@ func (r *toolRepository) ListByOrg(ctx context.Context, orgID int32, page, pageS
 	return tools, count, nil
 }
 
+func (r *toolRepository) ListByOwner(ctx context.Context, ownerID int32, page, pageSize int32) ([]domain.Tool, int32, error) {
+	offset := (page - 1) * pageSize
+	query := `SELECT id, owner_id, name, description, categories, price_per_day_cents, price_per_week_cents, price_per_month_cents, replacement_cost_cents, condition, metro, status, created_on, deleted_on 
+	          FROM tools WHERE owner_id = $1 AND deleted_on IS NULL LIMIT $2 OFFSET $3`
+	rows, err := r.db.QueryContext(ctx, query, ownerID, pageSize, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var count int32
+	countQuery := `SELECT count(*) FROM tools WHERE owner_id = $1 AND deleted_on IS NULL`
+	err = r.db.QueryRowContext(ctx, countQuery, ownerID).Scan(&count)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var tools []domain.Tool
+	for rows.Next() {
+		var t domain.Tool
+		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Name, &t.Description, pq.Array(&t.Categories), &t.PricePerDayCents, &t.PricePerWeekCents, &t.PricePerMonthCents, &t.ReplacementCostCents, &t.Condition, &t.Metro, &t.Status, &t.CreatedOn, &t.DeletedOn); err != nil {
+			return nil, 0, err
+		}
+		tools = append(tools, t)
+	}
+	return tools, count, nil
+}
+
 func (r *toolRepository) Search(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
 	orgQuery := `SELECT metro FROM orgs WHERE id = $1`
 	var metro string
@@ -153,12 +181,14 @@ func (r *toolRepository) Search(ctx context.Context, orgID int32, query string, 
 }
 
 func (r *toolRepository) AddImage(ctx context.Context, img *domain.ToolImage) error {
-	query := `INSERT INTO tool_images (tool_id, image_url, display_order) VALUES ($1, $2, $3) RETURNING id`
-	return r.db.QueryRowContext(ctx, query, img.ToolID, img.ImageURL, img.DisplayOrder).Scan(&img.ID)
+	query := `INSERT INTO tool_images (tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, width, height, is_primary, display_order, created_on) 
+	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`
+	return r.db.QueryRowContext(ctx, query, img.ToolID, img.FileName, img.FilePath, img.ThumbnailPath, img.FileSize, img.MimeType, img.Width, img.Height, img.IsPrimary, img.DisplayOrder, time.Now()).Scan(&img.ID)
 }
 
 func (r *toolRepository) GetImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error) {
-	query := `SELECT id, tool_id, image_url, display_order FROM tool_images WHERE tool_id = $1 ORDER BY display_order`
+	query := `SELECT id, tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, width, height, is_primary, display_order, created_on 
+	          FROM tool_images WHERE tool_id = $1 AND deleted_on IS NULL ORDER BY display_order`
 	rows, err := r.db.QueryContext(ctx, query, toolID)
 	if err != nil {
 		return nil, err
@@ -168,10 +198,40 @@ func (r *toolRepository) GetImages(ctx context.Context, toolID int32) ([]domain.
 	var images []domain.ToolImage
 	for rows.Next() {
 		var img domain.ToolImage
-		if err := rows.Scan(&img.ID, &img.ToolID, &img.ImageURL, &img.DisplayOrder); err != nil {
+		var createdOn time.Time
+		if err := rows.Scan(&img.ID, &img.ToolID, &img.FileName, &img.FilePath, &img.ThumbnailPath, &img.FileSize, &img.MimeType, &img.Width, &img.Height, &img.IsPrimary, &img.DisplayOrder, &createdOn); err != nil {
 			return nil, err
 		}
+		img.CreatedOn = createdOn.Format("2006-01-02")
 		images = append(images, img)
 	}
 	return images, nil
+}
+
+func (r *toolRepository) DeleteImage(ctx context.Context, imageID int32) error {
+	query := `UPDATE tool_images SET deleted_on = $1 WHERE id = $2`
+	_, err := r.db.ExecContext(ctx, query, time.Now(), imageID)
+	return err
+}
+
+func (r *toolRepository) SetPrimaryImage(ctx context.Context, toolID, imageID int32) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Unset all primaries for this tool
+	_, err = tx.ExecContext(ctx, `UPDATE tool_images SET is_primary = false WHERE tool_id = $1`, toolID)
+	if err != nil {
+		return err
+	}
+
+	// Set new primary
+	_, err = tx.ExecContext(ctx, `UPDATE tool_images SET is_primary = true WHERE id = $1`, imageID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

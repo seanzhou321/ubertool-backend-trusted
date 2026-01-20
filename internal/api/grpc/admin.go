@@ -33,7 +33,7 @@ func (h *AdminHandler) AdminBlockUserAccount(ctx context.Context, req *pb.AdminB
 	if err != nil {
 		return nil, err
 	}
-	err = h.adminSvc.BlockUser(ctx, adminID, req.BlockedUserId, req.OrganizationId, req.IsBlock, req.Reason)
+	err = h.adminSvc.BlockUser(ctx, adminID, req.BlockedUserId, req.OrganizationId, true, req.Reason)
 	if err != nil {
 		return nil, err
 	}

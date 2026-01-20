@@ -46,8 +46,16 @@ type Tool struct {
 }
 
 type ToolImage struct {
-	ID           int32  `json:"id"`
-	ToolID       int32  `json:"tool_id"`
-	ImageURL     string `json:"image_url"`
-	DisplayOrder int32  `json:"display_order"`
+	ID            int32   `json:"id"`
+	ToolID        int32   `json:"tool_id"`
+	FileName      string  `json:"file_name"`
+	FilePath      string  `json:"file_path"`
+	ThumbnailPath string  `json:"thumbnail_path"`
+	FileSize      int32   `json:"file_size"`
+	MimeType      string  `json:"mime_type"`
+	Width         int32   `json:"width"`
+	Height        int32   `json:"height"`
+	IsPrimary     bool    `json:"is_primary"`
+	DisplayOrder  int32   `json:"display_order"`
+	CreatedOn     string  `json:"created_on"`
 }

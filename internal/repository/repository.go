@@ -34,10 +34,13 @@ type ToolRepository interface {
 	Update(ctx context.Context, tool *domain.Tool) error
 	Delete(ctx context.Context, id int32) error
 	ListByOrg(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error)
+	ListByOwner(ctx context.Context, ownerID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	Search(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
 	
 	AddImage(ctx context.Context, image *domain.ToolImage) error
 	GetImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error)
+	DeleteImage(ctx context.Context, imageID int32) error
+	SetPrimaryImage(ctx context.Context, toolID, imageID int32) error
 }
 
 type RentalRepository interface {

@@ -131,3 +131,17 @@ func (h *RentalHandler) GetRental(ctx context.Context, req *pb.GetRentalRequest)
 	}
 	return &pb.GetRentalResponse{RentalRequest: MapDomainRentalToProto(rt)}, nil
 }
+func (h *RentalHandler) CancelRental(ctx context.Context, req *pb.CancelRentalRequest) (*pb.CancelRentalResponse, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rt, err := h.rentalSvc.CancelRental(ctx, userID, req.RequestId, req.Reason)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.CancelRentalResponse{
+		Success:       true,
+		RentalRequest: MapDomainRentalToProto(rt),
+	}, nil
+}

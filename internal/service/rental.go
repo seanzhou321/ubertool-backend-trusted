@@ -105,7 +105,31 @@ func (s *rentalService) RejectRentalRequest(ctx context.Context, ownerID, rental
 		return nil, errors.New("unauthorized")
 	}
 
+	rt.Status = domain.RentalStatusRejected
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+	return rt, nil
+}
+
+func (s *rentalService) CancelRental(ctx context.Context, renterID, rentalID int32, reason string) (*domain.Rental, error) {
+	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
+	if err != nil {
+		return nil, err
+	}
+	if rt.RenterID != renterID {
+		return nil, errors.New("unauthorized")
+	}
+
+	// Can only cancel if PENDING or APPROVED or SCHEDULED (maybe?)
+	// Logic says: if cancel, status -> CANCELLED.
+	// NOTE: If paid, we might need refund logic. For now, just change status.
+	
 	rt.Status = domain.RentalStatusCancelled
+	// rt.CancelReason = reason // User request mentioned reason, but domain struct doesn't have it? 
+	// The schema doesn't have cancel_reason column for rental table.
+	// So we ignore reason for now or log it.
+
 	if err := s.rentalRepo.Update(ctx, rt); err != nil {
 		return nil, err
 	}

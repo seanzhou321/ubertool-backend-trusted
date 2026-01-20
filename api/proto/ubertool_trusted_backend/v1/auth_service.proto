@@ -62,20 +62,24 @@ message LoginRequest {
 
 // Login response
 message LoginResponse {
-  string two_fa_token = 1;
-  int64 expires_at = 2;
+  bool success = 1;
+  string two_fa_token = 2;
+  int64 expires_at = 3;
+  string message = 4;
 }
 
 // 2FA verification request
+// two_fa_token is in the request header
 message Verify2FARequest {
-  string code = 1;
+  string two_fa_code = 1;
 }
 
 // 2FA verification response
 message Verify2FAResponse {
-  string access_token = 1;
-  string refresh_token = 2;
-  User user = 3;
+  bool success = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  User user = 4;
 }
 
 // Signup request
@@ -89,9 +93,8 @@ message SignupRequest {
 
 // Signup response
 message SignupResponse {
-  string access_token = 1;
-  string refresh_token = 2;
-  User user = 3;
+  bool success = 1;
+  string message = 2;
 }
 
 // Refresh token request

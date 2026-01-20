@@ -137,8 +137,7 @@ type AdminBlockUserAccountRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	BlockedUserId  int32                  `protobuf:"varint,1,opt,name=blocked_user_id,json=blockedUserId,proto3" json:"blocked_user_id,omitempty"`
 	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	IsBlock        bool                   `protobuf:"varint,3,opt,name=is_block,json=isBlock,proto3" json:"is_block,omitempty"`
-	Reason         string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Reason         string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -185,13 +184,6 @@ func (x *AdminBlockUserAccountRequest) GetOrganizationId() int32 {
 		return x.OrganizationId
 	}
 	return 0
-}
-
-func (x *AdminBlockUserAccountRequest) GetIsBlock() bool {
-	if x != nil {
-		return x.IsBlock
-	}
-	return false
 }
 
 func (x *AdminBlockUserAccountRequest) GetReason() string {
@@ -720,12 +712,11 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x0eapplicant_name\x18\x03 \x01(\tR\rapplicantName\"R\n" +
 	"\x1cApproveRequestToJoinResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xa2\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x87\x01\n" +
 	"\x1cAdminBlockUserAccountRequest\x12&\n" +
 	"\x0fblocked_user_id\x18\x01 \x01(\x05R\rblockedUserId\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12\x19\n" +
-	"\bis_block\x18\x03 \x01(\bR\aisBlock\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reason\"^\n" +
+	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"^\n" +
 	"\x1dAdminBlockUserAccountResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"=\n" +

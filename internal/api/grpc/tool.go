@@ -34,7 +34,7 @@ func (h *ToolHandler) AddTool(ctx context.Context, req *pb.AddToolRequest) (*pb.
 		Condition:            domain.ToolCondition(req.Condition),
 		Status:               domain.ToolStatusAvailable,
 	}
-	err = h.toolSvc.AddTool(ctx, tool, []string{req.ImageUrl})
+	err = h.toolSvc.AddTool(ctx, tool, req.ImageUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,11 @@ func (h *ToolHandler) DeleteTool(ctx context.Context, req *pb.DeleteToolRequest)
 }
 
 func (h *ToolHandler) ListTools(ctx context.Context, req *pb.ListToolsRequest) (*pb.ListToolsResponse, error) {
-	tools, count, err := h.toolSvc.ListTools(ctx, req.OrganizationId, req.Page, req.PageSize)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tools, count, err := h.toolSvc.ListMyTools(ctx, userID, req.Page, req.PageSize)
 	if err != nil {
 		return nil, err
 	}

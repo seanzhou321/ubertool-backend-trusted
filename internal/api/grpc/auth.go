@@ -3,6 +3,10 @@ package grpc
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/service"
 )
@@ -33,32 +37,28 @@ func (h *AuthHandler) RequestToJoinOrganization(ctx context.Context, req *pb.Req
 }
 
 func (h *AuthHandler) UserSignup(ctx context.Context, req *pb.SignupRequest) (*pb.SignupResponse, error) {
-	user, access, refresh, err := h.authSvc.Signup(ctx, req.InvitationCode, req.Name, req.Email, req.Phone, req.Password)
+	_, _, _, err := h.authSvc.Signup(ctx, req.InvitationCode, req.Name, req.Email, req.Phone, req.Password)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.SignupResponse{
-		User:         MapDomainUserToProto(user),
-		AccessToken:  access,
-		RefreshToken: refresh,
+		Success: true,
+		Message: "Signup successful",
 	}, nil
 }
 
 func (h *AuthHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
 	// Assume always requires 2FA for trusted backend, ie. requires2FA is always true
-	_, _, session, requires2FA, err := h.authSvc.Login(ctx, req.Email, req.Password)
+	_, _, session, _, err := h.authSvc.Login(ctx, req.Email, req.Password)
 	if err != nil {
 		return nil, err
 	}
 
 	// Note: access/refresh are empty if 2FA is required
 	return &pb.LoginResponse{
-		SessionId:    session, // This is the 2FA pending token
-		Requires_2Fa: requires2FA,
-		// If NO 2FA, these would hypothetically be populated if we changed message structure,
-		// but proto LoginResponse only has SessionId/Requires2FA?
-		// Wait, if LoginResponse ONLY has SessionId/Requires2FA, how do we return AccessToken if 2FA is OFF?
-		// Let me re-read api/gen/v1/auth_service.pb.go LoginResponse struct carefully.
+		Success:      true,
+		TwoFaToken:   session,
+		Message:      "2FA Required",
 	}, nil
 }
 
@@ -69,12 +69,13 @@ func (h *AuthHandler) Verify2FA(ctx context.Context, req *pb.Verify2FARequest) (
 		return nil, err
 	}
 
-	access, refresh, err := h.authSvc.Verify2FA(ctx, int32(userID), req.Code)
+	access, refresh, err := h.authSvc.Verify2FA(ctx, int32(userID), req.TwoFaCode)
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.Verify2FAResponse{
+		Success:      true,
 		AccessToken:  access,
 		RefreshToken: refresh,
 		// User field is optional in response? Check proto.
@@ -82,7 +83,17 @@ func (h *AuthHandler) Verify2FA(ctx context.Context, req *pb.Verify2FARequest) (
 }
 
 func (h *AuthHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.RefreshTokenResponse, error) {
-	access, refresh, err := h.authSvc.RefreshToken(ctx, req.RefreshToken)
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, status.Errorf(codes.Unauthenticated, "metadata is not provided")
+	}
+	tokens := md.Get("refresh-token")
+	if len(tokens) == 0 {
+		return nil, status.Errorf(codes.Unauthenticated, "refresh-token is not provided in metadata")
+	}
+	refreshToken := tokens[0]
+
+	access, refresh, err := h.authSvc.RefreshToken(ctx, refreshToken)
 	if err != nil {
 		return nil, err
 	}

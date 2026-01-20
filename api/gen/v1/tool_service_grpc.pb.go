@@ -19,7 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ToolService_ListTools_FullMethodName          = "/ubertool.trusted.api.v1.ToolService/ListTools"
+	ToolService_ListMyTools_FullMethodName        = "/ubertool.trusted.api.v1.ToolService/ListMyTools"
 	ToolService_GetTool_FullMethodName            = "/ubertool.trusted.api.v1.ToolService/GetTool"
 	ToolService_AddTool_FullMethodName            = "/ubertool.trusted.api.v1.ToolService/AddTool"
 	ToolService_UpdateTool_FullMethodName         = "/ubertool.trusted.api.v1.ToolService/UpdateTool"
@@ -34,8 +34,8 @@ const (
 //
 // Tool service
 type ToolServiceClient interface {
-	// List tools in an organization
-	ListTools(ctx context.Context, in *ListToolsRequest, opts ...grpc.CallOption) (*ListToolsResponse, error)
+	// List tools in of a user
+	ListMyTools(ctx context.Context, in *ListToolsRequest, opts ...grpc.CallOption) (*ListToolsResponse, error)
 	// Get tool details
 	GetTool(ctx context.Context, in *GetToolRequest, opts ...grpc.CallOption) (*GetToolResponse, error)
 	// Add a new tool
@@ -58,10 +58,10 @@ func NewToolServiceClient(cc grpc.ClientConnInterface) ToolServiceClient {
 	return &toolServiceClient{cc}
 }
 
-func (c *toolServiceClient) ListTools(ctx context.Context, in *ListToolsRequest, opts ...grpc.CallOption) (*ListToolsResponse, error) {
+func (c *toolServiceClient) ListMyTools(ctx context.Context, in *ListToolsRequest, opts ...grpc.CallOption) (*ListToolsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListToolsResponse)
-	err := c.cc.Invoke(ctx, ToolService_ListTools_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ToolService_ListMyTools_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +134,8 @@ func (c *toolServiceClient) ListToolCategories(ctx context.Context, in *ListTool
 //
 // Tool service
 type ToolServiceServer interface {
-	// List tools in an organization
-	ListTools(context.Context, *ListToolsRequest) (*ListToolsResponse, error)
+	// List tools in of a user
+	ListMyTools(context.Context, *ListToolsRequest) (*ListToolsResponse, error)
 	// Get tool details
 	GetTool(context.Context, *GetToolRequest) (*GetToolResponse, error)
 	// Add a new tool
@@ -158,8 +158,8 @@ type ToolServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedToolServiceServer struct{}
 
-func (UnimplementedToolServiceServer) ListTools(context.Context, *ListToolsRequest) (*ListToolsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListTools not implemented")
+func (UnimplementedToolServiceServer) ListMyTools(context.Context, *ListToolsRequest) (*ListToolsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMyTools not implemented")
 }
 func (UnimplementedToolServiceServer) GetTool(context.Context, *GetToolRequest) (*GetToolResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTool not implemented")
@@ -200,20 +200,20 @@ func RegisterToolServiceServer(s grpc.ServiceRegistrar, srv ToolServiceServer) {
 	s.RegisterService(&ToolService_ServiceDesc, srv)
 }
 
-func _ToolService_ListTools_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ToolService_ListMyTools_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListToolsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ToolServiceServer).ListTools(ctx, in)
+		return srv.(ToolServiceServer).ListMyTools(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ToolService_ListTools_FullMethodName,
+		FullMethod: ToolService_ListMyTools_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ToolServiceServer).ListTools(ctx, req.(*ListToolsRequest))
+		return srv.(ToolServiceServer).ListMyTools(ctx, req.(*ListToolsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -334,8 +334,8 @@ var ToolService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ToolServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ListTools",
-			Handler:    _ToolService_ListTools_Handler,
+			MethodName: "ListMyTools",
+			Handler:    _ToolService_ListMyTools_Handler,
 		},
 		{
 			MethodName: "GetTool",

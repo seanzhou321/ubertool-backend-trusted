@@ -11,26 +11,30 @@ option java_outer_classname = "RentalServiceProto";
 
 // Rental service
 service RentalService {
+  // Create rental request (renter)
+  rpc CreateRentalRequest(CreateRentalRequestRequest) returns (CreateRentalRequestResponse);
+
   // Approve rental request (owner)
   rpc ApproveRentalRequest(ApproveRentalRequestRequest) returns (ApproveRentalRequestResponse);
 
   // Reject rental request (owner)
   rpc RejectRentalRequest(RejectRentalRequestRequest) returns (RejectRentalRequestResponse);
 
-  // List lendings (owner)
-  rpc ListMyLendings(ListMyLendingsRequest) returns (ListRentalsResponse);
+  // Finalize approved rental request (renter)
+  rpc FinalizeRentalRequest(FinalizeRentalRequestRequest) returns (FinalizeRentalRequestResponse);
+
+  // Cancel rental (renter)
+  rpc CancelRental(CancelRentalRequest) returns (CancelRentalResponse);
 
   // Complete rental (mark as returned, both sides)
   rpc CompleteRental(CompleteRentalRequest) returns (CompleteRentalResponse);
+  // TODO: Dispute rental (both sides) should be in a designated dispute service
 
   // Get rental details (both sides)
   rpc GetRental(GetRentalRequest) returns (GetRentalResponse);
 
-  // Create rental request (renter)
-  rpc CreateRentalRequest(CreateRentalRequestRequest) returns (CreateRentalRequestResponse);
-
-  // Finalize approved rental request (renter)
-  rpc FinalizeRentalRequest(FinalizeRentalRequestRequest) returns (FinalizeRentalRequestResponse);
+  // List lendings (owner)
+  rpc ListMyLendings(ListMyLendingsRequest) returns (ListRentalsResponse);
 
   // List rentals (renter)
   rpc ListMyRentals(ListMyRentalsRequest) returns (ListRentalsResponse);
@@ -71,6 +75,15 @@ message RejectRentalRequestResponse {
   bool success = 1;
   RentalRequest rental_request = 2;
 }
+
+message CancelRentalRequest {
+  int32 request_id = 1;
+  string reason = 2;
+}
+message CancelRentalResponse {
+  bool success = 1;
+  RentalRequest rental_request = 2;
+} 
 
 // Complete rental
 message CompleteRentalRequest {
@@ -121,6 +134,8 @@ message FinalizeRentalRequestRequest {
 
 message FinalizeRentalRequestResponse {
   RentalRequest rental_request = 1;
+  repeated RentalRequest approved_rentals = 2;
+  repeated RentalRequest pending_rentals = 3;
 }
 
 

@@ -47,12 +47,13 @@ type AuthServiceClient interface {
 	// No access_token required
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 	// Verify 2FA code
-	// No access_token required
+	// 2FA token required
 	Verify2FA(ctx context.Context, in *Verify2FARequest, opts ...grpc.CallOption) (*Verify2FAResponse, error)
 	// Refresh access token
-	// No access_token required
+	// RefreshToken sent in metadata
 	RefreshToken(ctx context.Context, in *RefreshTokenRequest, opts ...grpc.CallOption) (*RefreshTokenResponse, error)
 	// Logout
+	// AccessToken required
 	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LogoutResponse, error)
 }
 
@@ -153,12 +154,13 @@ type AuthServiceServer interface {
 	// No access_token required
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	// Verify 2FA code
-	// No access_token required
+	// 2FA token required
 	Verify2FA(context.Context, *Verify2FARequest) (*Verify2FAResponse, error)
 	// Refresh access token
-	// No access_token required
+	// RefreshToken sent in metadata
 	RefreshToken(context.Context, *RefreshTokenRequest) (*RefreshTokenResponse, error)
 	// Logout
+	// AccessToken required
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }

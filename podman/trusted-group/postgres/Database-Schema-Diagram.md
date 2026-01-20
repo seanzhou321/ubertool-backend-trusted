@@ -87,10 +87,11 @@ erDiagram
         INT renter_id FK
         INT owner_id FK
         DATE start_date
-        DATE scheduled_end_date
         DATE end_date
         INT total_cost_cents
         TEXT status
+        TEXT pickup_note
+        INT completed_by
         DATE created_on
         DATE updated_on
     }

@@ -26,6 +26,10 @@ func (s *organizationService) SearchOrganizations(ctx context.Context, name, met
 	return s.orgRepo.Search(ctx, name, metro)
 }
 
+func (s *organizationService) CreateOrganization(ctx context.Context, org *domain.Organization) error {
+	return s.orgRepo.Create(ctx, org)
+}
+
 func (s *organizationService) UpdateOrganization(ctx context.Context, org *domain.Organization) error {
 	return s.orgRepo.Update(ctx, org)
 }

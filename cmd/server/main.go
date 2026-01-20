@@ -43,6 +43,10 @@ func main() {
 	ledgerSvc := service.NewLedgerService(store.LedgerRepository)
 	noteSvc := service.NewNotificationService(store.NotificationRepository)
 	rentalSvc := service.NewRentalService(store.RentalRepository, store.ToolRepository, store.LedgerRepository, store.UserRepository)
+	
+	// Create uploads directory if not exists
+	uploadDir := "./uploads"
+	imageSvc := service.NewImageStorageService(store.ToolRepository, uploadDir)
 
 	// Gmail Configuration from Environment Variables
 	smtpHost := "smtp.gmail.com"
@@ -63,6 +67,7 @@ func main() {
 	ledgerHandler := api.NewLedgerHandler(ledgerSvc)
 	notificationHandler := api.NewNotificationHandler(noteSvc)
 	adminHandler := api.NewAdminHandler(adminSvc)
+	imageHandler := api.NewImageStorageHandler(imageSvc)
 
 	// Set up gRPC server
 	lis, err := net.Listen("tcp", ":50051")
@@ -81,6 +86,7 @@ func main() {
 	pb.RegisterLedgerServiceServer(s, ledgerHandler)
 	pb.RegisterNotificationServiceServer(s, notificationHandler)
 	pb.RegisterAdminServiceServer(s, adminHandler)
+	pb.RegisterImageStorageServiceServer(s, imageHandler)
 
 	reflection.Register(s)
 

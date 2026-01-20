@@ -19,7 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ImageStorageService_GetUploadUrl_FullMethodName = "/ubertool.trusted.api.v1.ImageStorageService/GetUploadUrl"
+	ImageStorageService_UploadImage_FullMethodName     = "/ubertool.trusted.api.v1.ImageStorageService/UploadImage"
+	ImageStorageService_GetToolImages_FullMethodName   = "/ubertool.trusted.api.v1.ImageStorageService/GetToolImages"
+	ImageStorageService_DownloadImage_FullMethodName   = "/ubertool.trusted.api.v1.ImageStorageService/DownloadImage"
+	ImageStorageService_DeleteImage_FullMethodName     = "/ubertool.trusted.api.v1.ImageStorageService/DeleteImage"
+	ImageStorageService_SetPrimaryImage_FullMethodName = "/ubertool.trusted.api.v1.ImageStorageService/SetPrimaryImage"
 )
 
 // ImageStorageServiceClient is the client API for ImageStorageService service.
@@ -28,8 +32,16 @@ const (
 //
 // Image storage service for uploading tool images and avatars
 type ImageStorageServiceClient interface {
-	// Get a presigned upload URL for image upload
-	GetUploadUrl(ctx context.Context, in *GetUploadUrlRequest, opts ...grpc.CallOption) (*GetUploadUrlResponse, error)
+	// Upload an image
+	UploadImage(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadImageRequest, UploadImageResponse], error)
+	// Get Images of a tool
+	GetToolImages(ctx context.Context, in *GetToolImagesRequest, opts ...grpc.CallOption) (*GetToolImagesResponse, error)
+	// Download an image
+	DownloadImage(ctx context.Context, in *DownloadImageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadImageResponse], error)
+	// Delete an image
+	DeleteImage(ctx context.Context, in *DeleteImageRequest, opts ...grpc.CallOption) (*DeleteImageResponse, error)
+	// Set primary image
+	SetPrimaryImage(ctx context.Context, in *SetPrimaryImageRequest, opts ...grpc.CallOption) (*SetPrimaryImageResponse, error)
 }
 
 type imageStorageServiceClient struct {
@@ -40,10 +52,62 @@ func NewImageStorageServiceClient(cc grpc.ClientConnInterface) ImageStorageServi
 	return &imageStorageServiceClient{cc}
 }
 
-func (c *imageStorageServiceClient) GetUploadUrl(ctx context.Context, in *GetUploadUrlRequest, opts ...grpc.CallOption) (*GetUploadUrlResponse, error) {
+func (c *imageStorageServiceClient) UploadImage(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadImageRequest, UploadImageResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetUploadUrlResponse)
-	err := c.cc.Invoke(ctx, ImageStorageService_GetUploadUrl_FullMethodName, in, out, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &ImageStorageService_ServiceDesc.Streams[0], ImageStorageService_UploadImage_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[UploadImageRequest, UploadImageResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ImageStorageService_UploadImageClient = grpc.ClientStreamingClient[UploadImageRequest, UploadImageResponse]
+
+func (c *imageStorageServiceClient) GetToolImages(ctx context.Context, in *GetToolImagesRequest, opts ...grpc.CallOption) (*GetToolImagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetToolImagesResponse)
+	err := c.cc.Invoke(ctx, ImageStorageService_GetToolImages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *imageStorageServiceClient) DownloadImage(ctx context.Context, in *DownloadImageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadImageResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ImageStorageService_ServiceDesc.Streams[1], ImageStorageService_DownloadImage_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[DownloadImageRequest, DownloadImageResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ImageStorageService_DownloadImageClient = grpc.ServerStreamingClient[DownloadImageResponse]
+
+func (c *imageStorageServiceClient) DeleteImage(ctx context.Context, in *DeleteImageRequest, opts ...grpc.CallOption) (*DeleteImageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteImageResponse)
+	err := c.cc.Invoke(ctx, ImageStorageService_DeleteImage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *imageStorageServiceClient) SetPrimaryImage(ctx context.Context, in *SetPrimaryImageRequest, opts ...grpc.CallOption) (*SetPrimaryImageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetPrimaryImageResponse)
+	err := c.cc.Invoke(ctx, ImageStorageService_SetPrimaryImage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +120,16 @@ func (c *imageStorageServiceClient) GetUploadUrl(ctx context.Context, in *GetUpl
 //
 // Image storage service for uploading tool images and avatars
 type ImageStorageServiceServer interface {
-	// Get a presigned upload URL for image upload
-	GetUploadUrl(context.Context, *GetUploadUrlRequest) (*GetUploadUrlResponse, error)
+	// Upload an image
+	UploadImage(grpc.ClientStreamingServer[UploadImageRequest, UploadImageResponse]) error
+	// Get Images of a tool
+	GetToolImages(context.Context, *GetToolImagesRequest) (*GetToolImagesResponse, error)
+	// Download an image
+	DownloadImage(*DownloadImageRequest, grpc.ServerStreamingServer[DownloadImageResponse]) error
+	// Delete an image
+	DeleteImage(context.Context, *DeleteImageRequest) (*DeleteImageResponse, error)
+	// Set primary image
+	SetPrimaryImage(context.Context, *SetPrimaryImageRequest) (*SetPrimaryImageResponse, error)
 	mustEmbedUnimplementedImageStorageServiceServer()
 }
 
@@ -68,8 +140,20 @@ type ImageStorageServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedImageStorageServiceServer struct{}
 
-func (UnimplementedImageStorageServiceServer) GetUploadUrl(context.Context, *GetUploadUrlRequest) (*GetUploadUrlResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetUploadUrl not implemented")
+func (UnimplementedImageStorageServiceServer) UploadImage(grpc.ClientStreamingServer[UploadImageRequest, UploadImageResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method UploadImage not implemented")
+}
+func (UnimplementedImageStorageServiceServer) GetToolImages(context.Context, *GetToolImagesRequest) (*GetToolImagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetToolImages not implemented")
+}
+func (UnimplementedImageStorageServiceServer) DownloadImage(*DownloadImageRequest, grpc.ServerStreamingServer[DownloadImageResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method DownloadImage not implemented")
+}
+func (UnimplementedImageStorageServiceServer) DeleteImage(context.Context, *DeleteImageRequest) (*DeleteImageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteImage not implemented")
+}
+func (UnimplementedImageStorageServiceServer) SetPrimaryImage(context.Context, *SetPrimaryImageRequest) (*SetPrimaryImageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetPrimaryImage not implemented")
 }
 func (UnimplementedImageStorageServiceServer) mustEmbedUnimplementedImageStorageServiceServer() {}
 func (UnimplementedImageStorageServiceServer) testEmbeddedByValue()                             {}
@@ -92,20 +176,74 @@ func RegisterImageStorageServiceServer(s grpc.ServiceRegistrar, srv ImageStorage
 	s.RegisterService(&ImageStorageService_ServiceDesc, srv)
 }
 
-func _ImageStorageService_GetUploadUrl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetUploadUrlRequest)
+func _ImageStorageService_UploadImage_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ImageStorageServiceServer).UploadImage(&grpc.GenericServerStream[UploadImageRequest, UploadImageResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ImageStorageService_UploadImageServer = grpc.ClientStreamingServer[UploadImageRequest, UploadImageResponse]
+
+func _ImageStorageService_GetToolImages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetToolImagesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ImageStorageServiceServer).GetUploadUrl(ctx, in)
+		return srv.(ImageStorageServiceServer).GetToolImages(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ImageStorageService_GetUploadUrl_FullMethodName,
+		FullMethod: ImageStorageService_GetToolImages_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ImageStorageServiceServer).GetUploadUrl(ctx, req.(*GetUploadUrlRequest))
+		return srv.(ImageStorageServiceServer).GetToolImages(ctx, req.(*GetToolImagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ImageStorageService_DownloadImage_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DownloadImageRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ImageStorageServiceServer).DownloadImage(m, &grpc.GenericServerStream[DownloadImageRequest, DownloadImageResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ImageStorageService_DownloadImageServer = grpc.ServerStreamingServer[DownloadImageResponse]
+
+func _ImageStorageService_DeleteImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteImageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImageStorageServiceServer).DeleteImage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ImageStorageService_DeleteImage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImageStorageServiceServer).DeleteImage(ctx, req.(*DeleteImageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ImageStorageService_SetPrimaryImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetPrimaryImageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImageStorageServiceServer).SetPrimaryImage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ImageStorageService_SetPrimaryImage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImageStorageServiceServer).SetPrimaryImage(ctx, req.(*SetPrimaryImageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -118,10 +256,29 @@ var ImageStorageService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ImageStorageServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetUploadUrl",
-			Handler:    _ImageStorageService_GetUploadUrl_Handler,
+			MethodName: "GetToolImages",
+			Handler:    _ImageStorageService_GetToolImages_Handler,
+		},
+		{
+			MethodName: "DeleteImage",
+			Handler:    _ImageStorageService_DeleteImage_Handler,
+		},
+		{
+			MethodName: "SetPrimaryImage",
+			Handler:    _ImageStorageService_SetPrimaryImage_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "UploadImage",
+			Handler:       _ImageStorageService_UploadImage_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "DownloadImage",
+			Handler:       _ImageStorageService_DownloadImage_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "ubertool_trusted_backend/v1/image_storage_service.proto",
 }

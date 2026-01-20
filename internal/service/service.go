@@ -23,8 +23,17 @@ type UserService interface {
 type OrganizationService interface {
 	ListOrganizations(ctx context.Context) ([]domain.Organization, error)
 	GetOrganization(ctx context.Context, id int32) (*domain.Organization, error)
+	CreateOrganization(ctx context.Context, org *domain.Organization) error
 	SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error)
 	UpdateOrganization(ctx context.Context, org *domain.Organization) error
+}
+
+type ImageStorageService interface {
+	UploadImage(ctx context.Context, toolID int32, file []byte, filename, mimeType string) (*domain.ToolImage, error)
+	GetToolImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error)
+	DownloadImage(ctx context.Context, toolID, imageID int32) ([]byte, string, error) // returns data, contentType, error
+	DeleteImage(ctx context.Context, imageID int32) error
+	SetPrimaryImage(ctx context.Context, toolID, imageID int32) error
 }
 
 type ToolService interface {
@@ -33,6 +42,7 @@ type ToolService interface {
 	UpdateTool(ctx context.Context, tool *domain.Tool) error
 	DeleteTool(ctx context.Context, id int32) error
 	ListTools(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error)
+	ListMyTools(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	SearchTools(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
 	ListCategories(ctx context.Context) ([]string, error)
 }
@@ -41,6 +51,7 @@ type RentalService interface {
 	CreateRentalRequest(ctx context.Context, renterID, toolID, orgID int32, startDate, endDate string) (*domain.Rental, error)
 	ApproveRentalRequest(ctx context.Context, ownerID, rentalID int32, pickupNote string) (*domain.Rental, error)
 	RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
+	CancelRental(ctx context.Context, renterID, rentalID int32, reason string) (*domain.Rental, error)
 	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error)
 	CompleteRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
 	ListRentals(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)

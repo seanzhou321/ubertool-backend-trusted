@@ -19,13 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	RentalService_CreateRentalRequest_FullMethodName   = "/ubertool.trusted.api.v1.RentalService/CreateRentalRequest"
 	RentalService_ApproveRentalRequest_FullMethodName  = "/ubertool.trusted.api.v1.RentalService/ApproveRentalRequest"
 	RentalService_RejectRentalRequest_FullMethodName   = "/ubertool.trusted.api.v1.RentalService/RejectRentalRequest"
-	RentalService_ListMyLendings_FullMethodName        = "/ubertool.trusted.api.v1.RentalService/ListMyLendings"
+	RentalService_FinalizeRentalRequest_FullMethodName = "/ubertool.trusted.api.v1.RentalService/FinalizeRentalRequest"
+	RentalService_CancelRental_FullMethodName          = "/ubertool.trusted.api.v1.RentalService/CancelRental"
 	RentalService_CompleteRental_FullMethodName        = "/ubertool.trusted.api.v1.RentalService/CompleteRental"
 	RentalService_GetRental_FullMethodName             = "/ubertool.trusted.api.v1.RentalService/GetRental"
-	RentalService_CreateRentalRequest_FullMethodName   = "/ubertool.trusted.api.v1.RentalService/CreateRentalRequest"
-	RentalService_FinalizeRentalRequest_FullMethodName = "/ubertool.trusted.api.v1.RentalService/FinalizeRentalRequest"
+	RentalService_ListMyLendings_FullMethodName        = "/ubertool.trusted.api.v1.RentalService/ListMyLendings"
 	RentalService_ListMyRentals_FullMethodName         = "/ubertool.trusted.api.v1.RentalService/ListMyRentals"
 )
 
@@ -35,20 +36,22 @@ const (
 //
 // Rental service
 type RentalServiceClient interface {
+	// Create rental request (renter)
+	CreateRentalRequest(ctx context.Context, in *CreateRentalRequestRequest, opts ...grpc.CallOption) (*CreateRentalRequestResponse, error)
 	// Approve rental request (owner)
 	ApproveRentalRequest(ctx context.Context, in *ApproveRentalRequestRequest, opts ...grpc.CallOption) (*ApproveRentalRequestResponse, error)
 	// Reject rental request (owner)
 	RejectRentalRequest(ctx context.Context, in *RejectRentalRequestRequest, opts ...grpc.CallOption) (*RejectRentalRequestResponse, error)
-	// List lendings (owner)
-	ListMyLendings(ctx context.Context, in *ListMyLendingsRequest, opts ...grpc.CallOption) (*ListRentalsResponse, error)
+	// Finalize approved rental request (renter)
+	FinalizeRentalRequest(ctx context.Context, in *FinalizeRentalRequestRequest, opts ...grpc.CallOption) (*FinalizeRentalRequestResponse, error)
+	// Cancel rental (renter)
+	CancelRental(ctx context.Context, in *CancelRentalRequest, opts ...grpc.CallOption) (*CancelRentalResponse, error)
 	// Complete rental (mark as returned, both sides)
 	CompleteRental(ctx context.Context, in *CompleteRentalRequest, opts ...grpc.CallOption) (*CompleteRentalResponse, error)
 	// Get rental details (both sides)
 	GetRental(ctx context.Context, in *GetRentalRequest, opts ...grpc.CallOption) (*GetRentalResponse, error)
-	// Create rental request (renter)
-	CreateRentalRequest(ctx context.Context, in *CreateRentalRequestRequest, opts ...grpc.CallOption) (*CreateRentalRequestResponse, error)
-	// Finalize approved rental request (renter)
-	FinalizeRentalRequest(ctx context.Context, in *FinalizeRentalRequestRequest, opts ...grpc.CallOption) (*FinalizeRentalRequestResponse, error)
+	// List lendings (owner)
+	ListMyLendings(ctx context.Context, in *ListMyLendingsRequest, opts ...grpc.CallOption) (*ListRentalsResponse, error)
 	// List rentals (renter)
 	ListMyRentals(ctx context.Context, in *ListMyRentalsRequest, opts ...grpc.CallOption) (*ListRentalsResponse, error)
 }
@@ -59,6 +62,16 @@ type rentalServiceClient struct {
 
 func NewRentalServiceClient(cc grpc.ClientConnInterface) RentalServiceClient {
 	return &rentalServiceClient{cc}
+}
+
+func (c *rentalServiceClient) CreateRentalRequest(ctx context.Context, in *CreateRentalRequestRequest, opts ...grpc.CallOption) (*CreateRentalRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateRentalRequestResponse)
+	err := c.cc.Invoke(ctx, RentalService_CreateRentalRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *rentalServiceClient) ApproveRentalRequest(ctx context.Context, in *ApproveRentalRequestRequest, opts ...grpc.CallOption) (*ApproveRentalRequestResponse, error) {
@@ -81,10 +94,20 @@ func (c *rentalServiceClient) RejectRentalRequest(ctx context.Context, in *Rejec
 	return out, nil
 }
 
-func (c *rentalServiceClient) ListMyLendings(ctx context.Context, in *ListMyLendingsRequest, opts ...grpc.CallOption) (*ListRentalsResponse, error) {
+func (c *rentalServiceClient) FinalizeRentalRequest(ctx context.Context, in *FinalizeRentalRequestRequest, opts ...grpc.CallOption) (*FinalizeRentalRequestResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListRentalsResponse)
-	err := c.cc.Invoke(ctx, RentalService_ListMyLendings_FullMethodName, in, out, cOpts...)
+	out := new(FinalizeRentalRequestResponse)
+	err := c.cc.Invoke(ctx, RentalService_FinalizeRentalRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *rentalServiceClient) CancelRental(ctx context.Context, in *CancelRentalRequest, opts ...grpc.CallOption) (*CancelRentalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelRentalResponse)
+	err := c.cc.Invoke(ctx, RentalService_CancelRental_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -111,20 +134,10 @@ func (c *rentalServiceClient) GetRental(ctx context.Context, in *GetRentalReques
 	return out, nil
 }
 
-func (c *rentalServiceClient) CreateRentalRequest(ctx context.Context, in *CreateRentalRequestRequest, opts ...grpc.CallOption) (*CreateRentalRequestResponse, error) {
+func (c *rentalServiceClient) ListMyLendings(ctx context.Context, in *ListMyLendingsRequest, opts ...grpc.CallOption) (*ListRentalsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateRentalRequestResponse)
-	err := c.cc.Invoke(ctx, RentalService_CreateRentalRequest_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *rentalServiceClient) FinalizeRentalRequest(ctx context.Context, in *FinalizeRentalRequestRequest, opts ...grpc.CallOption) (*FinalizeRentalRequestResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(FinalizeRentalRequestResponse)
-	err := c.cc.Invoke(ctx, RentalService_FinalizeRentalRequest_FullMethodName, in, out, cOpts...)
+	out := new(ListRentalsResponse)
+	err := c.cc.Invoke(ctx, RentalService_ListMyLendings_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -147,20 +160,22 @@ func (c *rentalServiceClient) ListMyRentals(ctx context.Context, in *ListMyRenta
 //
 // Rental service
 type RentalServiceServer interface {
+	// Create rental request (renter)
+	CreateRentalRequest(context.Context, *CreateRentalRequestRequest) (*CreateRentalRequestResponse, error)
 	// Approve rental request (owner)
 	ApproveRentalRequest(context.Context, *ApproveRentalRequestRequest) (*ApproveRentalRequestResponse, error)
 	// Reject rental request (owner)
 	RejectRentalRequest(context.Context, *RejectRentalRequestRequest) (*RejectRentalRequestResponse, error)
-	// List lendings (owner)
-	ListMyLendings(context.Context, *ListMyLendingsRequest) (*ListRentalsResponse, error)
+	// Finalize approved rental request (renter)
+	FinalizeRentalRequest(context.Context, *FinalizeRentalRequestRequest) (*FinalizeRentalRequestResponse, error)
+	// Cancel rental (renter)
+	CancelRental(context.Context, *CancelRentalRequest) (*CancelRentalResponse, error)
 	// Complete rental (mark as returned, both sides)
 	CompleteRental(context.Context, *CompleteRentalRequest) (*CompleteRentalResponse, error)
 	// Get rental details (both sides)
 	GetRental(context.Context, *GetRentalRequest) (*GetRentalResponse, error)
-	// Create rental request (renter)
-	CreateRentalRequest(context.Context, *CreateRentalRequestRequest) (*CreateRentalRequestResponse, error)
-	// Finalize approved rental request (renter)
-	FinalizeRentalRequest(context.Context, *FinalizeRentalRequestRequest) (*FinalizeRentalRequestResponse, error)
+	// List lendings (owner)
+	ListMyLendings(context.Context, *ListMyLendingsRequest) (*ListRentalsResponse, error)
 	// List rentals (renter)
 	ListMyRentals(context.Context, *ListMyRentalsRequest) (*ListRentalsResponse, error)
 	mustEmbedUnimplementedRentalServiceServer()
@@ -173,14 +188,20 @@ type RentalServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedRentalServiceServer struct{}
 
+func (UnimplementedRentalServiceServer) CreateRentalRequest(context.Context, *CreateRentalRequestRequest) (*CreateRentalRequestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateRentalRequest not implemented")
+}
 func (UnimplementedRentalServiceServer) ApproveRentalRequest(context.Context, *ApproveRentalRequestRequest) (*ApproveRentalRequestResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ApproveRentalRequest not implemented")
 }
 func (UnimplementedRentalServiceServer) RejectRentalRequest(context.Context, *RejectRentalRequestRequest) (*RejectRentalRequestResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RejectRentalRequest not implemented")
 }
-func (UnimplementedRentalServiceServer) ListMyLendings(context.Context, *ListMyLendingsRequest) (*ListRentalsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListMyLendings not implemented")
+func (UnimplementedRentalServiceServer) FinalizeRentalRequest(context.Context, *FinalizeRentalRequestRequest) (*FinalizeRentalRequestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeRentalRequest not implemented")
+}
+func (UnimplementedRentalServiceServer) CancelRental(context.Context, *CancelRentalRequest) (*CancelRentalResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelRental not implemented")
 }
 func (UnimplementedRentalServiceServer) CompleteRental(context.Context, *CompleteRentalRequest) (*CompleteRentalResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CompleteRental not implemented")
@@ -188,11 +209,8 @@ func (UnimplementedRentalServiceServer) CompleteRental(context.Context, *Complet
 func (UnimplementedRentalServiceServer) GetRental(context.Context, *GetRentalRequest) (*GetRentalResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRental not implemented")
 }
-func (UnimplementedRentalServiceServer) CreateRentalRequest(context.Context, *CreateRentalRequestRequest) (*CreateRentalRequestResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateRentalRequest not implemented")
-}
-func (UnimplementedRentalServiceServer) FinalizeRentalRequest(context.Context, *FinalizeRentalRequestRequest) (*FinalizeRentalRequestResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FinalizeRentalRequest not implemented")
+func (UnimplementedRentalServiceServer) ListMyLendings(context.Context, *ListMyLendingsRequest) (*ListRentalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMyLendings not implemented")
 }
 func (UnimplementedRentalServiceServer) ListMyRentals(context.Context, *ListMyRentalsRequest) (*ListRentalsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMyRentals not implemented")
@@ -216,6 +234,24 @@ func RegisterRentalServiceServer(s grpc.ServiceRegistrar, srv RentalServiceServe
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&RentalService_ServiceDesc, srv)
+}
+
+func _RentalService_CreateRentalRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateRentalRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RentalServiceServer).CreateRentalRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RentalService_CreateRentalRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RentalServiceServer).CreateRentalRequest(ctx, req.(*CreateRentalRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _RentalService_ApproveRentalRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -254,20 +290,38 @@ func _RentalService_RejectRentalRequest_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RentalService_ListMyLendings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListMyLendingsRequest)
+func _RentalService_FinalizeRentalRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeRentalRequestRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RentalServiceServer).ListMyLendings(ctx, in)
+		return srv.(RentalServiceServer).FinalizeRentalRequest(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RentalService_ListMyLendings_FullMethodName,
+		FullMethod: RentalService_FinalizeRentalRequest_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RentalServiceServer).ListMyLendings(ctx, req.(*ListMyLendingsRequest))
+		return srv.(RentalServiceServer).FinalizeRentalRequest(ctx, req.(*FinalizeRentalRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RentalService_CancelRental_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelRentalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RentalServiceServer).CancelRental(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RentalService_CancelRental_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RentalServiceServer).CancelRental(ctx, req.(*CancelRentalRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -308,38 +362,20 @@ func _RentalService_GetRental_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RentalService_CreateRentalRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateRentalRequestRequest)
+func _RentalService_ListMyLendings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMyLendingsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RentalServiceServer).CreateRentalRequest(ctx, in)
+		return srv.(RentalServiceServer).ListMyLendings(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RentalService_CreateRentalRequest_FullMethodName,
+		FullMethod: RentalService_ListMyLendings_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RentalServiceServer).CreateRentalRequest(ctx, req.(*CreateRentalRequestRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RentalService_FinalizeRentalRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(FinalizeRentalRequestRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RentalServiceServer).FinalizeRentalRequest(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RentalService_FinalizeRentalRequest_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RentalServiceServer).FinalizeRentalRequest(ctx, req.(*FinalizeRentalRequestRequest))
+		return srv.(RentalServiceServer).ListMyLendings(ctx, req.(*ListMyLendingsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -370,6 +406,10 @@ var RentalService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*RentalServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "CreateRentalRequest",
+			Handler:    _RentalService_CreateRentalRequest_Handler,
+		},
+		{
 			MethodName: "ApproveRentalRequest",
 			Handler:    _RentalService_ApproveRentalRequest_Handler,
 		},
@@ -378,8 +418,12 @@ var RentalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _RentalService_RejectRentalRequest_Handler,
 		},
 		{
-			MethodName: "ListMyLendings",
-			Handler:    _RentalService_ListMyLendings_Handler,
+			MethodName: "FinalizeRentalRequest",
+			Handler:    _RentalService_FinalizeRentalRequest_Handler,
+		},
+		{
+			MethodName: "CancelRental",
+			Handler:    _RentalService_CancelRental_Handler,
 		},
 		{
 			MethodName: "CompleteRental",
@@ -390,12 +434,8 @@ var RentalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _RentalService_GetRental_Handler,
 		},
 		{
-			MethodName: "CreateRentalRequest",
-			Handler:    _RentalService_CreateRentalRequest_Handler,
-		},
-		{
-			MethodName: "FinalizeRentalRequest",
-			Handler:    _RentalService_FinalizeRentalRequest_Handler,
+			MethodName: "ListMyLendings",
+			Handler:    _RentalService_ListMyLendings_Handler,
 		},
 		{
 			MethodName: "ListMyRentals",

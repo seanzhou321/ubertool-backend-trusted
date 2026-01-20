@@ -21,7 +21,9 @@ func (s *toolService) AddTool(ctx context.Context, tool *domain.Tool, images []s
 	for i, url := range images {
 		img := &domain.ToolImage{
 			ToolID:       tool.ID,
-			ImageURL:     url,
+			FileName:     url, // Use URL as filename for now
+			FilePath:     url,
+			ThumbnailPath: url,
 			DisplayOrder: int32(i),
 		}
 		if err := s.toolRepo.AddImage(ctx, img); err != nil {
@@ -53,6 +55,10 @@ func (s *toolService) DeleteTool(ctx context.Context, id int32) error {
 
 func (s *toolService) ListTools(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error) {
 	return s.toolRepo.ListByOrg(ctx, orgID, page, pageSize)
+}
+
+func (s *toolService) ListMyTools(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Tool, int32, error) {
+	return s.toolRepo.ListByOwner(ctx, userID, page, pageSize)
 }
 
 func (s *toolService) SearchTools(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {

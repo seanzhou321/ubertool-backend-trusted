@@ -4,6 +4,7 @@ package ubertool.trusted.api.v1;
 
 option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
+import "ubertool_trusted_backend/v1/rental_service.proto";
 
 option java_multiple_files = true;
 option java_package = "com.ubertool.trusted.api.v1";
@@ -48,15 +49,13 @@ message GetTransactionsResponse {
 // Get ledger summary request
 message GetLedgerSummaryRequest {
   int32 organization_id = 1;
+  int32 number_of_months = 2; // e.g., last 3 months
 }
 
 // Get ledger summary response
 message GetLedgerSummaryResponse {
   int32 balance = 1;
-  repeated Transaction recent_transactions = 2;
-  int32 active_rentals_count = 3;
-  int32 active_lendings_count = 4;
-  int32 pending_requests_count = 5;
+  map<string, int32> status_count = 2; // count of rentals by status
 }
 
 // Transaction message
@@ -66,7 +65,7 @@ message Transaction {
   int32 organization_id = 3;
   int32 amount = 4; // positive for credit, negative for debit
   TransactionType type = 5;
-  int32 related_rental_id = 6;
+  RentalRequest related_rental = 6;
   string description = 7;
   string charged_on = 8; // Date string YYYY-MM-DD
 }

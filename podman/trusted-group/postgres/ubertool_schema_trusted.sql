@@ -8,7 +8,7 @@
 -- CREATE TYPE tool_status_enum AS ENUM ('AVAILABLE', 'UNAVAILABLE', 'RENTED');
 -- CREATE TYPE tool_condition_enum AS ENUM ('EXCELLENT', 'GOOD', 'ACCEPTABLE', 'DAMAGED/NEEDS_REPAIR');
 -- CREATE TYPE ledger_transaction_type_enum AS ENUM ('RENTAL_DEBIT', 'LENDING_CREDIT', 'REFUND', 'ADJUSTMENT');
--- CREATE TYPE rental_status_enum AS ENUM ('PENDING', 'APPROVED', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'OVERDUE');
+-- CREATE TYPE rental_status_enum AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'OVERDUE');
 
 -- 1. Organizations (Community/Church Groups)
 CREATE TABLE orgs (
@@ -40,6 +40,7 @@ CREATE TABLE users_orgs (
     org_id INTEGER REFERENCES orgs(id) ON DELETE CASCADE,
     joined_on DATE DEFAULT CURRENT_DATE,
     balance_cents INTEGER DEFAULT 0,
+    last_balance_updated_on DATE,
     status TEXT NOT NULL DEFAULT 'ACTIVE',
     role TEXT NOT NULL DEFAULT 'MEMBER',
     blocked_date DATE,
@@ -90,9 +91,24 @@ CREATE TABLE tools (
 CREATE TABLE tool_images (
     id SERIAL PRIMARY KEY,
     tool_id INTEGER REFERENCES tools(id) ON DELETE CASCADE,
-    image_url TEXT NOT NULL,
-    display_order INTEGER DEFAULT 0
+    file_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    thumbnail_path TEXT NOT NULL,
+    file_size int32 NOT NULL,
+    mime_type TEXT NOT NULL,
+    width int32 NOT NULL,
+    height int32 NOT NULL,
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+    display_order INTEGER DEFAULT 0,
+    created_on DATE DEFAULT CURRENT_DATE,
+    deleted_on DATE
+    CONSTRAINT unique_primary_per_tool UNIQUE (tool_id, is_primary) WHERE is_primary = TRUE
+    CONSTRAINT unique_filename_per_tool UNIQUE (tool_id, file_name)
 );
+
+-- Index for fast queries
+CREATE INDEX idx_tool_images_tool_id ON tool_images(tool_id);
+CREATE INDEX idx_tool_images_primary ON tool_images(tool_id, is_primary);
 
 -- 4. Rentals
 CREATE TABLE rentals (
@@ -102,11 +118,11 @@ CREATE TABLE rentals (
     renter_id INTEGER REFERENCES users(id),
     owner_id INTEGER REFERENCES users(id),
     start_date DATE NOT NULL,
-    scheduled_end_date DATE NOT NULL, -- Expected return
     end_date DATE, -- Actual return date
     total_cost_cents INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING',
     pickup_note TEXT,
+    completed_by int32,
     created_on DATE DEFAULT CURRENT_DATE,
     updated_on DATE DEFAULT CURRENT_DATE
 );

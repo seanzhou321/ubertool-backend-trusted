@@ -131,12 +131,12 @@ func (ToolStatus) EnumDescriptor() ([]byte, []int) {
 
 // List tools request
 type ListToolsRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	Page           int32                  `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize       int32                  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Metro         string                 `protobuf:"bytes,1,opt,name=metro,proto3" json:"metro,omitempty"` // Optional metro filter
+	Page          int32                  `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      int32                  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListToolsRequest) Reset() {
@@ -169,11 +169,11 @@ func (*ListToolsRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_tool_service_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ListToolsRequest) GetOrganizationId() int32 {
+func (x *ListToolsRequest) GetMetro() string {
 	if x != nil {
-		return x.OrganizationId
+		return x.Metro
 	}
-	return 0
+	return ""
 }
 
 func (x *ListToolsRequest) GetPage() int32 {
@@ -360,8 +360,11 @@ type AddToolRequest struct {
 	PricePerWeekCents    int32         `protobuf:"varint,5,opt,name=price_per_week_cents,json=pricePerWeekCents,proto3" json:"price_per_week_cents,omitempty"`
 	PricePerMonthCents   int32         `protobuf:"varint,6,opt,name=price_per_month_cents,json=pricePerMonthCents,proto3" json:"price_per_month_cents,omitempty"`
 	ReplacementCostCents int32         `protobuf:"varint,7,opt,name=replacement_cost_cents,json=replacementCostCents,proto3" json:"replacement_cost_cents,omitempty"`
-	Condition            ToolCondition `protobuf:"varint,8,opt,name=condition,proto3,enum=ubertool.trusted.api.v1.ToolCondition" json:"condition,omitempty"`
-	ImageUrl             string        `protobuf:"bytes,9,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	Duration             string        `protobuf:"bytes,8,opt,name=duration,proto3" json:"duration,omitempty"`
+	Condition            ToolCondition `protobuf:"varint,9,opt,name=condition,proto3,enum=ubertool.trusted.api.v1.ToolCondition" json:"condition,omitempty"`
+	Metro                string        `protobuf:"bytes,10,opt,name=metro,proto3" json:"metro,omitempty"`
+	Status               string        `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
+	ImageUrl             []string      `protobuf:"bytes,12,rep,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -445,6 +448,13 @@ func (x *AddToolRequest) GetReplacementCostCents() int32 {
 	return 0
 }
 
+func (x *AddToolRequest) GetDuration() string {
+	if x != nil {
+		return x.Duration
+	}
+	return ""
+}
+
 func (x *AddToolRequest) GetCondition() ToolCondition {
 	if x != nil {
 		return x.Condition
@@ -452,11 +462,25 @@ func (x *AddToolRequest) GetCondition() ToolCondition {
 	return ToolCondition_TOOL_CONDITION_UNSPECIFIED
 }
 
-func (x *AddToolRequest) GetImageUrl() string {
+func (x *AddToolRequest) GetMetro() string {
+	if x != nil {
+		return x.Metro
+	}
+	return ""
+}
+
+func (x *AddToolRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AddToolRequest) GetImageUrl() []string {
 	if x != nil {
 		return x.ImageUrl
 	}
-	return ""
+	return nil
 }
 
 // Add tool response
@@ -765,8 +789,11 @@ type SearchToolsRequest struct {
 	Categories     []string               `protobuf:"bytes,3,rep,name=categories,proto3" json:"categories,omitempty"`
 	MaxPrice       int32                  `protobuf:"varint,4,opt,name=max_price,json=maxPrice,proto3" json:"max_price,omitempty"`
 	Condition      ToolCondition          `protobuf:"varint,5,opt,name=condition,proto3,enum=ubertool.trusted.api.v1.ToolCondition" json:"condition,omitempty"`
-	Page           int32                  `protobuf:"varint,6,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize       int32                  `protobuf:"varint,7,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	Metro          string                 `protobuf:"bytes,6,opt,name=metro,proto3" json:"metro,omitempty"`
+	StartDate      string                 `protobuf:"bytes,7,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"` // Date string YYYY-MM-DD
+	EndDate        string                 `protobuf:"bytes,8,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`       // Date string YYYY-MM-DD
+	Page           int32                  `protobuf:"varint,9,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize       int32                  `protobuf:"varint,10,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -834,6 +861,27 @@ func (x *SearchToolsRequest) GetCondition() ToolCondition {
 		return x.Condition
 	}
 	return ToolCondition_TOOL_CONDITION_UNSPECIFIED
+}
+
+func (x *SearchToolsRequest) GetMetro() string {
+	if x != nil {
+		return x.Metro
+	}
+	return ""
+}
+
+func (x *SearchToolsRequest) GetStartDate() string {
+	if x != nil {
+		return x.StartDate
+	}
+	return ""
+}
+
+func (x *SearchToolsRequest) GetEndDate() string {
+	if x != nil {
+		return x.EndDate
+	}
+	return ""
 }
 
 func (x *SearchToolsRequest) GetPage() int32 {
@@ -1156,9 +1204,9 @@ var File_ubertool_trusted_backend_v1_tool_service_proto protoreflect.FileDescrip
 
 const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\n" +
-	".ubertool_trusted_backend/v1/tool_service.proto\x12\x17ubertool.trusted.api.v1\"l\n" +
-	"\x10ListToolsRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12\x12\n" +
+	".ubertool_trusted_backend/v1/tool_service.proto\x12\x17ubertool.trusted.api.v1\"Y\n" +
+	"\x10ListToolsRequest\x12\x14\n" +
+	"\x05metro\x18\x01 \x01(\tR\x05metro\x12\x12\n" +
 	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"\x9a\x01\n" +
 	"\x11ListToolsResponse\x123\n" +
@@ -1170,7 +1218,7 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\x0eGetToolRequest\x12\x17\n" +
 	"\atool_id\x18\x01 \x01(\x05R\x06toolId\"D\n" +
 	"\x0fGetToolResponse\x121\n" +
-	"\x04tool\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.ToolR\x04tool\"\x92\x03\n" +
+	"\x04tool\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.ToolR\x04tool\"\xdc\x03\n" +
 	"\x0eAddToolRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1e\n" +
@@ -1180,9 +1228,13 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\x13price_per_day_cents\x18\x04 \x01(\x05R\x10pricePerDayCents\x12/\n" +
 	"\x14price_per_week_cents\x18\x05 \x01(\x05R\x11pricePerWeekCents\x121\n" +
 	"\x15price_per_month_cents\x18\x06 \x01(\x05R\x12pricePerMonthCents\x124\n" +
-	"\x16replacement_cost_cents\x18\a \x01(\x05R\x14replacementCostCents\x12D\n" +
-	"\tcondition\x18\b \x01(\x0e2&.ubertool.trusted.api.v1.ToolConditionR\tcondition\x12\x1b\n" +
-	"\timage_url\x18\t \x01(\tR\bimageUrl\"D\n" +
+	"\x16replacement_cost_cents\x18\a \x01(\x05R\x14replacementCostCents\x12\x1a\n" +
+	"\bduration\x18\b \x01(\tR\bduration\x12D\n" +
+	"\tcondition\x18\t \x01(\x0e2&.ubertool.trusted.api.v1.ToolConditionR\tcondition\x12\x14\n" +
+	"\x05metro\x18\n" +
+	" \x01(\tR\x05metro\x12\x16\n" +
+	"\x06status\x18\v \x01(\tR\x06status\x12\x1b\n" +
+	"\timage_url\x18\f \x03(\tR\bimageUrl\"D\n" +
 	"\x0fAddToolResponse\x121\n" +
 	"\x04tool\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.ToolR\x04tool\"\xae\x03\n" +
 	"\x11UpdateToolRequest\x12\x17\n" +
@@ -1204,7 +1256,7 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\x11DeleteToolRequest\x12\x17\n" +
 	"\atool_id\x18\x01 \x01(\x05R\x06toolId\".\n" +
 	"\x12DeleteToolResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x87\x02\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\xd7\x02\n" +
 	"\x12SearchToolsRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x1e\n" +
@@ -1212,9 +1264,14 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"categories\x18\x03 \x03(\tR\n" +
 	"categories\x12\x1b\n" +
 	"\tmax_price\x18\x04 \x01(\x05R\bmaxPrice\x12D\n" +
-	"\tcondition\x18\x05 \x01(\x0e2&.ubertool.trusted.api.v1.ToolConditionR\tcondition\x12\x12\n" +
-	"\x04page\x18\x06 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\a \x01(\x05R\bpageSize\"k\n" +
+	"\tcondition\x18\x05 \x01(\x0e2&.ubertool.trusted.api.v1.ToolConditionR\tcondition\x12\x14\n" +
+	"\x05metro\x18\x06 \x01(\tR\x05metro\x12\x1d\n" +
+	"\n" +
+	"start_date\x18\a \x01(\tR\tstartDate\x12\x19\n" +
+	"\bend_date\x18\b \x01(\tR\aendDate\x12\x12\n" +
+	"\x04page\x18\t \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\n" +
+	" \x01(\x05R\bpageSize\"k\n" +
 	"\x13SearchToolsResponse\x123\n" +
 	"\x05tools\x18\x01 \x03(\v2\x1d.ubertool.trusted.api.v1.ToolR\x05tools\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
@@ -1258,9 +1315,9 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\x17TOOL_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15TOOL_STATUS_AVAILABLE\x10\x01\x12\x1b\n" +
 	"\x17TOOL_STATUS_UNAVAILABLE\x10\x02\x12\x16\n" +
-	"\x12TOOL_STATUS_RENTED\x10\x032\xe4\x05\n" +
-	"\vToolService\x12b\n" +
-	"\tListTools\x12).ubertool.trusted.api.v1.ListToolsRequest\x1a*.ubertool.trusted.api.v1.ListToolsResponse\x12\\\n" +
+	"\x12TOOL_STATUS_RENTED\x10\x032\xe6\x05\n" +
+	"\vToolService\x12d\n" +
+	"\vListMyTools\x12).ubertool.trusted.api.v1.ListToolsRequest\x1a*.ubertool.trusted.api.v1.ListToolsResponse\x12\\\n" +
 	"\aGetTool\x12'.ubertool.trusted.api.v1.GetToolRequest\x1a(.ubertool.trusted.api.v1.GetToolResponse\x12\\\n" +
 	"\aAddTool\x12'.ubertool.trusted.api.v1.AddToolRequest\x1a(.ubertool.trusted.api.v1.AddToolResponse\x12e\n" +
 	"\n" +
@@ -1315,14 +1372,14 @@ var file_ubertool_trusted_backend_v1_tool_service_proto_depIdxs = []int32{
 	14, // 7: ubertool.trusted.api.v1.SearchToolsResponse.tools:type_name -> ubertool.trusted.api.v1.Tool
 	0,  // 8: ubertool.trusted.api.v1.Tool.condition:type_name -> ubertool.trusted.api.v1.ToolCondition
 	1,  // 9: ubertool.trusted.api.v1.Tool.status:type_name -> ubertool.trusted.api.v1.ToolStatus
-	2,  // 10: ubertool.trusted.api.v1.ToolService.ListTools:input_type -> ubertool.trusted.api.v1.ListToolsRequest
+	2,  // 10: ubertool.trusted.api.v1.ToolService.ListMyTools:input_type -> ubertool.trusted.api.v1.ListToolsRequest
 	4,  // 11: ubertool.trusted.api.v1.ToolService.GetTool:input_type -> ubertool.trusted.api.v1.GetToolRequest
 	6,  // 12: ubertool.trusted.api.v1.ToolService.AddTool:input_type -> ubertool.trusted.api.v1.AddToolRequest
 	8,  // 13: ubertool.trusted.api.v1.ToolService.UpdateTool:input_type -> ubertool.trusted.api.v1.UpdateToolRequest
 	10, // 14: ubertool.trusted.api.v1.ToolService.DeleteTool:input_type -> ubertool.trusted.api.v1.DeleteToolRequest
 	12, // 15: ubertool.trusted.api.v1.ToolService.SearchTools:input_type -> ubertool.trusted.api.v1.SearchToolsRequest
 	15, // 16: ubertool.trusted.api.v1.ToolService.ListToolCategories:input_type -> ubertool.trusted.api.v1.ListToolCategoriesRequest
-	3,  // 17: ubertool.trusted.api.v1.ToolService.ListTools:output_type -> ubertool.trusted.api.v1.ListToolsResponse
+	3,  // 17: ubertool.trusted.api.v1.ToolService.ListMyTools:output_type -> ubertool.trusted.api.v1.ListToolsResponse
 	5,  // 18: ubertool.trusted.api.v1.ToolService.GetTool:output_type -> ubertool.trusted.api.v1.GetToolResponse
 	7,  // 19: ubertool.trusted.api.v1.ToolService.AddTool:output_type -> ubertool.trusted.api.v1.AddToolResponse
 	9,  // 20: ubertool.trusted.api.v1.ToolService.UpdateTool:output_type -> ubertool.trusted.api.v1.UpdateToolResponse

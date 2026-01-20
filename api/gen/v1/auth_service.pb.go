@@ -183,8 +183,10 @@ func (x *LoginRequest) GetPassword() string {
 // Login response
 type LoginResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Requires_2Fa  bool                   `protobuf:"varint,2,opt,name=requires_2fa,json=requires2fa,proto3" json:"requires_2fa,omitempty"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	TwoFaToken    string                 `protobuf:"bytes,2,opt,name=two_fa_token,json=twoFaToken,proto3" json:"two_fa_token,omitempty"`
+	ExpiresAt     int64                  `protobuf:"varint,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -219,25 +221,39 @@ func (*LoginResponse) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_auth_service_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *LoginResponse) GetSessionId() string {
+func (x *LoginResponse) GetSuccess() bool {
 	if x != nil {
-		return x.SessionId
-	}
-	return ""
-}
-
-func (x *LoginResponse) GetRequires_2Fa() bool {
-	if x != nil {
-		return x.Requires_2Fa
+		return x.Success
 	}
 	return false
 }
 
+func (x *LoginResponse) GetTwoFaToken() string {
+	if x != nil {
+		return x.TwoFaToken
+	}
+	return ""
+}
+
+func (x *LoginResponse) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
+func (x *LoginResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 // 2FA verification request
+// two_fa_token is in the request header
 type Verify2FARequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	TwoFaCode     string                 `protobuf:"bytes,1,opt,name=two_fa_code,json=twoFaCode,proto3" json:"two_fa_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -272,16 +288,9 @@ func (*Verify2FARequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_auth_service_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *Verify2FARequest) GetSessionId() string {
+func (x *Verify2FARequest) GetTwoFaCode() string {
 	if x != nil {
-		return x.SessionId
-	}
-	return ""
-}
-
-func (x *Verify2FARequest) GetCode() string {
-	if x != nil {
-		return x.Code
+		return x.TwoFaCode
 	}
 	return ""
 }
@@ -289,9 +298,10 @@ func (x *Verify2FARequest) GetCode() string {
 // 2FA verification response
 type Verify2FAResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	RefreshToken  string                 `protobuf:"bytes,2,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
-	User          *User                  `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	AccessToken   string                 `protobuf:"bytes,2,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	RefreshToken  string                 `protobuf:"bytes,3,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	User          *User                  `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -324,6 +334,13 @@ func (x *Verify2FAResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use Verify2FAResponse.ProtoReflect.Descriptor instead.
 func (*Verify2FAResponse) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_auth_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Verify2FAResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
 }
 
 func (x *Verify2FAResponse) GetAccessToken() string {
@@ -427,9 +444,8 @@ func (x *SignupRequest) GetPassword() string {
 // Signup response
 type SignupResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
-	RefreshToken  string                 `protobuf:"bytes,2,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
-	User          *User                  `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -464,31 +480,23 @@ func (*SignupResponse) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_auth_service_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *SignupResponse) GetAccessToken() string {
+func (x *SignupResponse) GetSuccess() bool {
 	if x != nil {
-		return x.AccessToken
+		return x.Success
 	}
-	return ""
+	return false
 }
 
-func (x *SignupResponse) GetRefreshToken() string {
+func (x *SignupResponse) GetMessage() string {
 	if x != nil {
-		return x.RefreshToken
+		return x.Message
 	}
 	return ""
-}
-
-func (x *SignupResponse) GetUser() *User {
-	if x != nil {
-		return x.User
-	}
-	return nil
 }
 
 // Refresh token request
 type RefreshTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RefreshToken  string                 `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -521,13 +529,6 @@ func (x *RefreshTokenRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RefreshTokenRequest.ProtoReflect.Descriptor instead.
 func (*RefreshTokenRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_auth_service_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *RefreshTokenRequest) GetRefreshToken() string {
-	if x != nil {
-		return x.RefreshToken
-	}
-	return ""
 }
 
 // Refresh token response
@@ -800,31 +801,31 @@ const file_ubertool_trusted_backend_v1_auth_service_proto_rawDesc = "" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"@\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"Q\n" +
-	"\rLoginResponse\x12\x1d\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"\x84\x01\n" +
+	"\rLoginResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12 \n" +
+	"\ftwo_fa_token\x18\x02 \x01(\tR\n" +
+	"twoFaToken\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x01 \x01(\tR\tsessionId\x12!\n" +
-	"\frequires_2fa\x18\x02 \x01(\bR\vrequires2fa\"E\n" +
-	"\x10Verify2FARequest\x12\x1d\n" +
-	"\n" +
-	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\tR\x04code\"\x8e\x01\n" +
-	"\x11Verify2FAResponse\x12!\n" +
-	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
-	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x121\n" +
-	"\x04user\x18\x03 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user\"\x94\x01\n" +
+	"expires_at\x18\x03 \x01(\x03R\texpiresAt\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"2\n" +
+	"\x10Verify2FARequest\x12\x1e\n" +
+	"\vtwo_fa_code\x18\x01 \x01(\tR\ttwoFaCode\"\xa8\x01\n" +
+	"\x11Verify2FAResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12!\n" +
+	"\faccess_token\x18\x02 \x01(\tR\vaccessToken\x12#\n" +
+	"\rrefresh_token\x18\x03 \x01(\tR\frefreshToken\x121\n" +
+	"\x04user\x18\x04 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user\"\x94\x01\n" +
 	"\rSignupRequest\x12'\n" +
 	"\x0finvitation_code\x18\x01 \x01(\tR\x0einvitationCode\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
 	"\x05phone\x18\x04 \x01(\tR\x05phone\x12\x1a\n" +
-	"\bpassword\x18\x05 \x01(\tR\bpassword\"\x8b\x01\n" +
-	"\x0eSignupResponse\x12!\n" +
-	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
-	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x121\n" +
-	"\x04user\x18\x03 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user\":\n" +
-	"\x13RefreshTokenRequest\x12#\n" +
-	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"^\n" +
+	"\bpassword\x18\x05 \x01(\tR\bpassword\"D\n" +
+	"\x0eSignupResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x15\n" +
+	"\x13RefreshTokenRequest\"^\n" +
 	"\x14RefreshTokenResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"\x0f\n" +
@@ -882,26 +883,25 @@ var file_ubertool_trusted_backend_v1_auth_service_proto_goTypes = []any{
 }
 var file_ubertool_trusted_backend_v1_auth_service_proto_depIdxs = []int32{
 	14, // 0: ubertool.trusted.api.v1.Verify2FAResponse.user:type_name -> ubertool.trusted.api.v1.User
-	14, // 1: ubertool.trusted.api.v1.SignupResponse.user:type_name -> ubertool.trusted.api.v1.User
-	0,  // 2: ubertool.trusted.api.v1.AuthService.ValidateInvite:input_type -> ubertool.trusted.api.v1.ValidateInviteRequest
-	12, // 3: ubertool.trusted.api.v1.AuthService.RequestToJoinOrganization:input_type -> ubertool.trusted.api.v1.RequestToJoinRequest
-	6,  // 4: ubertool.trusted.api.v1.AuthService.UserSignup:input_type -> ubertool.trusted.api.v1.SignupRequest
-	2,  // 5: ubertool.trusted.api.v1.AuthService.Login:input_type -> ubertool.trusted.api.v1.LoginRequest
-	4,  // 6: ubertool.trusted.api.v1.AuthService.Verify2FA:input_type -> ubertool.trusted.api.v1.Verify2FARequest
-	8,  // 7: ubertool.trusted.api.v1.AuthService.RefreshToken:input_type -> ubertool.trusted.api.v1.RefreshTokenRequest
-	10, // 8: ubertool.trusted.api.v1.AuthService.Logout:input_type -> ubertool.trusted.api.v1.LogoutRequest
-	1,  // 9: ubertool.trusted.api.v1.AuthService.ValidateInvite:output_type -> ubertool.trusted.api.v1.ValidateInviteResponse
-	13, // 10: ubertool.trusted.api.v1.AuthService.RequestToJoinOrganization:output_type -> ubertool.trusted.api.v1.RequestToJoinResponse
-	7,  // 11: ubertool.trusted.api.v1.AuthService.UserSignup:output_type -> ubertool.trusted.api.v1.SignupResponse
-	3,  // 12: ubertool.trusted.api.v1.AuthService.Login:output_type -> ubertool.trusted.api.v1.LoginResponse
-	5,  // 13: ubertool.trusted.api.v1.AuthService.Verify2FA:output_type -> ubertool.trusted.api.v1.Verify2FAResponse
-	9,  // 14: ubertool.trusted.api.v1.AuthService.RefreshToken:output_type -> ubertool.trusted.api.v1.RefreshTokenResponse
-	11, // 15: ubertool.trusted.api.v1.AuthService.Logout:output_type -> ubertool.trusted.api.v1.LogoutResponse
-	9,  // [9:16] is the sub-list for method output_type
-	2,  // [2:9] is the sub-list for method input_type
-	2,  // [2:2] is the sub-list for extension type_name
-	2,  // [2:2] is the sub-list for extension extendee
-	0,  // [0:2] is the sub-list for field type_name
+	0,  // 1: ubertool.trusted.api.v1.AuthService.ValidateInvite:input_type -> ubertool.trusted.api.v1.ValidateInviteRequest
+	12, // 2: ubertool.trusted.api.v1.AuthService.RequestToJoinOrganization:input_type -> ubertool.trusted.api.v1.RequestToJoinRequest
+	6,  // 3: ubertool.trusted.api.v1.AuthService.UserSignup:input_type -> ubertool.trusted.api.v1.SignupRequest
+	2,  // 4: ubertool.trusted.api.v1.AuthService.Login:input_type -> ubertool.trusted.api.v1.LoginRequest
+	4,  // 5: ubertool.trusted.api.v1.AuthService.Verify2FA:input_type -> ubertool.trusted.api.v1.Verify2FARequest
+	8,  // 6: ubertool.trusted.api.v1.AuthService.RefreshToken:input_type -> ubertool.trusted.api.v1.RefreshTokenRequest
+	10, // 7: ubertool.trusted.api.v1.AuthService.Logout:input_type -> ubertool.trusted.api.v1.LogoutRequest
+	1,  // 8: ubertool.trusted.api.v1.AuthService.ValidateInvite:output_type -> ubertool.trusted.api.v1.ValidateInviteResponse
+	13, // 9: ubertool.trusted.api.v1.AuthService.RequestToJoinOrganization:output_type -> ubertool.trusted.api.v1.RequestToJoinResponse
+	7,  // 10: ubertool.trusted.api.v1.AuthService.UserSignup:output_type -> ubertool.trusted.api.v1.SignupResponse
+	3,  // 11: ubertool.trusted.api.v1.AuthService.Login:output_type -> ubertool.trusted.api.v1.LoginResponse
+	5,  // 12: ubertool.trusted.api.v1.AuthService.Verify2FA:output_type -> ubertool.trusted.api.v1.Verify2FAResponse
+	9,  // 13: ubertool.trusted.api.v1.AuthService.RefreshToken:output_type -> ubertool.trusted.api.v1.RefreshTokenResponse
+	11, // 14: ubertool.trusted.api.v1.AuthService.Logout:output_type -> ubertool.trusted.api.v1.LogoutResponse
+	8,  // [8:15] is the sub-list for method output_type
+	1,  // [1:8] is the sub-list for method input_type
+	1,  // [1:1] is the sub-list for extension type_name
+	1,  // [1:1] is the sub-list for extension extendee
+	0,  // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_auth_service_proto_init() }

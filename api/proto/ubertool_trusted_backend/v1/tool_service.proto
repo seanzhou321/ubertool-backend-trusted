@@ -11,8 +11,8 @@ option java_outer_classname = "ToolServiceProto";
 
 // Tool service
 service ToolService {
-  // List tools in an organization
-  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+  // List tools in of a user
+  rpc ListMyTools(ListToolsRequest) returns (ListToolsResponse);
 
   // Get tool details
   rpc GetTool(GetToolRequest) returns (GetToolResponse);
@@ -35,7 +35,7 @@ service ToolService {
 
 // List tools request
 message ListToolsRequest {
-  int32 organization_id = 1;
+  string metro = 1; // Optional metro filter
   int32 page = 2;
   int32 page_size = 3;
 }
@@ -68,8 +68,11 @@ message AddToolRequest {
   int32 price_per_week_cents = 5;
   int32 price_per_month_cents = 6;
   int32 replacement_cost_cents = 7;
-  ToolCondition condition = 8;
-  string image_url = 9;
+  string duration = 8;
+  ToolCondition condition = 9;
+  string metro = 10;
+  string status = 11;
+  repeated string image_url = 12;
 }
 
 // Add tool response
@@ -114,8 +117,11 @@ message SearchToolsRequest {
   repeated string categories = 3;
   int32 max_price = 4;
   ToolCondition condition = 5;
-  int32 page = 6;
-  int32 page_size = 7;
+  string metro = 6;
+  string start_date = 7; // Date string YYYY-MM-DD
+  string end_date = 8;   // Date string YYYY-MM-DD
+  int32 page = 9;
+  int32 page_size = 10;
 }
 
 // Search tools response

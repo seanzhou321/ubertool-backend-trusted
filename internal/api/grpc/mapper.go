@@ -162,7 +162,7 @@ func MapDomainTransactionToProto(t *domain.LedgerTransaction) *pb.Transaction {
 		ChargedOn:      t.ChargedOn.Format("2006-01-02"),
 	}
 	if t.RelatedRentalID != nil {
-		proto.RelatedRentalId = *t.RelatedRentalID
+		// proto.RelatedRentalId = *t.RelatedRentalID // Error: proto expects Object, domain has ID
 	}
 	return proto
 }
@@ -235,10 +235,33 @@ func MapDomainLedgerSummaryToProto(s *domain.LedgerSummary) *pb.GetLedgerSummary
 	if s == nil {
 		return &pb.GetLedgerSummaryResponse{}
 	}
+	// Convert individual counts to map for new proto
+	statusCount := make(map[string]int32)
+	statusCount["active_rentals"] = s.ActiveRentalsCount
+	statusCount["active_lendings"] = s.ActiveLendingsCount
+	statusCount["pending_requests"] = s.PendingRequestsCount
+
 	return &pb.GetLedgerSummaryResponse{
-		Balance:              s.Balance,
-		ActiveRentalsCount:   s.ActiveRentalsCount,
-		ActiveLendingsCount:  s.ActiveLendingsCount,
-		PendingRequestsCount: s.PendingRequestsCount,
+		Balance:     s.Balance,
+		StatusCount: statusCount,
+	}
+}
+
+func MapDomainToolImageToProto(t *domain.ToolImage) *pb.ToolImage {
+	if t == nil {
+		return nil
+	}
+	return &pb.ToolImage{
+		Id:           t.ID,
+		ToolId:       t.ToolID,
+		FileName:     t.FileName,
+		FilePath:     t.FilePath,
+		ThumbnailPath: t.ThumbnailPath,
+		FileSize:     int64(t.FileSize),
+		Width:        t.Width,
+		Height:       t.Height,
+		IsPrimary:    t.IsPrimary,
+		DisplayOrder: t.DisplayOrder,
+		UploadedOn:   t.CreatedOn,
 	}
 }

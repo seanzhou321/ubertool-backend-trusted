@@ -293,6 +293,7 @@ func (x *GetTransactionsResponse) GetTotalCount() int32 {
 type GetLedgerSummaryRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	NumberOfMonths int32                  `protobuf:"varint,2,opt,name=number_of_months,json=numberOfMonths,proto3" json:"number_of_months,omitempty"` // e.g., last 3 months
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -334,16 +335,20 @@ func (x *GetLedgerSummaryRequest) GetOrganizationId() int32 {
 	return 0
 }
 
+func (x *GetLedgerSummaryRequest) GetNumberOfMonths() int32 {
+	if x != nil {
+		return x.NumberOfMonths
+	}
+	return 0
+}
+
 // Get ledger summary response
 type GetLedgerSummaryResponse struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	Balance              int32                  `protobuf:"varint,1,opt,name=balance,proto3" json:"balance,omitempty"`
-	RecentTransactions   []*Transaction         `protobuf:"bytes,2,rep,name=recent_transactions,json=recentTransactions,proto3" json:"recent_transactions,omitempty"`
-	ActiveRentalsCount   int32                  `protobuf:"varint,3,opt,name=active_rentals_count,json=activeRentalsCount,proto3" json:"active_rentals_count,omitempty"`
-	ActiveLendingsCount  int32                  `protobuf:"varint,4,opt,name=active_lendings_count,json=activeLendingsCount,proto3" json:"active_lendings_count,omitempty"`
-	PendingRequestsCount int32                  `protobuf:"varint,5,opt,name=pending_requests_count,json=pendingRequestsCount,proto3" json:"pending_requests_count,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Balance       int32                  `protobuf:"varint,1,opt,name=balance,proto3" json:"balance,omitempty"`
+	StatusCount   map[string]int32       `protobuf:"bytes,2,rep,name=status_count,json=statusCount,proto3" json:"status_count,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"` // count of rentals by status
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetLedgerSummaryResponse) Reset() {
@@ -383,47 +388,26 @@ func (x *GetLedgerSummaryResponse) GetBalance() int32 {
 	return 0
 }
 
-func (x *GetLedgerSummaryResponse) GetRecentTransactions() []*Transaction {
+func (x *GetLedgerSummaryResponse) GetStatusCount() map[string]int32 {
 	if x != nil {
-		return x.RecentTransactions
+		return x.StatusCount
 	}
 	return nil
 }
 
-func (x *GetLedgerSummaryResponse) GetActiveRentalsCount() int32 {
-	if x != nil {
-		return x.ActiveRentalsCount
-	}
-	return 0
-}
-
-func (x *GetLedgerSummaryResponse) GetActiveLendingsCount() int32 {
-	if x != nil {
-		return x.ActiveLendingsCount
-	}
-	return 0
-}
-
-func (x *GetLedgerSummaryResponse) GetPendingRequestsCount() int32 {
-	if x != nil {
-		return x.PendingRequestsCount
-	}
-	return 0
-}
-
 // Transaction message
 type Transaction struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Id              int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	UserId          int32                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	OrganizationId  int32                  `protobuf:"varint,3,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	Amount          int32                  `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"` // positive for credit, negative for debit
-	Type            TransactionType        `protobuf:"varint,5,opt,name=type,proto3,enum=ubertool.trusted.api.v1.TransactionType" json:"type,omitempty"`
-	RelatedRentalId int32                  `protobuf:"varint,6,opt,name=related_rental_id,json=relatedRentalId,proto3" json:"related_rental_id,omitempty"`
-	Description     string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
-	ChargedOn       string                 `protobuf:"bytes,8,opt,name=charged_on,json=chargedOn,proto3" json:"charged_on,omitempty"` // Date string YYYY-MM-DD
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId         int32                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	OrganizationId int32                  `protobuf:"varint,3,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Amount         int32                  `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"` // positive for credit, negative for debit
+	Type           TransactionType        `protobuf:"varint,5,opt,name=type,proto3,enum=ubertool.trusted.api.v1.TransactionType" json:"type,omitempty"`
+	RelatedRental  *RentalRequest         `protobuf:"bytes,6,opt,name=related_rental,json=relatedRental,proto3" json:"related_rental,omitempty"`
+	Description    string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	ChargedOn      string                 `protobuf:"bytes,8,opt,name=charged_on,json=chargedOn,proto3" json:"charged_on,omitempty"` // Date string YYYY-MM-DD
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Transaction) Reset() {
@@ -491,11 +475,11 @@ func (x *Transaction) GetType() TransactionType {
 	return TransactionType_TRANSACTION_TYPE_UNSPECIFIED
 }
 
-func (x *Transaction) GetRelatedRentalId() int32 {
+func (x *Transaction) GetRelatedRental() *RentalRequest {
 	if x != nil {
-		return x.RelatedRentalId
+		return x.RelatedRental
 	}
-	return 0
+	return nil
 }
 
 func (x *Transaction) GetDescription() string {
@@ -516,7 +500,7 @@ var File_ubertool_trusted_backend_v1_ledger_service_proto protoreflect.FileDescr
 
 const file_ubertool_trusted_backend_v1_ledger_service_proto_rawDesc = "" +
 	"\n" +
-	"0ubertool_trusted_backend/v1/ledger_service.proto\x12\x17ubertool.trusted.api.v1\"<\n" +
+	"0ubertool_trusted_backend/v1/ledger_service.proto\x12\x17ubertool.trusted.api.v1\x1a0ubertool_trusted_backend/v1/rental_service.proto\"<\n" +
 	"\x11GetBalanceRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"V\n" +
 	"\x12GetBalanceResponse\x12\x18\n" +
@@ -529,22 +513,23 @@ const file_ubertool_trusted_backend_v1_ledger_service_proto_rawDesc = "" +
 	"\x17GetTransactionsResponse\x12H\n" +
 	"\ftransactions\x18\x01 \x03(\v2$.ubertool.trusted.api.v1.TransactionR\ftransactions\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
-	"totalCount\"B\n" +
+	"totalCount\"l\n" +
 	"\x17GetLedgerSummaryRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"\xa7\x02\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12(\n" +
+	"\x10number_of_months\x18\x02 \x01(\x05R\x0enumberOfMonths\"\xdb\x01\n" +
 	"\x18GetLedgerSummaryResponse\x12\x18\n" +
-	"\abalance\x18\x01 \x01(\x05R\abalance\x12U\n" +
-	"\x13recent_transactions\x18\x02 \x03(\v2$.ubertool.trusted.api.v1.TransactionR\x12recentTransactions\x120\n" +
-	"\x14active_rentals_count\x18\x03 \x01(\x05R\x12activeRentalsCount\x122\n" +
-	"\x15active_lendings_count\x18\x04 \x01(\x05R\x13activeLendingsCount\x124\n" +
-	"\x16pending_requests_count\x18\x05 \x01(\x05R\x14pendingRequestsCount\"\xa2\x02\n" +
+	"\abalance\x18\x01 \x01(\x05R\abalance\x12e\n" +
+	"\fstatus_count\x18\x02 \x03(\v2B.ubertool.trusted.api.v1.GetLedgerSummaryResponse.StatusCountEntryR\vstatusCount\x1a>\n" +
+	"\x10StatusCountEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xc5\x02\n" +
 	"\vTransaction\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x05R\x06userId\x12'\n" +
 	"\x0forganization_id\x18\x03 \x01(\x05R\x0eorganizationId\x12\x16\n" +
 	"\x06amount\x18\x04 \x01(\x05R\x06amount\x12<\n" +
-	"\x04type\x18\x05 \x01(\x0e2(.ubertool.trusted.api.v1.TransactionTypeR\x04type\x12*\n" +
-	"\x11related_rental_id\x18\x06 \x01(\x05R\x0frelatedRentalId\x12 \n" +
+	"\x04type\x18\x05 \x01(\x0e2(.ubertool.trusted.api.v1.TransactionTypeR\x04type\x12M\n" +
+	"\x0erelated_rental\x18\x06 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrelatedRental\x12 \n" +
 	"\vdescription\x18\a \x01(\tR\vdescription\x12\x1d\n" +
 	"\n" +
 	"charged_on\x18\b \x01(\tR\tchargedOn*\xb9\x01\n" +
@@ -574,7 +559,7 @@ func file_ubertool_trusted_backend_v1_ledger_service_proto_rawDescGZIP() []byte 
 }
 
 var file_ubertool_trusted_backend_v1_ledger_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_ubertool_trusted_backend_v1_ledger_service_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_ubertool_trusted_backend_v1_ledger_service_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_ubertool_trusted_backend_v1_ledger_service_proto_goTypes = []any{
 	(TransactionType)(0),             // 0: ubertool.trusted.api.v1.TransactionType
 	(*GetBalanceRequest)(nil),        // 1: ubertool.trusted.api.v1.GetBalanceRequest
@@ -584,22 +569,25 @@ var file_ubertool_trusted_backend_v1_ledger_service_proto_goTypes = []any{
 	(*GetLedgerSummaryRequest)(nil),  // 5: ubertool.trusted.api.v1.GetLedgerSummaryRequest
 	(*GetLedgerSummaryResponse)(nil), // 6: ubertool.trusted.api.v1.GetLedgerSummaryResponse
 	(*Transaction)(nil),              // 7: ubertool.trusted.api.v1.Transaction
+	nil,                              // 8: ubertool.trusted.api.v1.GetLedgerSummaryResponse.StatusCountEntry
+	(*RentalRequest)(nil),            // 9: ubertool.trusted.api.v1.RentalRequest
 }
 var file_ubertool_trusted_backend_v1_ledger_service_proto_depIdxs = []int32{
 	7, // 0: ubertool.trusted.api.v1.GetTransactionsResponse.transactions:type_name -> ubertool.trusted.api.v1.Transaction
-	7, // 1: ubertool.trusted.api.v1.GetLedgerSummaryResponse.recent_transactions:type_name -> ubertool.trusted.api.v1.Transaction
+	8, // 1: ubertool.trusted.api.v1.GetLedgerSummaryResponse.status_count:type_name -> ubertool.trusted.api.v1.GetLedgerSummaryResponse.StatusCountEntry
 	0, // 2: ubertool.trusted.api.v1.Transaction.type:type_name -> ubertool.trusted.api.v1.TransactionType
-	1, // 3: ubertool.trusted.api.v1.LedgerService.GetBalance:input_type -> ubertool.trusted.api.v1.GetBalanceRequest
-	3, // 4: ubertool.trusted.api.v1.LedgerService.GetTransactions:input_type -> ubertool.trusted.api.v1.GetTransactionsRequest
-	5, // 5: ubertool.trusted.api.v1.LedgerService.GetLedgerSummary:input_type -> ubertool.trusted.api.v1.GetLedgerSummaryRequest
-	2, // 6: ubertool.trusted.api.v1.LedgerService.GetBalance:output_type -> ubertool.trusted.api.v1.GetBalanceResponse
-	4, // 7: ubertool.trusted.api.v1.LedgerService.GetTransactions:output_type -> ubertool.trusted.api.v1.GetTransactionsResponse
-	6, // 8: ubertool.trusted.api.v1.LedgerService.GetLedgerSummary:output_type -> ubertool.trusted.api.v1.GetLedgerSummaryResponse
-	6, // [6:9] is the sub-list for method output_type
-	3, // [3:6] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	9, // 3: ubertool.trusted.api.v1.Transaction.related_rental:type_name -> ubertool.trusted.api.v1.RentalRequest
+	1, // 4: ubertool.trusted.api.v1.LedgerService.GetBalance:input_type -> ubertool.trusted.api.v1.GetBalanceRequest
+	3, // 5: ubertool.trusted.api.v1.LedgerService.GetTransactions:input_type -> ubertool.trusted.api.v1.GetTransactionsRequest
+	5, // 6: ubertool.trusted.api.v1.LedgerService.GetLedgerSummary:input_type -> ubertool.trusted.api.v1.GetLedgerSummaryRequest
+	2, // 7: ubertool.trusted.api.v1.LedgerService.GetBalance:output_type -> ubertool.trusted.api.v1.GetBalanceResponse
+	4, // 8: ubertool.trusted.api.v1.LedgerService.GetTransactions:output_type -> ubertool.trusted.api.v1.GetTransactionsResponse
+	6, // 9: ubertool.trusted.api.v1.LedgerService.GetLedgerSummary:output_type -> ubertool.trusted.api.v1.GetLedgerSummaryResponse
+	7, // [7:10] is the sub-list for method output_type
+	4, // [4:7] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_ledger_service_proto_init() }
@@ -607,13 +595,14 @@ func file_ubertool_trusted_backend_v1_ledger_service_proto_init() {
 	if File_ubertool_trusted_backend_v1_ledger_service_proto != nil {
 		return
 	}
+	file_ubertool_trusted_backend_v1_rental_service_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ubertool_trusted_backend_v1_ledger_service_proto_rawDesc), len(file_ubertool_trusted_backend_v1_ledger_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

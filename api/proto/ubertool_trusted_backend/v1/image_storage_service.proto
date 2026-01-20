@@ -11,19 +11,91 @@ option java_outer_classname = "ImageStorageServiceProto";
 
 // Image storage service for uploading tool images and avatars
 service ImageStorageService {
-  // Get a presigned upload URL for image upload
-  rpc GetUploadUrl(GetUploadUrlRequest) returns (GetUploadUrlResponse);
+  // Upload an image
+  rpc UploadImage(stream UploadImageRequest) returns (UploadImageResponse);
+
+  // Get Images of a tool
+  rpc GetToolImages(GetToolImagesRequest) returns (GetToolImagesResponse);
+
+  // Download an image
+  rpc DownloadImage(DownloadImageRequest) returns (stream DownloadImageResponse);
+
+  // Delete an image
+  rpc DeleteImage(DeleteImageRequest) returns (DeleteImageResponse);
+
+  // Set primary image
+  rpc SetPrimaryImage(SetPrimaryImageRequest) returns (SetPrimaryImageResponse);
 }
 
-// Get upload URL request
-message GetUploadUrlRequest {
-  string filename = 1;
-  string content_type = 2;
+// Upload image method messages
+message UploadImageRequest {
+  UploadImageRequestObject upload_image_request_object = 1;
+  bytes chunk = 2;
 }
 
-// Get upload URL response
-message GetUploadUrlResponse {
-  string upload_url = 1;
-  string download_url = 2;
+message UploadImageRequestObject {
+  int32 tool_id = 1;
+  string file_name = 2;
+  string mime_type = 3;
+  bool is_primary = 4;
+}
+
+message UploadImageResponse {
+  ToolImage tool_image = 1;
+}
+
+// Get uploaded tool image
+message GetToolImagesRequest {
+  int32 tool_id = 1;
+}
+
+message GetToolImagesResponse {
+  repeated ToolImage images = 1;
+}
+
+// Download image method messages
+message DownloadImageRequest {
+  int32 image_id = 1;
+  int32 tool_id = 2;
+  bool is_thumbnail = 3;
+}
+
+message DownloadImageResponse {
+  ToolImage tool_image = 1;
+  bytes chunk = 2;
+}
+
+// Delete image method messages
+message DeleteImageRequest {
+  int32 image_id = 1;
+  int32 tool_id = 2;
+}
+
+message DeleteImageResponse {
+  bool success = 1;
+}
+
+message SetPrimaryImageRequest {
+  int32 image_id = 1;
+  int32 tool_id = 2;
+}
+
+message SetPrimaryImageResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ToolImage {
+  int32 id = 1;
+  int32 tool_id = 2;
+  string file_name = 3;
+  string file_path = 4;
+  string thumbnail_path = 5;
+  int64 file_size = 6;
+  int32 width = 7;
+  int32 height = 8;
+  bool is_primary = 9;
+  int32 display_order = 10;
+  string uploaded_on = 11;
 }
 
