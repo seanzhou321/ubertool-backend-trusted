@@ -2,6 +2,7 @@ package interceptor
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -48,14 +49,17 @@ func (i *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 			return nil, err
 		}
 
-		// Inject user ID into context (via metadata for compatibility with existing GetUserIDFromContext)
-		// We add it to IncomingContext so handlers can read it
-		newMD := metadata.Pairs("user-id", claims.Subject) // 'sub' is user ID string
-		// Preserve existing metadata
-		if existingMD, ok := metadata.FromIncomingContext(ctx); ok {
-			newMD = metadata.Join(existingMD, newMD)
+		// Inject user ID into context. We use a Copy to avoid side effects
+		// and Set to overwrite any existing "user-id" header from the client for security.
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			md = metadata.New(nil)
+		} else {
+			md = md.Copy()
 		}
-		newCtx := metadata.NewIncomingContext(ctx, newMD)
+
+		md.Set("user-id", strconv.Itoa(int(claims.UserID)))
+		newCtx := metadata.NewIncomingContext(ctx, md)
 
 		return handler(newCtx, req)
 	}

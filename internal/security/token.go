@@ -24,7 +24,7 @@ const (
 
 // UserClaims defines the standard claims for our application
 type UserClaims struct {
-	UserID    int32     `json:"sub_int"` // Custom field for int ID since 'sub' is usually string
+	UserID    int32     `json:"user_id"` // Standard field for our application
 	Type      TokenType `json:"type"`
 	Scope     []string  `json:"scope,omitempty"`
 	Roles     []string  `json:"roles,omitempty"`
