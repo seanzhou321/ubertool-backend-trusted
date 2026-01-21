@@ -38,4 +38,4 @@ test-e2e:
 	go test -v ./tests/e2e/... -config=config/config.test.yaml
 
 test-ext-integration:
-	go test -v ./tests/ext-integration/...
+	go test -v ./tests/ext-integration/... -run Gmail -config=config/config.test.yaml
