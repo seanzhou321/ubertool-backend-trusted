@@ -47,5 +47,6 @@ config/config.dev.yaml
 config/config.stage.yaml
 config/config.prod.yaml
 config/config.test.yaml
+config/mail_config.test.yaml
 uploads/
 test-uploads/

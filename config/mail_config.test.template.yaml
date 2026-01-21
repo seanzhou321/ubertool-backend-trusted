@@ -1,0 +1,9 @@
+smtp:
+  host: "smtp.gmail.com"
+  port: 587
+  user: "test-email@yourdomain.com"
+  password: "CHANGE_ME_WITH_TEST_SMTP_PASSWORD"
+  from: "noreply@yourdomain.com"
+  to: "recipient@example.com"
+  cc: "cc-recipient@example.com"
+  

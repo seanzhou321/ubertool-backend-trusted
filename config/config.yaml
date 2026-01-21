@@ -8,7 +8,7 @@ database:
   host: "production-db-host"
   port: 5432
   user: "ubertool_prod"
-  password: "CHANGE_ME_IN_PRODUCTION"
+  password: "CHANGE_ME_WITH_PRODUCTION_DB_PASSWORD"
   database: "ubertool_prod_db"
   ssl_mode: "require"
 
@@ -16,8 +16,11 @@ smtp:
   host: "smtp.gmail.com"
   port: 587
   user: "production-email@yourdomain.com"
-  password: "CHANGE_ME_IN_PRODUCTION"
+  password: "CHANGE_ME_WITH_PRODUCTION_SMTP_PASSWORD"
   from: "noreply@yourdomain.com"
+
+# For testing with mock SMTP server, set smtp.host to mock
+# host: "mock"
 
 jwt:
   secret: "CHANGE_ME_TO_STRONG_RANDOM_SECRET_MIN_32_CHARS"
