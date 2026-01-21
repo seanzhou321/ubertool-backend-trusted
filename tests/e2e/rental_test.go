@@ -15,7 +15,7 @@ func TestRentalService_E2E(t *testing.T) {
 	defer db.Close()
 	defer db.Cleanup()
 
-	client := NewGRPCClient(t, "localhost:50051")
+	client := NewGRPCClient(t, "")
 	defer client.Close()
 
 	rentalClient := pb.NewRentalServiceClient(client.Conn())
@@ -99,10 +99,9 @@ func TestRentalService_E2E(t *testing.T) {
 
 		// Verify: Ledger transaction created (debit)
 		var debitCount int
-		err = db.QueryRow("SELECT COUNT(*) FROM ledger_entries WHERE user_id = $1 AND org_id = $2", renterID, orgID).Scan(&debitCount)
+		err = db.QueryRow("SELECT COUNT(*) FROM ledger_transactions WHERE user_id = $1 AND org_id = $2", renterID, orgID).Scan(&debitCount)
 		assert.NoError(t, err)
-		assert.Equal(t, 2, debitCount) // (Pre-authorization and then confirmation or similar?) Wait, original test said 1.
-        // Actually, let's keep it as is if it's just about compiling.
+		assert.Equal(t, 1, debitCount)
 
 		// Verify: Tool status updated to RENTED
 		var toolStatus string
@@ -271,3 +270,4 @@ func TestRentalService_E2E(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+

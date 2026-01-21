@@ -118,7 +118,7 @@ func MapDomainRentalStatusToProto(s domain.RentalStatus) pb.RentalStatus {
 		return pb.RentalStatus_RENTAL_STATUS_ACTIVE
 	case domain.RentalStatusCompleted:
 		return pb.RentalStatus_RENTAL_STATUS_COMPLETED
-	case domain.RentalStatusCancelled:
+	case domain.RentalStatusCancelled, domain.RentalStatusRejected:
 		return pb.RentalStatus_RENTAL_STATUS_CANCELLED
 	case domain.RentalStatusOverdue:
 		return pb.RentalStatus_RENTAL_STATUS_OVERDUE
@@ -235,15 +235,9 @@ func MapDomainLedgerSummaryToProto(s *domain.LedgerSummary) *pb.GetLedgerSummary
 	if s == nil {
 		return &pb.GetLedgerSummaryResponse{}
 	}
-	// Convert individual counts to map for new proto
-	statusCount := make(map[string]int32)
-	statusCount["active_rentals"] = s.ActiveRentalsCount
-	statusCount["active_lendings"] = s.ActiveLendingsCount
-	statusCount["pending_requests"] = s.PendingRequestsCount
-
 	return &pb.GetLedgerSummaryResponse{
 		Balance:     s.Balance,
-		StatusCount: statusCount,
+		StatusCount: s.StatusCount,
 	}
 }
 

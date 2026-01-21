@@ -15,7 +15,7 @@ func TestOrganizationService_E2E(t *testing.T) {
 	defer db.Close()
 	defer db.Cleanup()
 
-	client := NewGRPCClient(t, "localhost:50051")
+	client := NewGRPCClient(t, "")
 	defer client.Close()
 
 	orgClient := pb.NewOrganizationServiceClient(client.Conn())
@@ -101,3 +101,4 @@ func TestOrganizationService_E2E(t *testing.T) {
 		assert.Greater(t, len(resp.Organizations), 0)
 	})
 }
+

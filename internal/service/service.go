@@ -16,8 +16,8 @@ type AuthService interface {
 }
 
 type UserService interface {
-	GetUserProfile(ctx context.Context, userID int32) (*domain.User, []domain.UserOrg, error)
-	UpdateProfile(ctx context.Context, userID int32, name, avatarURL string) error
+	GetUserProfile(ctx context.Context, userID int32) (*domain.User, []domain.Organization, []domain.UserOrg, error)
+	UpdateProfile(ctx context.Context, userID int32, name, email, phone, avatarURL string) error
 }
 
 type OrganizationService interface {
@@ -26,13 +26,13 @@ type OrganizationService interface {
 	CreateOrganization(ctx context.Context, userID int32, org *domain.Organization) error
 	SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error)
 	UpdateOrganization(ctx context.Context, org *domain.Organization) error
-	ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, error)
+	ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, []domain.UserOrg, error)
 }
 
 type ImageStorageService interface {
-	UploadImage(ctx context.Context, toolID int32, file []byte, filename, mimeType string) (*domain.ToolImage, error)
+	UploadImage(ctx context.Context, userID, toolID int32, file []byte, filename, mimeType string) (*domain.ToolImage, error)
 	GetToolImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error)
-	DownloadImage(ctx context.Context, toolID, imageID int32) ([]byte, string, error) // returns data, contentType, error
+	DownloadImage(ctx context.Context, toolID, imageID int32, isThumbnail bool) ([]byte, string, error) // returns data, contentType, error
 	DeleteImage(ctx context.Context, imageID int32) error
 	SetPrimaryImage(ctx context.Context, toolID, imageID int32) error
 }

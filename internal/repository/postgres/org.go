@@ -25,7 +25,7 @@ func (r *organizationRepository) Create(ctx context.Context, o *domain.Organizat
 
 func (r *organizationRepository) GetByID(ctx context.Context, id int32) (*domain.Organization, error) {
 	o := &domain.Organization{}
-	query := `SELECT id, name, description, address, metro, admin_phone_number, admin_email, created_on FROM orgs WHERE id = $1`
+	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on FROM orgs WHERE id = $1`
 	err := r.db.QueryRowContext(ctx, query, id).Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &o.CreatedOn)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (r *organizationRepository) GetByID(ctx context.Context, id int32) (*domain
 }
 
 func (r *organizationRepository) List(ctx context.Context) ([]domain.Organization, error) {
-	query := `SELECT id, name, description, address, metro, admin_phone_number, admin_email, created_on FROM orgs`
+	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on FROM orgs`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (r *organizationRepository) List(ctx context.Context) ([]domain.Organizatio
 }
 
 func (r *organizationRepository) Search(ctx context.Context, name, metro string) ([]domain.Organization, error) {
-	query := `SELECT id, name, description, address, metro, admin_phone_number, admin_email, created_on FROM orgs 
+	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on FROM orgs 
 	          WHERE name ILIKE $1 AND metro ILIKE $2`
 	rows, err := r.db.QueryContext(ctx, query, "%"+name+"%", "%"+metro+"%")
 	if err != nil {

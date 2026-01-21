@@ -3,7 +3,10 @@ package e2e
 import (
 	"context"
 	"database/sql"
+	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,7 +14,46 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+
+	"ubertool-backend-trusted/internal/config"
+	"ubertool-backend-trusted/internal/security"
 )
+
+var configPath string
+var testConfig *config.Config
+var tokenManager security.TokenManager
+
+func init() {
+	flag.StringVar(&configPath, "config", "../../config/config.test.yaml", "path to config file")
+}
+
+func loadConfig(t *testing.T) *config.Config {
+	if testConfig != nil {
+		return testConfig
+	}
+
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+
+	// Logic to handle running from root vs package dir
+	finalPath := configPath
+	if _, err := os.Stat(finalPath); os.IsNotExist(err) {
+		// If running from tests/e2e, try going up
+		altPath := filepath.Join("..", "..", configPath)
+		if _, err := os.Stat(altPath); err == nil {
+			finalPath = altPath
+		}
+	}
+
+	var err error
+	testConfig, err = config.Load(finalPath)
+	if err != nil {
+		t.Fatalf("failed to load config from %s: %v", finalPath, err)
+	}
+	tokenManager = security.NewTokenManager(testConfig.JWT.Secret)
+	return testConfig
+}
 
 // TestDB wraps database connection with helper methods
 type TestDB struct {
@@ -21,7 +63,16 @@ type TestDB struct {
 
 // PrepareDB creates a database connection for E2E tests
 func PrepareDB(t *testing.T) *TestDB {
-	connStr := "postgres://ubertool_trusted:ubertool123@localhost:5454/ubertool_db?sslmode=disable"
+	cfg := loadConfig(t)
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.Database,
+		cfg.Database.SSLMode,
+	)
+
 	var db *sql.DB
 	var err error
 
@@ -142,7 +193,8 @@ type GRPCClient struct {
 // NewGRPCClient creates a new gRPC client connection
 func NewGRPCClient(t *testing.T, serverAddr string) *GRPCClient {
 	if serverAddr == "" {
-		serverAddr = "localhost:50051"
+		cfg := loadConfig(t)
+		serverAddr = cfg.GetServerAddress()
 	}
 	
 	conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -163,9 +215,15 @@ func (c *GRPCClient) Conn() *grpc.ClientConn {
 	return c.conn
 }
 
-// ContextWithUserID creates a context with user ID in metadata
+// ContextWithUserID creates a context with user ID and JWT token in metadata
 func ContextWithUserID(userID int32) context.Context {
 	md := metadata.Pairs("user-id", fmt.Sprintf("%d", userID))
+	if tokenManager != nil {
+		// Generate a valid token for the test user
+		// Note: We use a generic "user" role here; tests needing higher privileges should adjust
+		token, _ := tokenManager.GenerateAccessToken(userID, []string{"user"})
+		md.Set("authorization", "Bearer "+token)
+	}
 	return metadata.NewOutgoingContext(context.Background(), md)
 }
 
@@ -174,9 +232,14 @@ func ContextWithTimeout(timeout time.Duration) (context.Context, context.CancelF
 	return context.WithTimeout(context.Background(), timeout)
 }
 
-// ContextWithUserIDAndTimeout creates a context with user ID and timeout
+// ContextWithUserIDAndTimeout creates a context with user ID, JWT token and timeout
 func ContextWithUserIDAndTimeout(userID int32, timeout time.Duration) (context.Context, context.CancelFunc) {
 	md := metadata.Pairs("user-id", fmt.Sprintf("%d", userID))
+	if tokenManager != nil {
+		token, _ := tokenManager.GenerateAccessToken(userID, []string{"user"})
+		md.Set("authorization", "Bearer "+token)
+	}
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	return context.WithTimeout(ctx, timeout)
 }
+

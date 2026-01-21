@@ -28,7 +28,7 @@ func (r *toolRepository) Create(ctx context.Context, t *domain.Tool) error {
 
 func (r *toolRepository) GetByID(ctx context.Context, id int32) (*domain.Tool, error) {
 	t := &domain.Tool{}
-	query := `SELECT id, owner_id, name, description, categories, price_per_day_cents, price_per_week_cents, price_per_month_cents, replacement_cost_cents, condition, metro, status, created_on, deleted_on FROM tools WHERE id = $1`
+	query := `SELECT id, owner_id, name, COALESCE(description, ''), categories, price_per_day_cents, COALESCE(price_per_week_cents, 0), COALESCE(price_per_month_cents, 0), COALESCE(replacement_cost_cents, 0), condition, metro, status, created_on, deleted_on FROM tools WHERE id = $1`
 	err := r.db.QueryRowContext(ctx, query, id).Scan(&t.ID, &t.OwnerID, &t.Name, &t.Description, pq.Array(&t.Categories), &t.PricePerDayCents, &t.PricePerWeekCents, &t.PricePerMonthCents, &t.ReplacementCostCents, &t.Condition, &t.Metro, &t.Status, &t.CreatedOn, &t.DeletedOn)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (r *toolRepository) ListByOrg(ctx context.Context, orgID int32, page, pageS
 	}
 
 	offset := (page - 1) * pageSize
-	query := `SELECT id, owner_id, name, description, categories, price_per_day_cents, price_per_week_cents, price_per_month_cents, replacement_cost_cents, condition, metro, status, created_on, deleted_on 
+	query := `SELECT id, owner_id, name, COALESCE(description, ''), categories, price_per_day_cents, COALESCE(price_per_week_cents, 0), COALESCE(price_per_month_cents, 0), COALESCE(replacement_cost_cents, 0), condition, metro, status, created_on, deleted_on 
 	          FROM tools WHERE metro = $1 AND deleted_on IS NULL LIMIT $2 OFFSET $3`
 	rows, err := r.db.QueryContext(ctx, query, metro, pageSize, offset)
 	if err != nil {
@@ -91,7 +91,7 @@ func (r *toolRepository) ListByOrg(ctx context.Context, orgID int32, page, pageS
 
 func (r *toolRepository) ListByOwner(ctx context.Context, ownerID int32, page, pageSize int32) ([]domain.Tool, int32, error) {
 	offset := (page - 1) * pageSize
-	query := `SELECT id, owner_id, name, description, categories, price_per_day_cents, price_per_week_cents, price_per_month_cents, replacement_cost_cents, condition, metro, status, created_on, deleted_on 
+	query := `SELECT id, owner_id, name, COALESCE(description, ''), categories, price_per_day_cents, COALESCE(price_per_week_cents, 0), COALESCE(price_per_month_cents, 0), COALESCE(replacement_cost_cents, 0), condition, metro, status, created_on, deleted_on 
 	          FROM tools WHERE owner_id = $1 AND deleted_on IS NULL LIMIT $2 OFFSET $3`
 	rows, err := r.db.QueryContext(ctx, query, ownerID, pageSize, offset)
 	if err != nil {
@@ -126,7 +126,7 @@ func (r *toolRepository) Search(ctx context.Context, orgID int32, query string, 
 	}
 
 	offset := (page - 1) * pageSize
-	sql := `SELECT id, owner_id, name, description, categories, price_per_day_cents, price_per_week_cents, price_per_month_cents, replacement_cost_cents, condition, metro, status, created_on, deleted_on 
+	sql := `SELECT id, owner_id, name, COALESCE(description, ''), categories, price_per_day_cents, COALESCE(price_per_week_cents, 0), COALESCE(price_per_month_cents, 0), COALESCE(replacement_cost_cents, 0), condition, metro, status, created_on, deleted_on 
 	          FROM tools WHERE metro = $1 AND deleted_on IS NULL`
 	
 	args := []interface{}{metro}

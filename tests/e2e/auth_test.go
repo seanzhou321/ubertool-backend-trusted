@@ -17,7 +17,7 @@ func TestAuthService_E2E(t *testing.T) {
 
 	// Note: These tests require a running gRPC server
 	// Skip if server is not available
-	client := NewGRPCClient(t, "localhost:50051")
+	client := NewGRPCClient(t, "")
 	defer client.Close()
 
 	authClient := pb.NewAuthServiceClient(client.Conn())
@@ -130,3 +130,4 @@ func TestAuthService_E2E(t *testing.T) {
 		}
 	})
 }
+

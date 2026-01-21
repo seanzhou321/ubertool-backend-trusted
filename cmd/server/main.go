@@ -83,7 +83,7 @@ func main() {
 		emailSvc,
 		cfg.JWT.Secret,
 	)
-	userSvc := service.NewUserService(store.UserRepository)
+	userSvc := service.NewUserService(store.UserRepository, store.OrganizationRepository)
 	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository)
 	toolSvc := service.NewToolService(store.ToolRepository, store.UserRepository)
 	ledgerSvc := service.NewLedgerService(store.LedgerRepository)

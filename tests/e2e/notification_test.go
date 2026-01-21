@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -15,7 +16,7 @@ func TestNotificationService_E2E(t *testing.T) {
 	defer db.Close()
 	defer db.Cleanup()
 
-	client := NewGRPCClient(t, "localhost:50051")
+	client := NewGRPCClient(t, "")
 	defer client.Close()
 
 	notificationClient := pb.NewNotificationServiceClient(client.Conn())
@@ -107,7 +108,7 @@ func TestNotificationService_E2E(t *testing.T) {
 			_, err := db.Exec(`
 				INSERT INTO notifications (user_id, org_id, title, message, is_read)
 				VALUES ($1, $2, $3, $4, false)
-			`, userID, orgID, "Notification "+string(rune(i)), "Message "+string(rune(i)))
+			`, userID, orgID, fmt.Sprintf("Notification %d", i), fmt.Sprintf("Message %d", i))
 			require.NoError(t, err)
 		}
 

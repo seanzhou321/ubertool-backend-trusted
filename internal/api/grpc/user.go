@@ -21,13 +21,26 @@ func (h *UserHandler) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 	if err != nil {
 		return nil, err
 	}
-	user, _, err := h.userSvc.GetUserProfile(ctx, userID)
+	user, orgs, userOrgs, err := h.userSvc.GetUserProfile(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	
+
+	protoUser := MapDomainUserToProto(user)
+	protoUser.Orgs = make([]*pb.Organization, len(orgs))
+	for i, o := range orgs {
+		protoUser.Orgs[i] = MapDomainOrgToProto(&o)
+		// Set user balance for each org
+		for _, uo := range userOrgs {
+			if uo.OrgID == o.ID {
+				protoUser.Orgs[i].UserBalance = uo.BalanceCents
+				break
+			}
+		}
+	}
+
 	return &pb.GetUserResponse{
-		User: MapDomainUserToProto(user),
+		User: protoUser,
 	}, nil
 }
 
@@ -36,12 +49,12 @@ func (h *UserHandler) UpdateProfile(ctx context.Context, req *pb.UpdateProfileRe
 	if err != nil {
 		return nil, err
 	}
-	err = h.userSvc.UpdateProfile(ctx, userID, req.Name, req.AvatarUrl)
+	err = h.userSvc.UpdateProfile(ctx, userID, req.Name, req.Email, req.Phone, req.AvatarUrl)
 	if err != nil {
 		return nil, err
 	}
 	// Fetch updated user to return it
-	user, _, err := h.userSvc.GetUserProfile(ctx, userID)
+	user, _, _, err := h.userSvc.GetUserProfile(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,8 @@ package e2e
 import (
 	"bytes"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,7 +19,7 @@ func TestImageStorageService_E2E(t *testing.T) {
 	defer db.Close()
 	defer db.Cleanup()
 
-	client := NewGRPCClient(t, "localhost:50051")
+	client := NewGRPCClient(t, "")
 	defer client.Close()
 
 	imageClient := pb.NewImageStorageServiceClient(client.Conn())
@@ -126,14 +128,25 @@ func TestImageStorageService_E2E(t *testing.T) {
 		userID := db.CreateTestUser("e2e-test-getimages@test.com", "Get Images User")
 		toolID := db.CreateTestTool(userID, "Multi Image Tool", 1000)
 
+		// Get upload directory from config and convert to absolute path
+		cfg := loadConfig(t)
+		uploadDir := cfg.Storage.UploadDir
+		if !filepath.IsAbs(uploadDir) {
+			uploadDir = filepath.Join("..", "..", uploadDir)
+			uploadDir, _ = filepath.Abs(uploadDir)
+		}
+
 		// Create test images in database
 		_, err := db.Exec(`
 			INSERT INTO tool_images (tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, width, height, is_primary, display_order)
 			VALUES 
-				($1, 'image1.jpg', '/uploads/image1.jpg', '/uploads/thumb1.jpg', 1024, 'image/jpeg', 800, 600, true, 0),
-				($1, 'image2.jpg', '/uploads/image2.jpg', '/uploads/thumb2.jpg', 2048, 'image/jpeg', 1024, 768, false, 1),
-				($1, 'image3.png', '/uploads/image3.png', '/uploads/thumb3.png', 1536, 'image/png', 640, 480, false, 2)
-		`, toolID)
+				($1, 'image1.jpg', $2, $3, 1024, 'image/jpeg', 800, 600, true, 0),
+				($1, 'image2.jpg', $4, $5, 2048, 'image/jpeg', 1024, 768, false, 1),
+				($1, 'image3.png', $6, $7, 1536, 'image/png', 640, 480, false, 2)
+		`, toolID,
+			filepath.Join(uploadDir, "image1.jpg"), filepath.Join(uploadDir, "thumb1.jpg"),
+			filepath.Join(uploadDir, "image2.jpg"), filepath.Join(uploadDir, "thumb2.jpg"),
+			filepath.Join(uploadDir, "image3.png"), filepath.Join(uploadDir, "thumb3.png"))
 		require.NoError(t, err)
 
 		// Test: Get tool images
@@ -159,19 +172,27 @@ func TestImageStorageService_E2E(t *testing.T) {
 		userID := db.CreateTestUser("e2e-test-setprimary@test.com", "Set Primary User")
 		toolID := db.CreateTestTool(userID, "Primary Test Tool", 1000)
 
+		// Get upload directory from config and convert to absolute path
+		cfg := loadConfig(t)
+		uploadDir := cfg.Storage.UploadDir
+		if !filepath.IsAbs(uploadDir) {
+			uploadDir = filepath.Join("..", "..", uploadDir)
+			uploadDir, _ = filepath.Abs(uploadDir)
+		}
+
 		var image1ID, image2ID int32
 		err := db.QueryRow(`
 			INSERT INTO tool_images (tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, width, height, is_primary)
-			VALUES ($1, 'primary.jpg', '/uploads/primary.jpg', '/uploads/thumb_primary.jpg', 1024, 'image/jpeg', 800, 600, true)
+			VALUES ($1, 'primary.jpg', $2, $3, 1024, 'image/jpeg', 800, 600, true)
 			RETURNING id
-		`, toolID).Scan(&image1ID)
+		`, toolID, filepath.Join(uploadDir, "primary.jpg"), filepath.Join(uploadDir, "thumb_primary.jpg")).Scan(&image1ID)
 		require.NoError(t, err)
 
 		err = db.QueryRow(`
 			INSERT INTO tool_images (tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, width, height, is_primary)
-			VALUES ($1, 'secondary.jpg', '/uploads/secondary.jpg', '/uploads/thumb_secondary.jpg', 1024, 'image/jpeg', 800, 600, false)
+			VALUES ($1, 'secondary.jpg', $2, $3, 1024, 'image/jpeg', 800, 600, false)
 			RETURNING id
-		`, toolID).Scan(&image2ID)
+		`, toolID, filepath.Join(uploadDir, "secondary.jpg"), filepath.Join(uploadDir, "thumb_secondary.jpg")).Scan(&image2ID)
 		require.NoError(t, err)
 
 		// Test: Set image2 as primary
@@ -203,12 +224,20 @@ func TestImageStorageService_E2E(t *testing.T) {
 		userID := db.CreateTestUser("e2e-test-deleteimage@test.com", "Delete Image User")
 		toolID := db.CreateTestTool(userID, "Delete Test Tool", 1000)
 
+		// Get upload directory from config and convert to absolute path
+		cfg := loadConfig(t)
+		uploadDir := cfg.Storage.UploadDir
+		if !filepath.IsAbs(uploadDir) {
+			uploadDir = filepath.Join("..", "..", uploadDir)
+			uploadDir, _ = filepath.Abs(uploadDir)
+		}
+
 		var imageID int32
 		err := db.QueryRow(`
 			INSERT INTO tool_images (tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, width, height, is_primary)
-			VALUES ($1, 'todelete.jpg', '/uploads/todelete.jpg', '/uploads/thumb_todelete.jpg', 1024, 'image/jpeg', 800, 600, false)
+			VALUES ($1, 'todelete.jpg', $2, $3, 1024, 'image/jpeg', 800, 600, false)
 			RETURNING id
-		`, toolID).Scan(&imageID)
+		`, toolID, filepath.Join(uploadDir, "todelete.jpg"), filepath.Join(uploadDir, "thumb_todelete.jpg")).Scan(&imageID)
 		require.NoError(t, err)
 
 		// Test: Delete image
@@ -236,12 +265,26 @@ func TestImageStorageService_E2E(t *testing.T) {
 		userID := db.CreateTestUser("e2e-test-thumbnail@test.com", "Thumbnail User")
 		toolID := db.CreateTestTool(userID, "Thumbnail Test Tool", 1000)
 
+		// Get upload directory from config and convert to absolute path
+		cfg := loadConfig(t)
+		uploadDir := cfg.Storage.UploadDir
+		if !filepath.IsAbs(uploadDir) {
+			// Convert relative path to absolute (relative to project root)
+			uploadDir = filepath.Join("..", "..", uploadDir)
+			uploadDir, _ = filepath.Abs(uploadDir)
+		}
+		
+		// Create dummy file on disk
+		os.MkdirAll(uploadDir, 0755)
+		thumbPath := filepath.Join(uploadDir, "thumb_withthumb.jpg")
+		os.WriteFile(thumbPath, []byte("dummy thumbnail content"), 0644)
+
 		var imageID int32
 		err := db.QueryRow(`
 			INSERT INTO tool_images (tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, width, height, is_primary)
-			VALUES ($1, 'withthumb.jpg', '/uploads/withthumb.jpg', '/uploads/thumb_withthumb.jpg', 1024, 'image/jpeg', 800, 600, false)
+			VALUES ($1, 'withthumb.jpg', $2, $3, 1024, 'image/jpeg', 800, 600, false)
 			RETURNING id
-		`, toolID).Scan(&imageID)
+		`, toolID, thumbPath, thumbPath).Scan(&imageID)
 		require.NoError(t, err)
 
 		// Test: Download thumbnail
@@ -294,3 +337,4 @@ func TestImageStorageService_E2E(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+

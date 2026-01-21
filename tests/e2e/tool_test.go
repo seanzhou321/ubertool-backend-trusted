@@ -15,7 +15,7 @@ func TestToolService_E2E(t *testing.T) {
 	defer db.Close()
 	defer db.Cleanup()
 
-	client := NewGRPCClient(t, "localhost:50051")
+	client := NewGRPCClient(t, "")
 	defer client.Close()
 
 	toolClient := pb.NewToolServiceClient(client.Conn())
@@ -172,3 +172,4 @@ func TestToolService_E2E(t *testing.T) {
 		assert.NotNil(t, deletedOn)
 	})
 }
+

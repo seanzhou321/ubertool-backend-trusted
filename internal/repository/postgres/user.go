@@ -26,7 +26,7 @@ func (r *userRepository) Create(ctx context.Context, u *domain.User) error {
 
 func (r *userRepository) GetByID(ctx context.Context, id int32) (*domain.User, error) {
 	u := &domain.User{}
-	query := `SELECT id, email, phone_number, password_hash, name, avatar_url, created_on, updated_on FROM users WHERE id = $1`
+	query := `SELECT id, email, phone_number, password_hash, name, COALESCE(avatar_url, ''), created_on, updated_on FROM users WHERE id = $1`
 	err := r.db.QueryRowContext(ctx, query, id).Scan(&u.ID, &u.Email, &u.PhoneNumber, &u.PasswordHash, &u.Name, &u.AvatarURL, &u.CreatedOn, &u.UpdatedOn)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func (r *userRepository) GetByID(ctx context.Context, id int32) (*domain.User, e
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	u := &domain.User{}
-	query := `SELECT id, email, phone_number, password_hash, name, avatar_url, created_on, updated_on FROM users WHERE email = $1`
+	query := `SELECT id, email, phone_number, password_hash, name, COALESCE(avatar_url, ''), created_on, updated_on FROM users WHERE email = $1`
 	err := r.db.QueryRowContext(ctx, query, email).Scan(&u.ID, &u.Email, &u.PhoneNumber, &u.PasswordHash, &u.Name, &u.AvatarURL, &u.CreatedOn, &u.UpdatedOn)
 	if err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func (r *userRepository) AddUserToOrg(ctx context.Context, uo *domain.UserOrg) e
 
 func (r *userRepository) GetUserOrg(ctx context.Context, userID, orgID int32) (*domain.UserOrg, error) {
 	uo := &domain.UserOrg{}
-	query := `SELECT user_id, org_id, joined_on, balance_cents, status, role, blocked_date, block_reason FROM users_orgs WHERE user_id = $1 AND org_id = $2`
+	query := `SELECT user_id, org_id, joined_on, balance_cents, status, role, blocked_date, COALESCE(block_reason, '') FROM users_orgs WHERE user_id = $1 AND org_id = $2`
 	err := r.db.QueryRowContext(ctx, query, userID, orgID).Scan(&uo.UserID, &uo.OrgID, &uo.JoinedOn, &uo.BalanceCents, &uo.Status, &uo.Role, &uo.BlockedDate, &uo.BlockReason)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func (r *userRepository) GetUserOrg(ctx context.Context, userID, orgID int32) (*
 }
 
 func (r *userRepository) ListUserOrgs(ctx context.Context, userID int32) ([]domain.UserOrg, error) {
-	query := `SELECT user_id, org_id, joined_on, balance_cents, status, role, blocked_date, block_reason FROM users_orgs WHERE user_id = $1`
+	query := `SELECT user_id, org_id, joined_on, balance_cents, status, role, blocked_date, COALESCE(block_reason, '') FROM users_orgs WHERE user_id = $1`
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, err
@@ -93,8 +93,8 @@ func (r *userRepository) UpdateUserOrg(ctx context.Context, uo *domain.UserOrg) 
 }
 
 func (r *userRepository) ListMembersByOrg(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error) {
-	query := `SELECT u.id, u.email, u.phone_number, u.password_hash, u.name, u.avatar_url, u.created_on, u.updated_on,
-	                 uo.user_id, uo.org_id, uo.joined_on, uo.balance_cents, uo.status, uo.role, uo.blocked_date, uo.block_reason
+	query := `SELECT u.id, u.email, u.phone_number, u.password_hash, u.name, COALESCE(u.avatar_url, ''), u.created_on, u.updated_on,
+	                 uo.user_id, uo.org_id, uo.joined_on, uo.balance_cents, uo.status, uo.role, uo.blocked_date, COALESCE(uo.block_reason, '')
 	          FROM users u
 	          JOIN users_orgs uo ON u.id = uo.user_id
 	          WHERE uo.org_id = $1`

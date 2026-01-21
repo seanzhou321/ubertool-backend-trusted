@@ -26,7 +26,7 @@ func (r *rentalRepository) Create(ctx context.Context, rt *domain.Rental) error 
 
 func (r *rentalRepository) GetByID(ctx context.Context, id int32) (*domain.Rental, error) {
 	rt := &domain.Rental{}
-	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, total_cost_cents, status, pickup_note, completed_by, created_on, updated_on FROM rentals WHERE id = $1`
+	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), completed_by, created_on, updated_on FROM rentals WHERE id = $1`
 	err := r.db.QueryRowContext(ctx, query, id).Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &rt.StartDate, &rt.ScheduledEndDate, &rt.EndDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.CompletedBy, &rt.CreatedOn, &rt.UpdatedOn)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (r *rentalRepository) Update(ctx context.Context, rt *domain.Rental) error 
 
 func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
-	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, total_cost_cents, status, pickup_note, completed_by, created_on, updated_on 
+	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), completed_by, created_on, updated_on 
 	        FROM rentals WHERE renter_id = $1 AND org_id = $2`
 	
 	args := []interface{}{renterID, orgID}
@@ -82,7 +82,7 @@ func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int
 
 func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
-	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, total_cost_cents, status, pickup_note, completed_by, created_on, updated_on 
+	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), completed_by, created_on, updated_on 
 	        FROM rentals WHERE owner_id = $1 AND org_id = $2`
 	
 	args := []interface{}{ownerID, orgID}

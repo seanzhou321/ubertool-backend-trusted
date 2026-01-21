@@ -47,3 +47,5 @@ config/config.dev.yaml
 config/config.stage.yaml
 config/config.prod.yaml
 config/config.test.yaml
+uploads/
+test-uploads/

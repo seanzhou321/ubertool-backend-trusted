@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
@@ -64,6 +65,16 @@ func (r *notificationRepository) List(ctx context.Context, userID int32, limit, 
 
 func (r *notificationRepository) MarkAsRead(ctx context.Context, id, userID int32) error {
 	query := `UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2`
-	_, err := r.db.ExecContext(ctx, query, id, userID)
-	return err
+	result, err := r.db.ExecContext(ctx, query, id, userID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("notification not found or access denied")
+	}
+	return nil
 }

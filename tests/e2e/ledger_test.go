@@ -15,7 +15,7 @@ func TestLedgerService_E2E(t *testing.T) {
 	defer db.Close()
 	defer db.Cleanup()
 
-	client := NewGRPCClient(t, "localhost:50051")
+	client := NewGRPCClient(t, "")
 	defer client.Close()
 
 	ledgerClient := pb.NewLedgerServiceClient(client.Conn())
@@ -195,3 +195,4 @@ func TestLedgerService_E2E(t *testing.T) {
 		assert.Equal(t, int32(4000), ownerBalanceResp.Balance)
 	})
 }
+

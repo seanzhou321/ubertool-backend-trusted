@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/smtp"
 	"strings"
 )
@@ -36,6 +37,10 @@ type EmailMessage struct {
 
 // SendEmail sends an email using SMTP (internal helper)
 func (s *emailService) sendEmail(msg EmailMessage) error {
+	if s.smtpHost == "" || s.smtpHost == "mock" || s.smtpHost == "localhost" {
+		log.Printf("[MOCK EMAIL] To: %v, Subject: %s", msg.To, msg.Subject)
+		return nil
+	}
 	auth := smtp.PlainAuth("", s.senderEmail, s.senderPass, s.smtpHost)
 
 	// Build email headers

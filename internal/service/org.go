@@ -54,23 +54,21 @@ func (s *organizationService) UpdateOrganization(ctx context.Context, org *domai
 	return s.orgRepo.Update(ctx, org)
 }
 
-func (s *organizationService) ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, error) {
+func (s *organizationService) ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, []domain.UserOrg, error) {
 	userOrgs, err := s.userRepo.ListUserOrgs(ctx, userID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var orgs []domain.Organization
 	for _, uo := range userOrgs {
 		org, err := s.orgRepo.GetByID(ctx, uo.OrgID)
 		if err != nil {
-			// Skip not found orgs? or fail?
-			// For robustness, skip if nil or err, but log it.
 			continue
 		}
 		if org != nil {
 			orgs = append(orgs, *org)
 		}
 	}
-	return orgs, nil
+	return orgs, userOrgs, nil
 }

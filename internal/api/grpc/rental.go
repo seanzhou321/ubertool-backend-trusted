@@ -100,7 +100,15 @@ func (h *RentalHandler) ListMyRentals(ctx context.Context, req *pb.ListMyRentals
 		return nil, err
 	}
 	statusStr := MapProtoRentalStatusToDomain(req.Status)
-	rentals, count, err := h.rentalSvc.ListRentals(ctx, userID, req.OrganizationId, statusStr, req.Page, req.PageSize)
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	rentals, count, err := h.rentalSvc.ListRentals(ctx, userID, req.OrganizationId, statusStr, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +128,15 @@ func (h *RentalHandler) ListMyLendings(ctx context.Context, req *pb.ListMyLendin
 		return nil, err
 	}
 	statusStr := MapProtoRentalStatusToDomain(req.Status)
-	rentals, count, err := h.rentalSvc.ListLendings(ctx, userID, req.OrganizationId, statusStr, req.Page, req.PageSize)
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	rentals, count, err := h.rentalSvc.ListLendings(ctx, userID, req.OrganizationId, statusStr, page, pageSize)
 	if err != nil {
 		return nil, err
 	}

@@ -78,12 +78,20 @@ func (h *ToolHandler) DeleteTool(ctx context.Context, req *pb.DeleteToolRequest)
 	return &pb.DeleteToolResponse{Success: true}, nil
 }
 
-func (h *ToolHandler) ListTools(ctx context.Context, req *pb.ListToolsRequest) (*pb.ListToolsResponse, error) {
+func (h *ToolHandler) ListMyTools(ctx context.Context, req *pb.ListToolsRequest) (*pb.ListToolsResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	tools, count, err := h.toolSvc.ListMyTools(ctx, userID, req.Page, req.PageSize)
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	tools, count, err := h.toolSvc.ListMyTools(ctx, userID, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +102,8 @@ func (h *ToolHandler) ListTools(ctx context.Context, req *pb.ListToolsRequest) (
 	return &pb.ListToolsResponse{
 		Tools:      protoTools,
 		TotalCount: count,
-		Page:       req.Page,
-		PageSize:   req.PageSize,
+		Page:       page,
+		PageSize:   pageSize,
 	}, nil
 }
 
@@ -109,7 +117,15 @@ func (h *ToolHandler) SearchTools(ctx context.Context, req *pb.SearchToolsReques
 		// So if orgID is missing, userID might not be strictly needed for check, but authentication is usually required for API.
 		return nil, err
 	}
-	tools, count, err := h.toolSvc.SearchTools(ctx, userID, req.OrganizationId, req.Query, req.Categories, req.MaxPrice, req.Condition.String(), req.Page, req.PageSize)
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	tools, count, err := h.toolSvc.SearchTools(ctx, userID, req.OrganizationId, req.Query, req.Categories, req.MaxPrice, req.Condition.String(), page, pageSize)
 	if err != nil {
 		return nil, err
 	}

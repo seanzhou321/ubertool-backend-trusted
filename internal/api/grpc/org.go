@@ -22,13 +22,20 @@ func (h *OrganizationHandler) ListMyOrganizations(ctx context.Context, req *pb.L
 	if err != nil {
 		return nil, err
 	}
-	orgs, err := h.orgSvc.ListMyOrganizations(ctx, userID)
+	orgs, userOrgs, err := h.orgSvc.ListMyOrganizations(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	protoOrgs := make([]*pb.Organization, len(orgs))
 	for i, o := range orgs {
 		protoOrgs[i] = MapDomainOrgToProto(&o)
+		// Find matching userOrg to set balance
+		for _, uo := range userOrgs {
+			if uo.OrgID == o.ID {
+				protoOrgs[i].UserBalance = uo.BalanceCents
+				break
+			}
+		}
 	}
 	return &pb.ListOrganizationsResponse{Organizations: protoOrgs}, nil
 }

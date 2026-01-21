@@ -50,7 +50,7 @@ func TestLedgerRepository_GetBalance(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
-		mock.ExpectQuery("SELECT balance_cents FROM users_orgs").
+		mock.ExpectQuery("SELECT COALESCE\\(balance_cents, 0\\) FROM users_orgs").
 			WithArgs(int32(1), int32(2)).
 			WillReturnRows(sqlmock.NewRows([]string{"balance_cents"}).AddRow(1000))
 

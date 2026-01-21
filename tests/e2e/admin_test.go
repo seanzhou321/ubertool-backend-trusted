@@ -15,7 +15,7 @@ func TestAdminService_E2E(t *testing.T) {
 	defer db.Close()
 	defer db.Cleanup()
 
-	client := NewGRPCClient(t, "localhost:50051")
+	client := NewGRPCClient(t, "")
 	defer client.Close()
 
 	adminClient := pb.NewAdminServiceClient(client.Conn())
@@ -188,3 +188,4 @@ func TestAdminService_E2E(t *testing.T) {
 		assert.GreaterOrEqual(t, len(resp.Requests), 2)
 	})
 }
+

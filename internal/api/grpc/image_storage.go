@@ -24,6 +24,11 @@ func (h *ImageStorageHandler) UploadImage(stream pb.ImageStorageService_UploadIm
 	var mimeType string
 	var fileBytes []byte
 
+	userID, err := GetUserIDFromContext(stream.Context())
+	if err != nil {
+		return err
+	}
+
 	// Read first chunk to get metadata
 	req, err := stream.Recv()
 	if err != nil {
@@ -32,14 +37,18 @@ func (h *ImageStorageHandler) UploadImage(stream pb.ImageStorageService_UploadIm
 	if req.UploadImageRequestObject == nil {
 		return io.ErrUnexpectedEOF // First msg must include metadata
 	}
-	
+
 	toolID = req.UploadImageRequestObject.ToolId
 	filename = req.UploadImageRequestObject.FileName
 	mimeType = req.UploadImageRequestObject.MimeType
-	
+
+	// Authorization check: Does user own the tool?
+	// We might need ToolService to check this properly, or just let service handle it.
+	// For now, we'll implement it here or in service.
+	// Service.UploadImage only takes toolID. Let's add userID to it or check here.
+
 	// Append first chunk data if any
 	fileBytes = append(fileBytes, req.Chunk...)
-
 	// Read remaining chunks
 	for {
 		req, err := stream.Recv()
@@ -53,7 +62,7 @@ func (h *ImageStorageHandler) UploadImage(stream pb.ImageStorageService_UploadIm
 	}
 
 	// Call service
-	img, err := h.storeSvc.UploadImage(stream.Context(), toolID, fileBytes, filename, mimeType)
+	img, err := h.storeSvc.UploadImage(stream.Context(), userID, toolID, fileBytes, filename, mimeType)
 	if err != nil {
 		return err
 	}
@@ -77,11 +86,10 @@ func (h *ImageStorageHandler) GetToolImages(ctx context.Context, req *pb.GetTool
 }
 
 func (h *ImageStorageHandler) DownloadImage(req *pb.DownloadImageRequest, stream pb.ImageStorageService_DownloadImageServer) error {
-	data, _, err := h.storeSvc.DownloadImage(stream.Context(), req.ToolId, req.ImageId)
+	data, _, err := h.storeSvc.DownloadImage(stream.Context(), req.ToolId, req.ImageId, req.IsThumbnail)
 	if err != nil {
 		return err
 	}
-	
 	// We need to fetch the image metadata to return map to proto
 	// This is inefficient (double fetch) but without changing service signature further it's reliable.
 	// Actually, DownloadImage service could return *domain.ToolImage but we didn't change it.
@@ -101,19 +109,24 @@ func (h *ImageStorageHandler) DownloadImage(req *pb.DownloadImageRequest, stream
 	}
 	// If not found, DownloadImage would have failed already, but safe to check.
 
+	// Send metadata first in its own message to satisfy E2E test's expected message sequence
+	if targetImg != nil {
+		if err := stream.Send(&pb.DownloadImageResponse{
+			ToolImage: MapDomainToolImageToProto(targetImg),
+		}); err != nil {
+			return err
+		}
+	}
+
 	chunkSize := 64 * 1024 // 64KB
 	for i := 0; i < len(data); i += chunkSize {
 		end := i + chunkSize
 		if end > len(data) {
 			end = len(data)
 		}
-		
+
 		resp := &pb.DownloadImageResponse{
 			Chunk: data[i:end],
-		}
-		
-		if i == 0 && targetImg != nil {
-			resp.ToolImage = MapDomainToolImageToProto(targetImg)
 		}
 
 		if err := stream.Send(resp); err != nil {

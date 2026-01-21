@@ -15,7 +15,7 @@ func TestUserService_E2E(t *testing.T) {
 	defer db.Close()
 	defer db.Cleanup()
 
-	client := NewGRPCClient(t, "localhost:50051")
+	client := NewGRPCClient(t, "")
 	defer client.Close()
 
 	userClient := pb.NewUserServiceClient(client.Conn())
@@ -132,3 +132,4 @@ func TestUserService_E2E(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+

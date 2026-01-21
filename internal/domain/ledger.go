@@ -24,8 +24,9 @@ type LedgerTransaction struct {
 }
 
 type LedgerSummary struct {
-	Balance              int32 `json:"balance"`
-	ActiveRentalsCount   int32 `json:"active_rentals_count"`
-	ActiveLendingsCount  int32 `json:"active_lendings_count"`
-	PendingRequestsCount int32 `json:"pending_requests_count"`
+	Balance              int32            `json:"balance"`
+	ActiveRentalsCount   int32            `json:"active_rentals_count"`
+	ActiveLendingsCount  int32            `json:"active_lendings_count"`
+	PendingRequestsCount int32            `json:"pending_requests_count"`
+	StatusCount          map[string]int32 `json:"status_count"`
 }
