@@ -104,7 +104,7 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 	owner, _ := s.userRepo.GetByID(ctx, tool.OwnerID)
 	renter, _ := s.userRepo.GetByID(ctx, renterID)
 	if owner != nil && renter != nil {
-		_ = s.emailSvc.SendRentalRequestNotification(ctx, owner.Email, renter.Name, tool.Name)
+		_ = s.emailSvc.SendRentalRequestNotification(ctx, owner.Email, renter.Name, tool.Name, renter.Email)
 		
 		notif := &domain.Notification{
 			UserID:  owner.ID,
@@ -146,7 +146,7 @@ func (s *rentalService) ApproveRentalRequest(ctx context.Context, ownerID, renta
 	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
 	
 	if renter != nil && owner != nil && tool != nil {
-		_ = s.emailSvc.SendRentalApprovalNotification(ctx, renter.Email, tool.Name, owner.Name, pickupNote)
+		_ = s.emailSvc.SendRentalApprovalNotification(ctx, renter.Email, tool.Name, owner.Name, pickupNote, owner.Email)
 
 		notif := &domain.Notification{
 			UserID:  renter.ID,
@@ -184,7 +184,7 @@ func (s *rentalService) RejectRentalRequest(ctx context.Context, ownerID, rental
 	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
 	
 	if renter != nil && owner != nil && tool != nil {
-		_ = s.emailSvc.SendRentalRejectionNotification(ctx, renter.Email, tool.Name, owner.Name)
+		_ = s.emailSvc.SendRentalRejectionNotification(ctx, renter.Email, tool.Name, owner.Name, owner.Email)
 
 		notif := &domain.Notification{
 			UserID:  renter.ID,
@@ -222,7 +222,7 @@ func (s *rentalService) CancelRental(ctx context.Context, renterID, rentalID int
 	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
 	
 	if renter != nil && owner != nil && tool != nil {
-		_ = s.emailSvc.SendRentalCancellationNotification(ctx, owner.Email, renter.Name, tool.Name, reason)
+		_ = s.emailSvc.SendRentalCancellationNotification(ctx, owner.Email, renter.Name, tool.Name, reason, renter.Email)
 		
 		notif := &domain.Notification{
 			UserID:  owner.ID,
@@ -285,7 +285,7 @@ func (s *rentalService) FinalizeRentalRequest(ctx context.Context, renterID, ren
 	owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
 	
 	if renter != nil && owner != nil && tool != nil {
-		_ = s.emailSvc.SendRentalConfirmationNotification(ctx, owner.Email, renter.Name, tool.Name)
+		_ = s.emailSvc.SendRentalConfirmationNotification(ctx, owner.Email, renter.Name, tool.Name, renter.Email)
 		
 		notif := &domain.Notification{
 			UserID:  owner.ID,

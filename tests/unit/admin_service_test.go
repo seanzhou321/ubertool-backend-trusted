@@ -88,6 +88,8 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	name := "Applicant"
 
 	mockOrgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Test Org"}, nil)
+	// Mock admin user for CC
+	mockUserRepo.On("GetByID", ctx, adminID).Return(&domain.User{ID: adminID, Name: "Admin", Email: "admin@test.com"}, nil)
 	// Mock Check if user exists (false for this test case)
 	mockUserRepo.On("GetByEmail", ctx, email).Return(nil, nil)
 	
@@ -97,7 +99,7 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 		inv := args.Get(1).(*domain.Invitation)
 		inv.Token = "uuid-token"
 	}).Return(nil)
-	mockEmailSvc.On("SendInvitation", ctx, email, name, "uuid-token", "Test Org").Return(nil)
+	mockEmailSvc.On("SendInvitation", ctx, email, name, "uuid-token", "Test Org", "admin@test.com").Return(nil)
 	
 	// Mock ListJoinRequests lookup update
 	mockJoinRepo.On("ListByOrg", ctx, orgID).Return([]domain.JoinRequest{}, nil)

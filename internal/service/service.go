@@ -80,15 +80,15 @@ type AdminService interface {
 }
 
 type EmailService interface {
-	SendInvitation(ctx context.Context, email, name, token string, orgName string) error
+	SendInvitation(ctx context.Context, email, name, token string, orgName string, ccEmail string) error
 	SendAccountStatusNotification(ctx context.Context, email, name, orgName, status, reason string) error
 
 	// Rental Notifications
-	SendRentalRequestNotification(ctx context.Context, ownerEmail, renterName, toolName string) error
-	SendRentalApprovalNotification(ctx context.Context, renterEmail, toolName, ownerName, pickupNote string) error
-	SendRentalRejectionNotification(ctx context.Context, renterEmail, toolName, ownerName string) error
-	SendRentalConfirmationNotification(ctx context.Context, ownerEmail, renterName, toolName string) error
-	SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string) error
+	SendRentalRequestNotification(ctx context.Context, ownerEmail, renterName, toolName string, ccEmail string) error
+	SendRentalApprovalNotification(ctx context.Context, renterEmail, toolName, ownerName, pickupNote string, ccEmail string) error
+	SendRentalRejectionNotification(ctx context.Context, renterEmail, toolName, ownerName string, ccEmail string) error
+	SendRentalConfirmationNotification(ctx context.Context, ownerEmail, renterName, toolName string, ccEmail string) error
+	SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string, ccEmail string) error
 	SendRentalCompletionNotification(ctx context.Context, email, role, toolName string, amount int32) error
 
 	// Admin Notifications

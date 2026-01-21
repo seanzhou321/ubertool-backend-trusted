@@ -1,4 +1,4 @@
-.PHONY: proto-gen build run tidy clean test-unit test-integration
+.PHONY: proto-gen build run tidy clean test-unit test-integration test-e2e
 
 PROTO_SRC_DIR = api/proto
 PROTO_DEST_DIR = .
@@ -15,8 +15,11 @@ build:
 	@if not exist "bin" mkdir bin
 	go build -o bin/server.exe ./cmd/server
 
-run:
-	go run ./cmd/server
+run-dev:
+	go run ./cmd/server -config=config/config.dev.yaml
+
+run-test:
+	go run ./cmd/server -config=config/config.test.yaml
 
 tidy:
 	go mod tidy
@@ -29,4 +32,10 @@ test-unit:
 	go test -v ./tests/unit/...
 
 test-integration:
-	go test -v ./tests/integration/...
+	go test -v ./tests/integration/... -config=config/config.test.yaml
+
+test-e2e:
+	go test -v ./tests/e2e/... -config=config/config.test.yaml
+
+test-ext-integration:
+	go test -v ./tests/ext_integration/... -config=config/config.test.yaml

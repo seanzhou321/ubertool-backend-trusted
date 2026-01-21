@@ -44,7 +44,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		// Setup expectations for email notification
 		userRepo.On("GetByID", ctx, int32(10)).Return(&domain.User{ID: 10, Email: "owner@test.com", Name: "Owner"}, nil)
 		userRepo.On("GetByID", ctx, renterID).Return(&domain.User{ID: renterID, Email: "renter@test.com", Name: "Renter"}, nil)
-		emailSvc.On("SendRentalRequestNotification", ctx, "owner@test.com", "Renter", "Tool").Return(nil)
+		emailSvc.On("SendRentalRequestNotification", ctx, "owner@test.com", "Renter", "Tool", "renter@test.com").Return(nil)
 		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
 
 		res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, startDate, endDate)

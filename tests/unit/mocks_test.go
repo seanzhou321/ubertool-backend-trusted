@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"ubertool-backend-trusted/internal/domain"
+
 	"github.com/stretchr/testify/mock"
 )
 
@@ -249,8 +250,8 @@ type MockEmailService struct {
 	mock.Mock
 }
 
-func (m *MockEmailService) SendInvitation(ctx context.Context, email, name, token string, orgName string) error {
-	args := m.Called(ctx, email, name, token, orgName)
+func (m *MockEmailService) SendInvitation(ctx context.Context, email, name, token string, orgName string, ccEmail string) error {
+	args := m.Called(ctx, email, name, token, orgName, ccEmail)
 	return args.Error(0)
 }
 
@@ -259,28 +260,28 @@ func (m *MockEmailService) SendAccountStatusNotification(ctx context.Context, em
 	return args.Error(0)
 }
 
-func (m *MockEmailService) SendRentalRequestNotification(ctx context.Context, ownerEmail, renterName, toolName string) error {
-	args := m.Called(ctx, ownerEmail, renterName, toolName)
+func (m *MockEmailService) SendRentalRequestNotification(ctx context.Context, ownerEmail, renterName, toolName string, ccEmail string) error {
+	args := m.Called(ctx, ownerEmail, renterName, toolName, ccEmail)
 	return args.Error(0)
 }
 
-func (m *MockEmailService) SendRentalApprovalNotification(ctx context.Context, renterEmail, toolName, ownerName, pickupNote string) error {
-	args := m.Called(ctx, renterEmail, toolName, ownerName, pickupNote)
+func (m *MockEmailService) SendRentalApprovalNotification(ctx context.Context, renterEmail, toolName, ownerName, pickupNote string, ccEmail string) error {
+	args := m.Called(ctx, renterEmail, toolName, ownerName, pickupNote, ccEmail)
 	return args.Error(0)
 }
 
-func (m *MockEmailService) SendRentalRejectionNotification(ctx context.Context, renterEmail, toolName, ownerName string) error {
-	args := m.Called(ctx, renterEmail, toolName, ownerName)
+func (m *MockEmailService) SendRentalRejectionNotification(ctx context.Context, renterEmail, toolName, ownerName string, ccEmail string) error {
+	args := m.Called(ctx, renterEmail, toolName, ownerName, ccEmail)
 	return args.Error(0)
 }
 
-func (m *MockEmailService) SendRentalConfirmationNotification(ctx context.Context, ownerEmail, renterName, toolName string) error {
-	args := m.Called(ctx, ownerEmail, renterName, toolName)
+func (m *MockEmailService) SendRentalConfirmationNotification(ctx context.Context, ownerEmail, renterName, toolName string, ccEmail string) error {
+	args := m.Called(ctx, ownerEmail, renterName, toolName, ccEmail)
 	return args.Error(0)
 }
 
-func (m *MockEmailService) SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string) error {
-	args := m.Called(ctx, ownerEmail, renterName, toolName, reason)
+func (m *MockEmailService) SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string, ccEmail string) error {
+	args := m.Called(ctx, ownerEmail, renterName, toolName, reason, ccEmail)
 	return args.Error(0)
 }
 

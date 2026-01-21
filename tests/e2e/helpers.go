@@ -1,0 +1,182 @@
+package e2e
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"testing"
+	"time"
+
+	_ "github.com/lib/pq"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+)
+
+// TestDB wraps database connection with helper methods
+type TestDB struct {
+	*sql.DB
+	t *testing.T
+}
+
+// PrepareDB creates a database connection for E2E tests
+func PrepareDB(t *testing.T) *TestDB {
+	connStr := "postgres://ubertool_trusted:ubertool123@localhost:5454/ubertool_db?sslmode=disable"
+	var db *sql.DB
+	var err error
+
+	// Retry connection as DB might still be starting up
+	for i := 0; i < 10; i++ {
+		db, err = sql.Open("postgres", connStr)
+		if err == nil {
+			err = db.Ping()
+			if err == nil {
+				return &TestDB{DB: db, t: t}
+			}
+		}
+		time.Sleep(2 * time.Second)
+	}
+	t.Fatalf("failed to connect to database: %v", err)
+	return nil
+}
+
+// Cleanup performs test cleanup
+func (db *TestDB) Cleanup() {
+	db.Exec("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
+	db.Exec("DELETE FROM ledger_transactions WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
+	db.Exec("DELETE FROM rentals WHERE renter_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
+	db.Exec("DELETE FROM tool_images WHERE tool_id IN (SELECT id FROM tools WHERE owner_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%'))")
+	db.Exec("DELETE FROM tools WHERE owner_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
+	db.Exec("DELETE FROM invitations WHERE email LIKE 'e2e-test-%'")
+	db.Exec("DELETE FROM join_requests WHERE email LIKE 'e2e-test-%'")
+	db.Exec("DELETE FROM users_orgs WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
+	db.Exec("DELETE FROM users WHERE email LIKE 'e2e-test-%'")
+	db.Exec("DELETE FROM orgs WHERE name LIKE 'E2E-Test-%'")
+}
+
+// CreateTestOrg creates a test organization
+func (db *TestDB) CreateTestOrg(name string) int32 {
+	if name == "" {
+		name = fmt.Sprintf("E2E-Test-Org-%d", time.Now().UnixNano())
+	}
+	var orgID int32
+	err := db.QueryRow(`
+		INSERT INTO orgs (name, metro, admin_email, admin_phone_number)
+		VALUES ($1, 'San Jose', 'admin@test.com', '555-0000')
+		RETURNING id
+	`, name).Scan(&orgID)
+	if err != nil {
+		db.t.Fatalf("failed to create test org: %v", err)
+	}
+	return orgID
+}
+
+// CreateTestUser creates a test user
+func (db *TestDB) CreateTestUser(email, name string) int32 {
+	if email == "" {
+		email = fmt.Sprintf("e2e-test-%d@test.com", time.Now().UnixNano())
+	}
+	if name == "" {
+		name = "Test User"
+	}
+	var userID int32
+	err := db.QueryRow(`
+		INSERT INTO users (email, phone_number, password_hash, name)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`, email, fmt.Sprintf("555-%d", time.Now().UnixNano()), "hashed_password", name).Scan(&userID)
+	if err != nil {
+		db.t.Fatalf("failed to create test user: %v", err)
+	}
+	return userID
+}
+
+// AddUserToOrg adds a user to an organization
+func (db *TestDB) AddUserToOrg(userID, orgID int32, role, status string, balanceCents int32) {
+	_, err := db.Exec(`
+		INSERT INTO users_orgs (user_id, org_id, role, status, balance_cents)
+		VALUES ($1, $2, $3, $4, $5)
+	`, userID, orgID, role, status, balanceCents)
+	if err != nil {
+		db.t.Fatalf("failed to add user to org: %v", err)
+	}
+}
+
+// CreateTestTool creates a test tool
+func (db *TestDB) CreateTestTool(ownerID int32, name string, pricePerDay int32) int32 {
+	if name == "" {
+		name = fmt.Sprintf("Test Tool %d", time.Now().UnixNano())
+	}
+	var toolID int32
+	err := db.QueryRow(`
+		INSERT INTO tools (owner_id, name, description, price_per_day_cents, condition, metro, status)
+		VALUES ($1, $2, 'Test tool description', $3, 'EXCELLENT', 'San Jose', 'AVAILABLE')
+		RETURNING id
+	`, ownerID, name, pricePerDay).Scan(&toolID)
+	if err != nil {
+		db.t.Fatalf("failed to create test tool: %v", err)
+	}
+	return toolID
+}
+
+// CreateTestInvitation creates a test invitation
+func (db *TestDB) CreateTestInvitation(orgID int32, email string, createdBy int32) string {
+	var token string
+	err := db.QueryRow(`
+		INSERT INTO invitations (org_id, email, created_by, expires_on)
+		VALUES ($1, $2, $3, CURRENT_DATE + INTERVAL '7 days')
+		RETURNING token
+	`, orgID, email, createdBy).Scan(&token)
+	if err != nil {
+		db.t.Fatalf("failed to create test invitation: %v", err)
+	}
+	return token
+}
+
+// GRPCClient wraps gRPC connection with helper methods
+type GRPCClient struct {
+	conn *grpc.ClientConn
+	t    *testing.T
+}
+
+// NewGRPCClient creates a new gRPC client connection
+func NewGRPCClient(t *testing.T, serverAddr string) *GRPCClient {
+	if serverAddr == "" {
+		serverAddr = "localhost:50051"
+	}
+	
+	conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatalf("failed to connect to gRPC server: %v", err)
+	}
+	
+	return &GRPCClient{conn: conn, t: t}
+}
+
+// Close closes the gRPC connection
+func (c *GRPCClient) Close() {
+	c.conn.Close()
+}
+
+// Conn returns the underlying gRPC connection
+func (c *GRPCClient) Conn() *grpc.ClientConn {
+	return c.conn
+}
+
+// ContextWithUserID creates a context with user ID in metadata
+func ContextWithUserID(userID int32) context.Context {
+	md := metadata.Pairs("user-id", fmt.Sprintf("%d", userID))
+	return metadata.NewOutgoingContext(context.Background(), md)
+}
+
+// ContextWithTimeout creates a context with timeout
+func ContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), timeout)
+}
+
+// ContextWithUserIDAndTimeout creates a context with user ID and timeout
+func ContextWithUserIDAndTimeout(userID int32, timeout time.Duration) (context.Context, context.CancelFunc) {
+	md := metadata.Pairs("user-id", fmt.Sprintf("%d", userID))
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	return context.WithTimeout(ctx, timeout)
+}

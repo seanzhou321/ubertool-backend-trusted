@@ -74,7 +74,13 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 			return fmt.Errorf("failed to create invitation: %w", err)
 		}
 
-		if err := s.emailSvc.SendInvitation(ctx, email, name, inv.Token, org.Name); err != nil {
+		// Get admin email for CC
+		admin, err := s.userRepo.GetByID(ctx, adminID)
+		if err != nil {
+			return fmt.Errorf("failed to get admin user: %w", err)
+		}
+
+		if err := s.emailSvc.SendInvitation(ctx, email, name, inv.Token, org.Name, admin.Email); err != nil {
 			return fmt.Errorf("failed to send invitation email: %w", err)
 		}
 	}

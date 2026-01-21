@@ -92,7 +92,7 @@ Business Logic:
 1. Verify the caller has 'ADMIN' or 'SUPER_ADMIN' role in the given `organization_id`.
 2. Find the pending request in `join_requests`.
 3. If the user already exists in `users` table (by email), add them to `users_orgs` with 'MEMBER' role.
-4. If the user does not exist, creates an invitation record in `invitations` and use the admin email of the organization to send the invitation code to the new user.
+4. If the user does not exist, creates an invitation record in `invitations` and send the invitation code to the new user, cc to the admin user (`user_id` parsed from this JWT token).
 5. Update `join_requests` status to 'APPROVED'.
 
 ### Admin Block User Account
@@ -258,7 +258,7 @@ Business Logic:
 2. Calculate `total_cost_cents` based on duration and tool price.
 3. Insert into `rentals` with status 'PENDING'.
 4. Create a notification to the owner with attributes set to {topic:rental_request; rental:rental_id; purpose:"request for approval"}
-5. Send an email from the renter to the tool owner to notify the rental request.
+5. Send an email to the tool owner to notify the rental request, cc to the renter (user_id parsed from the JWT token).
 
 ### Approve Rental Request
 Purpose: Owner approves the lending.
@@ -269,7 +269,7 @@ Business Logic:
 1. Verify `user_id` is the tool owner.
 2. Update `rentals` status to 'APPROVED'.
 3. Create a notification to the renter with attributes set to {topic:rental_request; rental:rental_id, purpose:"rental request approved"}
-4. Send an email from the owner to the renter to notify the rental approval with `pickup_instruction`.
+4. Send an email to the renter to notify the rental approval with `pickup_instruction`, cc to the owner.
 
 ### Reject Rental Request
 Purpose: Owner declines the lending.
@@ -280,7 +280,7 @@ Business Logic:
 1. Verify `user_id` is the tool owner.
 2. Update `rentals` status to 'REJECTED'.
 3. Create a notification to the renter with attributes set to {topic:rental_request; rental:rental_id; purpose:"rental request rejected"}
-4. Send an email from the owner to the renter to notify the rental rejection with `reason`. 
+4. Send an email to the renter to notify the rental rejection with `reason`, cc to the owner (user_id parsed from the JWT token). 
 
 ### Finalize Rental Request
 Purpose: Renter confirms and pays for the rental.
@@ -293,7 +293,7 @@ Business Logic:
 3. Update `rentals` status to 'SCHEDULED'.
 4. Update the tool status to 'RENTED'.
 5. Create a notification to the owner with attributes set to {topic: rental_request; rental:rental_id; purpose:"rental request confirmed"}
-5. Send an email from the renter to the owner indicating the rental confirmation.
+5. Send an email to the owner to notify the rental confirmation, cc to the renter (user_id parsed from the JWT token).
 6. Search approved rental requests of the renter for the same kind of tool.
 7. Search pending rental requests of the renter for the same kind of tool. 
 
@@ -306,7 +306,7 @@ Business Logic:
 1. Verify `user_id` is the tool renter.
 2. Update `rentals` status to 'CANCELED'.
 3. Create a notification to the owner with attributes set to {topic: rental_request; rental:rental_id; purpose:"rental request canceled"}
-4. Send an email from the renter to the owner to notify the cancelation of the rental request with `reason`. 
+4. Send an email to the owner to notify the cancelation of the rental request with `reason`, cc to the renter (user_id parsed from the JWT token). 
 
 ### Complete Rental
 Purpose: Mark tool as returned.

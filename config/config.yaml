@@ -1,0 +1,35 @@
+# Ubertool Trusted Backend Configuration - Production
+
+server:
+  host: "0.0.0.0"
+  port: 50051
+
+database:
+  host: "production-db-host"
+  port: 5432
+  user: "ubertool_prod"
+  password: "CHANGE_ME_IN_PRODUCTION"
+  database: "ubertool_prod_db"
+  ssl_mode: "require"
+
+smtp:
+  host: "smtp.gmail.com"
+  port: 587
+  user: "production-email@yourdomain.com"
+  password: "CHANGE_ME_IN_PRODUCTION"
+  from: "noreply@yourdomain.com"
+
+jwt:
+  secret: "CHANGE_ME_TO_STRONG_RANDOM_SECRET_MIN_32_CHARS"
+  access_token_expiry_minutes: 15
+  refresh_token_expiry_minutes: 10080  # 7 days
+  temp_token_expiry_minutes: 5
+
+storage:
+  upload_dir: "/var/ubertool/uploads"
+  max_file_size_mb: 10
+  allowed_types:
+    - "image/jpeg"
+    - "image/png"
+    - "image/gif"
+    - "image/webp"
