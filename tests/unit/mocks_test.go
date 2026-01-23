@@ -174,13 +174,32 @@ func (m *MockToolRepo) Search(ctx context.Context, orgID int32, query string, ca
 	args := m.Called(ctx, orgID, query, categories, maxPrice, condition, page, pageSize)
 	return args.Get(0).([]domain.Tool), args.Get(1).(int32), args.Error(2)
 }
-func (m *MockToolRepo) AddImage(ctx context.Context, image *domain.ToolImage) error {
+func (m *MockToolRepo) CreateImage(ctx context.Context, image *domain.ToolImage) error {
 	args := m.Called(ctx, image)
 	return args.Error(0)
+}
+func (m *MockToolRepo) GetImageByID(ctx context.Context, imageID int32) (*domain.ToolImage, error) {
+	args := m.Called(ctx, imageID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.ToolImage), args.Error(1)
 }
 func (m *MockToolRepo) GetImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error) {
 	args := m.Called(ctx, toolID)
 	return args.Get(0).([]domain.ToolImage), args.Error(1)
+}
+func (m *MockToolRepo) GetPendingImagesByUser(ctx context.Context, userID int32) ([]domain.ToolImage, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).([]domain.ToolImage), args.Error(1)
+}
+func (m *MockToolRepo) UpdateImage(ctx context.Context, image *domain.ToolImage) error {
+	args := m.Called(ctx, image)
+	return args.Error(0)
+}
+func (m *MockToolRepo) ConfirmImage(ctx context.Context, imageID int32, toolID int32) error {
+	args := m.Called(ctx, imageID, toolID)
+	return args.Error(0)
 }
 func (m *MockToolRepo) DeleteImage(ctx context.Context, imageID int32) error {
 	args := m.Called(ctx, imageID)
@@ -188,6 +207,10 @@ func (m *MockToolRepo) DeleteImage(ctx context.Context, imageID int32) error {
 }
 func (m *MockToolRepo) SetPrimaryImage(ctx context.Context, toolID, imageID int32) error {
 	args := m.Called(ctx, toolID, imageID)
+	return args.Error(0)
+}
+func (m *MockToolRepo) DeleteExpiredPendingImages(ctx context.Context) error {
+	args := m.Called(ctx)
 	return args.Error(0)
 }
 

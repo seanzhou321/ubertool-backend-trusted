@@ -43,17 +43,19 @@ type SMTPConfig struct {
 
 // JWTConfig contains JWT token settings
 type JWTConfig struct {
-	Secret              string `yaml:"secret"`
-	AccessTokenExpiry   int    `yaml:"access_token_expiry_minutes"`
-	RefreshTokenExpiry  int    `yaml:"refresh_token_expiry_minutes"`
-	TempTokenExpiry     int    `yaml:"temp_token_expiry_minutes"`
+	Secret             string `yaml:"secret"`
+	AccessTokenExpiry  int    `yaml:"access_token_expiry_minutes"`
+	RefreshTokenExpiry int    `yaml:"refresh_token_expiry_minutes"`
+	TempTokenExpiry    int    `yaml:"temp_token_expiry_minutes"`
 }
 
 // StorageConfig contains file storage settings
 type StorageConfig struct {
-	UploadDir     string `yaml:"upload_dir"`
-	MaxFileSize   int64  `yaml:"max_file_size_mb"`
-	AllowedTypes  []string `yaml:"allowed_types"`
+	Type         string   `yaml:"type"`       // "mock" or "s3"
+	UploadDir    string   `yaml:"upload_dir"` // For mock storage
+	BaseURL      string   `yaml:"base_url"`   // Server base URL for mock URLs
+	MaxFileSize  int64    `yaml:"max_file_size_mb"`
+	AllowedTypes []string `yaml:"allowed_types"`
 }
 
 // Load reads configuration from a YAML file

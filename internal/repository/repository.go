@@ -37,10 +37,16 @@ type ToolRepository interface {
 	ListByOwner(ctx context.Context, ownerID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	Search(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
 	
-	AddImage(ctx context.Context, image *domain.ToolImage) error
+	// Image management (unified pending + confirmed)
+	CreateImage(ctx context.Context, image *domain.ToolImage) error
+	GetImageByID(ctx context.Context, imageID int32) (*domain.ToolImage, error)
 	GetImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error)
+	GetPendingImagesByUser(ctx context.Context, userID int32) ([]domain.ToolImage, error)
+	UpdateImage(ctx context.Context, image *domain.ToolImage) error
+	ConfirmImage(ctx context.Context, imageID int32, toolID int32) error
 	DeleteImage(ctx context.Context, imageID int32) error
-	SetPrimaryImage(ctx context.Context, toolID, imageID int32) error
+	SetPrimaryImage(ctx context.Context, toolID int32, imageID int32) error
+	DeleteExpiredPendingImages(ctx context.Context) error
 }
 
 type RentalRepository interface {

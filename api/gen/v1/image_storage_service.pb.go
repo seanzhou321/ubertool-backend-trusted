@@ -21,84 +21,32 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Upload image method messages
-type UploadImageRequest struct {
-	state                    protoimpl.MessageState    `protogen:"open.v1"`
-	UploadImageRequestObject *UploadImageRequestObject `protobuf:"bytes,1,opt,name=upload_image_request_object,json=uploadImageRequestObject,proto3" json:"upload_image_request_object,omitempty"`
-	Chunk                    []byte                    `protobuf:"bytes,2,opt,name=chunk,proto3" json:"chunk,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
-}
-
-func (x *UploadImageRequest) Reset() {
-	*x = UploadImageRequest{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UploadImageRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UploadImageRequest) ProtoMessage() {}
-
-func (x *UploadImageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UploadImageRequest.ProtoReflect.Descriptor instead.
-func (*UploadImageRequest) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *UploadImageRequest) GetUploadImageRequestObject() *UploadImageRequestObject {
-	if x != nil {
-		return x.UploadImageRequestObject
-	}
-	return nil
-}
-
-func (x *UploadImageRequest) GetChunk() []byte {
-	if x != nil {
-		return x.Chunk
-	}
-	return nil
-}
-
-type UploadImageRequestObject struct {
+// Presigned URL methods
+type GetUploadUrlRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ToolId        int32                  `protobuf:"varint,1,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
-	FileName      string                 `protobuf:"bytes,2,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
-	MimeType      string                 `protobuf:"bytes,3,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	Filename      string                 `protobuf:"bytes,1,opt,name=filename,proto3" json:"filename,omitempty"`
+	ContentType   string                 `protobuf:"bytes,2,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"` // e.g., "image/jpeg", "image/png"
+	ToolId        int32                  `protobuf:"varint,3,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`               // 0 for new tools
 	IsPrimary     bool                   `protobuf:"varint,4,opt,name=is_primary,json=isPrimary,proto3" json:"is_primary,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *UploadImageRequestObject) Reset() {
-	*x = UploadImageRequestObject{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[1]
+func (x *GetUploadUrlRequest) Reset() {
+	*x = GetUploadUrlRequest{}
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *UploadImageRequestObject) String() string {
+func (x *GetUploadUrlRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UploadImageRequestObject) ProtoMessage() {}
+func (*GetUploadUrlRequest) ProtoMessage() {}
 
-func (x *UploadImageRequestObject) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[1]
+func (x *GetUploadUrlRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -109,60 +57,130 @@ func (x *UploadImageRequestObject) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UploadImageRequestObject.ProtoReflect.Descriptor instead.
-func (*UploadImageRequestObject) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{1}
+// Deprecated: Use GetUploadUrlRequest.ProtoReflect.Descriptor instead.
+func (*GetUploadUrlRequest) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *UploadImageRequestObject) GetToolId() int32 {
+func (x *GetUploadUrlRequest) GetFilename() string {
+	if x != nil {
+		return x.Filename
+	}
+	return ""
+}
+
+func (x *GetUploadUrlRequest) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *GetUploadUrlRequest) GetToolId() int32 {
 	if x != nil {
 		return x.ToolId
 	}
 	return 0
 }
 
-func (x *UploadImageRequestObject) GetFileName() string {
-	if x != nil {
-		return x.FileName
-	}
-	return ""
-}
-
-func (x *UploadImageRequestObject) GetMimeType() string {
-	if x != nil {
-		return x.MimeType
-	}
-	return ""
-}
-
-func (x *UploadImageRequestObject) GetIsPrimary() bool {
+func (x *GetUploadUrlRequest) GetIsPrimary() bool {
 	if x != nil {
 		return x.IsPrimary
 	}
 	return false
 }
 
-type UploadImageResponse struct {
+type GetUploadUrlResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ToolImage     *ToolImage             `protobuf:"bytes,1,opt,name=tool_image,json=toolImage,proto3" json:"tool_image,omitempty"`
+	UploadUrl     string                 `protobuf:"bytes,1,opt,name=upload_url,json=uploadUrl,proto3" json:"upload_url,omitempty"`       // Presigned PUT URL for uploading
+	ImageId       int32                  `protobuf:"varint,2,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`            // Unique ID to reference this image
+	DownloadUrl   string                 `protobuf:"bytes,3,opt,name=download_url,json=downloadUrl,proto3" json:"download_url,omitempty"` // URL to download/display the image
+	ExpiresAt     int64                  `protobuf:"varint,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`      // Unix timestamp when URLs expire
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *UploadImageResponse) Reset() {
-	*x = UploadImageResponse{}
+func (x *GetUploadUrlResponse) Reset() {
+	*x = GetUploadUrlResponse{}
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUploadUrlResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUploadUrlResponse) ProtoMessage() {}
+
+func (x *GetUploadUrlResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUploadUrlResponse.ProtoReflect.Descriptor instead.
+func (*GetUploadUrlResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GetUploadUrlResponse) GetUploadUrl() string {
+	if x != nil {
+		return x.UploadUrl
+	}
+	return ""
+}
+
+func (x *GetUploadUrlResponse) GetImageId() int32 {
+	if x != nil {
+		return x.ImageId
+	}
+	return 0
+}
+
+func (x *GetUploadUrlResponse) GetDownloadUrl() string {
+	if x != nil {
+		return x.DownloadUrl
+	}
+	return ""
+}
+
+func (x *GetUploadUrlResponse) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
+type ConfirmImageUploadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ImageId       int32                  `protobuf:"varint,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
+	ToolId        int32                  `protobuf:"varint,2,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
+	FileSize      int64                  `protobuf:"varint,3,opt,name=file_size,json=fileSize,proto3" json:"file_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmImageUploadRequest) Reset() {
+	*x = ConfirmImageUploadRequest{}
 	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *UploadImageResponse) String() string {
+func (x *ConfirmImageUploadRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UploadImageResponse) ProtoMessage() {}
+func (*ConfirmImageUploadRequest) ProtoMessage() {}
 
-func (x *UploadImageResponse) ProtoReflect() protoreflect.Message {
+func (x *ConfirmImageUploadRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -174,16 +192,202 @@ func (x *UploadImageResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UploadImageResponse.ProtoReflect.Descriptor instead.
-func (*UploadImageResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ConfirmImageUploadRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmImageUploadRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *UploadImageResponse) GetToolImage() *ToolImage {
+func (x *ConfirmImageUploadRequest) GetImageId() int32 {
+	if x != nil {
+		return x.ImageId
+	}
+	return 0
+}
+
+func (x *ConfirmImageUploadRequest) GetToolId() int32 {
+	if x != nil {
+		return x.ToolId
+	}
+	return 0
+}
+
+func (x *ConfirmImageUploadRequest) GetFileSize() int64 {
+	if x != nil {
+		return x.FileSize
+	}
+	return 0
+}
+
+type ConfirmImageUploadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	ToolImage     *ToolImage             `protobuf:"bytes,2,opt,name=tool_image,json=toolImage,proto3" json:"tool_image,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmImageUploadResponse) Reset() {
+	*x = ConfirmImageUploadResponse{}
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmImageUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmImageUploadResponse) ProtoMessage() {}
+
+func (x *ConfirmImageUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmImageUploadResponse.ProtoReflect.Descriptor instead.
+func (*ConfirmImageUploadResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ConfirmImageUploadResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ConfirmImageUploadResponse) GetToolImage() *ToolImage {
 	if x != nil {
 		return x.ToolImage
 	}
 	return nil
+}
+
+func (x *ConfirmImageUploadResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type GetDownloadUrlRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ImageId       int32                  `protobuf:"varint,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
+	ToolId        int32                  `protobuf:"varint,2,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
+	IsThumbnail   bool                   `protobuf:"varint,3,opt,name=is_thumbnail,json=isThumbnail,proto3" json:"is_thumbnail,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDownloadUrlRequest) Reset() {
+	*x = GetDownloadUrlRequest{}
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDownloadUrlRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDownloadUrlRequest) ProtoMessage() {}
+
+func (x *GetDownloadUrlRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDownloadUrlRequest.ProtoReflect.Descriptor instead.
+func (*GetDownloadUrlRequest) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetDownloadUrlRequest) GetImageId() int32 {
+	if x != nil {
+		return x.ImageId
+	}
+	return 0
+}
+
+func (x *GetDownloadUrlRequest) GetToolId() int32 {
+	if x != nil {
+		return x.ToolId
+	}
+	return 0
+}
+
+func (x *GetDownloadUrlRequest) GetIsThumbnail() bool {
+	if x != nil {
+		return x.IsThumbnail
+	}
+	return false
+}
+
+type GetDownloadUrlResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DownloadUrl   string                 `protobuf:"bytes,1,opt,name=download_url,json=downloadUrl,proto3" json:"download_url,omitempty"`
+	ExpiresAt     int64                  `protobuf:"varint,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDownloadUrlResponse) Reset() {
+	*x = GetDownloadUrlResponse{}
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDownloadUrlResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDownloadUrlResponse) ProtoMessage() {}
+
+func (x *GetDownloadUrlResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDownloadUrlResponse.ProtoReflect.Descriptor instead.
+func (*GetDownloadUrlResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetDownloadUrlResponse) GetDownloadUrl() string {
+	if x != nil {
+		return x.DownloadUrl
+	}
+	return ""
+}
+
+func (x *GetDownloadUrlResponse) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
 }
 
 // Get uploaded tool image
@@ -196,7 +400,7 @@ type GetToolImagesRequest struct {
 
 func (x *GetToolImagesRequest) Reset() {
 	*x = GetToolImagesRequest{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[3]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -208,7 +412,7 @@ func (x *GetToolImagesRequest) String() string {
 func (*GetToolImagesRequest) ProtoMessage() {}
 
 func (x *GetToolImagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[3]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -221,7 +425,7 @@ func (x *GetToolImagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetToolImagesRequest.ProtoReflect.Descriptor instead.
 func (*GetToolImagesRequest) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{3}
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetToolImagesRequest) GetToolId() int32 {
@@ -240,7 +444,7 @@ type GetToolImagesResponse struct {
 
 func (x *GetToolImagesResponse) Reset() {
 	*x = GetToolImagesResponse{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[4]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -252,7 +456,7 @@ func (x *GetToolImagesResponse) String() string {
 func (*GetToolImagesResponse) ProtoMessage() {}
 
 func (x *GetToolImagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[4]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -265,125 +469,12 @@ func (x *GetToolImagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetToolImagesResponse.ProtoReflect.Descriptor instead.
 func (*GetToolImagesResponse) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{4}
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetToolImagesResponse) GetImages() []*ToolImage {
 	if x != nil {
 		return x.Images
-	}
-	return nil
-}
-
-// Download image method messages
-type DownloadImageRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ImageId       int32                  `protobuf:"varint,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
-	ToolId        int32                  `protobuf:"varint,2,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
-	IsThumbnail   bool                   `protobuf:"varint,3,opt,name=is_thumbnail,json=isThumbnail,proto3" json:"is_thumbnail,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DownloadImageRequest) Reset() {
-	*x = DownloadImageRequest{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DownloadImageRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DownloadImageRequest) ProtoMessage() {}
-
-func (x *DownloadImageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DownloadImageRequest.ProtoReflect.Descriptor instead.
-func (*DownloadImageRequest) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *DownloadImageRequest) GetImageId() int32 {
-	if x != nil {
-		return x.ImageId
-	}
-	return 0
-}
-
-func (x *DownloadImageRequest) GetToolId() int32 {
-	if x != nil {
-		return x.ToolId
-	}
-	return 0
-}
-
-func (x *DownloadImageRequest) GetIsThumbnail() bool {
-	if x != nil {
-		return x.IsThumbnail
-	}
-	return false
-}
-
-type DownloadImageResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ToolImage     *ToolImage             `protobuf:"bytes,1,opt,name=tool_image,json=toolImage,proto3" json:"tool_image,omitempty"`
-	Chunk         []byte                 `protobuf:"bytes,2,opt,name=chunk,proto3" json:"chunk,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DownloadImageResponse) Reset() {
-	*x = DownloadImageResponse{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DownloadImageResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DownloadImageResponse) ProtoMessage() {}
-
-func (x *DownloadImageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DownloadImageResponse.ProtoReflect.Descriptor instead.
-func (*DownloadImageResponse) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *DownloadImageResponse) GetToolImage() *ToolImage {
-	if x != nil {
-		return x.ToolImage
-	}
-	return nil
-}
-
-func (x *DownloadImageResponse) GetChunk() []byte {
-	if x != nil {
-		return x.Chunk
 	}
 	return nil
 }
@@ -399,7 +490,7 @@ type DeleteImageRequest struct {
 
 func (x *DeleteImageRequest) Reset() {
 	*x = DeleteImageRequest{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[7]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -411,7 +502,7 @@ func (x *DeleteImageRequest) String() string {
 func (*DeleteImageRequest) ProtoMessage() {}
 
 func (x *DeleteImageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[7]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -424,7 +515,7 @@ func (x *DeleteImageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteImageRequest.ProtoReflect.Descriptor instead.
 func (*DeleteImageRequest) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{7}
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DeleteImageRequest) GetImageId() int32 {
@@ -450,7 +541,7 @@ type DeleteImageResponse struct {
 
 func (x *DeleteImageResponse) Reset() {
 	*x = DeleteImageResponse{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[8]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -462,7 +553,7 @@ func (x *DeleteImageResponse) String() string {
 func (*DeleteImageResponse) ProtoMessage() {}
 
 func (x *DeleteImageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[8]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -475,7 +566,7 @@ func (x *DeleteImageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteImageResponse.ProtoReflect.Descriptor instead.
 func (*DeleteImageResponse) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{8}
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DeleteImageResponse) GetSuccess() bool {
@@ -495,7 +586,7 @@ type SetPrimaryImageRequest struct {
 
 func (x *SetPrimaryImageRequest) Reset() {
 	*x = SetPrimaryImageRequest{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[9]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -507,7 +598,7 @@ func (x *SetPrimaryImageRequest) String() string {
 func (*SetPrimaryImageRequest) ProtoMessage() {}
 
 func (x *SetPrimaryImageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[9]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -520,7 +611,7 @@ func (x *SetPrimaryImageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPrimaryImageRequest.ProtoReflect.Descriptor instead.
 func (*SetPrimaryImageRequest) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{9}
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SetPrimaryImageRequest) GetImageId() int32 {
@@ -547,7 +638,7 @@ type SetPrimaryImageResponse struct {
 
 func (x *SetPrimaryImageResponse) Reset() {
 	*x = SetPrimaryImageResponse{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[10]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -559,7 +650,7 @@ func (x *SetPrimaryImageResponse) String() string {
 func (*SetPrimaryImageResponse) ProtoMessage() {}
 
 func (x *SetPrimaryImageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[10]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -572,7 +663,7 @@ func (x *SetPrimaryImageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPrimaryImageResponse.ProtoReflect.Descriptor instead.
 func (*SetPrimaryImageResponse) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{10}
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SetPrimaryImageResponse) GetSuccess() bool {
@@ -597,18 +688,18 @@ type ToolImage struct {
 	FilePath      string                 `protobuf:"bytes,4,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
 	ThumbnailPath string                 `protobuf:"bytes,5,opt,name=thumbnail_path,json=thumbnailPath,proto3" json:"thumbnail_path,omitempty"`
 	FileSize      int64                  `protobuf:"varint,6,opt,name=file_size,json=fileSize,proto3" json:"file_size,omitempty"`
-	Width         int32                  `protobuf:"varint,7,opt,name=width,proto3" json:"width,omitempty"`
-	Height        int32                  `protobuf:"varint,8,opt,name=height,proto3" json:"height,omitempty"`
-	IsPrimary     bool                   `protobuf:"varint,9,opt,name=is_primary,json=isPrimary,proto3" json:"is_primary,omitempty"`
-	DisplayOrder  int32                  `protobuf:"varint,10,opt,name=display_order,json=displayOrder,proto3" json:"display_order,omitempty"`
-	UploadedOn    string                 `protobuf:"bytes,11,opt,name=uploaded_on,json=uploadedOn,proto3" json:"uploaded_on,omitempty"`
+	IsPrimary     bool                   `protobuf:"varint,7,opt,name=is_primary,json=isPrimary,proto3" json:"is_primary,omitempty"`
+	DisplayOrder  int32                  `protobuf:"varint,8,opt,name=display_order,json=displayOrder,proto3" json:"display_order,omitempty"`
+	Status        string                 `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
+	CreatedOn     string                 `protobuf:"bytes,10,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"`
+	ConfirmedOn   string                 `protobuf:"bytes,11,opt,name=confirmed_on,json=confirmedOn,proto3" json:"confirmed_on,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ToolImage) Reset() {
 	*x = ToolImage{}
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[11]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -620,7 +711,7 @@ func (x *ToolImage) String() string {
 func (*ToolImage) ProtoMessage() {}
 
 func (x *ToolImage) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[11]
+	mi := &file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -633,7 +724,7 @@ func (x *ToolImage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ToolImage.ProtoReflect.Descriptor instead.
 func (*ToolImage) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{11}
+	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ToolImage) GetId() int32 {
@@ -678,20 +769,6 @@ func (x *ToolImage) GetFileSize() int64 {
 	return 0
 }
 
-func (x *ToolImage) GetWidth() int32 {
-	if x != nil {
-		return x.Width
-	}
-	return 0
-}
-
-func (x *ToolImage) GetHeight() int32 {
-	if x != nil {
-		return x.Height
-	}
-	return 0
-}
-
 func (x *ToolImage) GetIsPrimary() bool {
 	if x != nil {
 		return x.IsPrimary
@@ -706,9 +783,23 @@ func (x *ToolImage) GetDisplayOrder() int32 {
 	return 0
 }
 
-func (x *ToolImage) GetUploadedOn() string {
+func (x *ToolImage) GetStatus() string {
 	if x != nil {
-		return x.UploadedOn
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ToolImage) GetCreatedOn() string {
+	if x != nil {
+		return x.CreatedOn
+	}
+	return ""
+}
+
+func (x *ToolImage) GetConfirmedOn() string {
+	if x != nil {
+		return x.ConfirmedOn
 	}
 	return ""
 }
@@ -717,31 +808,41 @@ var File_ubertool_trusted_backend_v1_image_storage_service_proto protoreflect.Fi
 
 const file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDesc = "" +
 	"\n" +
-	"7ubertool_trusted_backend/v1/image_storage_service.proto\x12\x17ubertool.trusted.api.v1\"\x9c\x01\n" +
-	"\x12UploadImageRequest\x12p\n" +
-	"\x1bupload_image_request_object\x18\x01 \x01(\v21.ubertool.trusted.api.v1.UploadImageRequestObjectR\x18uploadImageRequestObject\x12\x14\n" +
-	"\x05chunk\x18\x02 \x01(\fR\x05chunk\"\x8c\x01\n" +
-	"\x18UploadImageRequestObject\x12\x17\n" +
-	"\atool_id\x18\x01 \x01(\x05R\x06toolId\x12\x1b\n" +
-	"\tfile_name\x18\x02 \x01(\tR\bfileName\x12\x1b\n" +
-	"\tmime_type\x18\x03 \x01(\tR\bmimeType\x12\x1d\n" +
+	"7ubertool_trusted_backend/v1/image_storage_service.proto\x12\x17ubertool.trusted.api.v1\"\x8c\x01\n" +
+	"\x13GetUploadUrlRequest\x12\x1a\n" +
+	"\bfilename\x18\x01 \x01(\tR\bfilename\x12!\n" +
+	"\fcontent_type\x18\x02 \x01(\tR\vcontentType\x12\x17\n" +
+	"\atool_id\x18\x03 \x01(\x05R\x06toolId\x12\x1d\n" +
 	"\n" +
-	"is_primary\x18\x04 \x01(\bR\tisPrimary\"X\n" +
-	"\x13UploadImageResponse\x12A\n" +
+	"is_primary\x18\x04 \x01(\bR\tisPrimary\"\x92\x01\n" +
+	"\x14GetUploadUrlResponse\x12\x1d\n" +
 	"\n" +
-	"tool_image\x18\x01 \x01(\v2\".ubertool.trusted.api.v1.ToolImageR\ttoolImage\"/\n" +
+	"upload_url\x18\x01 \x01(\tR\tuploadUrl\x12\x19\n" +
+	"\bimage_id\x18\x02 \x01(\x05R\aimageId\x12!\n" +
+	"\fdownload_url\x18\x03 \x01(\tR\vdownloadUrl\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\x03R\texpiresAt\"l\n" +
+	"\x19ConfirmImageUploadRequest\x12\x19\n" +
+	"\bimage_id\x18\x01 \x01(\x05R\aimageId\x12\x17\n" +
+	"\atool_id\x18\x02 \x01(\x05R\x06toolId\x12\x1b\n" +
+	"\tfile_size\x18\x03 \x01(\x03R\bfileSize\"\x93\x01\n" +
+	"\x1aConfirmImageUploadResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12A\n" +
+	"\n" +
+	"tool_image\x18\x02 \x01(\v2\".ubertool.trusted.api.v1.ToolImageR\ttoolImage\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"n\n" +
+	"\x15GetDownloadUrlRequest\x12\x19\n" +
+	"\bimage_id\x18\x01 \x01(\x05R\aimageId\x12\x17\n" +
+	"\atool_id\x18\x02 \x01(\x05R\x06toolId\x12!\n" +
+	"\fis_thumbnail\x18\x03 \x01(\bR\visThumbnail\"Z\n" +
+	"\x16GetDownloadUrlResponse\x12!\n" +
+	"\fdownload_url\x18\x01 \x01(\tR\vdownloadUrl\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\x03R\texpiresAt\"/\n" +
 	"\x14GetToolImagesRequest\x12\x17\n" +
 	"\atool_id\x18\x01 \x01(\x05R\x06toolId\"S\n" +
 	"\x15GetToolImagesResponse\x12:\n" +
-	"\x06images\x18\x01 \x03(\v2\".ubertool.trusted.api.v1.ToolImageR\x06images\"m\n" +
-	"\x14DownloadImageRequest\x12\x19\n" +
-	"\bimage_id\x18\x01 \x01(\x05R\aimageId\x12\x17\n" +
-	"\atool_id\x18\x02 \x01(\x05R\x06toolId\x12!\n" +
-	"\fis_thumbnail\x18\x03 \x01(\bR\visThumbnail\"p\n" +
-	"\x15DownloadImageResponse\x12A\n" +
-	"\n" +
-	"tool_image\x18\x01 \x01(\v2\".ubertool.trusted.api.v1.ToolImageR\ttoolImage\x12\x14\n" +
-	"\x05chunk\x18\x02 \x01(\fR\x05chunk\"H\n" +
+	"\x06images\x18\x01 \x03(\v2\".ubertool.trusted.api.v1.ToolImageR\x06images\"H\n" +
 	"\x12DeleteImageRequest\x12\x19\n" +
 	"\bimage_id\x18\x01 \x01(\x05R\aimageId\x12\x17\n" +
 	"\atool_id\x18\x02 \x01(\x05R\x06toolId\"/\n" +
@@ -752,26 +853,27 @@ const file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDesc = "" 
 	"\atool_id\x18\x02 \x01(\x05R\x06toolId\"M\n" +
 	"\x17SetPrimaryImageResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xc5\x02\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xd0\x02\n" +
 	"\tToolImage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x17\n" +
 	"\atool_id\x18\x02 \x01(\x05R\x06toolId\x12\x1b\n" +
 	"\tfile_name\x18\x03 \x01(\tR\bfileName\x12\x1b\n" +
 	"\tfile_path\x18\x04 \x01(\tR\bfilePath\x12%\n" +
 	"\x0ethumbnail_path\x18\x05 \x01(\tR\rthumbnailPath\x12\x1b\n" +
-	"\tfile_size\x18\x06 \x01(\x03R\bfileSize\x12\x14\n" +
-	"\x05width\x18\a \x01(\x05R\x05width\x12\x16\n" +
-	"\x06height\x18\b \x01(\x05R\x06height\x12\x1d\n" +
+	"\tfile_size\x18\x06 \x01(\x03R\bfileSize\x12\x1d\n" +
 	"\n" +
-	"is_primary\x18\t \x01(\bR\tisPrimary\x12#\n" +
-	"\rdisplay_order\x18\n" +
-	" \x01(\x05R\fdisplayOrder\x12\x1f\n" +
-	"\vuploaded_on\x18\v \x01(\tR\n" +
-	"uploadedOn2\xc3\x04\n" +
-	"\x13ImageStorageService\x12j\n" +
-	"\vUploadImage\x12+.ubertool.trusted.api.v1.UploadImageRequest\x1a,.ubertool.trusted.api.v1.UploadImageResponse(\x01\x12n\n" +
-	"\rGetToolImages\x12-.ubertool.trusted.api.v1.GetToolImagesRequest\x1a..ubertool.trusted.api.v1.GetToolImagesResponse\x12p\n" +
-	"\rDownloadImage\x12-.ubertool.trusted.api.v1.DownloadImageRequest\x1a..ubertool.trusted.api.v1.DownloadImageResponse0\x01\x12h\n" +
+	"is_primary\x18\a \x01(\bR\tisPrimary\x12#\n" +
+	"\rdisplay_order\x18\b \x01(\x05R\fdisplayOrder\x12\x16\n" +
+	"\x06status\x18\t \x01(\tR\x06status\x12\x1d\n" +
+	"\n" +
+	"created_on\x18\n" +
+	" \x01(\tR\tcreatedOn\x12!\n" +
+	"\fconfirmed_on\x18\v \x01(\tR\vconfirmedOn2\xc4\x05\n" +
+	"\x13ImageStorageService\x12k\n" +
+	"\fGetUploadUrl\x12,.ubertool.trusted.api.v1.GetUploadUrlRequest\x1a-.ubertool.trusted.api.v1.GetUploadUrlResponse\x12}\n" +
+	"\x12ConfirmImageUpload\x122.ubertool.trusted.api.v1.ConfirmImageUploadRequest\x1a3.ubertool.trusted.api.v1.ConfirmImageUploadResponse\x12q\n" +
+	"\x0eGetDownloadUrl\x12..ubertool.trusted.api.v1.GetDownloadUrlRequest\x1a/.ubertool.trusted.api.v1.GetDownloadUrlResponse\x12n\n" +
+	"\rGetToolImages\x12-.ubertool.trusted.api.v1.GetToolImagesRequest\x1a..ubertool.trusted.api.v1.GetToolImagesResponse\x12h\n" +
 	"\vDeleteImage\x12+.ubertool.trusted.api.v1.DeleteImageRequest\x1a,.ubertool.trusted.api.v1.DeleteImageResponse\x12t\n" +
 	"\x0fSetPrimaryImage\x12/.ubertool.trusted.api.v1.SetPrimaryImageRequest\x1a0.ubertool.trusted.api.v1.SetPrimaryImageResponseBj\n" +
 	"\x1bcom.ubertool.trusted.api.v1B\x18ImageStorageServiceProtoP\x01Z/ubertool-backend-trusted/api/gen/v1;ubertool_v1b\x06proto3"
@@ -788,41 +890,42 @@ func file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescGZIP() 
 	return file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDescData
 }
 
-var file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_ubertool_trusted_backend_v1_image_storage_service_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_ubertool_trusted_backend_v1_image_storage_service_proto_goTypes = []any{
-	(*UploadImageRequest)(nil),       // 0: ubertool.trusted.api.v1.UploadImageRequest
-	(*UploadImageRequestObject)(nil), // 1: ubertool.trusted.api.v1.UploadImageRequestObject
-	(*UploadImageResponse)(nil),      // 2: ubertool.trusted.api.v1.UploadImageResponse
-	(*GetToolImagesRequest)(nil),     // 3: ubertool.trusted.api.v1.GetToolImagesRequest
-	(*GetToolImagesResponse)(nil),    // 4: ubertool.trusted.api.v1.GetToolImagesResponse
-	(*DownloadImageRequest)(nil),     // 5: ubertool.trusted.api.v1.DownloadImageRequest
-	(*DownloadImageResponse)(nil),    // 6: ubertool.trusted.api.v1.DownloadImageResponse
-	(*DeleteImageRequest)(nil),       // 7: ubertool.trusted.api.v1.DeleteImageRequest
-	(*DeleteImageResponse)(nil),      // 8: ubertool.trusted.api.v1.DeleteImageResponse
-	(*SetPrimaryImageRequest)(nil),   // 9: ubertool.trusted.api.v1.SetPrimaryImageRequest
-	(*SetPrimaryImageResponse)(nil),  // 10: ubertool.trusted.api.v1.SetPrimaryImageResponse
-	(*ToolImage)(nil),                // 11: ubertool.trusted.api.v1.ToolImage
+	(*GetUploadUrlRequest)(nil),        // 0: ubertool.trusted.api.v1.GetUploadUrlRequest
+	(*GetUploadUrlResponse)(nil),       // 1: ubertool.trusted.api.v1.GetUploadUrlResponse
+	(*ConfirmImageUploadRequest)(nil),  // 2: ubertool.trusted.api.v1.ConfirmImageUploadRequest
+	(*ConfirmImageUploadResponse)(nil), // 3: ubertool.trusted.api.v1.ConfirmImageUploadResponse
+	(*GetDownloadUrlRequest)(nil),      // 4: ubertool.trusted.api.v1.GetDownloadUrlRequest
+	(*GetDownloadUrlResponse)(nil),     // 5: ubertool.trusted.api.v1.GetDownloadUrlResponse
+	(*GetToolImagesRequest)(nil),       // 6: ubertool.trusted.api.v1.GetToolImagesRequest
+	(*GetToolImagesResponse)(nil),      // 7: ubertool.trusted.api.v1.GetToolImagesResponse
+	(*DeleteImageRequest)(nil),         // 8: ubertool.trusted.api.v1.DeleteImageRequest
+	(*DeleteImageResponse)(nil),        // 9: ubertool.trusted.api.v1.DeleteImageResponse
+	(*SetPrimaryImageRequest)(nil),     // 10: ubertool.trusted.api.v1.SetPrimaryImageRequest
+	(*SetPrimaryImageResponse)(nil),    // 11: ubertool.trusted.api.v1.SetPrimaryImageResponse
+	(*ToolImage)(nil),                  // 12: ubertool.trusted.api.v1.ToolImage
 }
 var file_ubertool_trusted_backend_v1_image_storage_service_proto_depIdxs = []int32{
-	1,  // 0: ubertool.trusted.api.v1.UploadImageRequest.upload_image_request_object:type_name -> ubertool.trusted.api.v1.UploadImageRequestObject
-	11, // 1: ubertool.trusted.api.v1.UploadImageResponse.tool_image:type_name -> ubertool.trusted.api.v1.ToolImage
-	11, // 2: ubertool.trusted.api.v1.GetToolImagesResponse.images:type_name -> ubertool.trusted.api.v1.ToolImage
-	11, // 3: ubertool.trusted.api.v1.DownloadImageResponse.tool_image:type_name -> ubertool.trusted.api.v1.ToolImage
-	0,  // 4: ubertool.trusted.api.v1.ImageStorageService.UploadImage:input_type -> ubertool.trusted.api.v1.UploadImageRequest
-	3,  // 5: ubertool.trusted.api.v1.ImageStorageService.GetToolImages:input_type -> ubertool.trusted.api.v1.GetToolImagesRequest
-	5,  // 6: ubertool.trusted.api.v1.ImageStorageService.DownloadImage:input_type -> ubertool.trusted.api.v1.DownloadImageRequest
-	7,  // 7: ubertool.trusted.api.v1.ImageStorageService.DeleteImage:input_type -> ubertool.trusted.api.v1.DeleteImageRequest
-	9,  // 8: ubertool.trusted.api.v1.ImageStorageService.SetPrimaryImage:input_type -> ubertool.trusted.api.v1.SetPrimaryImageRequest
-	2,  // 9: ubertool.trusted.api.v1.ImageStorageService.UploadImage:output_type -> ubertool.trusted.api.v1.UploadImageResponse
-	4,  // 10: ubertool.trusted.api.v1.ImageStorageService.GetToolImages:output_type -> ubertool.trusted.api.v1.GetToolImagesResponse
-	6,  // 11: ubertool.trusted.api.v1.ImageStorageService.DownloadImage:output_type -> ubertool.trusted.api.v1.DownloadImageResponse
-	8,  // 12: ubertool.trusted.api.v1.ImageStorageService.DeleteImage:output_type -> ubertool.trusted.api.v1.DeleteImageResponse
-	10, // 13: ubertool.trusted.api.v1.ImageStorageService.SetPrimaryImage:output_type -> ubertool.trusted.api.v1.SetPrimaryImageResponse
-	9,  // [9:14] is the sub-list for method output_type
-	4,  // [4:9] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	12, // 0: ubertool.trusted.api.v1.ConfirmImageUploadResponse.tool_image:type_name -> ubertool.trusted.api.v1.ToolImage
+	12, // 1: ubertool.trusted.api.v1.GetToolImagesResponse.images:type_name -> ubertool.trusted.api.v1.ToolImage
+	0,  // 2: ubertool.trusted.api.v1.ImageStorageService.GetUploadUrl:input_type -> ubertool.trusted.api.v1.GetUploadUrlRequest
+	2,  // 3: ubertool.trusted.api.v1.ImageStorageService.ConfirmImageUpload:input_type -> ubertool.trusted.api.v1.ConfirmImageUploadRequest
+	4,  // 4: ubertool.trusted.api.v1.ImageStorageService.GetDownloadUrl:input_type -> ubertool.trusted.api.v1.GetDownloadUrlRequest
+	6,  // 5: ubertool.trusted.api.v1.ImageStorageService.GetToolImages:input_type -> ubertool.trusted.api.v1.GetToolImagesRequest
+	8,  // 6: ubertool.trusted.api.v1.ImageStorageService.DeleteImage:input_type -> ubertool.trusted.api.v1.DeleteImageRequest
+	10, // 7: ubertool.trusted.api.v1.ImageStorageService.SetPrimaryImage:input_type -> ubertool.trusted.api.v1.SetPrimaryImageRequest
+	1,  // 8: ubertool.trusted.api.v1.ImageStorageService.GetUploadUrl:output_type -> ubertool.trusted.api.v1.GetUploadUrlResponse
+	3,  // 9: ubertool.trusted.api.v1.ImageStorageService.ConfirmImageUpload:output_type -> ubertool.trusted.api.v1.ConfirmImageUploadResponse
+	5,  // 10: ubertool.trusted.api.v1.ImageStorageService.GetDownloadUrl:output_type -> ubertool.trusted.api.v1.GetDownloadUrlResponse
+	7,  // 11: ubertool.trusted.api.v1.ImageStorageService.GetToolImages:output_type -> ubertool.trusted.api.v1.GetToolImagesResponse
+	9,  // 12: ubertool.trusted.api.v1.ImageStorageService.DeleteImage:output_type -> ubertool.trusted.api.v1.DeleteImageResponse
+	11, // 13: ubertool.trusted.api.v1.ImageStorageService.SetPrimaryImage:output_type -> ubertool.trusted.api.v1.SetPrimaryImageResponse
+	8,  // [8:14] is the sub-list for method output_type
+	2,  // [2:8] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_image_storage_service_proto_init() }
@@ -836,7 +939,7 @@ func file_ubertool_trusted_backend_v1_image_storage_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDesc), len(file_ubertool_trusted_backend_v1_image_storage_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

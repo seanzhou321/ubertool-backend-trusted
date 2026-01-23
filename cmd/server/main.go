@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
+	"net/http"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -14,11 +14,14 @@ import (
 	pb "ubertool-backend-trusted/api/gen/v1"
 	api "ubertool-backend-trusted/internal/api/grpc"
 	"ubertool-backend-trusted/internal/api/grpc/interceptor"
+	httpapi "ubertool-backend-trusted/internal/api/http"
 	"ubertool-backend-trusted/internal/config"
 	"ubertool-backend-trusted/internal/repository/postgres"
 	"ubertool-backend-trusted/internal/security"
 	"ubertool-backend-trusted/internal/service"
+	"ubertool-backend-trusted/internal/storage"
 
+	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 )
 
@@ -58,11 +61,26 @@ func main() {
 	tokenManager := security.NewTokenManager(cfg.JWT.Secret)
 	authInterceptor := interceptor.NewAuthInterceptor(tokenManager)
 
-	// Create uploads directory if not exists
-	if err := os.MkdirAll(cfg.Storage.UploadDir, 0755); err != nil {
-		log.Fatalf("Failed to create upload directory: %v", err)
+	// Initialize Storage Service
+	var storageService storage.StorageInterface
+	if cfg.Storage.Type == "" || cfg.Storage.Type == "mock" {
+		log.Println("Using mock storage (local filesystem)")
+		mockStorage, err := storage.NewMockStorageService(cfg.Storage.BaseURL, cfg.Storage.UploadDir)
+		if err != nil {
+			log.Fatalf("Failed to initialize mock storage: %v", err)
+		}
+		storageService = mockStorage
+	} else {
+		log.Fatalf("Storage type '%s' not yet implemented", cfg.Storage.Type)
 	}
-	imageSvc := service.NewImageStorageService(store.ToolRepository, cfg.Storage.UploadDir)
+
+	// Initialize Image Storage Service
+	imageSvc := service.NewImageStorageService(
+		store.ToolRepository,
+		store.UserRepository,
+		store.OrganizationRepository,
+		storageService,
+	)
 
 	// Initialize Email Service
 	emailSvc := service.NewEmailService(
@@ -139,6 +157,23 @@ func main() {
 
 	// Register reflection service for grpcurl
 	reflection.Register(s)
+
+	// Set up HTTP server for mock storage endpoints (if using mock storage)
+	if cfg.Storage.Type == "" || cfg.Storage.Type == "mock" {
+		mockStorage := storageService.(*storage.MockStorageService)
+		router := mux.NewRouter()
+		httpapi.RegisterMockStorageRoutes(router, mockStorage)
+
+		// Start HTTP server in a goroutine
+		httpPort := cfg.Server.Port + 1 // Use next port for HTTP
+		httpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, httpPort)
+		go func() {
+			log.Printf("HTTP server for mock storage listening on %s", httpAddr)
+			if err := http.ListenAndServe(httpAddr, router); err != nil {
+				log.Printf("HTTP server error: %v", err)
+			}
+		}()
+	}
 
 	log.Printf("gRPC server listening on %s", cfg.GetServerAddress())
 	if err := s.Serve(lis); err != nil {

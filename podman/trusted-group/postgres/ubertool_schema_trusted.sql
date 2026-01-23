@@ -88,28 +88,34 @@ CREATE TABLE tools (
     deleted_on DATE
 );
 
+-- Unified table for both pending and confirmed tool images
 CREATE TABLE tool_images (
     id SERIAL PRIMARY KEY,
-    tool_id INTEGER REFERENCES tools(id) ON DELETE CASCADE,
+    tool_id INTEGER NOT NULL REFERENCES tools(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
     file_name TEXT NOT NULL,
     file_path TEXT NOT NULL,
-    thumbnail_path TEXT NOT NULL,
-    file_size INTEGER NOT NULL,
+    thumbnail_path TEXT,
+    file_size INTEGER,
     mime_type TEXT NOT NULL,
-    width INTEGER NOT NULL,
-    height INTEGER NOT NULL,
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
     display_order INTEGER DEFAULT 0,
-    created_on DATE DEFAULT CURRENT_DATE,
-    deleted_on DATE,
-    CONSTRAINT unique_filename_per_tool UNIQUE (tool_id, file_name)
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, CONFIRMED, DELETED
+    expires_at TIMESTAMP,                 -- For pending images
+    created_on TIMESTAMP DEFAULT NOW(),
+    confirmed_on TIMESTAMP,
+    deleted_on TIMESTAMP
 );
 
-CREATE UNIQUE INDEX idx_tool_images_primary_unique ON tool_images(tool_id) WHERE is_primary = TRUE;
+-- Unique constraint: only one primary image per confirmed tool
+CREATE UNIQUE INDEX idx_tool_images_primary_unique ON tool_images(tool_id) 
+    WHERE is_primary = TRUE AND status = 'CONFIRMED';
 
 -- Index for fast queries
-CREATE INDEX idx_tool_images_tool_id ON tool_images(tool_id);
-CREATE INDEX idx_tool_images_primary ON tool_images(tool_id, is_primary);
+CREATE INDEX idx_tool_images_tool_id ON tool_images(tool_id) WHERE tool_id IS NOT NULL;
+CREATE INDEX idx_tool_images_status ON tool_images(status);
+CREATE INDEX idx_tool_images_user_pending ON tool_images(user_id, status) WHERE status = 'PENDING';
+CREATE INDEX idx_tool_images_expires ON tool_images(expires_at) WHERE status = 'PENDING';
 
 -- 4. Rentals
 CREATE TABLE rentals (

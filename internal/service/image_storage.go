@@ -3,117 +3,293 @@ package service
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/repository"
+	"ubertool-backend-trusted/internal/storage"
 )
 
 type imageStorageService struct {
-	toolRepo   repository.ToolRepository
-	uploadPath string
+	toolRepo repository.ToolRepository
+	userRepo repository.UserRepository
+	orgRepo  repository.OrganizationRepository
+	storage  storage.StorageInterface
 }
 
-func NewImageStorageService(toolRepo repository.ToolRepository, uploadPath string) ImageStorageService {
-	// Ensure upload directory exists
-	if _, err := os.Stat(uploadPath); os.IsNotExist(err) {
-		_ = os.MkdirAll(uploadPath, 0755)
-	}
+func NewImageStorageService(
+	toolRepo repository.ToolRepository,
+	userRepo repository.UserRepository,
+	orgRepo repository.OrganizationRepository,
+	storage storage.StorageInterface,
+) ImageStorageService {
 	return &imageStorageService{
-		toolRepo:   toolRepo,
-		uploadPath: uploadPath,
+		toolRepo: toolRepo,
+		userRepo: userRepo,
+		orgRepo:  orgRepo,
+		storage:  storage,
 	}
 }
 
-func (s *imageStorageService) UploadImage(ctx context.Context, userID, toolID int32, file []byte, filename, mimeType string) (*domain.ToolImage, error) {
-	// 0. Authorization check: Does user own the tool?
+// GetUploadUrl generates a presigned URL for uploading an image
+func (s *imageStorageService) GetUploadUrl(
+	ctx context.Context,
+	userID int32,
+	filename, contentType string,
+	toolID int32,
+	isPrimary bool,
+) (*domain.ToolImage, string, string, int64, error) {
+	// Verify tool ownership
 	tool, err := s.toolRepo.GetByID(ctx, toolID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify tool ownership: %w", err)
+		return nil, "", "", 0, fmt.Errorf("failed to verify tool: %w", err)
 	}
 	if tool.OwnerID != userID {
-		return nil, fmt.Errorf("unauthorized: you do not own this tool")
+		return nil, "", "", 0, fmt.Errorf("unauthorized: you do not own this tool")
 	}
 
-	// 1. Save file to disk
-	// Generate unique filename to avoid collision
-	uniqueName := fmt.Sprintf("%d_%d_%s", toolID, time.Now().UnixNano(), filename)
-	filePath := filepath.Join(s.uploadPath, uniqueName)
+	// Determine storage path
+	storagePath := fmt.Sprintf("tools/%d/%s", toolID, filename)
 
-	if err := os.WriteFile(filePath, file, 0644); err != nil {
-		return nil, fmt.Errorf("failed to save image file: %w", err)
-	}
+	// Create pending image record (ID will be auto-generated)
+	expiresAt := time.Now().Add(15 * time.Minute)
 
-	// 2. Check if first image
-	existing, _ := s.toolRepo.GetImages(ctx, toolID)
-	isPrimary := len(existing) == 0
-
-	// 3. Create ToolImage record
-	// Note: We don't have real thumbnail logic or dimension extraction here without external libraries.
-	// For now, we'll placeholder them or use 0/empty.
-	img := &domain.ToolImage{
+	image := &domain.ToolImage{
 		ToolID:        toolID,
+		UserID:        userID,
 		FileName:      filename,
-		FilePath:      filePath,
-		ThumbnailPath: filePath, // Use same for now
-		FileSize:      int32(len(file)),
-		MimeType:      mimeType,
-		Width:         0, // Placeholder
-		Height:        0, // Placeholder
+		FilePath:      storagePath,
+		ThumbnailPath: "",
+		FileSize:      0,
+		MimeType:      contentType,
 		IsPrimary:     isPrimary,
-		DisplayOrder:  int32(len(existing)),
+		DisplayOrder:  0,
+		Status:        "PENDING",
+		ExpiresAt:     &expiresAt,
+		CreatedOn:     time.Now(),
 	}
 
-	if err := s.toolRepo.AddImage(ctx, img); err != nil {
-		return nil, fmt.Errorf("failed to save image metadata: %w", err)
+	// Create image record - database will generate ID
+	if err := s.toolRepo.CreateImage(ctx, image); err != nil {
+		return nil, "", "", 0, fmt.Errorf("failed to create image record: %w", err)
 	}
 
-	return img, nil
+	// Now we have the generated ID, update storage path to include it
+	storagePath = fmt.Sprintf("tools/%d/%d/%s", toolID, image.ID, filename)
+
+	// Update the image record with the correct path including ID
+	image.FilePath = storagePath
+	if err := s.toolRepo.UpdateImage(ctx, image); err != nil {
+		return nil, "", "", 0, fmt.Errorf("failed to update image path: %w", err)
+	}
+
+	// Generate presigned upload URL (15 minutes expiration)
+	uploadURL, err := s.storage.GeneratePresignedUploadURL(ctx, storagePath, contentType, 15*time.Minute)
+	if err != nil {
+		return nil, "", "", 0, fmt.Errorf("failed to generate upload URL: %w", err)
+	}
+
+	// Generate presigned download URL (1 hour expiration)
+	downloadURL, err := s.storage.GeneratePresignedDownloadURL(ctx, storagePath, 1*time.Hour)
+	if err != nil {
+		return nil, "", "", 0, fmt.Errorf("failed to generate download URL: %w", err)
+	}
+
+	return image, uploadURL, downloadURL, expiresAt.Unix(), nil
 }
 
+// ConfirmImageUpload confirms that an image was successfully uploaded
+func (s *imageStorageService) ConfirmImageUpload(
+	ctx context.Context,
+	userID int32,
+	imageID int32,
+	toolID int32,
+	fileSize int64,
+) (*domain.ToolImage, error) {
+	// Get pending image
+	image, err := s.toolRepo.GetImageByID(ctx, imageID)
+	if err != nil {
+		return nil, fmt.Errorf("image not found: %w", err)
+	}
+
+	// Verify ownership
+	if image.UserID != userID {
+		return nil, fmt.Errorf("unauthorized: you do not own this image")
+	}
+
+	// Verify image is pending
+	if image.Status != "PENDING" {
+		return nil, fmt.Errorf("image is not pending (status: %s)", image.Status)
+	}
+
+	// Check if file exists in storage
+	exists, actualSize, err := s.storage.FileExists(ctx, image.FilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify file: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("image file not found in storage")
+	}
+
+	// Update image record
+	if fileSize == 0 {
+		fileSize = actualSize
+	}
+	image.FileSize = fileSize
+	image.Status = "CONFIRMED"
+	now := time.Now()
+	image.ConfirmedOn = &now
+
+	// If this is the first image for the tool, set as primary
+	existingImages, err := s.toolRepo.GetImages(ctx, toolID)
+	if err == nil && len(existingImages) == 0 {
+		image.IsPrimary = true
+	}
+
+	if err := s.toolRepo.UpdateImage(ctx, image); err != nil {
+		return nil, fmt.Errorf("failed to update image: %w", err)
+	}
+
+	return image, nil
+}
+
+// GetDownloadUrl generates a presigned URL for downloading an image
+func (s *imageStorageService) GetDownloadUrl(
+	ctx context.Context,
+	userID int32,
+	imageID int32,
+	toolID int32,
+	isThumbnail bool,
+) (string, int64, error) {
+	// Get images for the tool
+	images, err := s.toolRepo.GetImages(ctx, toolID)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to get tool images: %w", err)
+	}
+
+	// Find the specific image
+	var targetImage *domain.ToolImage
+	for i := range images {
+		if images[i].ID == imageID {
+			targetImage = &images[i]
+			break
+		}
+	}
+
+	if targetImage == nil {
+		return "", 0, fmt.Errorf("image not found")
+	}
+
+	// Verify access to tool (basic check - could be enhanced with org membership)
+	tool, err := s.toolRepo.GetByID(ctx, toolID)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to verify tool: %w", err)
+	}
+
+	// Allow access if user owns the tool or tool is available (public)
+	if tool.OwnerID != userID && tool.Status != domain.ToolStatusAvailable {
+		return "", 0, fmt.Errorf("unauthorized: no access to this tool's images")
+	}
+
+	// Determine which path to use
+	path := targetImage.FilePath
+	if isThumbnail && targetImage.ThumbnailPath != "" {
+		path = targetImage.ThumbnailPath
+	}
+
+	// Generate presigned download URL (1 hour expiration)
+	downloadURL, err := s.storage.GeneratePresignedDownloadURL(ctx, path, 1*time.Hour)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to generate download URL: %w", err)
+	}
+
+	expiresAt := time.Now().Add(1 * time.Hour).Unix()
+	return downloadURL, expiresAt, nil
+}
+
+// GetToolImages retrieves all confirmed images for a tool
 func (s *imageStorageService) GetToolImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error) {
 	return s.toolRepo.GetImages(ctx, toolID)
 }
 
-func (s *imageStorageService) DownloadImage(ctx context.Context, toolID, imageID int32, isThumbnail bool) ([]byte, string, error) {
-	images, err := s.toolRepo.GetImages(ctx, toolID)
+// DeleteImage deletes an image and its files from storage
+func (s *imageStorageService) DeleteImage(
+	ctx context.Context,
+	userID int32,
+	imageID int32,
+	toolID int32,
+) error {
+	// Get image
+	image, err := s.toolRepo.GetImageByID(ctx, imageID)
 	if err != nil {
-		return nil, "", err
+		return fmt.Errorf("image not found: %w", err)
 	}
 
-	var targetImg *domain.ToolImage
-	for _, img := range images {
-		if img.ID == imageID {
-			targetImg = &img
-			break
+	// Verify ownership through tool
+	tool, err := s.toolRepo.GetByID(ctx, toolID)
+	if err != nil {
+		return fmt.Errorf("failed to verify tool: %w", err)
+	}
+	if tool.OwnerID != userID {
+		return fmt.Errorf("unauthorized: you do not own this tool")
+	}
+
+	// Delete files from storage
+	if err := s.storage.DeleteFile(ctx, image.FilePath); err != nil {
+		// Log error but continue - file might already be deleted
+		fmt.Printf("Warning: failed to delete image file: %v\n", err)
+	}
+	if image.ThumbnailPath != "" && image.ThumbnailPath != image.FilePath {
+		if err := s.storage.DeleteFile(ctx, image.ThumbnailPath); err != nil {
+			fmt.Printf("Warning: failed to delete thumbnail: %v\n", err)
 		}
 	}
-	if targetImg == nil {
-		return nil, "", fmt.Errorf("image not found")
+
+	// Soft delete in database
+	if err := s.toolRepo.DeleteImage(ctx, imageID); err != nil {
+		return fmt.Errorf("failed to delete image record: %w", err)
 	}
 
-	path := targetImg.FilePath
-	if isThumbnail && targetImg.ThumbnailPath != "" {
-		path = targetImg.ThumbnailPath
+	// If this was the primary image, set another as primary
+	if image.IsPrimary {
+		images, err := s.toolRepo.GetImages(ctx, toolID)
+		if err == nil && len(images) > 0 {
+			// Set the first remaining image as primary
+			s.toolRepo.SetPrimaryImage(ctx, toolID, images[0].ID)
+		}
 	}
 
-	data, err := os.ReadFile(path)
+	return nil
+}
+
+// SetPrimaryImage sets a specific image as the primary image for a tool
+func (s *imageStorageService) SetPrimaryImage(
+	ctx context.Context,
+	userID int32,
+	toolID int32,
+	imageID int32,
+) error {
+	// Verify tool ownership
+	tool, err := s.toolRepo.GetByID(ctx, toolID)
 	if err != nil {
-		return nil, "", err
+		return fmt.Errorf("failed to verify tool: %w", err)
+	}
+	if tool.OwnerID != userID {
+		return fmt.Errorf("unauthorized: you do not own this tool")
 	}
 
-	return data, targetImg.MimeType, nil
-}
+	// Verify image exists and belongs to this tool
+	image, err := s.toolRepo.GetImageByID(ctx, imageID)
+	if err != nil {
+		return fmt.Errorf("image not found: %w", err)
+	}
+	if image.ToolID != toolID {
+		return fmt.Errorf("image does not belong to this tool")
+	}
+	if image.Status != "CONFIRMED" {
+		return fmt.Errorf("image is not confirmed")
+	}
 
-func (s *imageStorageService) DeleteImage(ctx context.Context, imageID int32) error {
-	// Also delete from disk? We need path.
-	// Without GetImageByID, we can't look up path to delete file.
-	// Soft delete in DB is fine for now as per schema `deleted_on`.
-	return s.toolRepo.DeleteImage(ctx, imageID)
-}
-
-func (s *imageStorageService) SetPrimaryImage(ctx context.Context, toolID, imageID int32) error {
+	// Set as primary
 	return s.toolRepo.SetPrimaryImage(ctx, toolID, imageID)
 }

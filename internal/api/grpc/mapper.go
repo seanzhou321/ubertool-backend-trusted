@@ -10,12 +10,12 @@ func MapDomainUserToProto(u *domain.User) *pb.User {
 		return nil
 	}
 	return &pb.User{
-		Id:          u.ID,
-		Email:       u.Email,
-		Phone:       u.PhoneNumber,
-		Name:        u.Name,
-		AvatarUrl:   u.AvatarURL,
-		CreatedOn:   u.CreatedOn.Format("2006-01-02"),
+		Id:        u.ID,
+		Email:     u.Email,
+		Phone:     u.PhoneNumber,
+		Name:      u.Name,
+		AvatarUrl: u.AvatarURL,
+		CreatedOn: u.CreatedOn.Format("2006-01-02"),
 	}
 }
 
@@ -24,14 +24,14 @@ func MapDomainOrgToProto(o *domain.Organization) *pb.Organization {
 		return nil
 	}
 	return &pb.Organization{
-		Id:               o.ID,
-		Name:             o.Name,
-		Description:      o.Description,
-		Address:          o.Address,
-		Metro:            o.Metro,
-		AdminEmail:       o.AdminEmail,
-		AdminPhone:       o.AdminPhoneNumber,
-		CreatedOn:        o.CreatedOn.Format("2006-01-02"),
+		Id:          o.ID,
+		Name:        o.Name,
+		Description: o.Description,
+		Address:     o.Address,
+		Metro:       o.Metro,
+		AdminEmail:  o.AdminEmail,
+		AdminPhone:  o.AdminPhoneNumber,
+		CreatedOn:   o.CreatedOn.Format("2006-01-02"),
 	}
 }
 
@@ -45,9 +45,9 @@ func MapDomainToolToProto(t *domain.Tool) *pb.Tool {
 		Name:                 t.Name,
 		Description:          t.Description,
 		Categories:           t.Categories,
-		PricePerDayCents:    t.PricePerDayCents,
-		PricePerWeekCents:   t.PricePerWeekCents,
-		PricePerMonthCents:  t.PricePerMonthCents,
+		PricePerDayCents:     t.PricePerDayCents,
+		PricePerWeekCents:    t.PricePerWeekCents,
+		PricePerMonthCents:   t.PricePerMonthCents,
 		ReplacementCostCents: t.ReplacementCostCents,
 		Condition:            MapDomainToolConditionToProto(t.Condition),
 		Metro:                t.Metro,
@@ -245,17 +245,26 @@ func MapDomainToolImageToProto(t *domain.ToolImage) *pb.ToolImage {
 	if t == nil {
 		return nil
 	}
+
+	var createdOn, confirmedOn string
+	if !t.CreatedOn.IsZero() {
+		createdOn = t.CreatedOn.Format("2006-01-02T15:04:05Z")
+	}
+	if t.ConfirmedOn != nil && !t.ConfirmedOn.IsZero() {
+		confirmedOn = t.ConfirmedOn.Format("2006-01-02T15:04:05Z")
+	}
+
 	return &pb.ToolImage{
-		Id:           t.ID,
-		ToolId:       t.ToolID,
-		FileName:     t.FileName,
-		FilePath:     t.FilePath,
+		Id:            t.ID,
+		ToolId:        t.ToolID,
+		FileName:      t.FileName,
+		FilePath:      t.FilePath,
 		ThumbnailPath: t.ThumbnailPath,
-		FileSize:     int64(t.FileSize),
-		Width:        t.Width,
-		Height:       t.Height,
-		IsPrimary:    t.IsPrimary,
-		DisplayOrder: t.DisplayOrder,
-		UploadedOn:   t.CreatedOn,
+		FileSize:      t.FileSize,
+		IsPrimary:     t.IsPrimary,
+		DisplayOrder:  t.DisplayOrder,
+		Status:        t.Status,
+		CreatedOn:     createdOn,
+		ConfirmedOn:   confirmedOn,
 	}
 }

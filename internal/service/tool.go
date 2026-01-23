@@ -31,7 +31,7 @@ func (s *toolService) AddTool(ctx context.Context, tool *domain.Tool, images []s
 			ThumbnailPath: url,
 			DisplayOrder: int32(i),
 		}
-		if err := s.toolRepo.AddImage(ctx, img); err != nil {
+		if err := s.toolRepo.CreateImage(ctx, img); err != nil {
 			return err
 		}
 	}

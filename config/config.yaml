@@ -29,7 +29,9 @@ jwt:
   temp_token_expiry_minutes: 5
 
 storage:
-  upload_dir: "/var/ubertool/uploads"
+  type: "mock"  # "mock" for local storage, "s3" for AWS S3 (not yet implemented)
+  upload_dir: "./uploads"
+  base_url: "http://localhost:50052"  # HTTP server for mock storage uploads/downloads
   max_file_size_mb: 10
   allowed_types:
     - "image/jpeg"

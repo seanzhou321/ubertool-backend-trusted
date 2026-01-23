@@ -54,7 +54,7 @@ func (r *toolRepository) ListByOrg(ctx context.Context, orgID int32, page, pageS
 	// However, the schema shows tools are global but can be filtered by metro.
 	// Looking at the PRD: "Initial Context: User selects a 'Current Org' (e.g., Church A) to start searching. ... Auto-Metro Filter: The search automatically filters for Tools in Church A's metro."
 	// So we'll filter by metro of the organization.
-	
+
 	orgQuery := `SELECT metro FROM orgs WHERE id = $1`
 	var metro string
 	err := r.db.QueryRowContext(ctx, orgQuery, orgID).Scan(&metro)
@@ -128,10 +128,10 @@ func (r *toolRepository) Search(ctx context.Context, orgID int32, query string, 
 	offset := (page - 1) * pageSize
 	sql := `SELECT id, owner_id, name, COALESCE(description, ''), categories, price_per_day_cents, COALESCE(price_per_week_cents, 0), COALESCE(price_per_month_cents, 0), COALESCE(replacement_cost_cents, 0), condition, metro, status, created_on, deleted_on 
 	          FROM tools WHERE metro = $1 AND deleted_on IS NULL`
-	
+
 	args := []interface{}{metro}
 	argIdx := 2
-	
+
 	if query != "" {
 		sql += fmt.Sprintf(" AND (name ILIKE $%d OR description ILIKE $%d)", argIdx, argIdx)
 		args = append(args, "%"+query+"%")
@@ -180,15 +180,43 @@ func (r *toolRepository) Search(ctx context.Context, orgID int32, query string, 
 	return tools, count, nil
 }
 
-func (r *toolRepository) AddImage(ctx context.Context, img *domain.ToolImage) error {
-	query := `INSERT INTO tool_images (tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, width, height, is_primary, display_order, created_on) 
-	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`
-	return r.db.QueryRowContext(ctx, query, img.ToolID, img.FileName, img.FilePath, img.ThumbnailPath, img.FileSize, img.MimeType, img.Width, img.Height, img.IsPrimary, img.DisplayOrder, time.Now()).Scan(&img.ID)
+// CreateImage creates a new image record (can be pending or confirmed)
+func (r *toolRepository) CreateImage(ctx context.Context, img *domain.ToolImage) error {
+	query := `INSERT INTO tool_images (tool_id, user_id, file_name, file_path, thumbnail_path, 
+	          file_size, mime_type, is_primary, display_order, status, expires_at, created_on) 
+	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`
+	return r.db.QueryRowContext(ctx, query, img.ToolID, img.UserID, img.FileName,
+		img.FilePath, img.ThumbnailPath, img.FileSize, img.MimeType,
+		img.IsPrimary, img.DisplayOrder, img.Status, img.ExpiresAt, time.Now()).Scan(&img.ID)
 }
 
+// GetImageByID retrieves a single image by ID
+func (r *toolRepository) GetImageByID(ctx context.Context, imageID int32) (*domain.ToolImage, error) {
+	query := `SELECT id, tool_id, user_id, file_name, file_path, thumbnail_path, file_size, 
+	          mime_type, is_primary, display_order, status, expires_at, created_on, confirmed_on, deleted_on
+	          FROM tool_images WHERE id = $1`
+
+	img := &domain.ToolImage{}
+	err := r.db.QueryRowContext(ctx, query, imageID).Scan(
+		&img.ID, &img.ToolID, &img.UserID, &img.FileName, &img.FilePath,
+		&img.ThumbnailPath, &img.FileSize, &img.MimeType,
+		&img.IsPrimary, &img.DisplayOrder, &img.Status, &img.ExpiresAt, &img.CreatedOn,
+		&img.ConfirmedOn, &img.DeletedOn)
+
+	if err != nil {
+		return nil, err
+	}
+	return img, nil
+}
+
+// GetImages retrieves all confirmed images for a tool
 func (r *toolRepository) GetImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error) {
-	query := `SELECT id, tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, width, height, is_primary, display_order, created_on 
-	          FROM tool_images WHERE tool_id = $1 AND deleted_on IS NULL ORDER BY display_order`
+	query := `SELECT id, tool_id, user_id, file_name, file_path, thumbnail_path, file_size, 
+	          mime_type, is_primary, display_order, status, created_on, confirmed_on
+	          FROM tool_images 
+	          WHERE tool_id = $1 AND status = 'CONFIRMED' AND deleted_on IS NULL 
+	          ORDER BY is_primary DESC, display_order ASC, created_on ASC`
+
 	rows, err := r.db.QueryContext(ctx, query, toolID)
 	if err != nil {
 		return nil, err
@@ -198,23 +226,86 @@ func (r *toolRepository) GetImages(ctx context.Context, toolID int32) ([]domain.
 	var images []domain.ToolImage
 	for rows.Next() {
 		var img domain.ToolImage
-		var createdOn time.Time
-		if err := rows.Scan(&img.ID, &img.ToolID, &img.FileName, &img.FilePath, &img.ThumbnailPath, &img.FileSize, &img.MimeType, &img.Width, &img.Height, &img.IsPrimary, &img.DisplayOrder, &createdOn); err != nil {
+		if err := rows.Scan(&img.ID, &img.ToolID, &img.UserID, &img.FileName,
+			&img.FilePath, &img.ThumbnailPath, &img.FileSize, &img.MimeType,
+			&img.IsPrimary, &img.DisplayOrder, &img.Status, &img.CreatedOn, &img.ConfirmedOn); err != nil {
 			return nil, err
 		}
-		img.CreatedOn = createdOn.Format("2006-01-02")
 		images = append(images, img)
 	}
 	return images, nil
 }
 
+// GetPendingImagesByUser retrieves pending images for a user
+func (r *toolRepository) GetPendingImagesByUser(ctx context.Context, userID int32) ([]domain.ToolImage, error) {
+	query := `SELECT id, tool_id, user_id, file_name, file_path, thumbnail_path, file_size, 
+	          mime_type, is_primary, display_order, status, expires_at, created_on
+	          FROM tool_images 
+	          WHERE user_id = $1 AND status = 'PENDING' AND deleted_on IS NULL
+	          ORDER BY created_on DESC`
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var images []domain.ToolImage
+	for rows.Next() {
+		var img domain.ToolImage
+		if err := rows.Scan(&img.ID, &img.ToolID, &img.UserID, &img.FileName,
+			&img.FilePath, &img.ThumbnailPath, &img.FileSize, &img.MimeType,
+			&img.IsPrimary, &img.DisplayOrder, &img.Status, &img.ExpiresAt, &img.CreatedOn); err != nil {
+			return nil, err
+		}
+		images = append(images, img)
+	}
+	return images, nil
+}
+
+// UpdateImage updates an existing image record
+func (r *toolRepository) UpdateImage(ctx context.Context, img *domain.ToolImage) error {
+	query := `UPDATE tool_images 
+	          SET tool_id = $2, file_path = $3, thumbnail_path = $4, file_size = $5, 
+	              is_primary = $6, display_order = $7, status = $8, confirmed_on = $9
+	          WHERE id = $1`
+
+	_, err := r.db.ExecContext(ctx, query, img.ID, img.ToolID, img.FilePath, img.ThumbnailPath,
+		img.FileSize, img.IsPrimary, img.DisplayOrder, img.Status, img.ConfirmedOn)
+	return err
+}
+
+// ConfirmImage transitions a pending image to confirmed status
+func (r *toolRepository) ConfirmImage(ctx context.Context, imageID int32, toolID int32) error {
+	query := `UPDATE tool_images 
+	          SET status = 'CONFIRMED', tool_id = $2, confirmed_on = $3 
+	          WHERE id = $1 AND status = 'PENDING'`
+
+	result, err := r.db.ExecContext(ctx, query, imageID, toolID, time.Now())
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("image not found or already confirmed")
+	}
+
+	return nil
+}
+
+// DeleteImage soft deletes an image
 func (r *toolRepository) DeleteImage(ctx context.Context, imageID int32) error {
-	query := `UPDATE tool_images SET deleted_on = $1 WHERE id = $2`
+	query := `UPDATE tool_images SET status = 'DELETED', deleted_on = $1 WHERE id = $2`
 	_, err := r.db.ExecContext(ctx, query, time.Now(), imageID)
 	return err
 }
 
-func (r *toolRepository) SetPrimaryImage(ctx context.Context, toolID, imageID int32) error {
+// SetPrimaryImage sets a specific image as primary for a tool
+func (r *toolRepository) SetPrimaryImage(ctx context.Context, toolID int32, imageID int32) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -222,16 +313,33 @@ func (r *toolRepository) SetPrimaryImage(ctx context.Context, toolID, imageID in
 	defer tx.Rollback()
 
 	// Unset all primaries for this tool
-	_, err = tx.ExecContext(ctx, `UPDATE tool_images SET is_primary = false WHERE tool_id = $1`, toolID)
+	_, err = tx.ExecContext(ctx, `UPDATE tool_images SET is_primary = false WHERE tool_id = $1 AND status = 'CONFIRMED'`, toolID)
 	if err != nil {
 		return err
 	}
 
 	// Set new primary
-	_, err = tx.ExecContext(ctx, `UPDATE tool_images SET is_primary = true WHERE id = $1`, imageID)
+	result, err := tx.ExecContext(ctx, `UPDATE tool_images SET is_primary = true WHERE id = $1 AND tool_id = $2 AND status = 'CONFIRMED'`, imageID, toolID)
 	if err != nil {
 		return err
 	}
 
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("image not found or not confirmed")
+	}
+
 	return tx.Commit()
+}
+
+// DeleteExpiredPendingImages removes expired pending images
+func (r *toolRepository) DeleteExpiredPendingImages(ctx context.Context) error {
+	query := `UPDATE tool_images 
+	          SET status = 'DELETED', deleted_on = $1 
+	          WHERE status = 'PENDING' AND expires_at < $1`
+	_, err := r.db.ExecContext(ctx, query, time.Now())
+	return err
 }
