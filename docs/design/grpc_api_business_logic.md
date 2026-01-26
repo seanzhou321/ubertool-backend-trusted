@@ -7,11 +7,17 @@ The business logic should be implemented in the service layer.
 ### Validate Invite
 Purpose: Users receives an invitation code from email. The UI calls this API method to validate the invitation code. If the invitation code is valid, the UI will show the signup form. If the invitation code is invalid, the UI will show the error message. 
 
-Input: invitation code, email
-Output: valid or not, error message 
+Input: invitation_code, email
+Output: valid or not, error message, User object (if user exists AND is currently logged in)
 Business Logic: 
 1. Verify the invitation record with (`invitation_code`, `email`) in invitations table exists and not expired.
-2. Return true if validation success, otherwise return false and error message, stating the "invitation code and email pair is invalid or expired."
+2. Check if a user with this email exists in the users table.
+3. If user exists AND has a valid authentication session (logged in), return the User object in the response.
+4. If user exists but NOT logged in, do NOT return User object (validation should not substitute login process).
+5. If user doesn't exist, do NOT return User object (they need to sign up).
+6. Return true if validation success, otherwise return false and error message, stating the "invitation code and email pair is invalid or expired."
+
+Note: The presence of a User object in the response indicates the user is logged in and can proceed to join the organization directly.
 
 ### Request To Join Organization
 Purpose: A user who is not part of an organization wants to join. They search for the organization and submit a request.
@@ -29,20 +35,22 @@ Business Logic:
 8. Return success/failure and message, "Your request to join the organization has been submitted."
 
 ### User Signup
-Purpose: Register a new user and join an organization simultaneously after the invitation code is validated.
+Purpose: Register a new user account.
 
 Input: `invitation_code`, `name`, `email`, `phone`, `password`
 Output: success, message
 Business Logic:
 1. Validate the `invitation_code` and `email` pair from invitations table (exists, not expired, and `used_on` is null).
-2. Retrieves the `organization_id` from the invitations record. 
+2. Retrieve the `organization_id` from the invitations record.
 3. Search the user with email address from Users table.
-4. If no user is found by the email, create a new user record in the `users` table with hashed password.
-5. Update the `invitations` record's `used_on` field with the current timestamp.
-6. Record the user's membership in the `users_orgs` table for the `organization_id`.
-7. Return success/failure and message, "Your user account has been created (for new user) and successfully joined the `orgs.name`.
+4. If user already exists, return error "Email already registered. Please log in instead."
+5. Create a new user record in the `users` table with hashed password.
+6. Update the `invitations` record's `used_on` field with the current timestamp and `used_by_user_id`.
+7. Create a record in the `users_orgs` table with `user_id`, `organization_id`, and role 'MEMBER'.
+8. Initialize user's balance in the organization (balance_cents = 0).
+9. Return success and message "Your account has been created. Please log in."
 
-### Login
+Note: User must go through normal login process after signup. Signup does NOT return authentication tokens.
 Purpose: Authenticate existing user.
 
 Input: `email`, `password`
@@ -160,6 +168,26 @@ Output: created organization info
 Business Logic:
 1. Insert new record into `orgs`.
 2. Add the creator as `SUPER_ADMIN` in `users_orgs` with `balance_cents = 0`.
+
+### Join Organization With Invite
+Purpose: Allow an existing, logged-in user to join an additional organization using an invitation code.
+
+Input: `invitation_code` (user_id from JWT token)
+Output: success, organization, user, message
+Business Logic:
+1. Verify the user is authenticated (extract user_id from JWT token).
+2. Validate the `invitation_code` from invitations table (exists, not expired, and `used_on` is null).
+3. Retrieve the `organization_id` and invited `email` from the invitations record.
+4. Verify the authenticated user's email matches the invitation email.
+5. Check if user is already a member of the organization (search `users_orgs` table).
+6. If already a member, return error "You are already a member of this organization".
+7. Update the `invitations` record's `used_on` field with the current timestamp and `used_by_user_id`.
+8. Create a record in the `users_orgs` table with `user_id`, `organization_id`, and role 'MEMBER'.
+9. Initialize user's balance in the organization (balance_cents = 0).
+10. Create a notification to org admins about the new member.
+11. Return success, organization details, user details, and message "Successfully joined [organization name]".
+
+Note: This endpoint is for existing users who are already logged in and want to join additional organizations. New users must complete signup and login first.
 
 ### Search Organizations
 Purpose: Find organizations to join.

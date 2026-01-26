@@ -6,9 +6,9 @@ import (
 )
 
 type AuthService interface {
-	ValidateInvite(ctx context.Context, token string) (*domain.Invitation, error)
+	ValidateInvite(ctx context.Context, inviteCode, email string) (bool, string, *domain.User, error)
 	RequestToJoin(ctx context.Context, orgID int32, name, email, note string) error
-	Signup(ctx context.Context, inviteToken, name, email, phone, password string) (*domain.User, string, string, error)
+	Signup(ctx context.Context, inviteToken, name, email, phone, password string) error
 	Login(ctx context.Context, email, password string) (string, string, string, bool, error) // access, refresh, session, requires2FA
 	Verify2FA(ctx context.Context, userID int32, code string) (string, string, error)
 	RefreshToken(ctx context.Context, refresh string) (string, string, error)
@@ -27,6 +27,7 @@ type OrganizationService interface {
 	SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error)
 	UpdateOrganization(ctx context.Context, org *domain.Organization) error
 	ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, []domain.UserOrg, error)
+	JoinOrganizationWithInvite(ctx context.Context, userID int32, inviteCode string) (*domain.Organization, *domain.User, error)
 }
 
 type ImageStorageService interface {

@@ -108,10 +108,22 @@ func (m *MockInviteRepo) GetByToken(ctx context.Context, token string) (*domain.
 	}
 	return args.Get(0).(*domain.Invitation), args.Error(1)
 }
+
+func (m *MockInviteRepo) GetByTokenAndEmail(ctx context.Context, token, email string) (*domain.Invitation, error) {
+	args := m.Called(ctx, token, email)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Invitation), args.Error(1)
+}
+
 func (m *MockInviteRepo) Update(ctx context.Context, invite *domain.Invitation) error {
 	args := m.Called(ctx, invite)
 	return args.Error(0)
 }
+
+// Type alias for compatibility
+type MockInvitationRepo = MockInviteRepo
 
 // MockJoinRequestRepo
 type MockJoinRequestRepo struct {

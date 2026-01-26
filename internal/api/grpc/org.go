@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/domain"
@@ -93,4 +94,23 @@ func (h *OrganizationHandler) CreateOrganization(ctx context.Context, req *pb.Cr
 		return nil, err
 	}
 	return &pb.CreateOrganizationResponse{Organization: MapDomainOrgToProto(org)}, nil
+}
+
+func (h *OrganizationHandler) JoinOrganizationWithInvite(ctx context.Context, req *pb.JoinOrganizationRequest) (*pb.JoinOrganizationResponse, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	org, _, err := h.orgSvc.JoinOrganizationWithInvite(ctx, userID, req.InvitationCode)
+	if err != nil {
+		return nil, err
+	}
+
+	message := fmt.Sprintf("Successfully joined %s", org.Name)
+	return &pb.JoinOrganizationResponse{
+		Success:      true,
+		Organization: MapDomainOrgToProto(org),
+		Message:      message,
+	}, nil
 }

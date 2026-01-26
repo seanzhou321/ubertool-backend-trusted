@@ -25,8 +25,18 @@ func (r *invitationRepository) Create(ctx context.Context, inv *domain.Invitatio
 
 func (r *invitationRepository) GetByToken(ctx context.Context, token string) (*domain.Invitation, error) {
 	inv := &domain.Invitation{}
-	query := `SELECT token, org_id, email, created_by, expires_on, used_on, created_on FROM invitations WHERE token = $1`
-	err := r.db.QueryRowContext(ctx, query, token).Scan(&inv.Token, &inv.OrgID, &inv.Email, &inv.CreatedBy, &inv.ExpiresOn, &inv.UsedOn, &inv.CreatedOn)
+	query := `SELECT token, org_id, email, created_by, expires_on, used_on, used_by_user_id, created_on FROM invitations WHERE token = $1`
+	err := r.db.QueryRowContext(ctx, query, token).Scan(&inv.Token, &inv.OrgID, &inv.Email, &inv.CreatedBy, &inv.ExpiresOn, &inv.UsedOn, &inv.UsedByUserID, &inv.CreatedOn)
+	if err != nil {
+		return nil, err
+	}
+	return inv, nil
+}
+
+func (r *invitationRepository) GetByTokenAndEmail(ctx context.Context, token, email string) (*domain.Invitation, error) {
+	inv := &domain.Invitation{}
+	query := `SELECT token, org_id, email, created_by, expires_on, used_on, used_by_user_id, created_on FROM invitations WHERE token = $1 AND email = $2`
+	err := r.db.QueryRowContext(ctx, query, token, email).Scan(&inv.Token, &inv.OrgID, &inv.Email, &inv.CreatedBy, &inv.ExpiresOn, &inv.UsedOn, &inv.UsedByUserID, &inv.CreatedOn)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +44,7 @@ func (r *invitationRepository) GetByToken(ctx context.Context, token string) (*d
 }
 
 func (r *invitationRepository) Update(ctx context.Context, inv *domain.Invitation) error {
-	query := `UPDATE invitations SET used_on = $1 WHERE token = $2`
-	_, err := r.db.ExecContext(ctx, query, inv.UsedOn, inv.Token)
+	query := `UPDATE invitations SET used_on = $1, used_by_user_id = $2 WHERE token = $3`
+	_, err := r.db.ExecContext(ctx, query, inv.UsedOn, inv.UsedByUserID, inv.Token)
 	return err
 }

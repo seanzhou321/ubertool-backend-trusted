@@ -24,6 +24,9 @@ service OrganizationService {
   // No access_token required
   rpc SearchOrganizations(SearchOrganizationsRequest) returns (ListOrganizationsResponse);
 
+  // Join organization with invitation code (for existing users)
+  rpc JoinOrganizationWithInvite(JoinOrganizationRequest) returns (JoinOrganizationResponse);
+
   // Update organization details
   rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse);
 }
@@ -40,6 +43,7 @@ message ListOrganizationsResponse {
 // Get organization request
 message GetOrganizationRequest {
   int32 organization_id = 1;
+
 }
 
 // Get organization response
@@ -79,6 +83,18 @@ message UpdateOrganizationRequest {
 
 message UpdateOrganizationResponse {
   Organization organization = 1;
+}
+
+// Join organization with invitation request
+message JoinOrganizationRequest {
+  string invitation_code = 1;
+}
+
+// Join organization with invitation response
+message JoinOrganizationResponse {
+  bool success = 1;
+  Organization organization = 2;
+  string message = 3;
 }
 
 // Organization message

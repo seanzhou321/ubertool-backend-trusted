@@ -102,7 +102,7 @@ func main() {
 		cfg.JWT.Secret,
 	)
 	userSvc := service.NewUserService(store.UserRepository, store.OrganizationRepository)
-	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository)
+	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository, store.InvitationRepository, store.NotificationRepository)
 	toolSvc := service.NewToolService(store.ToolRepository, store.UserRepository)
 	ledgerSvc := service.NewLedgerService(store.LedgerRepository)
 	noteSvc := service.NewNotificationService(store.NotificationRepository)

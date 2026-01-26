@@ -10,7 +10,7 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id int32) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
-	
+
 	// User Organizations
 	AddUserToOrg(ctx context.Context, userOrg *domain.UserOrg) error
 	GetUserOrg(ctx context.Context, userID, orgID int32) (*domain.UserOrg, error)
@@ -36,7 +36,7 @@ type ToolRepository interface {
 	ListByOrg(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	ListByOwner(ctx context.Context, ownerID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	Search(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
-	
+
 	// Image management (unified pending + confirmed)
 	CreateImage(ctx context.Context, image *domain.ToolImage) error
 	GetImageByID(ctx context.Context, imageID int32) (*domain.ToolImage, error)
@@ -73,6 +73,7 @@ type NotificationRepository interface {
 type InvitationRepository interface {
 	Create(ctx context.Context, invite *domain.Invitation) error
 	GetByToken(ctx context.Context, token string) (*domain.Invitation, error)
+	GetByTokenAndEmail(ctx context.Context, token, email string) (*domain.Invitation, error)
 	Update(ctx context.Context, invite *domain.Invitation) error
 }
 

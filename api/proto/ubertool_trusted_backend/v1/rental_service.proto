@@ -83,7 +83,7 @@ message CancelRentalRequest {
 message CancelRentalResponse {
   bool success = 1;
   RentalRequest rental_request = 2;
-} 
+}
 
 // Complete rental
 message CompleteRentalRequest {
@@ -151,7 +151,7 @@ message RentalRequest {
   int32 organization_id = 8;
   string start_date = 9; // Date string YYYY-MM-DD
   string end_date = 10; // Date string YYYY-MM-DD
-  int32 total_cost = 11;
+  int32 total_cost_cents = 11;
   RentalStatus status = 12;
   string pickup_instructions = 13;
   string created_on = 14; // Date string YYYY-MM-DD

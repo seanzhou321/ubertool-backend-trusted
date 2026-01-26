@@ -97,7 +97,7 @@ func MapDomainRentalToProto(r *domain.Rental) *pb.RentalRequest {
 		OwnerId:            r.OwnerID,
 		StartDate:          r.StartDate.Format("2006-01-02"),
 		EndDate:            r.ScheduledEndDate.Format("2006-01-02"),
-		TotalCost:          r.TotalCostCents,
+		TotalCostCents:     r.TotalCostCents,
 		Status:             MapDomainRentalStatusToProto(r.Status),
 		PickupInstructions: r.PickupNote,
 		CreatedOn:          r.CreatedOn.Format("2006-01-02"),

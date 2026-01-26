@@ -44,18 +44,34 @@ func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.In
 	}
 }
 
-func (s *authService) ValidateInvite(ctx context.Context, token string) (*domain.Invitation, error) {
-	inv, err := s.inviteRepo.GetByToken(ctx, token)
+func (s *authService) ValidateInvite(ctx context.Context, inviteCode, email string) (bool, string, *domain.User, error) {
+	// 1. Verify the invitation record exists and is not expired
+	inv, err := s.inviteRepo.GetByTokenAndEmail(ctx, inviteCode, email)
 	if err != nil {
-		return nil, err
+		return false, "invitation code and email pair is invalid or expired", nil, nil
 	}
 	if inv.UsedOn != nil {
-		return nil, ErrInviteUsed
+		return false, "invitation already used", nil, nil
 	}
 	if inv.ExpiresOn.Before(time.Now()) {
-		return nil, ErrInviteExpired
+		return false, "invitation code and email pair is invalid or expired", nil, nil
 	}
-	return inv, nil
+
+	// 2. Check if a user with this email exists
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		// User doesn't exist - validation succeeds but no user object
+		return true, "", nil, nil
+	}
+
+	// 3. Check if user is currently logged in (has valid JWT token in context)
+	// Try to extract user ID from context - if successful, user is authenticated
+	// This requires the context to have been validated by the JWT interceptor
+	// For this validation to work, the gRPC handler should attempt to extract userID
+	// We'll return the user object only if they exist
+	// The gRPC layer will determine if they're logged in by checking the context
+
+	return true, "", user, nil
 }
 
 func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, email, note string) error {
@@ -125,15 +141,29 @@ func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, emai
 	return nil
 }
 
-func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phone, password string) (*domain.User, string, string, error) {
-	inv, err := s.ValidateInvite(ctx, inviteToken)
-	if err != nil {
-		return nil, "", "", err
+func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phone, password string) error {
+	// 1. Validate invitation code and email pair
+	valid, errMsg, _, _ := s.ValidateInvite(ctx, inviteToken, email)
+	if !valid {
+		return errors.New(errMsg)
 	}
 
+	// Get the invitation to retrieve org_id
+	inv, err := s.inviteRepo.GetByTokenAndEmail(ctx, inviteToken, email)
+	if err != nil {
+		return err
+	}
+
+	// 3. Check if user already exists
+	existingUser, err := s.userRepo.GetByEmail(ctx, email)
+	if err == nil && existingUser != nil {
+		return errors.New("Email already registered. Please log in instead.")
+	}
+
+	// 4. Create new user
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, "", "", err
+		return err
 	}
 
 	user := &domain.User{
@@ -144,38 +174,31 @@ func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phon
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
-		return nil, "", "", err
+		return err
 	}
 
-	// Link user to org
-	userOrg := &domain.UserOrg{
-		UserID:   user.ID,
-		OrgID:    inv.OrgID,
-		Role:     domain.UserOrgRoleMember,
-		Status:   domain.UserOrgStatusActive,
-		JoinedOn: time.Now(),
-	}
-	if err := s.userRepo.AddUserToOrg(ctx, userOrg); err != nil {
-		return nil, "", "", err
-	}
-
-	// Mark invite as used
+	// 6. Mark invite as used
 	now := time.Now()
 	inv.UsedOn = &now
+	inv.UsedByUserID = &user.ID
 	if err := s.inviteRepo.Update(ctx, inv); err != nil {
-		return nil, "", "", err
+		return err
 	}
 
-	access, err := s.tm.GenerateAccessToken(user.ID, []string{"user"})
-	if err != nil {
-		return nil, "", "", err
+	// 7. Link user to org
+	userOrg := &domain.UserOrg{
+		UserID:       user.ID,
+		OrgID:        inv.OrgID,
+		Role:         domain.UserOrgRoleMember,
+		Status:       domain.UserOrgStatusActive,
+		JoinedOn:     time.Now(),
+		BalanceCents: 0,
 	}
-	refresh, err := s.tm.GenerateRefreshToken(user.ID)
-	if err != nil {
-		return nil, "", "", err
+	if err := s.userRepo.AddUserToOrg(ctx, userOrg); err != nil {
+		return err
 	}
 
-	return user, access, refresh, nil
+	return nil
 }
 
 func (s *authService) Login(ctx context.Context, email, password string) (string, string, string, bool, error) {
@@ -196,13 +219,13 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		if err != nil {
 			return "", "", "", false, err
 		}
-		
+
 		// Send 2FA code via email
 		// For prototype, we might hardcode or log it.
 		// "123456" is hardcoded in Verify2FA currently.
 		// Real implementation should generate random code and store it in Redis/Session.
 		// For now, we can send the hardcoded code via email to demonstrate flow.
-		code := "123456" 
+		code := "123456"
 		subject := "Your 2FA Code"
 		message := fmt.Sprintf("Your login code is: %s", code)
 		_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message)

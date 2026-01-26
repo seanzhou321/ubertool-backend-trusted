@@ -21,11 +21,32 @@ func NewAuthHandler(authSvc service.AuthService) *AuthHandler {
 }
 
 func (h *AuthHandler) ValidateInvite(ctx context.Context, req *pb.ValidateInviteRequest) (*pb.ValidateInviteResponse, error) {
-	_, err := h.authSvc.ValidateInvite(ctx, req.InvitationCode)
+	valid, errMsg, user, err := h.authSvc.ValidateInvite(ctx, req.InvitationCode, req.Email)
 	if err != nil {
-		return &pb.ValidateInviteResponse{Valid: false}, nil
+		return nil, err
 	}
-	return &pb.ValidateInviteResponse{Valid: true}, nil
+	if !valid {
+		return &pb.ValidateInviteResponse{
+			Valid:   false,
+			Message: errMsg,
+		}, nil
+	}
+
+	// Check if user is logged in by trying to extract user ID from context
+	// If user exists AND is logged in, return user object
+	var protoUser *pb.User
+	if user != nil {
+		userIDFromContext, err := GetUserIDFromContext(ctx)
+		if err == nil && userIDFromContext == user.ID {
+			// User is logged in
+			protoUser = MapDomainUserToProto(user)
+		}
+	}
+
+	return &pb.ValidateInviteResponse{
+		Valid: true,
+		User:  protoUser,
+	}, nil
 }
 
 func (h *AuthHandler) RequestToJoinOrganization(ctx context.Context, req *pb.RequestToJoinRequest) (*pb.RequestToJoinResponse, error) {
@@ -37,13 +58,13 @@ func (h *AuthHandler) RequestToJoinOrganization(ctx context.Context, req *pb.Req
 }
 
 func (h *AuthHandler) UserSignup(ctx context.Context, req *pb.SignupRequest) (*pb.SignupResponse, error) {
-	_, _, _, err := h.authSvc.Signup(ctx, req.InvitationCode, req.Name, req.Email, req.Phone, req.Password)
+	err := h.authSvc.Signup(ctx, req.InvitationCode, req.Name, req.Email, req.Phone, req.Password)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.SignupResponse{
 		Success: true,
-		Message: "Signup successful",
+		Message: "Your account has been created. Please log in.",
 	}, nil
 }
 
@@ -56,9 +77,9 @@ func (h *AuthHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 
 	// Note: access/refresh are empty if 2FA is required
 	return &pb.LoginResponse{
-		Success:      true,
-		TwoFaToken:   session,
-		Message:      "2FA Required",
+		Success:    true,
+		TwoFaToken: session,
+		Message:    "2FA Required",
 	}, nil
 }
 

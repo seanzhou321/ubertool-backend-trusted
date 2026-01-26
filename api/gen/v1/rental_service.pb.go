@@ -1004,7 +1004,7 @@ type RentalRequest struct {
 	OrganizationId     int32                  `protobuf:"varint,8,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	StartDate          string                 `protobuf:"bytes,9,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"` // Date string YYYY-MM-DD
 	EndDate            string                 `protobuf:"bytes,10,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`      // Date string YYYY-MM-DD
-	TotalCost          int32                  `protobuf:"varint,11,opt,name=total_cost,json=totalCost,proto3" json:"total_cost,omitempty"`
+	TotalCostCents     int32                  `protobuf:"varint,11,opt,name=total_cost_cents,json=totalCostCents,proto3" json:"total_cost_cents,omitempty"`
 	Status             RentalStatus           `protobuf:"varint,12,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"`
 	PickupInstructions string                 `protobuf:"bytes,13,opt,name=pickup_instructions,json=pickupInstructions,proto3" json:"pickup_instructions,omitempty"`
 	CreatedOn          string                 `protobuf:"bytes,14,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"` // Date string YYYY-MM-DD
@@ -1113,9 +1113,9 @@ func (x *RentalRequest) GetEndDate() string {
 	return ""
 }
 
-func (x *RentalRequest) GetTotalCost() int32 {
+func (x *RentalRequest) GetTotalCostCents() int32 {
 	if x != nil {
-		return x.TotalCost
+		return x.TotalCostCents
 	}
 	return 0
 }
@@ -1212,7 +1212,7 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\x1dFinalizeRentalRequestResponse\x12M\n" +
 	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\x12Q\n" +
 	"\x10approved_rentals\x18\x02 \x03(\v2&.ubertool.trusted.api.v1.RentalRequestR\x0fapprovedRentals\x12O\n" +
-	"\x0fpending_rentals\x18\x03 \x03(\v2&.ubertool.trusted.api.v1.RentalRequestR\x0ependingRentals\"\xfd\x03\n" +
+	"\x0fpending_rentals\x18\x03 \x03(\v2&.ubertool.trusted.api.v1.RentalRequestR\x0ependingRentals\"\x88\x04\n" +
 	"\rRentalRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x17\n" +
 	"\atool_id\x18\x02 \x01(\x05R\x06toolId\x12\x1b\n" +
@@ -1227,9 +1227,8 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\n" +
 	"start_date\x18\t \x01(\tR\tstartDate\x12\x19\n" +
 	"\bend_date\x18\n" +
-	" \x01(\tR\aendDate\x12\x1d\n" +
-	"\n" +
-	"total_cost\x18\v \x01(\x05R\ttotalCost\x12=\n" +
+	" \x01(\tR\aendDate\x12(\n" +
+	"\x10total_cost_cents\x18\v \x01(\x05R\x0etotalCostCents\x12=\n" +
 	"\x06status\x18\f \x01(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12/\n" +
 	"\x13pickup_instructions\x18\r \x01(\tR\x12pickupInstructions\x12\x1d\n" +
 	"\n" +

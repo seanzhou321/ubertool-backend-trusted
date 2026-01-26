@@ -79,6 +79,7 @@ type ValidateInviteResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	User          *User                  `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -125,6 +126,13 @@ func (x *ValidateInviteResponse) GetMessage() string {
 		return x.Message
 	}
 	return ""
+}
+
+func (x *ValidateInviteResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
 }
 
 // Login request
@@ -795,10 +803,11 @@ const file_ubertool_trusted_backend_v1_auth_service_proto_rawDesc = "" +
 	".ubertool_trusted_backend/v1/auth_service.proto\x12\x17ubertool.trusted.api.v1\x1a.ubertool_trusted_backend/v1/user_service.proto\"V\n" +
 	"\x15ValidateInviteRequest\x12'\n" +
 	"\x0finvitation_code\x18\x01 \x01(\tR\x0einvitationCode\x12\x14\n" +
-	"\x05email\x18\x02 \x01(\tR\x05email\"H\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\"{\n" +
 	"\x16ValidateInviteResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"@\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x121\n" +
+	"\x04user\x18\x03 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user\"@\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\"\x84\x01\n" +
@@ -882,26 +891,27 @@ var file_ubertool_trusted_backend_v1_auth_service_proto_goTypes = []any{
 	(*User)(nil),                   // 14: ubertool.trusted.api.v1.User
 }
 var file_ubertool_trusted_backend_v1_auth_service_proto_depIdxs = []int32{
-	14, // 0: ubertool.trusted.api.v1.Verify2FAResponse.user:type_name -> ubertool.trusted.api.v1.User
-	0,  // 1: ubertool.trusted.api.v1.AuthService.ValidateInvite:input_type -> ubertool.trusted.api.v1.ValidateInviteRequest
-	12, // 2: ubertool.trusted.api.v1.AuthService.RequestToJoinOrganization:input_type -> ubertool.trusted.api.v1.RequestToJoinRequest
-	6,  // 3: ubertool.trusted.api.v1.AuthService.UserSignup:input_type -> ubertool.trusted.api.v1.SignupRequest
-	2,  // 4: ubertool.trusted.api.v1.AuthService.Login:input_type -> ubertool.trusted.api.v1.LoginRequest
-	4,  // 5: ubertool.trusted.api.v1.AuthService.Verify2FA:input_type -> ubertool.trusted.api.v1.Verify2FARequest
-	8,  // 6: ubertool.trusted.api.v1.AuthService.RefreshToken:input_type -> ubertool.trusted.api.v1.RefreshTokenRequest
-	10, // 7: ubertool.trusted.api.v1.AuthService.Logout:input_type -> ubertool.trusted.api.v1.LogoutRequest
-	1,  // 8: ubertool.trusted.api.v1.AuthService.ValidateInvite:output_type -> ubertool.trusted.api.v1.ValidateInviteResponse
-	13, // 9: ubertool.trusted.api.v1.AuthService.RequestToJoinOrganization:output_type -> ubertool.trusted.api.v1.RequestToJoinResponse
-	7,  // 10: ubertool.trusted.api.v1.AuthService.UserSignup:output_type -> ubertool.trusted.api.v1.SignupResponse
-	3,  // 11: ubertool.trusted.api.v1.AuthService.Login:output_type -> ubertool.trusted.api.v1.LoginResponse
-	5,  // 12: ubertool.trusted.api.v1.AuthService.Verify2FA:output_type -> ubertool.trusted.api.v1.Verify2FAResponse
-	9,  // 13: ubertool.trusted.api.v1.AuthService.RefreshToken:output_type -> ubertool.trusted.api.v1.RefreshTokenResponse
-	11, // 14: ubertool.trusted.api.v1.AuthService.Logout:output_type -> ubertool.trusted.api.v1.LogoutResponse
-	8,  // [8:15] is the sub-list for method output_type
-	1,  // [1:8] is the sub-list for method input_type
-	1,  // [1:1] is the sub-list for extension type_name
-	1,  // [1:1] is the sub-list for extension extendee
-	0,  // [0:1] is the sub-list for field type_name
+	14, // 0: ubertool.trusted.api.v1.ValidateInviteResponse.user:type_name -> ubertool.trusted.api.v1.User
+	14, // 1: ubertool.trusted.api.v1.Verify2FAResponse.user:type_name -> ubertool.trusted.api.v1.User
+	0,  // 2: ubertool.trusted.api.v1.AuthService.ValidateInvite:input_type -> ubertool.trusted.api.v1.ValidateInviteRequest
+	12, // 3: ubertool.trusted.api.v1.AuthService.RequestToJoinOrganization:input_type -> ubertool.trusted.api.v1.RequestToJoinRequest
+	6,  // 4: ubertool.trusted.api.v1.AuthService.UserSignup:input_type -> ubertool.trusted.api.v1.SignupRequest
+	2,  // 5: ubertool.trusted.api.v1.AuthService.Login:input_type -> ubertool.trusted.api.v1.LoginRequest
+	4,  // 6: ubertool.trusted.api.v1.AuthService.Verify2FA:input_type -> ubertool.trusted.api.v1.Verify2FARequest
+	8,  // 7: ubertool.trusted.api.v1.AuthService.RefreshToken:input_type -> ubertool.trusted.api.v1.RefreshTokenRequest
+	10, // 8: ubertool.trusted.api.v1.AuthService.Logout:input_type -> ubertool.trusted.api.v1.LogoutRequest
+	1,  // 9: ubertool.trusted.api.v1.AuthService.ValidateInvite:output_type -> ubertool.trusted.api.v1.ValidateInviteResponse
+	13, // 10: ubertool.trusted.api.v1.AuthService.RequestToJoinOrganization:output_type -> ubertool.trusted.api.v1.RequestToJoinResponse
+	7,  // 11: ubertool.trusted.api.v1.AuthService.UserSignup:output_type -> ubertool.trusted.api.v1.SignupResponse
+	3,  // 12: ubertool.trusted.api.v1.AuthService.Login:output_type -> ubertool.trusted.api.v1.LoginResponse
+	5,  // 13: ubertool.trusted.api.v1.AuthService.Verify2FA:output_type -> ubertool.trusted.api.v1.Verify2FAResponse
+	9,  // 14: ubertool.trusted.api.v1.AuthService.RefreshToken:output_type -> ubertool.trusted.api.v1.RefreshTokenResponse
+	11, // 15: ubertool.trusted.api.v1.AuthService.Logout:output_type -> ubertool.trusted.api.v1.LogoutResponse
+	9,  // [9:16] is the sub-list for method output_type
+	2,  // [2:9] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_auth_service_proto_init() }

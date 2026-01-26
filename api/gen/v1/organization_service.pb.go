@@ -511,6 +511,112 @@ func (x *UpdateOrganizationResponse) GetOrganization() *Organization {
 	return nil
 }
 
+// Join organization with invitation request
+type JoinOrganizationRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	InvitationCode string                 `protobuf:"bytes,1,opt,name=invitation_code,json=invitationCode,proto3" json:"invitation_code,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *JoinOrganizationRequest) Reset() {
+	*x = JoinOrganizationRequest{}
+	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JoinOrganizationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JoinOrganizationRequest) ProtoMessage() {}
+
+func (x *JoinOrganizationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JoinOrganizationRequest.ProtoReflect.Descriptor instead.
+func (*JoinOrganizationRequest) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_organization_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *JoinOrganizationRequest) GetInvitationCode() string {
+	if x != nil {
+		return x.InvitationCode
+	}
+	return ""
+}
+
+// Join organization with invitation response
+type JoinOrganizationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Organization  *Organization          `protobuf:"bytes,2,opt,name=organization,proto3" json:"organization,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *JoinOrganizationResponse) Reset() {
+	*x = JoinOrganizationResponse{}
+	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JoinOrganizationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JoinOrganizationResponse) ProtoMessage() {}
+
+func (x *JoinOrganizationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JoinOrganizationResponse.ProtoReflect.Descriptor instead.
+func (*JoinOrganizationResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_organization_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *JoinOrganizationResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *JoinOrganizationResponse) GetOrganization() *Organization {
+	if x != nil {
+		return x.Organization
+	}
+	return nil
+}
+
+func (x *JoinOrganizationResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 // Organization message
 type Organization struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -532,7 +638,7 @@ type Organization struct {
 
 func (x *Organization) Reset() {
 	*x = Organization{}
-	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[9]
+	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -544,7 +650,7 @@ func (x *Organization) String() string {
 func (*Organization) ProtoMessage() {}
 
 func (x *Organization) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[9]
+	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -557,7 +663,7 @@ func (x *Organization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Organization.ProtoReflect.Descriptor instead.
 func (*Organization) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_organization_service_proto_rawDescGZIP(), []int{9}
+	return file_ubertool_trusted_backend_v1_organization_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Organization) GetId() int32 {
@@ -681,7 +787,13 @@ const file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc = "" +
 	"\vadmin_phone\x18\a \x01(\tR\n" +
 	"adminPhone\"g\n" +
 	"\x1aUpdateOrganizationResponse\x12I\n" +
-	"\forganization\x18\x01 \x01(\v2%.ubertool.trusted.api.v1.OrganizationR\forganization\"\xed\x02\n" +
+	"\forganization\x18\x01 \x01(\v2%.ubertool.trusted.api.v1.OrganizationR\forganization\"B\n" +
+	"\x17JoinOrganizationRequest\x12'\n" +
+	"\x0finvitation_code\x18\x01 \x01(\tR\x0einvitationCode\"\x99\x01\n" +
+	"\x18JoinOrganizationResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12I\n" +
+	"\forganization\x18\x02 \x01(\v2%.ubertool.trusted.api.v1.OrganizationR\forganization\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xed\x02\n" +
 	"\fOrganization\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -699,12 +811,13 @@ const file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc = "" +
 	"\vadmin_email\x18\v \x01(\tR\n" +
 	"adminEmail\x12\x1f\n" +
 	"\vadmin_phone\x18\f \x01(\tR\n" +
-	"adminPhone2\x89\x05\n" +
+	"adminPhone2\x8d\x06\n" +
 	"\x13OrganizationService\x12~\n" +
 	"\x13ListMyOrganizations\x123.ubertool.trusted.api.v1.ListMyOrganizationsRequest\x1a2.ubertool.trusted.api.v1.ListOrganizationsResponse\x12t\n" +
 	"\x0fGetOrganization\x12/.ubertool.trusted.api.v1.GetOrganizationRequest\x1a0.ubertool.trusted.api.v1.GetOrganizationResponse\x12}\n" +
 	"\x12CreateOrganization\x122.ubertool.trusted.api.v1.CreateOrganizationRequest\x1a3.ubertool.trusted.api.v1.CreateOrganizationResponse\x12~\n" +
-	"\x13SearchOrganizations\x123.ubertool.trusted.api.v1.SearchOrganizationsRequest\x1a2.ubertool.trusted.api.v1.ListOrganizationsResponse\x12}\n" +
+	"\x13SearchOrganizations\x123.ubertool.trusted.api.v1.SearchOrganizationsRequest\x1a2.ubertool.trusted.api.v1.ListOrganizationsResponse\x12\x81\x01\n" +
+	"\x1aJoinOrganizationWithInvite\x120.ubertool.trusted.api.v1.JoinOrganizationRequest\x1a1.ubertool.trusted.api.v1.JoinOrganizationResponse\x12}\n" +
 	"\x12UpdateOrganization\x122.ubertool.trusted.api.v1.UpdateOrganizationRequest\x1a3.ubertool.trusted.api.v1.UpdateOrganizationResponseBj\n" +
 	"\x1bcom.ubertool.trusted.api.v1B\x18OrganizationServiceProtoP\x01Z/ubertool-backend-trusted/api/gen/v1;ubertool_v1b\x06proto3"
 
@@ -720,7 +833,7 @@ func file_ubertool_trusted_backend_v1_organization_service_proto_rawDescGZIP() [
 	return file_ubertool_trusted_backend_v1_organization_service_proto_rawDescData
 }
 
-var file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_ubertool_trusted_backend_v1_organization_service_proto_goTypes = []any{
 	(*ListMyOrganizationsRequest)(nil), // 0: ubertool.trusted.api.v1.ListMyOrganizationsRequest
 	(*ListOrganizationsResponse)(nil),  // 1: ubertool.trusted.api.v1.ListOrganizationsResponse
@@ -731,28 +844,33 @@ var file_ubertool_trusted_backend_v1_organization_service_proto_goTypes = []any{
 	(*SearchOrganizationsRequest)(nil), // 6: ubertool.trusted.api.v1.SearchOrganizationsRequest
 	(*UpdateOrganizationRequest)(nil),  // 7: ubertool.trusted.api.v1.UpdateOrganizationRequest
 	(*UpdateOrganizationResponse)(nil), // 8: ubertool.trusted.api.v1.UpdateOrganizationResponse
-	(*Organization)(nil),               // 9: ubertool.trusted.api.v1.Organization
+	(*JoinOrganizationRequest)(nil),    // 9: ubertool.trusted.api.v1.JoinOrganizationRequest
+	(*JoinOrganizationResponse)(nil),   // 10: ubertool.trusted.api.v1.JoinOrganizationResponse
+	(*Organization)(nil),               // 11: ubertool.trusted.api.v1.Organization
 }
 var file_ubertool_trusted_backend_v1_organization_service_proto_depIdxs = []int32{
-	9, // 0: ubertool.trusted.api.v1.ListOrganizationsResponse.organizations:type_name -> ubertool.trusted.api.v1.Organization
-	9, // 1: ubertool.trusted.api.v1.GetOrganizationResponse.organization:type_name -> ubertool.trusted.api.v1.Organization
-	9, // 2: ubertool.trusted.api.v1.CreateOrganizationResponse.organization:type_name -> ubertool.trusted.api.v1.Organization
-	9, // 3: ubertool.trusted.api.v1.UpdateOrganizationResponse.organization:type_name -> ubertool.trusted.api.v1.Organization
-	0, // 4: ubertool.trusted.api.v1.OrganizationService.ListMyOrganizations:input_type -> ubertool.trusted.api.v1.ListMyOrganizationsRequest
-	2, // 5: ubertool.trusted.api.v1.OrganizationService.GetOrganization:input_type -> ubertool.trusted.api.v1.GetOrganizationRequest
-	4, // 6: ubertool.trusted.api.v1.OrganizationService.CreateOrganization:input_type -> ubertool.trusted.api.v1.CreateOrganizationRequest
-	6, // 7: ubertool.trusted.api.v1.OrganizationService.SearchOrganizations:input_type -> ubertool.trusted.api.v1.SearchOrganizationsRequest
-	7, // 8: ubertool.trusted.api.v1.OrganizationService.UpdateOrganization:input_type -> ubertool.trusted.api.v1.UpdateOrganizationRequest
-	1, // 9: ubertool.trusted.api.v1.OrganizationService.ListMyOrganizations:output_type -> ubertool.trusted.api.v1.ListOrganizationsResponse
-	3, // 10: ubertool.trusted.api.v1.OrganizationService.GetOrganization:output_type -> ubertool.trusted.api.v1.GetOrganizationResponse
-	5, // 11: ubertool.trusted.api.v1.OrganizationService.CreateOrganization:output_type -> ubertool.trusted.api.v1.CreateOrganizationResponse
-	1, // 12: ubertool.trusted.api.v1.OrganizationService.SearchOrganizations:output_type -> ubertool.trusted.api.v1.ListOrganizationsResponse
-	8, // 13: ubertool.trusted.api.v1.OrganizationService.UpdateOrganization:output_type -> ubertool.trusted.api.v1.UpdateOrganizationResponse
-	9, // [9:14] is the sub-list for method output_type
-	4, // [4:9] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	11, // 0: ubertool.trusted.api.v1.ListOrganizationsResponse.organizations:type_name -> ubertool.trusted.api.v1.Organization
+	11, // 1: ubertool.trusted.api.v1.GetOrganizationResponse.organization:type_name -> ubertool.trusted.api.v1.Organization
+	11, // 2: ubertool.trusted.api.v1.CreateOrganizationResponse.organization:type_name -> ubertool.trusted.api.v1.Organization
+	11, // 3: ubertool.trusted.api.v1.UpdateOrganizationResponse.organization:type_name -> ubertool.trusted.api.v1.Organization
+	11, // 4: ubertool.trusted.api.v1.JoinOrganizationResponse.organization:type_name -> ubertool.trusted.api.v1.Organization
+	0,  // 5: ubertool.trusted.api.v1.OrganizationService.ListMyOrganizations:input_type -> ubertool.trusted.api.v1.ListMyOrganizationsRequest
+	2,  // 6: ubertool.trusted.api.v1.OrganizationService.GetOrganization:input_type -> ubertool.trusted.api.v1.GetOrganizationRequest
+	4,  // 7: ubertool.trusted.api.v1.OrganizationService.CreateOrganization:input_type -> ubertool.trusted.api.v1.CreateOrganizationRequest
+	6,  // 8: ubertool.trusted.api.v1.OrganizationService.SearchOrganizations:input_type -> ubertool.trusted.api.v1.SearchOrganizationsRequest
+	9,  // 9: ubertool.trusted.api.v1.OrganizationService.JoinOrganizationWithInvite:input_type -> ubertool.trusted.api.v1.JoinOrganizationRequest
+	7,  // 10: ubertool.trusted.api.v1.OrganizationService.UpdateOrganization:input_type -> ubertool.trusted.api.v1.UpdateOrganizationRequest
+	1,  // 11: ubertool.trusted.api.v1.OrganizationService.ListMyOrganizations:output_type -> ubertool.trusted.api.v1.ListOrganizationsResponse
+	3,  // 12: ubertool.trusted.api.v1.OrganizationService.GetOrganization:output_type -> ubertool.trusted.api.v1.GetOrganizationResponse
+	5,  // 13: ubertool.trusted.api.v1.OrganizationService.CreateOrganization:output_type -> ubertool.trusted.api.v1.CreateOrganizationResponse
+	1,  // 14: ubertool.trusted.api.v1.OrganizationService.SearchOrganizations:output_type -> ubertool.trusted.api.v1.ListOrganizationsResponse
+	10, // 15: ubertool.trusted.api.v1.OrganizationService.JoinOrganizationWithInvite:output_type -> ubertool.trusted.api.v1.JoinOrganizationResponse
+	8,  // 16: ubertool.trusted.api.v1.OrganizationService.UpdateOrganization:output_type -> ubertool.trusted.api.v1.UpdateOrganizationResponse
+	11, // [11:17] is the sub-list for method output_type
+	5,  // [5:11] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_organization_service_proto_init() }
@@ -766,7 +884,7 @@ func file_ubertool_trusted_backend_v1_organization_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc), len(file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

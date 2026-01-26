@@ -55,6 +55,7 @@ CREATE TABLE invitations (
     created_by INTEGER REFERENCES users(id),
     expires_on DATE NOT NULL,
     used_on DATE, -- NULL if unused
+    used_by_user_id INTEGER REFERENCES users(id), -- User who used the invitation
     created_on DATE DEFAULT CURRENT_DATE
 );
 

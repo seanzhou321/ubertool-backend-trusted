@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OrganizationService_ListMyOrganizations_FullMethodName = "/ubertool.trusted.api.v1.OrganizationService/ListMyOrganizations"
-	OrganizationService_GetOrganization_FullMethodName     = "/ubertool.trusted.api.v1.OrganizationService/GetOrganization"
-	OrganizationService_CreateOrganization_FullMethodName  = "/ubertool.trusted.api.v1.OrganizationService/CreateOrganization"
-	OrganizationService_SearchOrganizations_FullMethodName = "/ubertool.trusted.api.v1.OrganizationService/SearchOrganizations"
-	OrganizationService_UpdateOrganization_FullMethodName  = "/ubertool.trusted.api.v1.OrganizationService/UpdateOrganization"
+	OrganizationService_ListMyOrganizations_FullMethodName        = "/ubertool.trusted.api.v1.OrganizationService/ListMyOrganizations"
+	OrganizationService_GetOrganization_FullMethodName            = "/ubertool.trusted.api.v1.OrganizationService/GetOrganization"
+	OrganizationService_CreateOrganization_FullMethodName         = "/ubertool.trusted.api.v1.OrganizationService/CreateOrganization"
+	OrganizationService_SearchOrganizations_FullMethodName        = "/ubertool.trusted.api.v1.OrganizationService/SearchOrganizations"
+	OrganizationService_JoinOrganizationWithInvite_FullMethodName = "/ubertool.trusted.api.v1.OrganizationService/JoinOrganizationWithInvite"
+	OrganizationService_UpdateOrganization_FullMethodName         = "/ubertool.trusted.api.v1.OrganizationService/UpdateOrganization"
 )
 
 // OrganizationServiceClient is the client API for OrganizationService service.
@@ -41,6 +42,8 @@ type OrganizationServiceClient interface {
 	// Search organization
 	// No access_token required
 	SearchOrganizations(ctx context.Context, in *SearchOrganizationsRequest, opts ...grpc.CallOption) (*ListOrganizationsResponse, error)
+	// Join organization with invitation code (for existing users)
+	JoinOrganizationWithInvite(ctx context.Context, in *JoinOrganizationRequest, opts ...grpc.CallOption) (*JoinOrganizationResponse, error)
 	// Update organization details
 	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*UpdateOrganizationResponse, error)
 }
@@ -93,6 +96,16 @@ func (c *organizationServiceClient) SearchOrganizations(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *organizationServiceClient) JoinOrganizationWithInvite(ctx context.Context, in *JoinOrganizationRequest, opts ...grpc.CallOption) (*JoinOrganizationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinOrganizationResponse)
+	err := c.cc.Invoke(ctx, OrganizationService_JoinOrganizationWithInvite_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *organizationServiceClient) UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*UpdateOrganizationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateOrganizationResponse)
@@ -118,6 +131,8 @@ type OrganizationServiceServer interface {
 	// Search organization
 	// No access_token required
 	SearchOrganizations(context.Context, *SearchOrganizationsRequest) (*ListOrganizationsResponse, error)
+	// Join organization with invitation code (for existing users)
+	JoinOrganizationWithInvite(context.Context, *JoinOrganizationRequest) (*JoinOrganizationResponse, error)
 	// Update organization details
 	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*UpdateOrganizationResponse, error)
 	mustEmbedUnimplementedOrganizationServiceServer()
@@ -141,6 +156,9 @@ func (UnimplementedOrganizationServiceServer) CreateOrganization(context.Context
 }
 func (UnimplementedOrganizationServiceServer) SearchOrganizations(context.Context, *SearchOrganizationsRequest) (*ListOrganizationsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SearchOrganizations not implemented")
+}
+func (UnimplementedOrganizationServiceServer) JoinOrganizationWithInvite(context.Context, *JoinOrganizationRequest) (*JoinOrganizationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method JoinOrganizationWithInvite not implemented")
 }
 func (UnimplementedOrganizationServiceServer) UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*UpdateOrganizationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateOrganization not implemented")
@@ -238,6 +256,24 @@ func _OrganizationService_SearchOrganizations_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrganizationService_JoinOrganizationWithInvite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(JoinOrganizationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationServiceServer).JoinOrganizationWithInvite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrganizationService_JoinOrganizationWithInvite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationServiceServer).JoinOrganizationWithInvite(ctx, req.(*JoinOrganizationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _OrganizationService_UpdateOrganization_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateOrganizationRequest)
 	if err := dec(in); err != nil {
@@ -278,6 +314,10 @@ var OrganizationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchOrganizations",
 			Handler:    _OrganizationService_SearchOrganizations_Handler,
+		},
+		{
+			MethodName: "JoinOrganizationWithInvite",
+			Handler:    _OrganizationService_JoinOrganizationWithInvite_Handler,
 		},
 		{
 			MethodName: "UpdateOrganization",

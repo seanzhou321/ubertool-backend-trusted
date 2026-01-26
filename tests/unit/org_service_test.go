@@ -6,13 +6,16 @@ import (
 
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestOrganizationService_UpdateOrganization(t *testing.T) {
 	mockRepo := new(MockOrganizationRepo)
 	mockUserRepo := new(MockUserRepo)
-	svc := service.NewOrganizationService(mockRepo, mockUserRepo)
+	mockInviteRepo := new(MockInvitationRepo)
+	mockNoteRepo := new(MockNotificationRepo)
+	svc := service.NewOrganizationService(mockRepo, mockUserRepo, mockInviteRepo, mockNoteRepo)
 	ctx := context.Background()
 
 	org := &domain.Organization{ID: 1, Name: "Updated"}
