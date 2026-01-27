@@ -36,12 +36,14 @@ func NewAdminService(
 	}
 }
 
-func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID int32, email, name string) error {
+func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID int32, email, name string) (string, error) {
 	// 1. Get Organization
 	org, err := s.orgRepo.GetByID(ctx, orgID)
 	if err != nil {
-		return fmt.Errorf("failed to get organization: %w", err)
+		return "", fmt.Errorf("failed to get organization: %w", err)
 	}
+
+	var invitationCode string
 
 	// 2. Check if user already exists
 	user, err := s.userRepo.GetByEmail(ctx, email)
@@ -56,9 +58,9 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 			BalanceCents: 0,
 		}
 		if err := s.userRepo.AddUserToOrg(ctx, userOrg); err != nil {
-			return fmt.Errorf("failed to add existing user to org: %w", err)
+			return "", fmt.Errorf("failed to add existing user to org: %w", err)
 		}
-		
+
 		// Notify user
 		_ = s.emailSvc.SendAccountStatusNotification(ctx, email, name, org.Name, "APPROVED", "Your join request has been approved.")
 
@@ -71,27 +73,30 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 			ExpiresOn: time.Now().Add(7 * 24 * time.Hour),
 		}
 		if err := s.inviteRepo.Create(ctx, inv); err != nil {
-			return fmt.Errorf("failed to create invitation: %w", err)
+			return "", fmt.Errorf("failed to create invitation: %w", err)
 		}
 
 		// Get admin email for CC
 		admin, err := s.userRepo.GetByID(ctx, adminID)
 		if err != nil {
-			return fmt.Errorf("failed to get admin user: %w", err)
+			return "", fmt.Errorf("failed to get admin user: %w", err)
 		}
 
 		if err := s.emailSvc.SendInvitation(ctx, email, name, inv.InvitationCode, org.Name, admin.Email); err != nil {
-			return fmt.Errorf("failed to send invitation email: %w", err)
+			return "", fmt.Errorf("failed to send invitation email: %w", err)
 		}
+
+		// Store the invitation code to return to admin
+		invitationCode = inv.InvitationCode
 	}
 
 	// 3. Update Join Request Status (if we can find it by email/org or passed ID? Interface passes email/name/orgID)
-	// The interface `ApproveJoinRequest` doesn't take RequestID. 
+	// The interface `ApproveJoinRequest` doesn't take RequestID.
 	// But `JoinRequestRepository` likely has `GetByOrg` or we might need to search pending requests.
 	// `ListByOrg` exists.
 	// Optimization: Ideally `reqID` should be passed. But sticking to interface for now.
 	// We will search for pending requests for this email/org and update them.
-	
+
 	reqs, err := s.reqRepo.ListByOrg(ctx, orgID)
 	if err == nil {
 		for _, req := range reqs {
@@ -102,7 +107,11 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 		}
 	}
 
-	return nil
+	// Return invitation code if one was created, empty string otherwise
+	if invitationCode != "" {
+		return invitationCode, nil
+	}
+	return "", nil
 }
 
 func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int32, isBlock bool, reason string) error {

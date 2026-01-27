@@ -25,10 +25,10 @@ func (r *invitationRepository) Create(ctx context.Context, inv *domain.Invitatio
 	var invitationCode string
 	var err error
 	maxAttempts := 10
-	
+
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		invitationCode = generateInvitationCode()
-		
+
 		// Check if this code already exists for this email
 		var exists bool
 		checkQuery := `SELECT EXISTS(SELECT 1 FROM invitations WHERE invitation_code = $1 AND email = $2)`
@@ -36,12 +36,12 @@ func (r *invitationRepository) Create(ctx context.Context, inv *domain.Invitatio
 		if err != nil {
 			return err
 		}
-		
+
 		// If code doesn't exist for this email, we can use it
 		if !exists {
 			break
 		}
-		
+
 		// If this was the last attempt, return error
 		if attempt == maxAttempts-1 {
 			return errors.New("failed to generate unique invitation code after maximum attempts")
@@ -86,10 +86,11 @@ func (r *invitationRepository) Update(ctx context.Context, inv *domain.Invitatio
 	return err
 }
 
-// generateInvitationCode generates a cryptographically secure random 8-character alphanumeric code
+// generateInvitationCode generates a cryptographically secure random invitation code
+// Format: XXX-XXX-XXX (9 uppercase alphanumeric characters with dashes)
 func generateInvitationCode() string {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	const length = 8
+	const length = 9
 	code := make([]byte, length)
 	randomBytes := make([]byte, length)
 
@@ -100,12 +101,20 @@ func generateInvitationCode() string {
 		for i := range code {
 			code[i] = charset[time.Now().UnixNano()%int64(len(charset))]
 		}
-		return string(code)
+		return formatInvitationCode(string(code))
 	}
 
 	// Convert random bytes to characters from charset
 	for i := range code {
 		code[i] = charset[int(randomBytes[i])%len(charset)]
 	}
-	return string(code)
+	return formatInvitationCode(string(code))
+}
+
+// formatInvitationCode formats a 9-character code as XXX-XXX-XXX
+func formatInvitationCode(code string) string {
+	if len(code) != 9 {
+		return code
+	}
+	return code[0:3] + "-" + code[3:6] + "-" + code[6:9]
 }

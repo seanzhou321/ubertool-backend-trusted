@@ -82,11 +82,12 @@ func (x *ApproveRequestToJoinRequest) GetApplicantName() string {
 }
 
 type ApproveRequestToJoinResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Success        bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message        string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	InvitationCode string                 `protobuf:"bytes,3,opt,name=invitation_code,json=invitationCode,proto3" json:"invitation_code,omitempty"` // Only populated when invitation is sent to new user
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ApproveRequestToJoinResponse) Reset() {
@@ -129,6 +130,13 @@ func (x *ApproveRequestToJoinResponse) GetSuccess() bool {
 func (x *ApproveRequestToJoinResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
+	}
+	return ""
+}
+
+func (x *ApproveRequestToJoinResponse) GetInvitationCode() string {
+	if x != nil {
+		return x.InvitationCode
 	}
 	return ""
 }
@@ -709,10 +717,11 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x1bApproveRequestToJoinRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12'\n" +
 	"\x0fapplicant_email\x18\x02 \x01(\tR\x0eapplicantEmail\x12%\n" +
-	"\x0eapplicant_name\x18\x03 \x01(\tR\rapplicantName\"R\n" +
+	"\x0eapplicant_name\x18\x03 \x01(\tR\rapplicantName\"{\n" +
 	"\x1cApproveRequestToJoinResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x87\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12'\n" +
+	"\x0finvitation_code\x18\x03 \x01(\tR\x0einvitationCode\"\x87\x01\n" +
 	"\x1cAdminBlockUserAccountRequest\x12&\n" +
 	"\x0fblocked_user_id\x18\x01 \x01(\x05R\rblockedUserId\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12\x16\n" +

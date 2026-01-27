@@ -106,8 +106,9 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	// Mock ListJoinRequests lookup update
 	mockJoinRepo.On("ListByOrg", ctx, orgID).Return([]domain.JoinRequest{}, nil)
 
-	err := svc.ApproveJoinRequest(ctx, adminID, orgID, email, name)
+	invitationCode, err := svc.ApproveJoinRequest(ctx, adminID, orgID, email, name)
 	assert.NoError(t, err)
+	assert.Equal(t, "ABC12345", invitationCode, "Should return the invitation code for new users")
 
 	mockOrgRepo.AssertExpectations(t)
 	mockInviteRepo.AssertExpectations(t)

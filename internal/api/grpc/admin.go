@@ -21,11 +21,14 @@ func (h *AdminHandler) ApproveRequestToJoin(ctx context.Context, req *pb.Approve
 	if err != nil {
 		return nil, err
 	}
-	err = h.adminSvc.ApproveJoinRequest(ctx, adminID, req.OrganizationId, req.ApplicantEmail, req.ApplicantName)
+	invitationCode, err := h.adminSvc.ApproveJoinRequest(ctx, adminID, req.OrganizationId, req.ApplicantEmail, req.ApplicantName)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.ApproveRequestToJoinResponse{Success: true}, nil
+	return &pb.ApproveRequestToJoinResponse{
+		Success:        true,
+		InvitationCode: invitationCode,
+	}, nil
 }
 
 func (h *AdminHandler) AdminBlockUserAccount(ctx context.Context, req *pb.AdminBlockUserAccountRequest) (*pb.AdminBlockUserAccountResponse, error) {

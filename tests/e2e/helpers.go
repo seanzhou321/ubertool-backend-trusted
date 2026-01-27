@@ -185,14 +185,16 @@ func (db *TestDB) CreateTestInvitation(orgID int32, email string, createdBy int3
 }
 
 // generateTestInvitationCode generates a simple test invitation code
+// Format: XXX-XXX-XXX (9 uppercase alphanumeric characters with dashes)
 func generateTestInvitationCode() string {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	const length = 8
+	const length = 9
 	code := make([]byte, length)
 	for i := range code {
 		code[i] = charset[i%len(charset)]
 	}
-	return string(code)
+	// Format as XXX-XXX-XXX
+	return string(code[0:3]) + "-" + string(code[3:6]) + "-" + string(code[6:9])
 }
 
 // GRPCClient wraps gRPC connection with helper methods

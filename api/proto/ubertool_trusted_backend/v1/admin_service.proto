@@ -36,6 +36,7 @@ message ApproveRequestToJoinRequest {
 message ApproveRequestToJoinResponse {
   bool success = 1;
   string message = 2;
+  string invitation_code = 3; // Only populated when invitation is sent to new user
 }
 
 message AdminBlockUserAccountRequest {

@@ -74,7 +74,7 @@ type NotificationService interface {
 }
 
 type AdminService interface {
-	ApproveJoinRequest(ctx context.Context, adminID, orgID int32, email, name string) error
+	ApproveJoinRequest(ctx context.Context, adminID, orgID int32, email, name string) (invitationCode string, err error)
 	BlockUser(ctx context.Context, adminID, userID, orgID int32, isBlock bool, reason string) error
 	ListMembers(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error)
 	SearchUsers(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error)
