@@ -45,3 +45,7 @@ test-e2e:
 
 test-ext-integration:
 	go test -v ./tests/ext-integration/... -run Gmail -config=config/config.test.yaml
+
+setup-test-data:
+	@echo "Populating test data from YAML..."
+	go run ./tests/data-setup/setup.go

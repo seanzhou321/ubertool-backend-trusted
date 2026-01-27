@@ -1,0 +1,35 @@
+# Test Data Setup Configuration
+# This file defines test organization and user data for the ubertool trusted backend
+
+# Database configuration - reference the test config file
+config_file: "config/config.test.yaml"
+
+# Organization data
+organization:
+  name: "Test Community Church"
+  description: "A test organization for development and testing purposes"
+  address: "123 Test Street, Test City, TS 12345"
+  metro: "Test Metro Area"
+  admin_phone_number: "+1-555-TEST-ORG"
+  admin_email: "admin@testchurch.org"
+
+# Users for the organization (supports multiple users with different roles)
+users:
+  - email: "superadmin@testchurch.org"
+    phone_number: "+1-555-SUPER-ADMIN"
+    password: "Test@1234"  # Will be hashed with bcrypt
+    name: "Super Admin User"
+    avatar_url: ""
+    # User-Org relationship
+    role: "SUPER_ADMIN"  # SUPER_ADMIN, ADMIN, or MEMBER
+    status: "ACTIVE"
+    balance_cents: 0
+
+  - email: "admin1@testchurch.org"
+    phone_number: "+1-555-ADMIN-001"
+    password: "Admin@1234"
+    name: "Admin User One"
+    avatar_url: ""
+    role: "ADMIN"
+    status: "ACTIVE"
+    balance_cents: 0
