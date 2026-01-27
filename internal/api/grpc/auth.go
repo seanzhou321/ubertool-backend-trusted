@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "ubertool-backend-trusted/api/gen/v1"
+	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/service"
 )
 
@@ -50,10 +51,21 @@ func (h *AuthHandler) ValidateInvite(ctx context.Context, req *pb.ValidateInvite
 }
 
 func (h *AuthHandler) RequestToJoinOrganization(ctx context.Context, req *pb.RequestToJoinRequest) (*pb.RequestToJoinResponse, error) {
+	logger.Info("=== API RequestToJoinOrganization called ===",
+		"organizationID", req.OrganizationId,
+		"name", req.Name,
+		"email", req.Email)
+	logger.EnterMethod("AuthHandler.RequestToJoinOrganization", "organizationID", req.OrganizationId, "email", req.Email)
+
 	err := h.authSvc.RequestToJoin(ctx, req.OrganizationId, req.Name, req.Email, req.Message)
 	if err != nil {
+		logger.ExitMethodWithError("AuthHandler.RequestToJoinOrganization", err, "organizationID", req.OrganizationId, "email", req.Email)
+		logger.Error("=== API RequestToJoinOrganization FAILED ===", "error", err)
 		return nil, err
 	}
+
+	logger.ExitMethod("AuthHandler.RequestToJoinOrganization", "organizationID", req.OrganizationId)
+	logger.Info("=== API RequestToJoinOrganization completed successfully ===", "organizationID", req.OrganizationId)
 	return &pb.RequestToJoinResponse{Success: true}, nil
 }
 
@@ -84,17 +96,29 @@ func (h *AuthHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Logi
 }
 
 func (h *AuthHandler) Verify2FA(ctx context.Context, req *pb.Verify2FARequest) (*pb.Verify2FAResponse, error) {
+	logger.Info("=== API Verify2FA called ===", "codeProvided", req.TwoFaCode)
+	logger.EnterMethod("AuthHandler.Verify2FA", "codeLength", len(req.TwoFaCode))
+
 	// UserID comes from the valid 2FA token in the header, validated by interceptor
+	logger.Debug("Extracting userID from context (2FA token)")
 	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
+		logger.Error("CRITICAL: Failed to get userID from context - 2FA token missing or invalid?", "error", err)
+		logger.ExitMethodWithError("AuthHandler.Verify2FA", err, "reason", "no userID in context")
 		return nil, err
 	}
+	logger.Info("UserID extracted from 2FA token", "userID", userID)
 
+	logger.Debug("Calling authService.Verify2FA", "userID", userID, "code", req.TwoFaCode)
 	access, refresh, err := h.authSvc.Verify2FA(ctx, int32(userID), req.TwoFaCode)
 	if err != nil {
+		logger.Error("=== API Verify2FA FAILED ===", "userID", userID, "error", err)
+		logger.ExitMethodWithError("AuthHandler.Verify2FA", err, "userID", userID)
 		return nil, err
 	}
 
+	logger.Info("=== API Verify2FA completed successfully ===", "userID", userID)
+	logger.ExitMethod("AuthHandler.Verify2FA", "userID", userID)
 	return &pb.Verify2FAResponse{
 		Success:      true,
 		AccessToken:  access,

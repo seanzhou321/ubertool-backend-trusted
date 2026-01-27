@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository"
 )
 
@@ -20,14 +21,28 @@ func NewNotificationRepository(db *sql.DB) repository.NotificationRepository {
 }
 
 func (r *notificationRepository) Create(ctx context.Context, n *domain.Notification) error {
+	logger.EnterMethod("notificationRepository.Create", "userID", n.UserID, "orgID", n.OrgID, "title", n.Title)
+
 	attrs, err := json.Marshal(n.Attributes)
 	if err != nil {
+		logger.ExitMethodWithError("notificationRepository.Create", err, "reason", "failed to marshal attributes")
 		return err
 	}
+	logger.Debug("Notification attributes marshaled", "attributesJSON", string(attrs))
 
 	query := `INSERT INTO notifications (user_id, org_id, title, message, is_read, attributes, created_on) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
-	return r.db.QueryRowContext(ctx, query, n.UserID, n.OrgID, n.Title, n.Message, n.IsRead, attrs, time.Now()).Scan(&n.ID)
+	logger.DatabaseCall("INSERT", "notifications", "userID", n.UserID, "orgID", n.OrgID)
+
+	err = r.db.QueryRowContext(ctx, query, n.UserID, n.OrgID, n.Title, n.Message, n.IsRead, attrs, time.Now()).Scan(&n.ID)
+	logger.DatabaseResult("INSERT", 1, err, "notificationID", n.ID)
+
+	if err != nil {
+		logger.ExitMethodWithError("notificationRepository.Create", err, "userID", n.UserID, "orgID", n.OrgID)
+	} else {
+		logger.ExitMethod("notificationRepository.Create", "notificationID", n.ID)
+	}
+	return err
 }
 
 func (r *notificationRepository) List(ctx context.Context, userID int32, limit, offset int32) ([]domain.Notification, int32, error) {

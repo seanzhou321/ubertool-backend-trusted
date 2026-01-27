@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository"
 )
 
@@ -18,9 +19,21 @@ func NewJoinRequestRepository(db *sql.DB) repository.JoinRequestRepository {
 }
 
 func (r *joinRequestRepository) Create(ctx context.Context, req *domain.JoinRequest) error {
+	logger.EnterMethod("joinRequestRepository.Create", "orgID", req.OrgID, "email", req.Email, "name", req.Name)
+
 	query := `INSERT INTO join_requests (org_id, user_id, name, email, note, status, created_on) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
-	return r.db.QueryRowContext(ctx, query, req.OrgID, req.UserID, req.Name, req.Email, req.Note, req.Status, time.Now()).Scan(&req.ID)
+	logger.DatabaseCall("INSERT", "join_requests", "orgID", req.OrgID, "email", req.Email)
+
+	err := r.db.QueryRowContext(ctx, query, req.OrgID, req.UserID, req.Name, req.Email, req.Note, req.Status, time.Now()).Scan(&req.ID)
+	logger.DatabaseResult("INSERT", 1, err, "requestID", req.ID)
+
+	if err != nil {
+		logger.ExitMethodWithError("joinRequestRepository.Create", err, "orgID", req.OrgID, "email", req.Email)
+	} else {
+		logger.ExitMethod("joinRequestRepository.Create", "requestID", req.ID)
+	}
+	return err
 }
 
 func (r *joinRequestRepository) GetByID(ctx context.Context, id int32) (*domain.JoinRequest, error) {

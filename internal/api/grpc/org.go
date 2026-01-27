@@ -29,13 +29,19 @@ func (h *OrganizationHandler) ListMyOrganizations(ctx context.Context, req *pb.L
 	}
 	protoOrgs := make([]*pb.Organization, len(orgs))
 	for i, o := range orgs {
-		protoOrgs[i] = MapDomainOrgToProto(&o)
-		// Find matching userOrg to set balance
+		// Find matching userOrg to get role and balance
+		var userRole string
 		for _, uo := range userOrgs {
 			if uo.OrgID == o.ID {
+				userRole = string(uo.Role)
+				protoOrgs[i] = MapDomainOrgToProto(&o, userRole)
 				protoOrgs[i].UserBalance = uo.BalanceCents
 				break
 			}
+		}
+		if userRole == "" {
+			// Fallback in case userOrg not found
+			protoOrgs[i] = MapDomainOrgToProto(&o, "")
 		}
 	}
 	return &pb.ListOrganizationsResponse{Organizations: protoOrgs}, nil
@@ -46,7 +52,7 @@ func (h *OrganizationHandler) GetOrganization(ctx context.Context, req *pb.GetOr
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetOrganizationResponse{Organization: MapDomainOrgToProto(org)}, nil
+	return &pb.GetOrganizationResponse{Organization: MapDomainOrgToProto(org, "")}, nil
 }
 
 func (h *OrganizationHandler) SearchOrganizations(ctx context.Context, req *pb.SearchOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {
@@ -56,7 +62,8 @@ func (h *OrganizationHandler) SearchOrganizations(ctx context.Context, req *pb.S
 	}
 	protoOrgs := make([]*pb.Organization, len(orgs))
 	for i, o := range orgs {
-		protoOrgs[i] = MapDomainOrgToProto(&o)
+		// SearchOrganizations should not populate user_role
+		protoOrgs[i] = MapDomainOrgToProto(&o, "")
 	}
 	return &pb.ListOrganizationsResponse{Organizations: protoOrgs}, nil
 }
@@ -74,7 +81,7 @@ func (h *OrganizationHandler) UpdateOrganization(ctx context.Context, req *pb.Up
 	if err != nil {
 		return nil, err
 	}
-	return &pb.UpdateOrganizationResponse{Organization: MapDomainOrgToProto(org)}, nil
+	return &pb.UpdateOrganizationResponse{Organization: MapDomainOrgToProto(org, "")}, nil
 }
 func (h *OrganizationHandler) CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) (*pb.CreateOrganizationResponse, error) {
 	org := &domain.Organization{
@@ -93,7 +100,7 @@ func (h *OrganizationHandler) CreateOrganization(ctx context.Context, req *pb.Cr
 	if err != nil {
 		return nil, err
 	}
-	return &pb.CreateOrganizationResponse{Organization: MapDomainOrgToProto(org)}, nil
+	return &pb.CreateOrganizationResponse{Organization: MapDomainOrgToProto(org, "")}, nil
 }
 
 func (h *OrganizationHandler) JoinOrganizationWithInvite(ctx context.Context, req *pb.JoinOrganizationRequest) (*pb.JoinOrganizationResponse, error) {
@@ -110,7 +117,7 @@ func (h *OrganizationHandler) JoinOrganizationWithInvite(ctx context.Context, re
 	message := fmt.Sprintf("Successfully joined %s", org.Name)
 	return &pb.JoinOrganizationResponse{
 		Success:      true,
-		Organization: MapDomainOrgToProto(org),
+		Organization: MapDomainOrgToProto(org, ""),
 		Message:      message,
 	}, nil
 }

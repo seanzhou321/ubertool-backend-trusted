@@ -29,13 +29,19 @@ func (h *UserHandler) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 	protoUser := MapDomainUserToProto(user)
 	protoUser.Orgs = make([]*pb.Organization, len(orgs))
 	for i, o := range orgs {
-		protoUser.Orgs[i] = MapDomainOrgToProto(&o)
-		// Set user balance for each org
+		// Find matching userOrg to get role and balance
+		var userRole string
 		for _, uo := range userOrgs {
 			if uo.OrgID == o.ID {
+				userRole = string(uo.Role)
+				protoUser.Orgs[i] = MapDomainOrgToProto(&o, userRole)
 				protoUser.Orgs[i].UserBalance = uo.BalanceCents
 				break
 			}
+		}
+		if userRole == "" {
+			// Fallback in case userOrg not found
+			protoUser.Orgs[i] = MapDomainOrgToProto(&o, "")
 		}
 	}
 

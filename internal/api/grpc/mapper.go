@@ -19,7 +19,9 @@ func MapDomainUserToProto(u *domain.User) *pb.User {
 	}
 }
 
-func MapDomainOrgToProto(o *domain.Organization) *pb.Organization {
+// MapDomainOrgToProto converts domain Organization to protobuf Organization
+// userRole is optional - pass empty string to leave user_role field empty
+func MapDomainOrgToProto(o *domain.Organization, userRole string) *pb.Organization {
 	if o == nil {
 		return nil
 	}
@@ -32,6 +34,7 @@ func MapDomainOrgToProto(o *domain.Organization) *pb.Organization {
 		AdminEmail:  o.AdminEmail,
 		AdminPhone:  o.AdminPhoneNumber,
 		CreatedOn:   o.CreatedOn.Format("2006-01-02"),
+		UserRole:    userRole,
 	}
 }
 

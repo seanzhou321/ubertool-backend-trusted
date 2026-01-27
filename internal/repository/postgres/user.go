@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository"
 )
 
 type userRepository struct {
 	db *sql.DB
 }
-
 
 func NewUserRepository(db *sql.DB) repository.UserRepository {
 	return &userRepository{db: db}
@@ -93,13 +93,19 @@ func (r *userRepository) UpdateUserOrg(ctx context.Context, uo *domain.UserOrg) 
 }
 
 func (r *userRepository) ListMembersByOrg(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error) {
+	logger.EnterMethod("userRepository.ListMembersByOrg", "orgID", orgID)
+
 	query := `SELECT u.id, u.email, u.phone_number, u.password_hash, u.name, COALESCE(u.avatar_url, ''), u.created_on, u.updated_on,
 	                 uo.user_id, uo.org_id, uo.joined_on, uo.balance_cents, uo.status, uo.role, uo.blocked_date, COALESCE(uo.block_reason, '')
 	          FROM users u
 	          JOIN users_orgs uo ON u.id = uo.user_id
 	          WHERE uo.org_id = $1`
+	logger.DatabaseCall("SELECT", "users JOIN users_orgs", "orgID", orgID)
+
 	rows, err := r.db.QueryContext(ctx, query, orgID)
 	if err != nil {
+		logger.DatabaseResult("SELECT", 0, err, "orgID", orgID)
+		logger.ExitMethodWithError("userRepository.ListMembersByOrg", err, "orgID", orgID)
 		return nil, nil, err
 	}
 	defer rows.Close()
@@ -114,11 +120,16 @@ func (r *userRepository) ListMembersByOrg(ctx context.Context, orgID int32) ([]d
 			&uo.UserID, &uo.OrgID, &uo.JoinedOn, &uo.BalanceCents, &uo.Status, &uo.Role, &uo.BlockedDate, &uo.BlockReason,
 		)
 		if err != nil {
+			logger.DatabaseResult("SELECT", int64(len(users)), err, "orgID", orgID)
+			logger.ExitMethodWithError("userRepository.ListMembersByOrg", err, "orgID", orgID)
 			return nil, nil, err
 		}
 		users = append(users, u)
 		uos = append(uos, uo)
 	}
+
+	logger.DatabaseResult("SELECT", int64(len(users)), nil, "orgID", orgID, "membersFound", len(users))
+	logger.ExitMethod("userRepository.ListMembersByOrg", "orgID", orgID, "count", len(users))
 	return users, uos, nil
 }
 

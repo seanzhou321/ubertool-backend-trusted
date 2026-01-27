@@ -14,6 +14,7 @@ type Config struct {
 	SMTP     SMTPConfig     `yaml:"smtp"`
 	JWT      JWTConfig      `yaml:"jwt"`
 	Storage  StorageConfig  `yaml:"storage"`
+	Log      LogConfig      `yaml:"log"`
 }
 
 // ServerConfig contains gRPC server settings
@@ -56,6 +57,12 @@ type StorageConfig struct {
 	BaseURL      string   `yaml:"base_url"`   // Server base URL for mock URLs
 	MaxFileSize  int64    `yaml:"max_file_size_mb"`
 	AllowedTypes []string `yaml:"allowed_types"`
+}
+
+// LogConfig contains logging settings
+type LogConfig struct {
+	Level  string `yaml:"level"`  // "debug", "info", "warn", "error"
+	Format string `yaml:"format"` // "json" or "text"
 }
 
 // Load reads configuration from a YAML file
@@ -138,6 +145,22 @@ func (c *Config) overrideWithEnv() {
 	// Storage
 	if val := os.Getenv("UPLOAD_DIR"); val != "" {
 		c.Storage.UploadDir = val
+	}
+
+	// Log
+	if val := os.Getenv("LOG_LEVEL"); val != "" {
+		c.Log.Level = val
+	}
+	if val := os.Getenv("LOG_FORMAT"); val != "" {
+		c.Log.Format = val
+	}
+
+	// Set defaults for log if not configured
+	if c.Log.Level == "" {
+		c.Log.Level = "info"
+	}
+	if c.Log.Format == "" {
+		c.Log.Format = "text"
 	}
 }
 

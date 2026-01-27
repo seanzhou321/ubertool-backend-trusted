@@ -38,3 +38,7 @@ storage:
     - "image/png"
     - "image/gif"
     - "image/webp"
+
+log:
+  level: "debug"  # debug, info, warn, error
+  format: "json"  # text or json

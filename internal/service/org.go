@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository"
 )
 
@@ -137,11 +138,19 @@ func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, us
 	}
 
 	// 10. Create notification to org admins
+	logger.Debug("Creating notifications for admins about new member", "userID", userID, "orgID", inv.OrgID)
 	users, userOrgsAll, err := s.userRepo.ListMembersByOrg(ctx, inv.OrgID)
 	if err == nil {
+		adminCount := 0
+		notificationsSent := 0
+		notificationsFailed := 0
+
 		for i, u := range users {
 			uo := userOrgsAll[i]
 			if uo.Role == domain.UserOrgRoleAdmin || uo.Role == domain.UserOrgRoleSuperAdmin {
+				adminCount++
+				logger.Debug("Creating member joined notification for admin", "adminID", u.ID, "adminEmail", u.Email, "role", uo.Role)
+
 				notif := &domain.Notification{
 					UserID:  u.ID,
 					OrgID:   inv.OrgID,
@@ -154,9 +163,21 @@ func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, us
 					},
 					CreatedOn: time.Now(),
 				}
-				_ = s.noteRepo.Create(ctx, notif)
+
+				notifErr := s.noteRepo.Create(ctx, notif)
+				if notifErr != nil {
+					logger.Error("CRITICAL: Failed to create member joined notification", "adminID", u.ID, "error", notifErr)
+					notificationsFailed++
+				} else {
+					logger.Info("Member joined notification created", "adminID", u.ID, "notificationID", notif.ID)
+					notificationsSent++
+				}
 			}
 		}
+
+		logger.Info("Admin notifications completed", "adminsFound", adminCount, "notificationsSent", notificationsSent, "notificationsFailed", notificationsFailed)
+	} else {
+		logger.Warn("Failed to fetch admins for member joined notifications", "error", err)
 	}
 
 	return org, user, nil

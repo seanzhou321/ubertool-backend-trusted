@@ -111,4 +111,5 @@ message Organization {
   string created_on = 10; // Date string YYYY-MM-DD
   string admin_email = 11;
   string admin_phone = 12;
+  string user_role = 13; // Role of the user in this organization (SUPER_ADMIN, ADMIN, MEMBER, NULL)
 }

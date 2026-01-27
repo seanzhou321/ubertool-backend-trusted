@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository"
 	"ubertool-backend-trusted/internal/security"
 
@@ -75,20 +76,34 @@ func (s *authService) ValidateInvite(ctx context.Context, inviteCode, email stri
 }
 
 func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, email, note string) error {
+	logger.EnterMethod("authService.RequestToJoin", "orgID", orgID, "name", name, "email", email)
+
 	// 1. Verify org exists
+	logger.Debug("Fetching organization", "orgID", orgID)
+	logger.DatabaseCall("SELECT", "orgs WHERE id = $1")
 	org, err := s.orgRepo.GetByID(ctx, orgID)
+	logger.DatabaseResult("SELECT", 1, err, "orgID", orgID)
 	if err != nil {
+		logger.ExitMethodWithError("authService.RequestToJoin", err, "reason", "org not found")
 		return err // Could verify if err is NotFound and return ErrOrgNotFound
 	}
 	if org == nil {
+		logger.ExitMethodWithError("authService.RequestToJoin", ErrOrgNotFound, "reason", "org is nil")
 		return ErrOrgNotFound
 	}
+	logger.Debug("Organization found", "orgID", orgID, "orgName", org.Name)
 
 	// 2. Search user by email
+	logger.Debug("Searching for user by email", "email", email)
+	logger.DatabaseCall("SELECT", "users WHERE email = $1")
 	user, err := s.userRepo.GetByEmail(ctx, email)
+	logger.DatabaseResult("SELECT", 1, err)
 	var userID *int32
 	if err == nil && user != nil {
 		userID = &user.ID
+		logger.Debug("User found", "userID", *userID, "email", email)
+	} else {
+		logger.Debug("User not found, will create join request without userID", "email", email)
 	}
 
 	// 3. Create join request
@@ -100,26 +115,50 @@ func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, emai
 		Note:   note,
 		Status: domain.JoinRequestStatusPending,
 	}
+	logger.Debug("Creating join request", "orgID", orgID, "email", email, "name", name)
+	logger.DatabaseCall("INSERT", "join_requests (org_id, user_id, name, email, note, status)")
 	if err := s.reqRepo.Create(ctx, req); err != nil {
+		logger.DatabaseResult("INSERT", 0, err)
+		logger.ExitMethodWithError("authService.RequestToJoin", err, "reason", "failed to create join request")
 		return err
 	}
+	logger.DatabaseResult("INSERT", 1, nil, "requestID", req.ID)
+	logger.Info("Join request created successfully", "requestID", req.ID, "orgID", orgID, "email", email)
 
 	// 4. Find admin users to notify
+	logger.Debug("Fetching admin users for notifications", "orgID", orgID)
+	logger.DatabaseCall("SELECT", "users JOIN users_orgs WHERE org_id = $1 AND role IN ('ADMIN', 'SUPER_ADMIN')")
 	users, userOrgs, err := s.userRepo.ListMembersByOrg(ctx, orgID)
+	logger.DatabaseResult("SELECT", int64(len(users)), err)
 	if err != nil {
 		// Log error but don't fail the request? Or fail? Better to fail or log.
 		// For prototype, returning error is safer to detect issues.
+		logger.ExitMethodWithError("authService.RequestToJoin", err, "reason", "failed to list admins for notification")
 		return fmt.Errorf("failed to list admins for notification: %w", err)
 	}
+	logger.Debug("Members retrieved", "totalMembers", len(users))
+
+	adminCount := 0
+	notificationsSent := 0
+	notificationsFailed := 0
 
 	for i, u := range users {
 		uo := userOrgs[i]
 		if uo.Role == domain.UserOrgRoleAdmin || uo.Role == domain.UserOrgRoleSuperAdmin {
+			adminCount++
+			logger.Debug("Processing admin notification", "adminID", u.ID, "adminEmail", u.Email, "adminName", u.Name, "role", uo.Role)
+
 			// 5. Send Email
 			subject := fmt.Sprintf("New Join Request for %s", org.Name)
 			message := fmt.Sprintf("User %s (%s) has requested to join %s.\nMessage: %s", name, email, org.Name, note)
+
+			logger.ExternalServiceCall("email", "SendAdminNotification", "to", u.Email, "subject", subject)
 			// We act on best effort for notifications?
-			_ = s.emailSvc.SendAdminNotification(ctx, u.Email, subject, message)
+			emailErr := s.emailSvc.SendAdminNotification(ctx, u.Email, subject, message)
+			logger.ExternalServiceResult("email", "SendAdminNotification", emailErr, "to", u.Email)
+			if emailErr != nil {
+				logger.Warn("Failed to send email notification to admin", "adminID", u.ID, "email", u.Email, "error", emailErr)
+			}
 
 			// 6. Create Notification
 			notif := &domain.Notification{
@@ -134,10 +173,29 @@ func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, emai
 				},
 				CreatedOn: time.Now(),
 			}
-			_ = s.noteRepo.Create(ctx, notif)
+
+			logger.Debug("Creating notification for admin", "adminID", u.ID, "notifTitle", notif.Title)
+			logger.DatabaseCall("INSERT", "notifications (user_id, org_id, title, message, is_read, attributes)")
+			notifErr := s.noteRepo.Create(ctx, notif)
+			logger.DatabaseResult("INSERT", 1, notifErr, "adminID", u.ID)
+
+			if notifErr != nil {
+				logger.Error("CRITICAL: Failed to create notification for admin", "adminID", u.ID, "adminEmail", u.Email, "error", notifErr)
+				notificationsFailed++
+			} else {
+				logger.Info("Notification created successfully", "adminID", u.ID, "notificationID", notif.ID)
+				notificationsSent++
+			}
 		}
 	}
 
+	logger.Info("Join request processing completed",
+		"requestID", req.ID,
+		"adminsFound", adminCount,
+		"notificationsSent", notificationsSent,
+		"notificationsFailed", notificationsFailed)
+
+	logger.ExitMethod("authService.RequestToJoin", "requestID", req.ID)
 	return nil
 }
 
@@ -202,23 +260,32 @@ func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phon
 }
 
 func (s *authService) Login(ctx context.Context, email, password string) (string, string, string, bool, error) {
+	logger.EnterMethod("authService.Login", "email", email)
+
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
+		logger.ExitMethodWithError("authService.Login", ErrInvalidCredentials, "reason", "user not found")
 		return "", "", "", false, ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		logger.ExitMethodWithError("authService.Login", ErrInvalidCredentials, "reason", "password mismatch")
 		return "", "", "", false, ErrInvalidCredentials
 	}
+
+	logger.Info("Password validated successfully", "userID", user.ID, "email", email)
 
 	// Assume 2FA is always enabled for trusted backend
 	requires2FA := true
 
 	if requires2FA {
+		logger.Debug("Generating 2FA token", "userID", user.ID)
 		sessionToken, err := s.tm.Generate2FAToken(user.ID, "email")
 		if err != nil {
+			logger.ExitMethodWithError("authService.Login", err, "reason", "failed to generate 2FA token")
 			return "", "", "", false, err
 		}
+		logger.Debug("2FA token generated", "userID", user.ID, "tokenPrefix", sessionToken[:20])
 
 		// Send 2FA code via email
 		// For prototype, we might hardcode or log it.
@@ -226,10 +293,12 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		// Real implementation should generate random code and store it in Redis/Session.
 		// For now, we can send the hardcoded code via email to demonstrate flow.
 		code := "123456"
+		logger.Info("2FA code for testing (HARDCODED)", "userID", user.ID, "code", code)
 		subject := "Your 2FA Code"
 		message := fmt.Sprintf("Your login code is: %s", code)
 		_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message)
 
+		logger.ExitMethod("authService.Login", "userID", user.ID, "requires2FA", true)
 		return "", "", sessionToken, true, nil
 	}
 
@@ -246,27 +315,40 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 }
 
 func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) (string, string, error) {
+	logger.EnterMethod("authService.Verify2FA", "userID", userID, "codeProvided", code)
+
 	// Mock 2FA verification
+	logger.Debug("Validating 2FA code", "userID", userID, "providedCode", code, "expectedCode", "123456")
 	if code != "123456" {
+		logger.Warn("2FA code validation FAILED", "userID", userID, "providedCode", code, "expectedCode", "123456")
+		logger.ExitMethodWithError("authService.Verify2FA", ErrInvalid2FACode, "userID", userID)
 		return "", "", ErrInvalid2FACode
 	}
+	logger.Info("2FA code validated successfully", "userID", userID)
 
 	// Verify user still exists
+	logger.Debug("Verifying user exists", "userID", userID)
 	_, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
+		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "user not found", "userID", userID)
 		return "", "", err
 	}
 
 	// Generate tokens
+	logger.Debug("Generating access and refresh tokens", "userID", userID)
 	access, err := s.tm.GenerateAccessToken(userID, []string{"user"})
 	if err != nil {
+		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "failed to generate access token")
 		return "", "", err
 	}
 	refresh, err := s.tm.GenerateRefreshToken(userID)
 	if err != nil {
+		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "failed to generate refresh token")
 		return "", "", err
 	}
 
+	logger.Info("2FA verification completed successfully", "userID", userID)
+	logger.ExitMethod("authService.Verify2FA", "userID", userID)
 	return access, refresh, nil
 }
 

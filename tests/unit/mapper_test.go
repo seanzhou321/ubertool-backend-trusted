@@ -7,6 +7,7 @@ import (
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/api/grpc"
 	"ubertool-backend-trusted/internal/domain"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,7 +46,8 @@ func TestMapDomainOrgToProto(t *testing.T) {
 		CreatedOn:   now,
 	}
 
-	proto := grpc.MapDomainOrgToProto(o)
+	// Test with user role
+	proto := grpc.MapDomainOrgToProto(o, "ADMIN")
 
 	assert.NotNil(t, proto)
 	assert.Equal(t, o.ID, proto.Id)
@@ -54,8 +56,14 @@ func TestMapDomainOrgToProto(t *testing.T) {
 	assert.Equal(t, o.Address, proto.Address)
 	assert.Equal(t, o.Metro, proto.Metro)
 	assert.Equal(t, o.CreatedOn.Format("2006-01-02"), proto.CreatedOn)
+	assert.Equal(t, "ADMIN", proto.UserRole)
 
-	assert.Nil(t, grpc.MapDomainOrgToProto(nil))
+	// Test without user role (empty string)
+	protoNoRole := grpc.MapDomainOrgToProto(o, "")
+	assert.Equal(t, "", protoNoRole.UserRole)
+
+	// Test nil
+	assert.Nil(t, grpc.MapDomainOrgToProto(nil, ""))
 }
 
 func TestMapDomainToolToProto(t *testing.T) {
@@ -66,7 +74,7 @@ func TestMapDomainToolToProto(t *testing.T) {
 		Name:                 "Test Tool",
 		Description:          "Test Desc",
 		Categories:           []string{"Power Tools"},
-		PricePerDayCents:    1000,
+		PricePerDayCents:     1000,
 		ReplacementCostCents: 5000,
 		Condition:            domain.ToolConditionExcellent,
 		Status:               domain.ToolStatusAvailable,

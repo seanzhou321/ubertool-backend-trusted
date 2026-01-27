@@ -6,4 +6,7 @@ smtp:
   from: "noreply@yourdomain.com"
   to: "recipient@example.com"
   cc: "cc-recipient@example.com"
-  
+
+log:
+  level: "debug"  # debug, info, warn, error
+  format: "json"  # text or json

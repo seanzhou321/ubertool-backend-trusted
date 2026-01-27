@@ -16,6 +16,7 @@ import (
 	"ubertool-backend-trusted/internal/api/grpc/interceptor"
 	httpapi "ubertool-backend-trusted/internal/api/http"
 	"ubertool-backend-trusted/internal/config"
+	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository/postgres"
 	"ubertool-backend-trusted/internal/security"
 	"ubertool-backend-trusted/internal/service"
@@ -36,23 +37,28 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	log.Printf("Starting Ubertool Trusted Backend...")
-	log.Printf("Server: %s", cfg.GetServerAddress())
-	log.Printf("Database: %s@%s:%d/%s", cfg.Database.User, cfg.Database.Host, cfg.Database.Port, cfg.Database.Database)
-	log.Printf("SMTP: %s:%d", cfg.SMTP.Host, cfg.SMTP.Port)
+	// Initialize logger
+	logger.Initialize(cfg.Log.Level, cfg.Log.Format)
+	logger.Info("Starting Ubertool Trusted Backend...", "log_level", cfg.Log.Level, "log_format", cfg.Log.Format)
+	logger.Info("Server configuration", "address", cfg.GetServerAddress())
+	logger.Info("Database configuration", "host", cfg.Database.Host, "port", cfg.Database.Port, "database", cfg.Database.Database, "user", cfg.Database.User)
+	logger.Info("SMTP configuration", "host", cfg.SMTP.Host, "port", cfg.SMTP.Port)
 
 	// Initialize Database
+	logger.Debug("Connecting to database...", "connection_string", fmt.Sprintf("%s@%s:%d/%s", cfg.Database.User, cfg.Database.Host, cfg.Database.Port, cfg.Database.Database))
 	db, err := sql.Open("postgres", cfg.GetDatabaseConnectionString())
 	if err != nil {
+		logger.Error("Failed to connect to database", "error", err)
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
 	// Test database connection
 	if err := db.Ping(); err != nil {
+		logger.Error("Failed to ping database", "error", err)
 		log.Fatalf("Failed to ping database: %v", err)
 	}
-	log.Println("Database connection established")
+	logger.Info("Database connection established")
 
 	// Initialize Repositories
 	store := postgres.NewStore(db)
@@ -64,13 +70,15 @@ func main() {
 	// Initialize Storage Service
 	var storageService storage.StorageInterface
 	if cfg.Storage.Type == "" || cfg.Storage.Type == "mock" {
-		log.Println("Using mock storage (local filesystem)")
+		logger.Info("Using mock storage (local filesystem)", "upload_dir", cfg.Storage.UploadDir)
 		mockStorage, err := storage.NewMockStorageService(cfg.Storage.BaseURL, cfg.Storage.UploadDir)
 		if err != nil {
+			logger.Error("Failed to initialize mock storage", "error", err)
 			log.Fatalf("Failed to initialize mock storage: %v", err)
 		}
 		storageService = mockStorage
 	} else {
+		logger.Error("Unsupported storage type", "type", cfg.Storage.Type)
 		log.Fatalf("Storage type '%s' not yet implemented", cfg.Storage.Type)
 	}
 
@@ -137,6 +145,7 @@ func main() {
 	// Set up gRPC server
 	lis, err := net.Listen("tcp", cfg.GetServerAddress())
 	if err != nil {
+		logger.Error("Failed to listen", "error", err, "address", cfg.GetServerAddress())
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
@@ -168,15 +177,16 @@ func main() {
 		httpPort := cfg.Server.Port + 1 // Use next port for HTTP
 		httpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, httpPort)
 		go func() {
-			log.Printf("HTTP server for mock storage listening on %s", httpAddr)
+			logger.Info("HTTP server for mock storage listening", "address", httpAddr)
 			if err := http.ListenAndServe(httpAddr, router); err != nil {
-				log.Printf("HTTP server error: %v", err)
+				logger.Error("HTTP server error", "error", err)
 			}
 		}()
 	}
 
-	log.Printf("gRPC server listening on %s", cfg.GetServerAddress())
+	logger.Info("gRPC server listening", "address", cfg.GetServerAddress())
 	if err := s.Serve(lis); err != nil {
+		logger.Error("Failed to serve gRPC", "error", err)
 		log.Fatalf("Failed to serve: %v", err)
 	}
 }

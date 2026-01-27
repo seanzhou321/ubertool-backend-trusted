@@ -13,13 +13,19 @@ proto-gen:
 
 build:
 	@if not exist "bin" mkdir bin
-	go build -o bin/server.exe ./cmd/server
+# go build -o bin/server.exe ./cmd/server
+	go build ./cmd/server
 
 run-dev:
 	go run ./cmd/server -config=config/config.dev.yaml
 
 run-test:
+	@echo "Starting server in DEBUG mode for testing..."
 	go run ./cmd/server -config=config/config.test.yaml
+
+run-test-debug:
+	@echo "Starting server in DEBUG mode with verbose output..."
+	set LOG_LEVEL=debug&& go run ./cmd/server -config=config/config.test.yaml
 
 tidy:
 	go mod tidy

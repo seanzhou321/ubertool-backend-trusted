@@ -632,6 +632,7 @@ type Organization struct {
 	CreatedOn     string                 `protobuf:"bytes,10,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"`       // Date string YYYY-MM-DD
 	AdminEmail    string                 `protobuf:"bytes,11,opt,name=admin_email,json=adminEmail,proto3" json:"admin_email,omitempty"`
 	AdminPhone    string                 `protobuf:"bytes,12,opt,name=admin_phone,json=adminPhone,proto3" json:"admin_phone,omitempty"`
+	UserRole      string                 `protobuf:"bytes,13,opt,name=user_role,json=userRole,proto3" json:"user_role,omitempty"` // Role of the user in this organization (SUPER_ADMIN, ADMIN, MEMBER, NULL)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -750,6 +751,13 @@ func (x *Organization) GetAdminPhone() string {
 	return ""
 }
 
+func (x *Organization) GetUserRole() string {
+	if x != nil {
+		return x.UserRole
+	}
+	return ""
+}
+
 var File_ubertool_trusted_backend_v1_organization_service_proto protoreflect.FileDescriptor
 
 const file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc = "" +
@@ -793,7 +801,7 @@ const file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc = "" +
 	"\x18JoinOrganizationResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12I\n" +
 	"\forganization\x18\x02 \x01(\v2%.ubertool.trusted.api.v1.OrganizationR\forganization\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"\xed\x02\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\x8a\x03\n" +
 	"\fOrganization\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -811,7 +819,8 @@ const file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc = "" +
 	"\vadmin_email\x18\v \x01(\tR\n" +
 	"adminEmail\x12\x1f\n" +
 	"\vadmin_phone\x18\f \x01(\tR\n" +
-	"adminPhone2\x8d\x06\n" +
+	"adminPhone\x12\x1b\n" +
+	"\tuser_role\x18\r \x01(\tR\buserRole2\x8d\x06\n" +
 	"\x13OrganizationService\x12~\n" +
 	"\x13ListMyOrganizations\x123.ubertool.trusted.api.v1.ListMyOrganizationsRequest\x1a2.ubertool.trusted.api.v1.ListOrganizationsResponse\x12t\n" +
 	"\x0fGetOrganization\x12/.ubertool.trusted.api.v1.GetOrganizationRequest\x1a0.ubertool.trusted.api.v1.GetOrganizationResponse\x12}\n" +
