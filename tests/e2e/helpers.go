@@ -170,18 +170,29 @@ func (db *TestDB) CreateTestTool(ownerID int32, name string, pricePerDay int32) 
 	return toolID
 }
 
-// CreateTestInvitation creates a test invitation
+// CreateTestInvitation creates a test invitation and returns the invitation code
 func (db *TestDB) CreateTestInvitation(orgID int32, email string, createdBy int32) string {
-	var token string
+	var invitationCode string
 	err := db.QueryRow(`
-		INSERT INTO invitations (org_id, email, created_by, expires_on)
-		VALUES ($1, $2, $3, CURRENT_DATE + INTERVAL '7 days')
-		RETURNING token
-	`, orgID, email, createdBy).Scan(&token)
+		INSERT INTO invitations (invitation_code, org_id, email, created_by, expires_on, created_on)
+		VALUES ($1, $2, $3, $4, CURRENT_DATE + INTERVAL '7 days', CURRENT_DATE)
+		RETURNING invitation_code
+	`, generateTestInvitationCode(), orgID, email, createdBy).Scan(&invitationCode)
 	if err != nil {
 		db.t.Fatalf("failed to create test invitation: %v", err)
 	}
-	return token
+	return invitationCode
+}
+
+// generateTestInvitationCode generates a simple test invitation code
+func generateTestInvitationCode() string {
+	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const length = 8
+	code := make([]byte, length)
+	for i := range code {
+		code[i] = charset[i%len(charset)]
+	}
+	return string(code)
 }
 
 // GRPCClient wraps gRPC connection with helper methods
@@ -196,12 +207,12 @@ func NewGRPCClient(t *testing.T, serverAddr string) *GRPCClient {
 		cfg := loadConfig(t)
 		serverAddr = cfg.GetServerAddress()
 	}
-	
+
 	conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("failed to connect to gRPC server: %v", err)
 	}
-	
+
 	return &GRPCClient{conn: conn, t: t}
 }
 
@@ -242,4 +253,3 @@ func ContextWithUserIDAndTimeout(userID int32, timeout time.Duration) (context.C
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	return context.WithTimeout(ctx, timeout)
 }
-

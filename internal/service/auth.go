@@ -46,16 +46,17 @@ func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.In
 }
 
 func (s *authService) ValidateInvite(ctx context.Context, inviteCode, email string) (bool, string, *domain.User, error) {
-	// 1. Verify the invitation record exists and is not expired
-	inv, err := s.inviteRepo.GetByTokenAndEmail(ctx, inviteCode, email)
+	// 1. Verify the invitation record exists using (invitation_code, email) tuple
+	inv, err := s.inviteRepo.GetByInvitationCodeAndEmail(ctx, inviteCode, email)
 	if err != nil {
-		return false, "invitation code and email pair is invalid or expired", nil, nil
+		return false, "invitation code is invalid", nil, err
 	}
 	if inv.UsedOn != nil {
-		return false, "invitation already used", nil, nil
+		return false, "invitation already used", nil, ErrInviteUsed
 	}
+	// Explicitly check expiration and return error
 	if inv.ExpiresOn.Before(time.Now()) {
-		return false, "invitation code and email pair is invalid or expired", nil, nil
+		return false, "invitation has expired", nil, ErrInviteExpired
 	}
 
 	// 2. Check if a user with this email exists
@@ -200,14 +201,17 @@ func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, emai
 }
 
 func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phone, password string) error {
-	// 1. Validate invitation code and email pair
-	valid, errMsg, _, _ := s.ValidateInvite(ctx, inviteToken, email)
+	// 1. Validate invitation code with (invitation_code, email) tuple
+	valid, errMsg, _, err := s.ValidateInvite(ctx, inviteToken, email)
+	if err != nil {
+		return err
+	}
 	if !valid {
 		return errors.New(errMsg)
 	}
 
-	// Get the invitation to retrieve org_id
-	inv, err := s.inviteRepo.GetByTokenAndEmail(ctx, inviteToken, email)
+	// Get the invitation to retrieve org details
+	inv, err := s.inviteRepo.GetByInvitationCodeAndEmail(ctx, inviteToken, email)
 	if err != nil {
 		return err
 	}

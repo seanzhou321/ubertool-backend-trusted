@@ -87,8 +87,8 @@ func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, us
 		return nil, nil, err
 	}
 
-	// 2. Validate the invitation code
-	inv, err := s.inviteRepo.GetByTokenAndEmail(ctx, inviteCode, user.Email)
+	// 2. Validate the invitation code using (invitation_code, email) tuple
+	inv, err := s.inviteRepo.GetByInvitationCodeAndEmail(ctx, inviteCode, user.Email)
 	if err != nil {
 		return nil, nil, errors.New("invitation code is invalid or expired")
 	}
@@ -99,7 +99,7 @@ func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, us
 		return nil, nil, errors.New("invitation code is invalid or expired")
 	}
 
-	// 3. Retrieve the organization_id from the invitation
+	// 3. Retrieve the organization from the invitation
 	org, err := s.orgRepo.GetByID(ctx, inv.OrgID)
 	if err != nil {
 		return nil, nil, err

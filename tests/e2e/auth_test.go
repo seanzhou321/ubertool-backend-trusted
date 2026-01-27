@@ -56,7 +56,7 @@ func TestAuthService_E2E(t *testing.T) {
 		assert.Greater(t, userID, int32(0))
 
 		// Verify: Invitation was marked as used
-		err = db.QueryRow("SELECT used_on FROM invitations WHERE token = $1", token).Scan(&usedOn)
+		err = db.QueryRow("SELECT used_on FROM invitations WHERE invitation_code = $1 AND email = $2", token, email).Scan(&usedOn)
 		assert.NoError(t, err)
 		assert.NotNil(t, usedOn)
 
@@ -130,4 +130,3 @@ func TestAuthService_E2E(t *testing.T) {
 		}
 	})
 }
-

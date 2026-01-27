@@ -72,8 +72,8 @@ type NotificationRepository interface {
 
 type InvitationRepository interface {
 	Create(ctx context.Context, invite *domain.Invitation) error
-	GetByToken(ctx context.Context, token string) (*domain.Invitation, error)
-	GetByTokenAndEmail(ctx context.Context, token, email string) (*domain.Invitation, error)
+	GetByInvitationCode(ctx context.Context, invitationCode string) (*domain.Invitation, error)
+	GetByInvitationCodeAndEmail(ctx context.Context, invitationCode, email string) (*domain.Invitation, error)
 	Update(ctx context.Context, invite *domain.Invitation) error
 }
 

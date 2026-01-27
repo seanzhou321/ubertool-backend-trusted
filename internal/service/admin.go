@@ -80,7 +80,7 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 			return fmt.Errorf("failed to get admin user: %w", err)
 		}
 
-		if err := s.emailSvc.SendInvitation(ctx, email, name, inv.Token, org.Name, admin.Email); err != nil {
+		if err := s.emailSvc.SendInvitation(ctx, email, name, inv.InvitationCode, org.Name, admin.Email); err != nil {
 			return fmt.Errorf("failed to send invitation email: %w", err)
 		}
 	}

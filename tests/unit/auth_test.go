@@ -27,13 +27,14 @@ func TestAuthService_ValidateInvite(t *testing.T) {
 
 	t.Run("Valid Token", func(t *testing.T) {
 		invite := &domain.Invitation{
-			Token:     token,
-			Email:     email,
-			ExpiresOn: time.Now().Add(time.Hour),
+			InvitationCode: token,
+			Email:          email,
+			OrgID:          1,
+			ExpiresOn:      time.Now().Add(time.Hour),
 		}
 		inviteRepo.ExpectedCalls = nil
 		userRepo.ExpectedCalls = nil
-		inviteRepo.On("GetByTokenAndEmail", ctx, token, email).Return(invite, nil)
+		inviteRepo.On("GetByInvitationCodeAndEmail", ctx, token, email).Return(invite, nil)
 		userRepo.On("GetByEmail", ctx, email).Return(nil, assert.AnError)
 
 		valid, msg, user, err := svc.ValidateInvite(ctx, token, email)
@@ -45,33 +46,37 @@ func TestAuthService_ValidateInvite(t *testing.T) {
 
 	t.Run("Expired Token", func(t *testing.T) {
 		invite := &domain.Invitation{
-			Token:     token,
-			Email:     email,
-			ExpiresOn: time.Now().Add(-time.Hour),
+			InvitationCode: token,
+			Email:          email,
+			OrgID:          1,
+			ExpiresOn:      time.Now().Add(-time.Hour),
 		}
 		inviteRepo.ExpectedCalls = nil
-		inviteRepo.On("GetByTokenAndEmail", ctx, token, email).Return(invite, nil)
+		inviteRepo.On("GetByInvitationCodeAndEmail", ctx, token, email).Return(invite, nil)
 
 		valid, msg, user, err := svc.ValidateInvite(ctx, token, email)
-		assert.NoError(t, err)
+		assert.Error(t, err, "Expected error for expired invitation")
+		assert.Equal(t, service.ErrInviteExpired, err, "Expected ErrInviteExpired")
 		assert.False(t, valid)
-		assert.Contains(t, msg, "invalid or expired")
+		assert.Contains(t, msg, "expired")
 		assert.Nil(t, user)
 	})
 
 	t.Run("Used Token", func(t *testing.T) {
 		now := time.Now()
 		invite := &domain.Invitation{
-			Token:     token,
-			Email:     email,
-			ExpiresOn: time.Now().Add(time.Hour),
-			UsedOn:    &now,
+			InvitationCode: token,
+			Email:          email,
+			OrgID:          1,
+			ExpiresOn:      time.Now().Add(time.Hour),
+			UsedOn:         &now,
 		}
 		inviteRepo.ExpectedCalls = nil
-		inviteRepo.On("GetByTokenAndEmail", ctx, token, email).Return(invite, nil)
+		inviteRepo.On("GetByInvitationCodeAndEmail", ctx, token, email).Return(invite, nil)
 
 		valid, msg, user, err := svc.ValidateInvite(ctx, token, email)
-		assert.NoError(t, err)
+		assert.Error(t, err, "Expected error for used invitation")
+		assert.Equal(t, service.ErrInviteUsed, err, "Expected ErrInviteUsed")
 		assert.False(t, valid)
 		assert.Contains(t, msg, "already used")
 		assert.Nil(t, user)

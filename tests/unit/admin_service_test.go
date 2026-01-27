@@ -7,6 +7,7 @@ import (
 
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -78,7 +79,7 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	// Add other missing repos: reqRepo, ledgerRepo
 	mockJoinRepo := new(MockJoinRequestRepo)
 	mockLedgerRepo := new(MockLedgerRepo)
-	
+
 	svc := service.NewAdminService(mockJoinRepo, mockUserRepo, mockLedgerRepo, mockOrgRepo, mockInviteRepo, mockEmailSvc)
 	ctx := context.Background()
 
@@ -92,15 +93,16 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	mockUserRepo.On("GetByID", ctx, adminID).Return(&domain.User{ID: adminID, Name: "Admin", Email: "admin@test.com"}, nil)
 	// Mock Check if user exists (false for this test case)
 	mockUserRepo.On("GetByEmail", ctx, email).Return(nil, nil)
-	
+
 	mockInviteRepo.On("Create", ctx, mock.MatchedBy(func(inv *domain.Invitation) bool {
 		return inv.OrgID == orgID && inv.Email == email && inv.CreatedBy == adminID
 	})).Run(func(args mock.Arguments) {
 		inv := args.Get(1).(*domain.Invitation)
-		inv.Token = "uuid-token"
+		inv.ID = 1
+		inv.InvitationCode = "ABC12345"
 	}).Return(nil)
-	mockEmailSvc.On("SendInvitation", ctx, email, name, "uuid-token", "Test Org", "admin@test.com").Return(nil)
-	
+	mockEmailSvc.On("SendInvitation", ctx, email, name, "ABC12345", "Test Org", "admin@test.com").Return(nil)
+
 	// Mock ListJoinRequests lookup update
 	mockJoinRepo.On("ListByOrg", ctx, orgID).Return([]domain.JoinRequest{}, nil)
 

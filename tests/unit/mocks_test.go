@@ -101,16 +101,16 @@ func (m *MockInviteRepo) Create(ctx context.Context, invite *domain.Invitation) 
 	args := m.Called(ctx, invite)
 	return args.Error(0)
 }
-func (m *MockInviteRepo) GetByToken(ctx context.Context, token string) (*domain.Invitation, error) {
-	args := m.Called(ctx, token)
+func (m *MockInviteRepo) GetByInvitationCode(ctx context.Context, invitationCode string) (*domain.Invitation, error) {
+	args := m.Called(ctx, invitationCode)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.Invitation), args.Error(1)
 }
 
-func (m *MockInviteRepo) GetByTokenAndEmail(ctx context.Context, token, email string) (*domain.Invitation, error) {
-	args := m.Called(ctx, token, email)
+func (m *MockInviteRepo) GetByInvitationCodeAndEmail(ctx context.Context, invitationCode, email string) (*domain.Invitation, error) {
+	args := m.Called(ctx, invitationCode, email)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

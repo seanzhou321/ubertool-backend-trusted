@@ -49,14 +49,16 @@ CREATE TABLE users_orgs (
 );
 
 CREATE TABLE invitations (
-    token UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Tokens should still be random UUIDs for security
+    id SERIAL PRIMARY KEY,
+    invitation_code TEXT NOT NULL,
     org_id INTEGER REFERENCES orgs(id),
     email TEXT NOT NULL,
     created_by INTEGER REFERENCES users(id),
     expires_on DATE NOT NULL,
     used_on DATE, -- NULL if unused
     used_by_user_id INTEGER REFERENCES users(id), -- User who used the invitation
-    created_on DATE DEFAULT CURRENT_DATE
+    created_on DATE DEFAULT CURRENT_DATE,
+    UNIQUE(invitation_code, email) -- Ensure uniqueness of invitation tuple
 );
 
 CREATE TABLE join_requests (
