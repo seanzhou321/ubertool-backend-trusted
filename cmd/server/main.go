@@ -111,7 +111,7 @@ func main() {
 	)
 	userSvc := service.NewUserService(store.UserRepository, store.OrganizationRepository)
 	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository, store.InvitationRepository, store.NotificationRepository)
-	toolSvc := service.NewToolService(store.ToolRepository, store.UserRepository)
+	toolSvc := service.NewToolService(store.ToolRepository, store.UserRepository, store.OrganizationRepository)
 	ledgerSvc := service.NewLedgerService(store.LedgerRepository)
 	noteSvc := service.NewNotificationService(store.NotificationRepository)
 	rentalSvc := service.NewRentalService(

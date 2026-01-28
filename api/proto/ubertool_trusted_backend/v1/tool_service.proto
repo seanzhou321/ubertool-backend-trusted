@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package ubertool.trusted.api.v1;
 
-option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
+import "ubertool_trusted_backend/v1/user_service.proto";
 
+option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
 option java_multiple_files = true;
 option java_package = "com.ubertool.trusted.api.v1";
@@ -143,13 +144,12 @@ message Tool {
   int32 price_per_month_cents = 7;
   int32 replacement_cost_cents = 8;
   ToolCondition condition = 9;
-  int32 owner_id = 10;
-  string owner_name = 11;
-  ToolStatus status = 12;
-  string metro = 14;
-  repeated string image_url = 15;
-  string created_on = 16; // Date string YYYY-MM-DD
-  string updated_on = 17; // Date string YYYY-MM-DD
+  User owner = 10;
+  ToolStatus status = 11;
+  string metro = 12;
+  repeated string image_url = 13;
+  string created_on = 14; // Date string YYYY-MM-DD
+  string updated_on = 15; // Date string YYYY-MM-DD
 }
 
 // Tool condition enum

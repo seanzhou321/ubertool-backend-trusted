@@ -43,7 +43,11 @@ func (h *ToolHandler) AddTool(ctx context.Context, req *pb.AddToolRequest) (*pb.
 }
 
 func (h *ToolHandler) GetTool(ctx context.Context, req *pb.GetToolRequest) (*pb.GetToolResponse, error) {
-	tool, _, err := h.toolSvc.GetTool(ctx, req.ToolId)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tool, _, err := h.toolSvc.GetTool(ctx, req.ToolId, userID)
 	if err != nil {
 		return nil, err
 	}

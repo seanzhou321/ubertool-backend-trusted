@@ -30,6 +30,7 @@ const (
 type Tool struct {
 	ID                   int32            `json:"id"`
 	OwnerID              int32            `json:"owner_id"`
+	Owner                *User            `json:"owner,omitempty"` // Populated when fetching tool details
 	Name                 string           `json:"name"`
 	Description          string           `json:"description"`
 	Categories           []string         `json:"categories"`

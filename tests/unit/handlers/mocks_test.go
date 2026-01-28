@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"ubertool-backend-trusted/internal/domain"
+
 	"github.com/stretchr/testify/mock"
 )
 
@@ -16,8 +17,8 @@ func (m *MockToolService) AddTool(ctx context.Context, tool *domain.Tool, images
 	args := m.Called(ctx, tool, images)
 	return args.Error(0)
 }
-func (m *MockToolService) GetTool(ctx context.Context, id int32) (*domain.Tool, []domain.ToolImage, error) {
-	args := m.Called(ctx, id)
+func (m *MockToolService) GetTool(ctx context.Context, id, requestingUserID int32) (*domain.Tool, []domain.ToolImage, error) {
+	args := m.Called(ctx, id, requestingUserID)
 	return args.Get(0).(*domain.Tool), args.Get(1).([]domain.ToolImage), args.Error(2)
 }
 func (m *MockToolService) UpdateTool(ctx context.Context, tool *domain.Tool) error {
@@ -28,8 +29,8 @@ func (m *MockToolService) DeleteTool(ctx context.Context, id int32) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
 }
-func (m *MockToolService) ListTools(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error) {
-	args := m.Called(ctx, orgID, page, pageSize)
+func (m *MockToolService) ListTools(ctx context.Context, orgID, requestingUserID int32, page, pageSize int32) ([]domain.Tool, int32, error) {
+	args := m.Called(ctx, orgID, requestingUserID, page, pageSize)
 	return args.Get(0).([]domain.Tool), args.Get(1).(int32), args.Error(2)
 }
 func (m *MockToolService) SearchTools(ctx context.Context, userID, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {

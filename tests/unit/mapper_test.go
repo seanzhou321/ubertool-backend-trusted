@@ -85,7 +85,7 @@ func TestMapDomainToolToProto(t *testing.T) {
 
 	assert.NotNil(t, proto)
 	assert.Equal(t, tool.ID, proto.Id)
-	assert.Equal(t, tool.OwnerID, proto.OwnerId)
+	assert.Nil(t, proto.Owner) // Owner is nil because tool.Owner is not populated
 	assert.Equal(t, tool.Name, proto.Name)
 	assert.Equal(t, pb.ToolCondition_TOOL_CONDITION_EXCELLENT, proto.Condition)
 	assert.Equal(t, pb.ToolStatus_TOOL_STATUS_AVAILABLE, proto.Status)

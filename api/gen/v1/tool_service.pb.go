@@ -965,13 +965,12 @@ type Tool struct {
 	PricePerMonthCents   int32         `protobuf:"varint,7,opt,name=price_per_month_cents,json=pricePerMonthCents,proto3" json:"price_per_month_cents,omitempty"`
 	ReplacementCostCents int32         `protobuf:"varint,8,opt,name=replacement_cost_cents,json=replacementCostCents,proto3" json:"replacement_cost_cents,omitempty"`
 	Condition            ToolCondition `protobuf:"varint,9,opt,name=condition,proto3,enum=ubertool.trusted.api.v1.ToolCondition" json:"condition,omitempty"`
-	OwnerId              int32         `protobuf:"varint,10,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
-	OwnerName            string        `protobuf:"bytes,11,opt,name=owner_name,json=ownerName,proto3" json:"owner_name,omitempty"`
-	Status               ToolStatus    `protobuf:"varint,12,opt,name=status,proto3,enum=ubertool.trusted.api.v1.ToolStatus" json:"status,omitempty"`
-	Metro                string        `protobuf:"bytes,14,opt,name=metro,proto3" json:"metro,omitempty"`
-	ImageUrl             []string      `protobuf:"bytes,15,rep,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
-	CreatedOn            string        `protobuf:"bytes,16,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"` // Date string YYYY-MM-DD
-	UpdatedOn            string        `protobuf:"bytes,17,opt,name=updated_on,json=updatedOn,proto3" json:"updated_on,omitempty"` // Date string YYYY-MM-DD
+	Owner                *User         `protobuf:"bytes,10,opt,name=owner,proto3" json:"owner,omitempty"`
+	Status               ToolStatus    `protobuf:"varint,11,opt,name=status,proto3,enum=ubertool.trusted.api.v1.ToolStatus" json:"status,omitempty"`
+	Metro                string        `protobuf:"bytes,12,opt,name=metro,proto3" json:"metro,omitempty"`
+	ImageUrl             []string      `protobuf:"bytes,13,rep,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	CreatedOn            string        `protobuf:"bytes,14,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"` // Date string YYYY-MM-DD
+	UpdatedOn            string        `protobuf:"bytes,15,opt,name=updated_on,json=updatedOn,proto3" json:"updated_on,omitempty"` // Date string YYYY-MM-DD
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -1069,18 +1068,11 @@ func (x *Tool) GetCondition() ToolCondition {
 	return ToolCondition_TOOL_CONDITION_UNSPECIFIED
 }
 
-func (x *Tool) GetOwnerId() int32 {
+func (x *Tool) GetOwner() *User {
 	if x != nil {
-		return x.OwnerId
+		return x.Owner
 	}
-	return 0
-}
-
-func (x *Tool) GetOwnerName() string {
-	if x != nil {
-		return x.OwnerName
-	}
-	return ""
+	return nil
 }
 
 func (x *Tool) GetStatus() ToolStatus {
@@ -1204,7 +1196,7 @@ var File_ubertool_trusted_backend_v1_tool_service_proto protoreflect.FileDescrip
 
 const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\n" +
-	".ubertool_trusted_backend/v1/tool_service.proto\x12\x17ubertool.trusted.api.v1\"Y\n" +
+	".ubertool_trusted_backend/v1/tool_service.proto\x12\x17ubertool.trusted.api.v1\x1a.ubertool_trusted_backend/v1/user_service.proto\"Y\n" +
 	"\x10ListToolsRequest\x12\x14\n" +
 	"\x05metro\x18\x01 \x01(\tR\x05metro\x12\x12\n" +
 	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x1b\n" +
@@ -1275,7 +1267,7 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\x13SearchToolsResponse\x123\n" +
 	"\x05tools\x18\x01 \x03(\v2\x1d.ubertool.trusted.api.v1.ToolR\x05tools\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
-	"totalCount\"\xe3\x04\n" +
+	"totalCount\"\xde\x04\n" +
 	"\x04Tool\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1287,18 +1279,16 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\x14price_per_week_cents\x18\x06 \x01(\x05R\x11pricePerWeekCents\x121\n" +
 	"\x15price_per_month_cents\x18\a \x01(\x05R\x12pricePerMonthCents\x124\n" +
 	"\x16replacement_cost_cents\x18\b \x01(\x05R\x14replacementCostCents\x12D\n" +
-	"\tcondition\x18\t \x01(\x0e2&.ubertool.trusted.api.v1.ToolConditionR\tcondition\x12\x19\n" +
-	"\bowner_id\x18\n" +
-	" \x01(\x05R\aownerId\x12\x1d\n" +
+	"\tcondition\x18\t \x01(\x0e2&.ubertool.trusted.api.v1.ToolConditionR\tcondition\x123\n" +
+	"\x05owner\x18\n" +
+	" \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x05owner\x12;\n" +
+	"\x06status\x18\v \x01(\x0e2#.ubertool.trusted.api.v1.ToolStatusR\x06status\x12\x14\n" +
+	"\x05metro\x18\f \x01(\tR\x05metro\x12\x1b\n" +
+	"\timage_url\x18\r \x03(\tR\bimageUrl\x12\x1d\n" +
 	"\n" +
-	"owner_name\x18\v \x01(\tR\townerName\x12;\n" +
-	"\x06status\x18\f \x01(\x0e2#.ubertool.trusted.api.v1.ToolStatusR\x06status\x12\x14\n" +
-	"\x05metro\x18\x0e \x01(\tR\x05metro\x12\x1b\n" +
-	"\timage_url\x18\x0f \x03(\tR\bimageUrl\x12\x1d\n" +
+	"created_on\x18\x0e \x01(\tR\tcreatedOn\x12\x1d\n" +
 	"\n" +
-	"created_on\x18\x10 \x01(\tR\tcreatedOn\x12\x1d\n" +
-	"\n" +
-	"updated_on\x18\x11 \x01(\tR\tupdatedOn\"\x1b\n" +
+	"updated_on\x18\x0f \x01(\tR\tupdatedOn\"\x1b\n" +
 	"\x19ListToolCategoriesRequest\"<\n" +
 	"\x1aListToolCategoriesResponse\x12\x1e\n" +
 	"\n" +
@@ -1360,6 +1350,7 @@ var file_ubertool_trusted_backend_v1_tool_service_proto_goTypes = []any{
 	(*Tool)(nil),                       // 14: ubertool.trusted.api.v1.Tool
 	(*ListToolCategoriesRequest)(nil),  // 15: ubertool.trusted.api.v1.ListToolCategoriesRequest
 	(*ListToolCategoriesResponse)(nil), // 16: ubertool.trusted.api.v1.ListToolCategoriesResponse
+	(*User)(nil),                       // 17: ubertool.trusted.api.v1.User
 }
 var file_ubertool_trusted_backend_v1_tool_service_proto_depIdxs = []int32{
 	14, // 0: ubertool.trusted.api.v1.ListToolsResponse.tools:type_name -> ubertool.trusted.api.v1.Tool
@@ -1371,26 +1362,27 @@ var file_ubertool_trusted_backend_v1_tool_service_proto_depIdxs = []int32{
 	0,  // 6: ubertool.trusted.api.v1.SearchToolsRequest.condition:type_name -> ubertool.trusted.api.v1.ToolCondition
 	14, // 7: ubertool.trusted.api.v1.SearchToolsResponse.tools:type_name -> ubertool.trusted.api.v1.Tool
 	0,  // 8: ubertool.trusted.api.v1.Tool.condition:type_name -> ubertool.trusted.api.v1.ToolCondition
-	1,  // 9: ubertool.trusted.api.v1.Tool.status:type_name -> ubertool.trusted.api.v1.ToolStatus
-	2,  // 10: ubertool.trusted.api.v1.ToolService.ListMyTools:input_type -> ubertool.trusted.api.v1.ListToolsRequest
-	4,  // 11: ubertool.trusted.api.v1.ToolService.GetTool:input_type -> ubertool.trusted.api.v1.GetToolRequest
-	6,  // 12: ubertool.trusted.api.v1.ToolService.AddTool:input_type -> ubertool.trusted.api.v1.AddToolRequest
-	8,  // 13: ubertool.trusted.api.v1.ToolService.UpdateTool:input_type -> ubertool.trusted.api.v1.UpdateToolRequest
-	10, // 14: ubertool.trusted.api.v1.ToolService.DeleteTool:input_type -> ubertool.trusted.api.v1.DeleteToolRequest
-	12, // 15: ubertool.trusted.api.v1.ToolService.SearchTools:input_type -> ubertool.trusted.api.v1.SearchToolsRequest
-	15, // 16: ubertool.trusted.api.v1.ToolService.ListToolCategories:input_type -> ubertool.trusted.api.v1.ListToolCategoriesRequest
-	3,  // 17: ubertool.trusted.api.v1.ToolService.ListMyTools:output_type -> ubertool.trusted.api.v1.ListToolsResponse
-	5,  // 18: ubertool.trusted.api.v1.ToolService.GetTool:output_type -> ubertool.trusted.api.v1.GetToolResponse
-	7,  // 19: ubertool.trusted.api.v1.ToolService.AddTool:output_type -> ubertool.trusted.api.v1.AddToolResponse
-	9,  // 20: ubertool.trusted.api.v1.ToolService.UpdateTool:output_type -> ubertool.trusted.api.v1.UpdateToolResponse
-	11, // 21: ubertool.trusted.api.v1.ToolService.DeleteTool:output_type -> ubertool.trusted.api.v1.DeleteToolResponse
-	13, // 22: ubertool.trusted.api.v1.ToolService.SearchTools:output_type -> ubertool.trusted.api.v1.SearchToolsResponse
-	16, // 23: ubertool.trusted.api.v1.ToolService.ListToolCategories:output_type -> ubertool.trusted.api.v1.ListToolCategoriesResponse
-	17, // [17:24] is the sub-list for method output_type
-	10, // [10:17] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	17, // 9: ubertool.trusted.api.v1.Tool.owner:type_name -> ubertool.trusted.api.v1.User
+	1,  // 10: ubertool.trusted.api.v1.Tool.status:type_name -> ubertool.trusted.api.v1.ToolStatus
+	2,  // 11: ubertool.trusted.api.v1.ToolService.ListMyTools:input_type -> ubertool.trusted.api.v1.ListToolsRequest
+	4,  // 12: ubertool.trusted.api.v1.ToolService.GetTool:input_type -> ubertool.trusted.api.v1.GetToolRequest
+	6,  // 13: ubertool.trusted.api.v1.ToolService.AddTool:input_type -> ubertool.trusted.api.v1.AddToolRequest
+	8,  // 14: ubertool.trusted.api.v1.ToolService.UpdateTool:input_type -> ubertool.trusted.api.v1.UpdateToolRequest
+	10, // 15: ubertool.trusted.api.v1.ToolService.DeleteTool:input_type -> ubertool.trusted.api.v1.DeleteToolRequest
+	12, // 16: ubertool.trusted.api.v1.ToolService.SearchTools:input_type -> ubertool.trusted.api.v1.SearchToolsRequest
+	15, // 17: ubertool.trusted.api.v1.ToolService.ListToolCategories:input_type -> ubertool.trusted.api.v1.ListToolCategoriesRequest
+	3,  // 18: ubertool.trusted.api.v1.ToolService.ListMyTools:output_type -> ubertool.trusted.api.v1.ListToolsResponse
+	5,  // 19: ubertool.trusted.api.v1.ToolService.GetTool:output_type -> ubertool.trusted.api.v1.GetToolResponse
+	7,  // 20: ubertool.trusted.api.v1.ToolService.AddTool:output_type -> ubertool.trusted.api.v1.AddToolResponse
+	9,  // 21: ubertool.trusted.api.v1.ToolService.UpdateTool:output_type -> ubertool.trusted.api.v1.UpdateToolResponse
+	11, // 22: ubertool.trusted.api.v1.ToolService.DeleteTool:output_type -> ubertool.trusted.api.v1.DeleteToolResponse
+	13, // 23: ubertool.trusted.api.v1.ToolService.SearchTools:output_type -> ubertool.trusted.api.v1.SearchToolsResponse
+	16, // 24: ubertool.trusted.api.v1.ToolService.ListToolCategories:output_type -> ubertool.trusted.api.v1.ListToolCategoriesResponse
+	18, // [18:25] is the sub-list for method output_type
+	11, // [11:18] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_tool_service_proto_init() }
@@ -1398,6 +1390,7 @@ func file_ubertool_trusted_backend_v1_tool_service_proto_init() {
 	if File_ubertool_trusted_backend_v1_tool_service_proto != nil {
 		return
 	}
+	file_ubertool_trusted_backend_v1_user_service_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

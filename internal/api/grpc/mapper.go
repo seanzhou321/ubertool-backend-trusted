@@ -44,7 +44,6 @@ func MapDomainToolToProto(t *domain.Tool) *pb.Tool {
 	}
 	return &pb.Tool{
 		Id:                   t.ID,
-		OwnerId:              t.OwnerID,
 		Name:                 t.Name,
 		Description:          t.Description,
 		Categories:           t.Categories,
@@ -53,6 +52,7 @@ func MapDomainToolToProto(t *domain.Tool) *pb.Tool {
 		PricePerMonthCents:   t.PricePerMonthCents,
 		ReplacementCostCents: t.ReplacementCostCents,
 		Condition:            MapDomainToolConditionToProto(t.Condition),
+		Owner:                MapDomainUserToProto(t.Owner),
 		Metro:                t.Metro,
 		Status:               MapDomainToolStatusToProto(t.Status),
 		CreatedOn:            t.CreatedOn.Format("2006-01-02"),

@@ -41,10 +41,10 @@ type ImageStorageService interface {
 
 type ToolService interface {
 	AddTool(ctx context.Context, tool *domain.Tool, images []string) error
-	GetTool(ctx context.Context, id int32) (*domain.Tool, []domain.ToolImage, error)
+	GetTool(ctx context.Context, id, requestingUserID int32) (*domain.Tool, []domain.ToolImage, error)
 	UpdateTool(ctx context.Context, tool *domain.Tool) error
 	DeleteTool(ctx context.Context, id int32) error
-	ListTools(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error)
+	ListTools(ctx context.Context, orgID, requestingUserID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	ListMyTools(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	SearchTools(ctx context.Context, userID, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
 	ListCategories(ctx context.Context) ([]string, error)
