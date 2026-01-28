@@ -126,7 +126,12 @@ func (h *ToolHandler) SearchTools(ctx context.Context, req *pb.SearchToolsReques
 	if pageSize <= 0 {
 		pageSize = 10
 	}
-	tools, count, err := h.toolSvc.SearchTools(ctx, userID, req.OrganizationId, req.Query, req.Categories, req.MaxPrice, req.Condition.String(), page, pageSize)
+	// Convert proto enum to domain string, or empty string if unspecified
+	conditionFilter := ""
+	if req.Condition != pb.ToolCondition_TOOL_CONDITION_UNSPECIFIED {
+		conditionFilter = string(MapProtoToolConditionToDomain(req.Condition))
+	}
+	tools, count, err := h.toolSvc.SearchTools(ctx, userID, req.OrganizationId, req.Query, req.Categories, req.MaxPrice, conditionFilter, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
