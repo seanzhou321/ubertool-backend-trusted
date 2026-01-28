@@ -75,7 +75,7 @@ func (s *toolService) SearchTools(ctx context.Context, userID, orgID int32, quer
 			return nil, 0, fmt.Errorf("user does not belong to organization %d: %w", orgID, err)
 		}
 	}
-	return s.toolRepo.Search(ctx, orgID, query, categories, maxPrice, condition, page, pageSize)
+	return s.toolRepo.Search(ctx, userID, orgID, query, categories, maxPrice, condition, page, pageSize)
 }
 
 func (s *toolService) ListCategories(ctx context.Context) ([]string, error) {

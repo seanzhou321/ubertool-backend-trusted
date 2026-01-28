@@ -117,7 +117,7 @@ func (r *toolRepository) ListByOwner(ctx context.Context, ownerID int32, page, p
 	return tools, count, nil
 }
 
-func (r *toolRepository) Search(ctx context.Context, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
+func (r *toolRepository) Search(ctx context.Context, userID, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
 	orgQuery := `SELECT metro FROM orgs WHERE id = $1`
 	var metro string
 	err := r.db.QueryRowContext(ctx, orgQuery, orgID).Scan(&metro)
@@ -127,10 +127,10 @@ func (r *toolRepository) Search(ctx context.Context, orgID int32, query string, 
 
 	offset := (page - 1) * pageSize
 	sql := `SELECT id, owner_id, name, COALESCE(description, ''), categories, price_per_day_cents, COALESCE(price_per_week_cents, 0), COALESCE(price_per_month_cents, 0), COALESCE(replacement_cost_cents, 0), condition, metro, status, created_on, deleted_on 
-	          FROM tools WHERE metro = $1 AND deleted_on IS NULL`
+	          FROM tools WHERE metro = $1 AND deleted_on IS NULL AND owner_id != $2`
 
-	args := []interface{}{metro}
-	argIdx := 2
+	args := []interface{}{metro, userID}
+	argIdx := 3
 
 	if query != "" {
 		sql += fmt.Sprintf(" AND (name ILIKE $%d OR description ILIKE $%d)", argIdx, argIdx)

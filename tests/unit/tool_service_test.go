@@ -6,6 +6,7 @@ import (
 
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +19,7 @@ func TestToolService_AddTool(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		tool := &domain.Tool{Name: "Tool"}
 		repo.On("Create", ctx, tool).Return(nil)
-		
+
 		err := svc.AddTool(ctx, tool, []string{})
 		assert.NoError(t, err)
 	})
@@ -32,9 +33,9 @@ func TestToolService_SearchTools(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		tools := []domain.Tool{{Name: "Hammer"}}
-		repo.On("Search", ctx, int32(1), "query", []string{"cat"}, int32(100), "condition", int32(1), int32(10)).
+		repo.On("Search", ctx, int32(1), int32(1), "query", []string{"cat"}, int32(100), "condition", int32(1), int32(10)).
 			Return(tools, int32(1), nil)
-		
+
 		// Mock GetUserOrg logic if orgID != 0
 		if 1 != 0 {
 			userRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(&domain.UserOrg{}, nil)
