@@ -60,6 +60,21 @@ func MapDomainToolToProto(t *domain.Tool) *pb.Tool {
 	}
 }
 
+func MapProtoToolConditionToDomain(c pb.ToolCondition) domain.ToolCondition {
+	switch c {
+	case pb.ToolCondition_TOOL_CONDITION_EXCELLENT:
+		return domain.ToolConditionExcellent
+	case pb.ToolCondition_TOOL_CONDITION_GOOD:
+		return domain.ToolConditionGood
+	case pb.ToolCondition_TOOL_CONDITION_ACCEPTABLE:
+		return domain.ToolConditionAcceptable
+	case pb.ToolCondition_TOOL_CONDITION_DAMAGED__NEEDS_REPAIR:
+		return domain.ToolConditionDamaged
+	default:
+		return domain.ToolConditionExcellent // Default to excellent if unspecified
+	}
+}
+
 func MapDomainToolConditionToProto(c domain.ToolCondition) pb.ToolCondition {
 	switch c {
 	case domain.ToolConditionExcellent:
