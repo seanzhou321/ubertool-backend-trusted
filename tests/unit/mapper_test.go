@@ -35,6 +35,31 @@ func TestMapDomainUserToProto(t *testing.T) {
 	assert.Nil(t, grpc.MapDomainUserToProto(nil))
 }
 
+func TestMapDomainUserToProto_WithOrgs(t *testing.T) {
+	now := time.Now()
+	u := &domain.User{
+		ID:        1,
+		Email:     "test@example.com",
+		Name:      "Test User",
+		CreatedOn: now,
+		Orgs: []domain.Organization{
+			{ID: 1, Name: "Org 1", Metro: "Metro 1", CreatedOn: now},
+			{ID: 2, Name: "Org 2", Metro: "Metro 2", CreatedOn: now},
+		},
+	}
+
+	proto := grpc.MapDomainUserToProto(u)
+
+	assert.NotNil(t, proto)
+	assert.Equal(t, u.ID, proto.Id)
+	assert.NotNil(t, proto.Orgs, "Orgs should not be nil")
+	assert.Len(t, proto.Orgs, 2, "Should have 2 orgs")
+	assert.Equal(t, int32(1), proto.Orgs[0].Id)
+	assert.Equal(t, "Org 1", proto.Orgs[0].Name)
+	assert.Equal(t, int32(2), proto.Orgs[1].Id)
+	assert.Equal(t, "Org 2", proto.Orgs[1].Name)
+}
+
 func TestMapDomainOrgToProto(t *testing.T) {
 	now := time.Now()
 	o := &domain.Organization{

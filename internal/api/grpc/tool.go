@@ -135,7 +135,7 @@ func (h *ToolHandler) SearchTools(ctx context.Context, req *pb.SearchToolsReques
 	if req.Condition != pb.ToolCondition_TOOL_CONDITION_UNSPECIFIED {
 		conditionFilter = string(MapProtoToolConditionToDomain(req.Condition))
 	}
-	tools, count, err := h.toolSvc.SearchTools(ctx, userID, req.OrganizationId, req.Query, req.Categories, req.MaxPrice, conditionFilter, page, pageSize)
+	tools, count, err := h.toolSvc.SearchTools(ctx, userID, req.OrganizationId, req.Metro, req.Query, req.Categories, req.MaxPrice, conditionFilter, page, pageSize)
 	if err != nil {
 		return nil, err
 	}

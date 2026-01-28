@@ -153,6 +153,16 @@ func (db *TestDB) AddUserToOrg(userID, orgID int32, role, status string, balance
 	}
 }
 
+// IsUserInOrg checks if a user is already a member of an organization
+func (db *TestDB) IsUserInOrg(userID, orgID int32) bool {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM users_orgs WHERE user_id = $1 AND org_id = $2", userID, orgID).Scan(&count)
+	if err != nil {
+		return false
+	}
+	return count > 0
+}
+
 // CreateTestTool creates a test tool
 func (db *TestDB) CreateTestTool(ownerID int32, name string, pricePerDay int32) int32 {
 	if name == "" {
@@ -168,6 +178,61 @@ func (db *TestDB) CreateTestTool(ownerID int32, name string, pricePerDay int32) 
 		db.t.Fatalf("failed to create test tool: %v", err)
 	}
 	return toolID
+}
+
+// CreateTestToolWithMetro creates a test tool with a specific metro
+func (db *TestDB) CreateTestToolWithMetro(ownerID int32, name, metro string, pricePerDay int32) int32 {
+	if name == "" {
+		name = fmt.Sprintf("Test Tool %d", time.Now().UnixNano())
+	}
+	var toolID int32
+	err := db.QueryRow(`
+		INSERT INTO tools (owner_id, name, description, price_per_day_cents, condition, metro, status)
+		VALUES ($1, $2, 'Test tool description', $3, 'EXCELLENT', $4, 'AVAILABLE')
+		RETURNING id
+	`, ownerID, name, pricePerDay, metro).Scan(&toolID)
+	if err != nil {
+		db.t.Fatalf("failed to create test tool: %v", err)
+	}
+	return toolID
+}
+
+// GetOrgByID retrieves an organization by ID, returns nil if not found
+func (db *TestDB) GetOrgByID(orgID int32) *int32 {
+	var id int32
+	err := db.QueryRow("SELECT id FROM orgs WHERE id = $1", orgID).Scan(&id)
+	if err != nil {
+		return nil
+	}
+	return &id
+}
+
+// GetUserByID retrieves a user by ID, returns nil if not found
+func (db *TestDB) GetUserByID(userID int32) *int32 {
+	var id int32
+	err := db.QueryRow("SELECT id FROM users WHERE id = $1", userID).Scan(&id)
+	if err != nil {
+		return nil
+	}
+	return &id
+}
+
+// GetToolByID retrieves a tool by ID, returns nil if not found
+func (db *TestDB) GetToolByID(toolID int32) *int32 {
+	var id int32
+	err := db.QueryRow("SELECT id FROM tools WHERE id = $1 AND deleted_on IS NULL", toolID).Scan(&id)
+	if err != nil {
+		return nil
+	}
+	return &id
+}
+
+// UpdateToolMetro updates a tool's metro
+func (db *TestDB) UpdateToolMetro(toolID int32, metro string) {
+	_, err := db.Exec("UPDATE tools SET metro = $1 WHERE id = $2", metro, toolID)
+	if err != nil {
+		db.t.Fatalf("failed to update tool metro: %v", err)
+	}
 }
 
 // CreateTestInvitation creates a test invitation and returns the invitation code

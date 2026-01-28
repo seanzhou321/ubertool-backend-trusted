@@ -33,8 +33,8 @@ func (m *MockToolService) ListTools(ctx context.Context, orgID, requestingUserID
 	args := m.Called(ctx, orgID, requestingUserID, page, pageSize)
 	return args.Get(0).([]domain.Tool), args.Get(1).(int32), args.Error(2)
 }
-func (m *MockToolService) SearchTools(ctx context.Context, userID, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
-	args := m.Called(ctx, userID, orgID, query, categories, maxPrice, condition, page, pageSize)
+func (m *MockToolService) SearchTools(ctx context.Context, userID, orgID int32, metro, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
+	args := m.Called(ctx, userID, orgID, metro, query, categories, maxPrice, condition, page, pageSize)
 	return args.Get(0).([]domain.Tool), args.Get(1).(int32), args.Error(2)
 }
 func (m *MockToolService) ListMyTools(ctx context.Context, userID, page, pageSize int32) ([]domain.Tool, int32, error) {

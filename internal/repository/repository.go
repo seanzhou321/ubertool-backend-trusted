@@ -35,7 +35,7 @@ type ToolRepository interface {
 	Delete(ctx context.Context, id int32) error
 	ListByOrg(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	ListByOwner(ctx context.Context, ownerID int32, page, pageSize int32) ([]domain.Tool, int32, error)
-	Search(ctx context.Context, userID, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
+	Search(ctx context.Context, userID int32, metro, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
 
 	// Image management (unified pending + confirmed)
 	CreateImage(ctx context.Context, image *domain.ToolImage) error

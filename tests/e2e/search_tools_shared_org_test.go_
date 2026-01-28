@@ -1,0 +1,158 @@
+package e2e
+
+import (
+	"testing"
+	"time"
+
+	pb "ubertool-backend-trusted/api/gen/v1"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TestSearchTools_SharedOrgFiltering tests the specific scenario:
+// - Tool ID 141, owned by user 1, in org 1
+// - Requesting user 301, also in org 1
+// - Search with org_id=0, metro="San Diego, CA", query="s"
+// - Should return tool 141 with owner.orgs containing org 1
+func TestSearchTools_SharedOrgFiltering(t *testing.T) {
+	db := PrepareDB(t)
+	defer db.Close()
+	defer db.Cleanup()
+
+	client := NewGRPCClient(t, "")
+	defer client.Close()
+
+	toolClient := pb.NewToolServiceClient(client.Conn())
+
+	t.Run("ReturnsToolWhenUsersShareOrg", func(t *testing.T) {
+		// Setup: Create org 1
+		orgID := int32(1)
+		existingOrg := db.GetOrgByID(orgID)
+		if existingOrg == nil {
+			orgID = db.CreateTestOrg("Test Org 1")
+		}
+
+		// Setup: Create or verify user 1 (tool owner)
+		user1ID := int32(1)
+		existingUser1 := db.GetUserByID(user1ID)
+		if existingUser1 == nil {
+			user1ID = db.CreateTestUser("owner1@test.com", "Owner 1")
+		}
+		// Add to org only if not already a member
+		if !db.IsUserInOrg(user1ID, orgID) {
+			db.AddUserToOrg(user1ID, orgID, "MEMBER", "ACTIVE", 0)
+		}
+
+		// Setup: Create or verify user 301 (requesting user)
+		user301ID := int32(301)
+		existingUser301 := db.GetUserByID(user301ID)
+		if existingUser301 == nil {
+			user301ID = db.CreateTestUser("user301@test.com", "User 301")
+		}
+		// Add to org only if not already a member
+		if !db.IsUserInOrg(user301ID, orgID) {
+			db.AddUserToOrg(user301ID, orgID, "MEMBER", "ACTIVE", 0)
+		}
+
+		// Setup: Create or verify tool 141
+		tool141ID := int32(141)
+		existingTool := db.GetToolByID(tool141ID)
+		if existingTool == nil {
+			tool141ID = db.CreateTestToolWithMetro(user1ID, "Shared Tool", "San Diego, CA", 1000)
+		} else {
+			// Update tool to ensure correct metro and owner
+			db.UpdateToolMetro(tool141ID, "San Diego, CA")
+		}
+
+		// Test: User 301 searches without org_id (org_id=0), providing metro
+		ctx, cancel := ContextWithUserIDAndTimeout(user301ID, 5*time.Second)
+		defer cancel()
+
+		req := &pb.SearchToolsRequest{
+			OrganizationId: 0, // Not specified
+			Metro:          "San Diego, CA",
+			Query:          "s", // Should match "Shared Tool"
+			Page:           1,
+			PageSize:       20,
+		}
+
+		resp, err := toolClient.SearchTools(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+
+		// Verify: Should return at least one tool
+		assert.Greater(t, len(resp.Tools), 0, "Should return at least one tool")
+
+		// Find tool 141 in results
+		var foundTool *pb.Tool
+		for _, tool := range resp.Tools {
+			if tool.Id == tool141ID {
+				foundTool = tool
+				break
+			}
+		}
+
+		require.NotNil(t, foundTool, "Should find tool ID %d in search results", tool141ID)
+		assert.Equal(t, tool141ID, foundTool.Id)
+
+		// Verify: Owner field should be populated
+		require.NotNil(t, foundTool.Owner, "Tool owner should be populated")
+		assert.Equal(t, user1ID, foundTool.Owner.Id, "Owner ID should be user 1")
+
+		// Verify: Owner should have shared organizations
+		require.NotNil(t, foundTool.Owner.Orgs, "Owner orgs should not be nil")
+		assert.Greater(t, len(foundTool.Owner.Orgs), 0, "Owner should have at least one shared org")
+
+		// Verify: Shared org should be org 1
+		foundSharedOrg := false
+		for _, org := range foundTool.Owner.Orgs {
+			if org.Id == orgID {
+				foundSharedOrg = true
+				break
+			}
+		}
+		assert.True(t, foundSharedOrg, "Owner orgs should contain org ID %d", orgID)
+	})
+
+	t.Run("FiltersOutToolWhenNoSharedOrg", func(t *testing.T) {
+		// Setup: Create two separate orgs
+		org1ID := db.CreateTestOrg("Org Without User 301")
+		org2ID := db.CreateTestOrg("Org With User 301")
+
+		// Setup: Create users in different orgs
+		ownerID := db.CreateTestUser("owner_separate@test.com", "Separate Owner")
+		searcherID := db.CreateTestUser("searcher_separate@test.com", "Separate Searcher")
+
+		db.AddUserToOrg(ownerID, org1ID, "MEMBER", "ACTIVE", 0)    // Owner in org1
+		db.AddUserToOrg(searcherID, org2ID, "MEMBER", "ACTIVE", 0) // Searcher in org2 (different!)
+
+		// Setup: Create tool owned by owner in org1's metro
+		var org1Metro string
+		err := db.QueryRow("SELECT metro FROM orgs WHERE id = $1", org1ID).Scan(&org1Metro)
+		require.NoError(t, err)
+
+		toolID := db.CreateTestToolWithMetro(ownerID, "Different Org Tool", org1Metro, 1500)
+
+		// Test: Searcher searches in same metro but different org
+		ctx, cancel := ContextWithUserIDAndTimeout(searcherID, 5*time.Second)
+		defer cancel()
+
+		req := &pb.SearchToolsRequest{
+			OrganizationId: 0, // Not specified
+			Metro:          org1Metro,
+			Query:          "Different", // Should match tool name
+			Page:           1,
+			PageSize:       20,
+		}
+
+		resp, err := toolClient.SearchTools(ctx, req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+
+		// Verify: Tool should be filtered out (no shared org)
+		for _, tool := range resp.Tools {
+			assert.NotEqual(t, toolID, tool.Id, "Tool from different org should be filtered out")
+		}
+	})
+}

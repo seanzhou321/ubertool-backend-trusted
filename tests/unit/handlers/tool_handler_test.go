@@ -58,7 +58,7 @@ func TestToolHandler_SearchTools(t *testing.T) {
 
 		tools := []domain.Tool{{ID: 1, Name: "Drill", PricePerDayCents: 500, Status: domain.ToolStatusAvailable}}
 		// Note: userID is now passed, assuming context has userID 1 (default in helper/mock)
-		svc.On("SearchTools", ctx, int32(1), int32(1), "Drill", mock.Anything, int32(0), "", int32(1), int32(10)).
+		svc.On("SearchTools", ctx, int32(1), int32(1), "", "Drill", mock.Anything, int32(0), "", int32(1), int32(10)).
 			Return(tools, int32(1), nil)
 
 		res, err := handler.SearchTools(ctx, req)

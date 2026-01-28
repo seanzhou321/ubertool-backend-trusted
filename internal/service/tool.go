@@ -87,34 +87,88 @@ func (s *toolService) ListMyTools(ctx context.Context, userID int32, page, pageS
 	return s.toolRepo.ListByOwner(ctx, userID, page, pageSize)
 }
 
-func (s *toolService) SearchTools(ctx context.Context, userID, orgID int32, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
+func (s *toolService) SearchTools(ctx context.Context, userID, orgID int32, metro, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
+	fmt.Printf("DEBUG SearchTools: userID=%d, orgID=%d, metro=%q, query=%q, categories=%v, maxPrice=%d, condition=%q, page=%d, pageSize=%d\n",
+		userID, orgID, metro, query, categories, maxPrice, condition, page, pageSize)
+
+	// Validate required parameters
+	if query == "" {
+		fmt.Printf("ERROR SearchTools: query parameter is empty or missing\n")
+		return nil, 0, fmt.Errorf("query parameter is required and cannot be empty")
+	}
+
+	// Get metro from org if orgID is provided, otherwise metro must be specified
+	var searchMetro string
 	if orgID != 0 {
+		fmt.Printf("DEBUG SearchTools: orgID provided (%d), fetching metro from organization\n", orgID)
 		// verify user belongs to this organization
-		// Assuming GetUserOrg checks existence/active status
 		_, err := s.userRepo.GetUserOrg(ctx, userID, orgID)
 		if err != nil {
 			return nil, 0, fmt.Errorf("user does not belong to organization %d: %w", orgID, err)
 		}
+		// Get metro from organization
+		org, err := s.orgRepo.GetByID(ctx, orgID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to get organization: %w", err)
+		}
+		searchMetro = org.Metro
+	} else {
+		// When orgID not provided, metro must be specified
+		fmt.Printf("DEBUG SearchTools: orgID=0, using metro from request parameter\n")
+		if metro == "" {
+			fmt.Printf("ERROR SearchTools: metro parameter is empty when orgID=0\n")
+			return nil, 0, fmt.Errorf("metro parameter is required when organization_id is not specified")
+		}
+		searchMetro = metro
 	}
-	tools, count, err := s.toolRepo.Search(ctx, userID, orgID, query, categories, maxPrice, condition, page, pageSize)
+	fmt.Printf("DEBUG SearchTools: searchMetro=%q\n", searchMetro)
+
+	// Default condition to exclude damaged tools if not specified
+	if condition == "" {
+		condition = "NOT_DAMAGED"
+		fmt.Printf("DEBUG SearchTools: condition defaulted to NOT_DAMAGED\n")
+	}
+
+	fmt.Printf("DEBUG SearchTools: calling repository Search with metro=%q, query=%q, condition=%q\n", searchMetro, query, condition)
+	tools, count, err := s.toolRepo.Search(ctx, userID, searchMetro, query, categories, maxPrice, condition, page, pageSize)
 	if err != nil {
+		fmt.Printf("ERROR SearchTools: repository Search failed: %v\n", err)
 		return nil, 0, err
 	}
+	fmt.Printf("DEBUG SearchTools: repository returned %d tools (count=%d)\n", len(tools), count)
 
-	// Populate owner information with shared organizations
+	// Populate owner information with shared organizations and filter out tools with no shared orgs
+	var filteredTools []domain.Tool
+	fmt.Printf("DEBUG SearchTools: Processing %d tools for owner population and filtering\n", len(tools))
 	for i := range tools {
+		fmt.Printf("DEBUG SearchTools: Processing tool ID=%d, ownerID=%d\n", tools[i].ID, tools[i].OwnerID)
 		if err := s.populateToolOwner(ctx, &tools[i], userID); err != nil {
-			fmt.Printf("ERROR: Fail to retrieve Tool ID %d owner (ID %d).\n", tools[i].ID, tools[i].OwnerID)
+			fmt.Printf("ERROR: Fail to retrieve Tool ID %d owner (ID %d): %v\n", tools[i].ID, tools[i].OwnerID, err)
 			continue
 		}
-		// Check that shared organizations are not empty for SearchTools
-		if tools[i].Owner != nil && len(tools[i].Owner.Orgs) == 0 {
-			fmt.Printf("ERROR: Tool ID %d owner (ID %d) has no shared organizations with requesting user (ID %d). This should not happen in SearchTools.\n",
-				tools[i].ID, tools[i].OwnerID, userID)
+
+		// Check owner and orgs
+		if tools[i].Owner == nil {
+			fmt.Printf("WARNING: Tool ID %d has nil Owner after populateToolOwner\n", tools[i].ID)
+			continue
 		}
+
+		fmt.Printf("DEBUG SearchTools: Tool ID=%d owner populated: ownerID=%d, ownerName=%q, orgs count=%d\n",
+			tools[i].ID, tools[i].Owner.ID, tools[i].Owner.Name, len(tools[i].Owner.Orgs))
+
+		// Filter out tools where owner has no shared organizations with requesting user
+		if len(tools[i].Owner.Orgs) == 0 {
+			fmt.Printf("FILTERED OUT: Tool ID %d owner (ID %d) has no shared organizations with requesting user (ID %d).\n",
+				tools[i].ID, tools[i].OwnerID, userID)
+			continue
+		}
+
+		fmt.Printf("DEBUG SearchTools: Tool ID=%d INCLUDED in results\n", tools[i].ID)
+		filteredTools = append(filteredTools, tools[i])
 	}
 
-	return tools, count, nil
+	fmt.Printf("DEBUG SearchTools: Returning %d tools after filtering (originally %d)\n", len(filteredTools), len(tools))
+	return filteredTools, int32(len(filteredTools)), nil
 }
 
 func (s *toolService) populateToolOwner(ctx context.Context, tool *domain.Tool, requestingUserID int32) error {
@@ -139,14 +193,18 @@ func (s *toolService) getSharedOrganizations(ctx context.Context, ownerID, reque
 	// Get all organizations for the owner
 	ownerOrgs, err := s.userRepo.ListUserOrgs(ctx, ownerID)
 	if err != nil {
+		fmt.Printf("DEBUG: Failed to get owner orgs for user %d: %v\n", ownerID, err)
 		return nil, err
 	}
+	fmt.Printf("DEBUG: Owner (user %d) orgs: %+v\n", ownerID, ownerOrgs)
 
 	// Get all organizations for the requesting user
 	requestingUserOrgs, err := s.userRepo.ListUserOrgs(ctx, requestingUserID)
 	if err != nil {
+		fmt.Printf("DEBUG: Failed to get requesting user orgs for user %d: %v\n", requestingUserID, err)
 		return nil, err
 	}
+	fmt.Printf("DEBUG: Requesting user (user %d) orgs: %+v\n", requestingUserID, requestingUserOrgs)
 
 	// Create a map of requesting user's org IDs for fast lookup
 	requestingOrgIDs := make(map[int32]bool)
@@ -161,12 +219,14 @@ func (s *toolService) getSharedOrganizations(ctx context.Context, ownerID, reque
 			// This is a shared organization, fetch its details
 			org, err := s.orgRepo.GetByID(ctx, ownerOrg.OrgID)
 			if err != nil {
+				fmt.Printf("DEBUG: Failed to get org details for org %d: %v\n", ownerOrg.OrgID, err)
 				continue // Skip if we can't fetch org details
 			}
 			sharedOrgs = append(sharedOrgs, *org)
 		}
 	}
 
+	fmt.Printf("DEBUG: Shared orgs between user %d and %d: %+v\n", ownerID, requestingUserID, sharedOrgs)
 	return sharedOrgs, nil
 }
 
