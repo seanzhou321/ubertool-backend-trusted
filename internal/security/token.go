@@ -25,6 +25,7 @@ const (
 // UserClaims defines the standard claims for our application
 type UserClaims struct {
 	UserID    int32     `json:"user_id"` // Standard field for our application
+	Email     string    `json:"email,omitempty"`
 	Type      TokenType `json:"type"`
 	Scope     []string  `json:"scope,omitempty"`
 	Roles     []string  `json:"roles,omitempty"`
@@ -34,8 +35,8 @@ type UserClaims struct {
 }
 
 type TokenManager interface {
-	GenerateAccessToken(userID int32, roles []string) (string, error)
-	GenerateRefreshToken(userID int32) (string, error)
+	GenerateAccessToken(userID int32, email string, roles []string) (string, error)
+	GenerateRefreshToken(userID int32, email string) (string, error)
 	Generate2FAToken(userID int32, method string) (string, error)
 	ValidateToken(tokenString string) (*UserClaims, error)
 }
@@ -50,11 +51,12 @@ func NewTokenManager(secret string) TokenManager {
 	}
 }
 
-func (m *tokenManager) GenerateAccessToken(userID int32, roles []string) (string, error) {
+func (m *tokenManager) GenerateAccessToken(userID int32, email string, roles []string) (string, error) {
 	claims := UserClaims{
-		UserID: userID,
-		Type:   TokenTypeAccess,
-		Roles:  roles,
+		UserID:  userID,
+		Email:   email,
+		Type:    TokenTypeAccess,
+		Roles:   roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   strconv.Itoa(int(userID)),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)), // 1 hour
@@ -68,9 +70,10 @@ func (m *tokenManager) GenerateAccessToken(userID int32, roles []string) (string
 	return token.SignedString(m.secret)
 }
 
-func (m *tokenManager) GenerateRefreshToken(userID int32) (string, error) {
+func (m *tokenManager) GenerateRefreshToken(userID int32, email string) (string, error) {
 	claims := UserClaims{
 		UserID: userID,
+		Email:  email,
 		Type:   TokenTypeRefresh,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   strconv.Itoa(int(userID)),

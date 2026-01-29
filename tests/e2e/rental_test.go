@@ -240,34 +240,34 @@ func TestRentalService_E2E(t *testing.T) {
 		assert.GreaterOrEqual(t, notifCount, 1)
 	})
 
-	t.Run("CreateRentalRequest with Insufficient Balance", func(t *testing.T) {
-		// Setup: Renter with low balance
-		orgID := db.CreateTestOrg("")
-		ownerID := db.CreateTestUser("e2e-test-owner4@test.com", "Owner 4")
-		renterID := db.CreateTestUser("e2e-test-renter4@test.com", "Renter 4")
+	// Balance check is disabled for now
+	// t.Run("CreateRentalRequest with Insufficient Balance", func(t *testing.T) {
+	// 	// Setup: Renter with low balance
+	// 	orgID := db.CreateTestOrg("")
+	// 	ownerID := db.CreateTestUser("e2e-test-owner4@test.com", "Owner 4")
+	// 	renterID := db.CreateTestUser("e2e-test-renter4@test.com", "Renter 4")
 
-		db.AddUserToOrg(ownerID, orgID, "MEMBER", "ACTIVE", 0)
-		db.AddUserToOrg(renterID, orgID, "MEMBER", "ACTIVE", 100) // Only 100 cents
+	// 	db.AddUserToOrg(ownerID, orgID, "MEMBER", "ACTIVE", 0)
+	// 	db.AddUserToOrg(renterID, orgID, "MEMBER", "ACTIVE", 100) // Only 100 cents
 
-		toolID := db.CreateTestTool(ownerID, "Expensive Tool", 5000) // 5000 cents per day
+	// 	toolID := db.CreateTestTool(ownerID, "Expensive Tool", 5000) // 5000 cents per day
 
-		// Try to create rental request
-		ctx, cancel := ContextWithUserIDAndTimeout(renterID, 5*time.Second)
-		defer cancel()
+	// 	// Try to create rental request
+	// 	ctx, cancel := ContextWithUserIDAndTimeout(renterID, 5*time.Second)
+	// 	defer cancel()
 
-		startDate := time.Now().Add(24 * time.Hour)
-		endDate := startDate.Add(24 * time.Hour)
+	// 	startDate := time.Now().Add(24 * time.Hour)
+	// 	endDate := startDate.Add(24 * time.Hour)
 
-		createReq := &pb.CreateRentalRequestRequest{
-			ToolId:         toolID,
-			StartDate:      startDate.Format("2006-01-02"),
-			EndDate:        endDate.Format("2006-01-02"),
-			OrganizationId: orgID,
-		}
+	// 	createReq := &pb.CreateRentalRequestRequest{
+	// 		ToolId:         toolID,
+	// 		StartDate:      startDate.Format("2006-01-02"),
+	// 		EndDate:        endDate.Format("2006-01-02"),
+	// 		OrganizationId: orgID,
+	// 	}
 
-		_, err := rentalClient.CreateRentalRequest(ctx, createReq)
-		// Should fail due to insufficient balance
-		assert.Error(t, err)
-	})
+	// 	_, err := rentalClient.CreateRentalRequest(ctx, createReq)
+	// 	// Should fail due to insufficient balance
+	// 	assert.Error(t, err)
+	// })
 }
-

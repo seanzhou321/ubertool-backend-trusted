@@ -26,8 +26,7 @@ var EndpointSecurityConfig = map[string]SecurityLevel{
 	// "/ubertool.trusted.api.v1.AuthService/ResendCode":   Security2FA,
 
 	// AuthService - Refresh Protected
-	// TODO: add refresh token to auth service
-	// "/ubertool.trusted.api.v1.AuthService/RefreshToken": SecurityRefresh,
+	"/ubertool.trusted.api.v1.AuthService/RefreshToken": SecurityRefresh,
 
 	// AuthService - Access Protected
 	"/ubertool.trusted.api.v1.AuthService/Logout": SecurityAccess,

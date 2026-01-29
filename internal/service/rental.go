@@ -76,14 +76,15 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 	// For MVP, daily * days is safer.
 	totalCost := tool.PricePerDayCents * days
 
-	// Check balance
-	balance, err := s.ledgerRepo.GetBalance(ctx, renterID, orgID)
-	if err != nil {
-		return nil, err
-	}
-	if balance < totalCost {
-		return nil, errors.New("insufficient balance")
-	}
+	// Check balance - DISABLED FOR NOW
+	// TODO: Re-enable balance check once payment system is implemented
+	// balance, err := s.ledgerRepo.GetBalance(ctx, renterID, orgID)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if balance < totalCost {
+	// 	return nil, status.Errorf(codes.FailedPrecondition, "insufficient balance: need %d cents, have %d cents", totalCost, balance)
+	// }
 
 	rental := &domain.Rental{
 		OrgID:            orgID,

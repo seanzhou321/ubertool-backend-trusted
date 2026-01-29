@@ -306,11 +306,12 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		return "", "", sessionToken, true, nil
 	}
 
-	access, err := s.tm.GenerateAccessToken(user.ID, []string{"user"}) // Retrieve roles
+	// TODO: Retrieve actual roles from database
+	access, err := s.tm.GenerateAccessToken(user.ID, user.Email, []string{"user"})
 	if err != nil {
 		return "", "", "", false, err
 	}
-	refresh, err := s.tm.GenerateRefreshToken(user.ID)
+	refresh, err := s.tm.GenerateRefreshToken(user.ID, user.Email)
 	if err != nil {
 		return "", "", "", false, err
 	}
@@ -332,7 +333,7 @@ func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) 
 
 	// Verify user still exists
 	logger.Debug("Verifying user exists", "userID", userID)
-	_, err := s.userRepo.GetByID(ctx, userID)
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "user not found", "userID", userID)
 		return "", "", err
@@ -340,12 +341,13 @@ func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) 
 
 	// Generate tokens
 	logger.Debug("Generating access and refresh tokens", "userID", userID)
-	access, err := s.tm.GenerateAccessToken(userID, []string{"user"})
+	// TODO: Retrieve actual roles from database
+	access, err := s.tm.GenerateAccessToken(userID, user.Email, []string{"user"})
 	if err != nil {
 		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "failed to generate access token")
 		return "", "", err
 	}
-	refresh, err := s.tm.GenerateRefreshToken(userID)
+	refresh, err := s.tm.GenerateRefreshToken(userID, user.Email)
 	if err != nil {
 		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "failed to generate refresh token")
 		return "", "", err
@@ -366,12 +368,13 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 		return "", "", ErrInvalidToken
 	}
 
-	access, err := s.tm.GenerateAccessToken(claims.UserID, claims.Roles)
+	// Preserve email from existing token
+	access, err := s.tm.GenerateAccessToken(claims.UserID, claims.Email, claims.Roles)
 	if err != nil {
 		return "", "", err
 	}
 
-	refresh, err := s.tm.GenerateRefreshToken(claims.UserID)
+	refresh, err := s.tm.GenerateRefreshToken(claims.UserID, claims.Email)
 	if err != nil {
 		return "", "", err
 	}

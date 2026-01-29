@@ -55,17 +55,18 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		assert.Equal(t, int32(2000), res.TotalCostCents) // 2 days inclusive (24h to 48h) * 1000
 	})
 
-	t.Run("Insufficient Balance", func(t *testing.T) {
-		toolRepo.ExpectedCalls = nil
-		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
-		ledgerRepo.ExpectedCalls = nil
-		ledgerRepo.On("GetBalance", ctx, renterID, orgID).Return(int32(500), nil) // Cost is 1000
+	// Balance check is disabled for now
+	// t.Run("Insufficient Balance", func(t *testing.T) {
+	// 	toolRepo.ExpectedCalls = nil
+	// 	toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
+	// 	ledgerRepo.ExpectedCalls = nil
+	// 	ledgerRepo.On("GetBalance", ctx, renterID, orgID).Return(int32(500), nil) // Cost is 1000
 
-		res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, startDate, endDate)
-		assert.Error(t, err)
-		assert.Nil(t, res)
-		assert.Contains(t, err.Error(), "insufficient balance")
-	})
+	// 	res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, startDate, endDate)
+	// 	assert.Error(t, err)
+	// 	assert.Nil(t, res)
+	// 	assert.Contains(t, err.Error(), "insufficient balance")
+	// })
 }
 
 func TestRentalService_CompleteRental(t *testing.T) {

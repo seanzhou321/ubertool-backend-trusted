@@ -1,0 +1,260 @@
+package e2e
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"strings"
+	"testing"
+	"time"
+
+	pb "ubertool-backend-trusted/api/gen/v1"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/metadata"
+)
+
+// JWTClaims represents the decoded JWT claims
+type JWTClaims struct {
+	UserID int32    `json:"user_id"`
+	Email  string   `json:"email"`
+	Type   string   `json:"type"`
+	Roles  []string `json:"roles"`
+	// Standard claims
+	Sub string   `json:"sub"`
+	Exp int64    `json:"exp"`
+	Iat int64    `json:"iat"`
+	Iss string   `json:"iss"`
+	Aud []string `json:"aud"`
+	Jti string   `json:"jti"`
+}
+
+// decodeJWT decodes a JWT token without verification (for testing purposes)
+func decodeJWT(token string) (*JWTClaims, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil, assert.AnError
+	}
+
+	// Decode the payload (second part)
+	payload := parts[1]
+
+	// Add padding if needed
+	if mod := len(payload) % 4; mod != 0 {
+		payload += strings.Repeat("=", 4-mod)
+	}
+
+	decoded, err := base64.URLEncoding.DecodeString(payload)
+	if err != nil {
+		// Try RawURLEncoding as fallback
+		decoded, err = base64.RawURLEncoding.DecodeString(parts[1])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var claims JWTClaims
+	if err := json.Unmarshal(decoded, &claims); err != nil {
+		return nil, err
+	}
+
+	return &claims, nil
+}
+
+func TestJWTTokenVerification(t *testing.T) {
+	db := PrepareDB(t)
+	defer db.Close()
+	defer db.Cleanup()
+
+	client := NewGRPCClient(t, "")
+	defer client.Close()
+
+	authClient := pb.NewAuthServiceClient(client.Conn())
+
+	t.Run("Login Returns Valid JWT with UserID and Email", func(t *testing.T) {
+		// Login with the specified user
+		ctx, cancel := ContextWithTimeout(5 * time.Second)
+		defer cancel()
+
+		loginReq := &pb.LoginRequest{
+			Email:    "ubertool320@gmail.com",
+			Password: "h",
+		}
+
+		resp, err := authClient.Login(ctx, loginReq)
+		require.NoError(t, err, "Login should succeed")
+
+		var accessToken, refreshToken string
+
+		// Check if 2FA is required
+		if resp.TwoFaToken != "" {
+			t.Log("2FA required, verifying with code 123456")
+
+			// Verify 2FA with hardcoded code
+			ctx2, cancel2 := ContextWithTimeout(5 * time.Second)
+			defer cancel2()
+
+			// Add 2FA token to metadata
+			md := metadata.Pairs("authorization", "Bearer "+resp.TwoFaToken)
+			ctx2 = metadata.NewOutgoingContext(ctx2, md)
+
+			verify2FAReq := &pb.Verify2FARequest{
+				TwoFaCode: "123456",
+			}
+
+			verify2FAResp, err := authClient.Verify2FA(ctx2, verify2FAReq)
+			require.NoError(t, err, "2FA verification should succeed")
+			require.NotEmpty(t, verify2FAResp.AccessToken, "Access token should not be empty after 2FA")
+			require.NotEmpty(t, verify2FAResp.RefreshToken, "Refresh token should not be empty after 2FA")
+
+			accessToken = verify2FAResp.AccessToken
+			refreshToken = verify2FAResp.RefreshToken
+		} else {
+			t.Fatal("Expected 2FA to be required for this user")
+		}
+
+		// Decode the JWT token
+		claims, err := decodeJWT(accessToken)
+		require.NoError(t, err, "Should be able to decode JWT token")
+
+		// Verify the claims
+		t.Logf("Decoded JWT Claims: UserID=%d, Email=%s, Type=%s, Roles=%v",
+			claims.UserID, claims.Email, claims.Type, claims.Roles)
+
+		assert.NotZero(t, claims.UserID, "UserID should not be zero")
+		assert.Equal(t, "ubertool320@gmail.com", claims.Email, "Email should match")
+		assert.Equal(t, "access", claims.Type, "Token type should be 'access'")
+		assert.NotEmpty(t, claims.Roles, "Roles should not be empty")
+
+		// Verify standard JWT claims
+		assert.NotEmpty(t, claims.Sub, "Subject should not be empty")
+		assert.NotZero(t, claims.Exp, "Expiration should not be zero")
+		assert.NotZero(t, claims.Iat, "Issued at should not be zero")
+		assert.Equal(t, "auth-service", claims.Iss, "Issuer should be 'auth-service'")
+		assert.Contains(t, claims.Aud, "api-access", "Audience should contain 'api-access'")
+		assert.NotEmpty(t, claims.Jti, "JWT ID should not be empty")
+
+		// Verify token expiration is in the future
+		now := time.Now().Unix()
+		assert.Greater(t, claims.Exp, now, "Token should not be expired")
+		assert.LessOrEqual(t, claims.Iat, now, "Issued at should not be in the future")
+
+		// Test the refresh token as well
+		t.Log("Testing refresh token functionality")
+		time.Sleep(1 * time.Second)
+
+		ctx3, cancel3 := ContextWithTimeout(5 * time.Second)
+		defer cancel3()
+
+		// Send refresh token in both authorization and refresh-token headers
+		md := metadata.Pairs(
+			"authorization", "Bearer "+refreshToken,
+			"refresh-token", refreshToken,
+		)
+		ctx3 = metadata.NewOutgoingContext(ctx3, md)
+
+		refreshReq := &pb.RefreshTokenRequest{}
+		refreshResp, err := authClient.RefreshToken(ctx3, refreshReq)
+		require.NoError(t, err, "Refresh should succeed")
+		require.NotEmpty(t, refreshResp.AccessToken, "New access token should not be empty")
+
+		// Log token for debugging
+		t.Logf("Refresh response access token (first 50 chars): %s", refreshResp.AccessToken[:min(50, len(refreshResp.AccessToken))])
+		t.Logf("Token length: %d", len(refreshResp.AccessToken))
+
+		// Decode and verify new token
+		newClaims, err := decodeJWT(refreshResp.AccessToken)
+		if err != nil {
+			t.Logf("Failed to decode token: %v", err)
+			t.Logf("Token parts count: %d", len(strings.Split(refreshResp.AccessToken, ".")))
+		}
+		require.NoError(t, err, "Should be able to decode refreshed JWT token")
+
+		t.Logf("Refreshed JWT: UserID=%d, Email=%s, Iat=%d",
+			newClaims.UserID, newClaims.Email, newClaims.Iat)
+
+		assert.Equal(t, claims.UserID, newClaims.UserID, "UserID should be preserved after refresh")
+		assert.Equal(t, claims.Email, newClaims.Email, "Email should be preserved after refresh")
+		assert.Greater(t, newClaims.Iat, claims.Iat, "Refreshed token should have newer issued-at timestamp")
+	})
+
+	t.Run("Refresh Token Returns New JWT with Same UserID and Email", func(t *testing.T) {
+		// First, login to get tokens
+		ctx, cancel := ContextWithTimeout(5 * time.Second)
+		defer cancel()
+
+		loginReq := &pb.LoginRequest{
+			Email:    "ubertool320@gmail.com",
+			Password: "h",
+		}
+
+		loginResp, err := authClient.Login(ctx, loginReq)
+		require.NoError(t, err, "Login should succeed")
+
+		var accessToken, refreshToken string
+
+		// Handle 2FA if required
+		if loginResp.TwoFaToken != "" {
+			t.Log("2FA required, verifying with code 123456")
+			ctx2, cancel2 := ContextWithTimeout(5 * time.Second)
+			defer cancel2()
+
+			// Add 2FA token to metadata
+			md := metadata.Pairs("authorization", "Bearer "+loginResp.TwoFaToken)
+			ctx2 = metadata.NewOutgoingContext(ctx2, md)
+
+			verify2FAReq := &pb.Verify2FARequest{
+				TwoFaCode: "123456",
+			}
+
+			verify2FAResp, err := authClient.Verify2FA(ctx2, verify2FAReq)
+			require.NoError(t, err, "2FA verification should succeed")
+
+			accessToken = verify2FAResp.AccessToken
+			refreshToken = verify2FAResp.RefreshToken
+		} else {
+			t.Fatal("Expected 2FA to be required for this user")
+		}
+
+		// Decode original access token
+		originalClaims, err := decodeJWT(accessToken)
+		require.NoError(t, err, "Should be able to decode original JWT token")
+
+		// Wait a second to ensure new token has different timestamps
+		time.Sleep(1 * time.Second)
+
+		// Refresh the token
+		ctx3, cancel3 := ContextWithTimeout(5 * time.Second)
+		defer cancel3()
+
+		// Send refresh token in both authorization and refresh-token headers
+		md := metadata.Pairs(
+			"authorization", "Bearer "+refreshToken,
+			"refresh-token", refreshToken,
+		)
+		ctx3 = metadata.NewOutgoingContext(ctx3, md)
+
+		refreshReq := &pb.RefreshTokenRequest{}
+
+		refreshResp, err := authClient.RefreshToken(ctx3, refreshReq)
+		require.NoError(t, err, "Refresh should succeed")
+		require.NotEmpty(t, refreshResp.AccessToken, "New access token should not be empty")
+
+		// Decode new access token
+		newClaims, err := decodeJWT(refreshResp.AccessToken)
+		require.NoError(t, err, "Should be able to decode new JWT token")
+
+		t.Logf("Original JWT: UserID=%d, Email=%s, Iat=%d",
+			originalClaims.UserID, originalClaims.Email, originalClaims.Iat)
+		t.Logf("Refreshed JWT: UserID=%d, Email=%s, Iat=%d",
+			newClaims.UserID, newClaims.Email, newClaims.Iat)
+
+		// Verify the new token preserves UserID and Email
+		assert.Equal(t, originalClaims.UserID, newClaims.UserID, "UserID should be preserved")
+		assert.Equal(t, originalClaims.Email, newClaims.Email, "Email should be preserved")
+		assert.Equal(t, "access", newClaims.Type, "Token type should be 'access'")
+
+		// Verify the new token has a newer timestamp
+		assert.Greater(t, newClaims.Iat, originalClaims.Iat, "New token should have newer issued-at timestamp")
+	})
+}

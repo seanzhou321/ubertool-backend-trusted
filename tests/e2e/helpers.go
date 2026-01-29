@@ -299,7 +299,7 @@ func ContextWithUserID(userID int32) context.Context {
 	if tokenManager != nil {
 		// Generate a valid token for the test user
 		// Note: We use a generic "user" role here; tests needing higher privileges should adjust
-		token, _ := tokenManager.GenerateAccessToken(userID, []string{"user"})
+		token, _ := tokenManager.GenerateAccessToken(userID, fmt.Sprintf("test%d@example.com", userID), []string{"user"})
 		md.Set("authorization", "Bearer "+token)
 	}
 	return metadata.NewOutgoingContext(context.Background(), md)
@@ -314,7 +314,7 @@ func ContextWithTimeout(timeout time.Duration) (context.Context, context.CancelF
 func ContextWithUserIDAndTimeout(userID int32, timeout time.Duration) (context.Context, context.CancelFunc) {
 	md := metadata.Pairs("user-id", fmt.Sprintf("%d", userID))
 	if tokenManager != nil {
-		token, _ := tokenManager.GenerateAccessToken(userID, []string{"user"})
+		token, _ := tokenManager.GenerateAccessToken(userID, fmt.Sprintf("test%d@example.com", userID), []string{"user"})
 		md.Set("authorization", "Bearer "+token)
 	}
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
