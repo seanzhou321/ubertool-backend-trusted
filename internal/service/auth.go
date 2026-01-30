@@ -319,7 +319,7 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	return access, refresh, "", false, nil
 }
 
-func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) (string, string, error) {
+func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) (string, string, *domain.User, error) {
 	logger.EnterMethod("authService.Verify2FA", "userID", userID, "codeProvided", code)
 
 	// Mock 2FA verification
@@ -327,7 +327,7 @@ func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) 
 	if code != "123456" {
 		logger.Warn("2FA code validation FAILED", "userID", userID, "providedCode", code, "expectedCode", "123456")
 		logger.ExitMethodWithError("authService.Verify2FA", ErrInvalid2FACode, "userID", userID)
-		return "", "", ErrInvalid2FACode
+		return "", "", nil, ErrInvalid2FACode
 	}
 	logger.Info("2FA code validated successfully", "userID", userID)
 
@@ -336,7 +336,7 @@ func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) 
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "user not found", "userID", userID)
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	// Generate tokens
@@ -345,17 +345,17 @@ func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) 
 	access, err := s.tm.GenerateAccessToken(userID, user.Email, []string{"user"})
 	if err != nil {
 		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "failed to generate access token")
-		return "", "", err
+		return "", "", nil, err
 	}
 	refresh, err := s.tm.GenerateRefreshToken(userID, user.Email)
 	if err != nil {
 		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "failed to generate refresh token")
-		return "", "", err
+		return "", "", nil, err
 	}
 
 	logger.Info("2FA verification completed successfully", "userID", userID)
 	logger.ExitMethod("authService.Verify2FA", "userID", userID)
-	return access, refresh, nil
+	return access, refresh, user, nil
 }
 
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {

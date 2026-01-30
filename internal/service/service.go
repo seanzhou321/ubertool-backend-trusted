@@ -10,7 +10,7 @@ type AuthService interface {
 	RequestToJoin(ctx context.Context, orgID int32, name, email, note string) error
 	Signup(ctx context.Context, inviteToken, name, email, phone, password string) error
 	Login(ctx context.Context, email, password string) (string, string, string, bool, error) // access, refresh, session, requires2FA
-	Verify2FA(ctx context.Context, userID int32, code string) (string, string, error)
+	Verify2FA(ctx context.Context, userID int32, code string) (string, string, *domain.User, error)
 	RefreshToken(ctx context.Context, refresh string) (string, string, error)
 	Logout(ctx context.Context, refresh string) error
 }

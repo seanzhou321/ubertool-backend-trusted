@@ -110,7 +110,7 @@ func (h *AuthHandler) Verify2FA(ctx context.Context, req *pb.Verify2FARequest) (
 	logger.Info("UserID extracted from 2FA token", "userID", userID)
 
 	logger.Debug("Calling authService.Verify2FA", "userID", userID, "code", req.TwoFaCode)
-	access, refresh, err := h.authSvc.Verify2FA(ctx, int32(userID), req.TwoFaCode)
+	access, refresh, user, err := h.authSvc.Verify2FA(ctx, int32(userID), req.TwoFaCode)
 	if err != nil {
 		logger.Error("=== API Verify2FA FAILED ===", "userID", userID, "error", err)
 		logger.ExitMethodWithError("AuthHandler.Verify2FA", err, "userID", userID)
@@ -123,7 +123,7 @@ func (h *AuthHandler) Verify2FA(ctx context.Context, req *pb.Verify2FARequest) (
 		Success:      true,
 		AccessToken:  access,
 		RefreshToken: refresh,
-		// User field is optional in response? Check proto.
+		User:         MapDomainUserToProto(user),
 	}, nil
 }
 

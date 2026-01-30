@@ -52,3 +52,4 @@ tests/data-setup/user_org.yaml
 uploads/
 test-uploads/
 logs/
+client/
