@@ -14,14 +14,19 @@
 9. enable 2fa
 10. refresh token enable
 
-## Milestone 3: Production
-11. deploy to cloud
-12. https certification
+## Milestone 3: Production - trial groups
+11. https certification
+12. deploy to cloud
+13. release to selected communities
 
 ## Milestone 4: Enhancements
-13. iOS app
-14. passkey
-15. push notification through FCM
+14. iOS app
+15. passkey
+16. push notification through FCM
+17. Form a company
 
-## Milestone 5: Ad Service integration
-16. add recomendations
+## Milestone 5: General production release
+18. Production release to general public
+
+## Milestone 6: Ad Service integration
+19. add recomendations by advertisement
