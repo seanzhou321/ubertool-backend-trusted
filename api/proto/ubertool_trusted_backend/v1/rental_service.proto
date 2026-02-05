@@ -23,6 +23,24 @@ service RentalService {
   // Finalize approved rental request (renter)
   rpc FinalizeRentalRequest(FinalizeRentalRequestRequest) returns (FinalizeRentalRequestResponse);
 
+  // Activate rental - mark as picked up and in use (both sides)
+  rpc ActivateRental(ActivateRentalRequest) returns (ActivateRentalResponse);
+
+  // Change rental dates (both sides, behavior depends on status and role)
+  rpc ChangeRentalDates(ChangeRentalDatesRequest) returns (ChangeRentalDatesResponse);
+
+  // Approve return date change (owner only, for RETURN_DATE_CHANGED status)
+  rpc ApproveReturnDateChange(ApproveReturnDateChangeRequest) returns (ApproveReturnDateChangeResponse);
+
+  // Reject return date change (owner only, for RETURN_DATE_CHANGED status)
+  rpc RejectReturnDateChange(RejectReturnDateChangeRequest) returns (RejectReturnDateChangeResponse);
+
+  // Acknowledge return date change rejection (renter only, for RETURN_DATE_CHANGE_REJECTED status)
+  rpc AcknowledgeReturnDateRejection(AcknowledgeReturnDateRejectionRequest) returns (AcknowledgeReturnDateRejectionResponse);
+
+  // Cancel return date change (renter only, for RETURN_DATE_CHANGED status)
+  rpc CancelReturnDateChange(CancelReturnDateChangeRequest) returns (CancelReturnDateChangeResponse);
+
   // Cancel rental (renter)
   rpc CancelRental(CancelRentalRequest) returns (CancelRentalResponse);
 
@@ -38,6 +56,9 @@ service RentalService {
 
   // List rentals (renter)
   rpc ListMyRentals(ListMyRentalsRequest) returns (ListRentalsResponse);
+
+  // List rentals for a specific tool (owner)
+  rpc ListToolRentals(ListToolRentalsRequest) returns (ListRentalsResponse);
 }
 
 // Create rental request
@@ -127,6 +148,15 @@ message ListMyLendingsRequest {
   int32 page_size = 4;
 }
 
+// List tool rentals request (for rental history of a specific tool)
+message ListToolRentalsRequest {
+  int32 tool_id = 1;                   // Tool ID to get rental history for
+  int32 organization_id = 2;           // Organization context
+  RentalStatus status = 3;             // Filter by status (optional, 0 = all)
+  int32 page = 4;
+  int32 page_size = 5;
+}
+
 message FinalizeRentalRequestRequest {
   int32 request_id = 1;
   int32 user_id = 2;
@@ -136,6 +166,66 @@ message FinalizeRentalRequestResponse {
   RentalRequest rental_request = 1;
   repeated RentalRequest approved_rentals = 2;
   repeated RentalRequest pending_rentals = 3;
+}
+
+// Activate rental (pickup)
+message ActivateRentalRequest {
+  int32 request_id = 1;
+}
+
+message ActivateRentalResponse {
+  RentalRequest rental_request = 1;
+}
+
+// Change rental dates
+message ChangeRentalDatesRequest {
+  int32 request_id = 1;
+  string new_start_date = 2; // YYYY-MM-DD (optional if only changing end date)
+  string new_end_date = 3;   // YYYY-MM-DD
+  string old_start_date = 4; // YYYY-MM-DD (for return date change tracking)
+  string old_end_date = 5;   // YYYY-MM-DD (for return date change tracking)
+}
+
+message ChangeRentalDatesResponse {
+  RentalRequest rental_request = 1;
+}
+
+// Approve return date change (owner)
+message ApproveReturnDateChangeRequest {
+  int32 request_id = 1;
+}
+
+message ApproveReturnDateChangeResponse {
+  RentalRequest rental_request = 1;
+}
+
+// Reject return date change (owner)
+message RejectReturnDateChangeRequest {
+  int32 request_id = 1;
+  string reason = 2;
+  string new_end_date = 3;
+}
+
+message RejectReturnDateChangeResponse {
+  RentalRequest rental_request = 1;
+}
+
+// Acknowledge return date change rejection (renter)
+message AcknowledgeReturnDateRejectionRequest {
+  int32 request_id = 1;
+}
+
+message AcknowledgeReturnDateRejectionResponse {
+  RentalRequest rental_request = 1;
+}
+
+// Cancel return date change (renter)
+message CancelReturnDateChangeRequest {
+  int32 request_id = 1;
+}
+
+message CancelReturnDateChangeResponse {
+  RentalRequest rental_request = 1;
 }
 
 
@@ -168,5 +258,7 @@ enum RentalStatus {
   RENTAL_STATUS_COMPLETED = 5;
   RENTAL_STATUS_CANCELLED = 6;
   RENTAL_STATUS_OVERDUE = 7;
+  RENTAL_STATUS_RETURN_DATE_CHANGED = 8;
+  RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED = 9;
 }
 

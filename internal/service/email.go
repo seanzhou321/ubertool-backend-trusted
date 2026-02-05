@@ -194,6 +194,17 @@ func (s *emailService) SendRentalCompletionNotification(ctx context.Context, ema
 	})
 }
 
+func (s *emailService) SendRentalPickupNotification(ctx context.Context, email, name, toolName, startDate, endDate string) error {
+	subject := fmt.Sprintf("Rental Picked Up: %s", toolName)
+	body := fmt.Sprintf("Hello %s,\n\nThe tool %s has been picked up.\nStart Date: %s\nScheduled End Date: %s", name, toolName, startDate, endDate)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
 func (s *emailService) SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error {
 	return s.sendEmail(EmailMessage{
 		To:      []string{adminEmail},

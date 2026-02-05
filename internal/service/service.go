@@ -57,9 +57,19 @@ type RentalService interface {
 	CancelRental(ctx context.Context, renterID, rentalID int32, reason string) (*domain.Rental, error)
 	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, []domain.Rental, []domain.Rental, error)
 	CompleteRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
+	Update(ctx context.Context, rt *domain.Rental) error
 	ListRentals(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListLendings(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
 	GetRental(ctx context.Context, userID, rentalID int32) (*domain.Rental, error)
+	
+	// New methods
+	ActivateRental(ctx context.Context, userID, rentalID int32) (*domain.Rental, error)
+	ChangeRentalDates(ctx context.Context, userID, rentalID int32, newStart, newEnd, oldStart, oldEnd string) (*domain.Rental, error)
+	ApproveReturnDateChange(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
+	RejectReturnDateChange(ctx context.Context, ownerID, rentalID int32, reason, newEndDate string) (*domain.Rental, error)
+	AcknowledgeReturnDateRejection(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error)
+	CancelReturnDateChange(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error)
+	ListToolRentals(ctx context.Context, ownerID, toolID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
 }
 
 type LedgerService interface {
@@ -92,6 +102,7 @@ type EmailService interface {
 	SendRentalConfirmationNotification(ctx context.Context, ownerEmail, renterName, toolName string, ccEmail string) error
 	SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string, ccEmail string) error
 	SendRentalCompletionNotification(ctx context.Context, email, role, toolName string, amount int32) error
+	SendRentalPickupNotification(ctx context.Context, email, name, toolName, startDate, endDate string) error
 
 	// Admin Notifications
 	SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error

@@ -102,3 +102,21 @@ func (m *MockRentalService) ListLendings(ctx context.Context, userID, orgID int3
 	args := m.Called(ctx, userID, orgID, status, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
 }
+
+// MockUserService
+type MockUserService struct {
+	mock.Mock
+}
+
+func (m *MockUserService) GetUserProfile(ctx context.Context, userID int32) (*domain.User, []domain.Organization, []domain.UserOrg, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, nil, nil, args.Error(3)
+	}
+	return args.Get(0).(*domain.User), args.Get(1).([]domain.Organization), args.Get(2).([]domain.UserOrg), args.Error(3)
+}
+
+func (m *MockUserService) UpdateProfile(ctx context.Context, userID int32, name, email, phone, avatarURL string) error {
+	args := m.Called(ctx, userID, name, email, phone, avatarURL)
+	return args.Error(0)
+}

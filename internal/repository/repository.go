@@ -55,6 +55,7 @@ type RentalRepository interface {
 	Update(ctx context.Context, rental *domain.Rental) error
 	ListByRenter(ctx context.Context, renterID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListByOwner(ctx context.Context, ownerID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
+	ListByTool(ctx context.Context, toolID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
 }
 
 type LedgerRepository interface {

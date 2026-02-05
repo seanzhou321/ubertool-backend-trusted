@@ -19,15 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	RentalService_CreateRentalRequest_FullMethodName   = "/ubertool.trusted.api.v1.RentalService/CreateRentalRequest"
-	RentalService_ApproveRentalRequest_FullMethodName  = "/ubertool.trusted.api.v1.RentalService/ApproveRentalRequest"
-	RentalService_RejectRentalRequest_FullMethodName   = "/ubertool.trusted.api.v1.RentalService/RejectRentalRequest"
-	RentalService_FinalizeRentalRequest_FullMethodName = "/ubertool.trusted.api.v1.RentalService/FinalizeRentalRequest"
-	RentalService_CancelRental_FullMethodName          = "/ubertool.trusted.api.v1.RentalService/CancelRental"
-	RentalService_CompleteRental_FullMethodName        = "/ubertool.trusted.api.v1.RentalService/CompleteRental"
-	RentalService_GetRental_FullMethodName             = "/ubertool.trusted.api.v1.RentalService/GetRental"
-	RentalService_ListMyLendings_FullMethodName        = "/ubertool.trusted.api.v1.RentalService/ListMyLendings"
-	RentalService_ListMyRentals_FullMethodName         = "/ubertool.trusted.api.v1.RentalService/ListMyRentals"
+	RentalService_CreateRentalRequest_FullMethodName            = "/ubertool.trusted.api.v1.RentalService/CreateRentalRequest"
+	RentalService_ApproveRentalRequest_FullMethodName           = "/ubertool.trusted.api.v1.RentalService/ApproveRentalRequest"
+	RentalService_RejectRentalRequest_FullMethodName            = "/ubertool.trusted.api.v1.RentalService/RejectRentalRequest"
+	RentalService_FinalizeRentalRequest_FullMethodName          = "/ubertool.trusted.api.v1.RentalService/FinalizeRentalRequest"
+	RentalService_ActivateRental_FullMethodName                 = "/ubertool.trusted.api.v1.RentalService/ActivateRental"
+	RentalService_ChangeRentalDates_FullMethodName              = "/ubertool.trusted.api.v1.RentalService/ChangeRentalDates"
+	RentalService_ApproveReturnDateChange_FullMethodName        = "/ubertool.trusted.api.v1.RentalService/ApproveReturnDateChange"
+	RentalService_RejectReturnDateChange_FullMethodName         = "/ubertool.trusted.api.v1.RentalService/RejectReturnDateChange"
+	RentalService_AcknowledgeReturnDateRejection_FullMethodName = "/ubertool.trusted.api.v1.RentalService/AcknowledgeReturnDateRejection"
+	RentalService_CancelReturnDateChange_FullMethodName         = "/ubertool.trusted.api.v1.RentalService/CancelReturnDateChange"
+	RentalService_CancelRental_FullMethodName                   = "/ubertool.trusted.api.v1.RentalService/CancelRental"
+	RentalService_CompleteRental_FullMethodName                 = "/ubertool.trusted.api.v1.RentalService/CompleteRental"
+	RentalService_GetRental_FullMethodName                      = "/ubertool.trusted.api.v1.RentalService/GetRental"
+	RentalService_ListMyLendings_FullMethodName                 = "/ubertool.trusted.api.v1.RentalService/ListMyLendings"
+	RentalService_ListMyRentals_FullMethodName                  = "/ubertool.trusted.api.v1.RentalService/ListMyRentals"
+	RentalService_ListToolRentals_FullMethodName                = "/ubertool.trusted.api.v1.RentalService/ListToolRentals"
 )
 
 // RentalServiceClient is the client API for RentalService service.
@@ -44,6 +51,18 @@ type RentalServiceClient interface {
 	RejectRentalRequest(ctx context.Context, in *RejectRentalRequestRequest, opts ...grpc.CallOption) (*RejectRentalRequestResponse, error)
 	// Finalize approved rental request (renter)
 	FinalizeRentalRequest(ctx context.Context, in *FinalizeRentalRequestRequest, opts ...grpc.CallOption) (*FinalizeRentalRequestResponse, error)
+	// Activate rental - mark as picked up and in use (both sides)
+	ActivateRental(ctx context.Context, in *ActivateRentalRequest, opts ...grpc.CallOption) (*ActivateRentalResponse, error)
+	// Change rental dates (both sides, behavior depends on status and role)
+	ChangeRentalDates(ctx context.Context, in *ChangeRentalDatesRequest, opts ...grpc.CallOption) (*ChangeRentalDatesResponse, error)
+	// Approve return date change (owner only, for RETURN_DATE_CHANGED status)
+	ApproveReturnDateChange(ctx context.Context, in *ApproveReturnDateChangeRequest, opts ...grpc.CallOption) (*ApproveReturnDateChangeResponse, error)
+	// Reject return date change (owner only, for RETURN_DATE_CHANGED status)
+	RejectReturnDateChange(ctx context.Context, in *RejectReturnDateChangeRequest, opts ...grpc.CallOption) (*RejectReturnDateChangeResponse, error)
+	// Acknowledge return date change rejection (renter only, for RETURN_DATE_CHANGE_REJECTED status)
+	AcknowledgeReturnDateRejection(ctx context.Context, in *AcknowledgeReturnDateRejectionRequest, opts ...grpc.CallOption) (*AcknowledgeReturnDateRejectionResponse, error)
+	// Cancel return date change (renter only, for RETURN_DATE_CHANGED status)
+	CancelReturnDateChange(ctx context.Context, in *CancelReturnDateChangeRequest, opts ...grpc.CallOption) (*CancelReturnDateChangeResponse, error)
 	// Cancel rental (renter)
 	CancelRental(ctx context.Context, in *CancelRentalRequest, opts ...grpc.CallOption) (*CancelRentalResponse, error)
 	// Complete rental (mark as returned, both sides)
@@ -54,6 +73,8 @@ type RentalServiceClient interface {
 	ListMyLendings(ctx context.Context, in *ListMyLendingsRequest, opts ...grpc.CallOption) (*ListRentalsResponse, error)
 	// List rentals (renter)
 	ListMyRentals(ctx context.Context, in *ListMyRentalsRequest, opts ...grpc.CallOption) (*ListRentalsResponse, error)
+	// List rentals for a specific tool (owner)
+	ListToolRentals(ctx context.Context, in *ListToolRentalsRequest, opts ...grpc.CallOption) (*ListRentalsResponse, error)
 }
 
 type rentalServiceClient struct {
@@ -98,6 +119,66 @@ func (c *rentalServiceClient) FinalizeRentalRequest(ctx context.Context, in *Fin
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FinalizeRentalRequestResponse)
 	err := c.cc.Invoke(ctx, RentalService_FinalizeRentalRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *rentalServiceClient) ActivateRental(ctx context.Context, in *ActivateRentalRequest, opts ...grpc.CallOption) (*ActivateRentalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ActivateRentalResponse)
+	err := c.cc.Invoke(ctx, RentalService_ActivateRental_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *rentalServiceClient) ChangeRentalDates(ctx context.Context, in *ChangeRentalDatesRequest, opts ...grpc.CallOption) (*ChangeRentalDatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChangeRentalDatesResponse)
+	err := c.cc.Invoke(ctx, RentalService_ChangeRentalDates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *rentalServiceClient) ApproveReturnDateChange(ctx context.Context, in *ApproveReturnDateChangeRequest, opts ...grpc.CallOption) (*ApproveReturnDateChangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApproveReturnDateChangeResponse)
+	err := c.cc.Invoke(ctx, RentalService_ApproveReturnDateChange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *rentalServiceClient) RejectReturnDateChange(ctx context.Context, in *RejectReturnDateChangeRequest, opts ...grpc.CallOption) (*RejectReturnDateChangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RejectReturnDateChangeResponse)
+	err := c.cc.Invoke(ctx, RentalService_RejectReturnDateChange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *rentalServiceClient) AcknowledgeReturnDateRejection(ctx context.Context, in *AcknowledgeReturnDateRejectionRequest, opts ...grpc.CallOption) (*AcknowledgeReturnDateRejectionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AcknowledgeReturnDateRejectionResponse)
+	err := c.cc.Invoke(ctx, RentalService_AcknowledgeReturnDateRejection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *rentalServiceClient) CancelReturnDateChange(ctx context.Context, in *CancelReturnDateChangeRequest, opts ...grpc.CallOption) (*CancelReturnDateChangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelReturnDateChangeResponse)
+	err := c.cc.Invoke(ctx, RentalService_CancelReturnDateChange_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +235,16 @@ func (c *rentalServiceClient) ListMyRentals(ctx context.Context, in *ListMyRenta
 	return out, nil
 }
 
+func (c *rentalServiceClient) ListToolRentals(ctx context.Context, in *ListToolRentalsRequest, opts ...grpc.CallOption) (*ListRentalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListRentalsResponse)
+	err := c.cc.Invoke(ctx, RentalService_ListToolRentals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RentalServiceServer is the server API for RentalService service.
 // All implementations must embed UnimplementedRentalServiceServer
 // for forward compatibility.
@@ -168,6 +259,18 @@ type RentalServiceServer interface {
 	RejectRentalRequest(context.Context, *RejectRentalRequestRequest) (*RejectRentalRequestResponse, error)
 	// Finalize approved rental request (renter)
 	FinalizeRentalRequest(context.Context, *FinalizeRentalRequestRequest) (*FinalizeRentalRequestResponse, error)
+	// Activate rental - mark as picked up and in use (both sides)
+	ActivateRental(context.Context, *ActivateRentalRequest) (*ActivateRentalResponse, error)
+	// Change rental dates (both sides, behavior depends on status and role)
+	ChangeRentalDates(context.Context, *ChangeRentalDatesRequest) (*ChangeRentalDatesResponse, error)
+	// Approve return date change (owner only, for RETURN_DATE_CHANGED status)
+	ApproveReturnDateChange(context.Context, *ApproveReturnDateChangeRequest) (*ApproveReturnDateChangeResponse, error)
+	// Reject return date change (owner only, for RETURN_DATE_CHANGED status)
+	RejectReturnDateChange(context.Context, *RejectReturnDateChangeRequest) (*RejectReturnDateChangeResponse, error)
+	// Acknowledge return date change rejection (renter only, for RETURN_DATE_CHANGE_REJECTED status)
+	AcknowledgeReturnDateRejection(context.Context, *AcknowledgeReturnDateRejectionRequest) (*AcknowledgeReturnDateRejectionResponse, error)
+	// Cancel return date change (renter only, for RETURN_DATE_CHANGED status)
+	CancelReturnDateChange(context.Context, *CancelReturnDateChangeRequest) (*CancelReturnDateChangeResponse, error)
 	// Cancel rental (renter)
 	CancelRental(context.Context, *CancelRentalRequest) (*CancelRentalResponse, error)
 	// Complete rental (mark as returned, both sides)
@@ -178,6 +281,8 @@ type RentalServiceServer interface {
 	ListMyLendings(context.Context, *ListMyLendingsRequest) (*ListRentalsResponse, error)
 	// List rentals (renter)
 	ListMyRentals(context.Context, *ListMyRentalsRequest) (*ListRentalsResponse, error)
+	// List rentals for a specific tool (owner)
+	ListToolRentals(context.Context, *ListToolRentalsRequest) (*ListRentalsResponse, error)
 	mustEmbedUnimplementedRentalServiceServer()
 }
 
@@ -200,6 +305,24 @@ func (UnimplementedRentalServiceServer) RejectRentalRequest(context.Context, *Re
 func (UnimplementedRentalServiceServer) FinalizeRentalRequest(context.Context, *FinalizeRentalRequestRequest) (*FinalizeRentalRequestResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeRentalRequest not implemented")
 }
+func (UnimplementedRentalServiceServer) ActivateRental(context.Context, *ActivateRentalRequest) (*ActivateRentalResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ActivateRental not implemented")
+}
+func (UnimplementedRentalServiceServer) ChangeRentalDates(context.Context, *ChangeRentalDatesRequest) (*ChangeRentalDatesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ChangeRentalDates not implemented")
+}
+func (UnimplementedRentalServiceServer) ApproveReturnDateChange(context.Context, *ApproveReturnDateChangeRequest) (*ApproveReturnDateChangeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ApproveReturnDateChange not implemented")
+}
+func (UnimplementedRentalServiceServer) RejectReturnDateChange(context.Context, *RejectReturnDateChangeRequest) (*RejectReturnDateChangeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RejectReturnDateChange not implemented")
+}
+func (UnimplementedRentalServiceServer) AcknowledgeReturnDateRejection(context.Context, *AcknowledgeReturnDateRejectionRequest) (*AcknowledgeReturnDateRejectionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AcknowledgeReturnDateRejection not implemented")
+}
+func (UnimplementedRentalServiceServer) CancelReturnDateChange(context.Context, *CancelReturnDateChangeRequest) (*CancelReturnDateChangeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelReturnDateChange not implemented")
+}
 func (UnimplementedRentalServiceServer) CancelRental(context.Context, *CancelRentalRequest) (*CancelRentalResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelRental not implemented")
 }
@@ -214,6 +337,9 @@ func (UnimplementedRentalServiceServer) ListMyLendings(context.Context, *ListMyL
 }
 func (UnimplementedRentalServiceServer) ListMyRentals(context.Context, *ListMyRentalsRequest) (*ListRentalsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListMyRentals not implemented")
+}
+func (UnimplementedRentalServiceServer) ListToolRentals(context.Context, *ListToolRentalsRequest) (*ListRentalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListToolRentals not implemented")
 }
 func (UnimplementedRentalServiceServer) mustEmbedUnimplementedRentalServiceServer() {}
 func (UnimplementedRentalServiceServer) testEmbeddedByValue()                       {}
@@ -308,6 +434,114 @@ func _RentalService_FinalizeRentalRequest_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RentalService_ActivateRental_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ActivateRentalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RentalServiceServer).ActivateRental(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RentalService_ActivateRental_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RentalServiceServer).ActivateRental(ctx, req.(*ActivateRentalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RentalService_ChangeRentalDates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangeRentalDatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RentalServiceServer).ChangeRentalDates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RentalService_ChangeRentalDates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RentalServiceServer).ChangeRentalDates(ctx, req.(*ChangeRentalDatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RentalService_ApproveReturnDateChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApproveReturnDateChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RentalServiceServer).ApproveReturnDateChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RentalService_ApproveReturnDateChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RentalServiceServer).ApproveReturnDateChange(ctx, req.(*ApproveReturnDateChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RentalService_RejectReturnDateChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RejectReturnDateChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RentalServiceServer).RejectReturnDateChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RentalService_RejectReturnDateChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RentalServiceServer).RejectReturnDateChange(ctx, req.(*RejectReturnDateChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RentalService_AcknowledgeReturnDateRejection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AcknowledgeReturnDateRejectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RentalServiceServer).AcknowledgeReturnDateRejection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RentalService_AcknowledgeReturnDateRejection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RentalServiceServer).AcknowledgeReturnDateRejection(ctx, req.(*AcknowledgeReturnDateRejectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RentalService_CancelReturnDateChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelReturnDateChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RentalServiceServer).CancelReturnDateChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RentalService_CancelReturnDateChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RentalServiceServer).CancelReturnDateChange(ctx, req.(*CancelReturnDateChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RentalService_CancelRental_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CancelRentalRequest)
 	if err := dec(in); err != nil {
@@ -398,6 +632,24 @@ func _RentalService_ListMyRentals_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RentalService_ListToolRentals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListToolRentalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RentalServiceServer).ListToolRentals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RentalService_ListToolRentals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RentalServiceServer).ListToolRentals(ctx, req.(*ListToolRentalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RentalService_ServiceDesc is the grpc.ServiceDesc for RentalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -422,6 +674,30 @@ var RentalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _RentalService_FinalizeRentalRequest_Handler,
 		},
 		{
+			MethodName: "ActivateRental",
+			Handler:    _RentalService_ActivateRental_Handler,
+		},
+		{
+			MethodName: "ChangeRentalDates",
+			Handler:    _RentalService_ChangeRentalDates_Handler,
+		},
+		{
+			MethodName: "ApproveReturnDateChange",
+			Handler:    _RentalService_ApproveReturnDateChange_Handler,
+		},
+		{
+			MethodName: "RejectReturnDateChange",
+			Handler:    _RentalService_RejectReturnDateChange_Handler,
+		},
+		{
+			MethodName: "AcknowledgeReturnDateRejection",
+			Handler:    _RentalService_AcknowledgeReturnDateRejection_Handler,
+		},
+		{
+			MethodName: "CancelReturnDateChange",
+			Handler:    _RentalService_CancelReturnDateChange_Handler,
+		},
+		{
 			MethodName: "CancelRental",
 			Handler:    _RentalService_CancelRental_Handler,
 		},
@@ -440,6 +716,10 @@ var RentalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListMyRentals",
 			Handler:    _RentalService_ListMyRentals_Handler,
+		},
+		{
+			MethodName: "ListToolRentals",
+			Handler:    _RentalService_ListToolRentals_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

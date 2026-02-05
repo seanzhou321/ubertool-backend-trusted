@@ -13,6 +13,8 @@ const (
 	RentalStatusCompleted RentalStatus = "COMPLETED"
 	RentalStatusCancelled RentalStatus = "CANCELLED"
 	RentalStatusOverdue   RentalStatus = "OVERDUE"
+	RentalStatusReturnDateChanged        RentalStatus = "RETURN_DATE_CHANGED"
+	RentalStatusReturnDateChangeRejected RentalStatus = "RETURN_DATE_CHANGE_REJECTED"
 )
 
 type Rental struct {
@@ -28,6 +30,7 @@ type Rental struct {
 	Status           RentalStatus `json:"status"`
 	CompletedBy      *int32       `json:"completed_by,omitempty"`
 	PickupNote       string       `json:"pickup_note"`
+	RejectionReason  string       `json:"rejection_reason"`
 	CreatedOn        time.Time    `json:"created_on"`
 	UpdatedOn        time.Time    `json:"updated_on"`
 }

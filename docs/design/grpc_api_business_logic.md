@@ -51,7 +51,9 @@ Business Logic:
 9. Return success and message "Your account has been created. Please log in."
 
 Note: User must go through normal login process after signup. Signup does NOT return authentication tokens.
-Purpose: Authenticate existing user.
+
+### Login
+Purpose: Authenticate existing user and initiate two-factor authentication.
 
 Input: `email`, `password`
 Output: success/failure boolean, temporary_token, expires_at, message
@@ -59,7 +61,7 @@ Business Logic:
 1. Fetch user by `email`.
 2. Verify `password` against hashed password in database.
 3. If valid, generate a two_fa_code, send the 2FA code by email to the user.
-4. If valid, generate a temporary_token and return the temporary_token and milisecond time stamp of expires at. 
+4. If valid, generate a temporary_token and return the temporary_token and milisecond time stamp of expires at.
 5. If not valid, return false and a message, "Either the email and/or the password is wrong".
 
 ### Verify 2FA
@@ -317,7 +319,7 @@ Input: `request_id`
 Output: updated rental request object, list of approved rental request objects, list of pending rental objects of the same type of tools
 Business Logic:
 1. Verify `user_id` is the renter.
-2. Deduct `total_cost_cents` from renter's balance in `users_orgs`.
+2. Set `scheduled_end_date` by `end_date`.
 3. Update `rentals` status to 'SCHEDULED'.
 4. Update the tool status to 'RENTED'.
 5. Create a notification to the owner with attributes set to {topic: rental_request; rental:rental_id; purpose:"rental request confirmed"}
@@ -388,6 +390,136 @@ Output: list of lendings
 Business Logic:
 1. Filter the rental requests of the user as the owner by the status. 
 2. If organization_is is given, filter only the requests from that organization.
+
+### Activate Rental
+Purpose: Mark a rental as picked up and in use (transition from SCHEDULED to ACTIVE).
+
+Input: `request_id`
+Output: updated rental request object
+Business Logic:
+1. Verify the rental exists and status is 'SCHEDULED'.
+2. Verify `user_id` is either the renter or the owner (both can initiate pickup).
+3. Update `rentals` status to 'ACTIVE'.
+4. Create a notification to the other party (if renter initiated, notify owner; if owner initiated, notify renter) with attributes set to {topic:rental_pickup; rental:rental_id; tool_name:tool_name; start_date:start_date; end_date:end_date; purpose:"rental has been picked up"}.
+5. Send an email to the other party to notify the tool pickup confirmation.
+6. Return the updated rental request object.
+
+### Change Rental Dates
+Purpose: Allow either renter or owner to modify rental dates with appropriate approval workflow.
+
+Input: `request_id`, `new_start_date`, `new_end_date`, `old_start_date`, `old_end_date`
+Output: updated rental request object
+Business Logic:
+1. Verify the rental exists.
+2. Extract `user_id` from JWT token.
+3. Determine if user is renter or owner.
+4. Check rental status and apply appropriate business rules:
+
+**Case 1: Renter changes dates in PENDING, APPROVED, or SCHEDULED status**
+   - Verify `user_id` is the renter.
+   - Calculate new `total_cost_cents` based on new dates and tool pricing.
+   - Update `rentals` with new start_date, end_date, and total_cost_cents.
+   - Set status to 'PENDING' (requires owner re-approval).
+   - Create a notification to the owner with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"renter changed dates, requires re-approval"}.
+   - Send email to owner about date change requiring re-approval.
+
+**Case 2: Owner changes dates in PENDING, APPROVED, or SCHEDULED status**
+   - Verify `user_id` is the tool owner.
+   - Calculate new `total_cost_cents` based on new dates and tool pricing.
+   - Update `rentals` with new start_date, end_date, and total_cost_cents.
+   - Set status to 'APPROVED' (requires renter confirmation).
+   - Create a notification to the renter with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"owner changed dates, requires confirmation"}.
+   - Send email to renter about date change requiring confirmation.
+
+**Case 3: Renter extends return date in ACTIVE or OVERDUE status**
+   - Verify `user_id` is the renter.
+   - Verify only `new_end_date` is changed (start date cannot change for active rentals).
+   - Calculate new `total_cost_cents` based on original start_date and new end_date.
+   - Update `rentals` with new end_date and total_cost_cents.
+   - Set status to 'RETURN_DATE_CHANGED'.
+   - Create a notification to the owner with attributes set to {topic:return_date_change_request; rental:rental_id; old_date:old_end_date; new_date:new_end_date; purpose:"renter requests return date extension"}.
+   - Send email to owner about return date extension request.
+
+5. Return the updated rental request object.
+
+### Approve Return Date Change
+Purpose: Owner approves a renter's request to extend the return date.
+
+Input: `request_id`
+Output: updated rental request object
+Business Logic:
+1. Verify the rental exists and status is 'RETURN_DATE_CHANGED'.
+2. Verify `user_id` is the tool owner.
+3. Update `rentals` status to 'ACTIVE' (or 'OVERDUE' if new end_date has passed).
+4. The new end_date and total_cost_cents remain as previously set by ChangeRentalDates.
+5. Create a notification to the renter with attributes set to {topic:return_date_change_approved; rental:rental_id; tool_name:tool_name; purpose:"owner approved return date change."}.
+6. Send email to renter about approved return date extension.
+7. Return the updated rental request object.
+
+### Reject Return Date Change
+Purpose: Owner rejects a renter's request to extend the return date.
+
+Input: `request_id`, `reason`, `new_end_date`
+Output: updated rental request object
+Business Logic:
+1. Verify the rental exists and status is 'RETURN_DATE_CHANGED'.
+2. Verify `user_id` is the tool owner.
+3. Update `rentals` status to 'RETURN_DATE_CHANGE_REJECTED'.
+4. Store rejection `reason` in the `rejection_reason` of the rental record.
+5. Update `rentals` with the new_end_date and recalculated `total_cost_cents`.
+6. Create a notification to the renter with attributes set to {topic:return_date_change_rejected; rental:rental_id; rejection_reason:reason; new_end_date:new_end_date; old_end_date:old_end_date; purpose:"owner rejected return date extension"}.
+7. Send email to renter about rejected return date extension with reason.
+8. Return the updated rental request object.
+
+### Acknowledge Return Date Rejection
+Purpose: Renter acknowledges the owner's rejection of return date change and reverts to original terms.
+
+Input: `request_id`
+Output: updated rental request object
+Business Logic:
+1. Verify the rental exists and status is 'RETURN_DATE_CHANGE_REJECTED'.
+2. Verify `user_id` is the renter.
+3. Determine appropriate status based on current date vs original end_date:
+   - If current_date <= original_end_date: Set status to 'ACTIVE'
+   - If current_date > original_end_date: Set status to 'OVERDUE'
+4. Update `scheduled_end_date` by `end_date` and newly calculated `total_cost_cents` field.
+5. Clear rejection_reason field.
+6. Create a notification to the owner with attributes set to {topic:return_date_rejection_acknowledged; rental:rental_id; purpose:"renter acknowledged rejection"}.
+7. Return the updated rental request object.
+
+### Cancel Return Date Change
+Purpose: Renter cancels their own pending return date change request.
+
+Input: `request_id`
+Output: updated rental request object
+Business Logic:
+1. Verify the rental exists and status is 'RETURN_DATE_CHANGED'.
+2. Verify `user_id` is the renter.
+3. Reset end_date by scheduled_end_date and newly calculated total_cost_cents.
+4. Update `rentals` status to 'ACTIVE' (or 'OVERDUE' if original end_date has passed).
+5. Create a notification to the owner with attributes set to {topic:return_date_change_cancelled; rental:rental_id; purpose:"renter cancelled return date change request"}.
+6. Send email to owner about cancelled return date change request.
+7. Return the updated rental request object.
+
+### List Tool Rentals
+Purpose: View complete rental history for a specific tool (for tool owners).
+
+Input: `tool_id`, `organization_id`, status filter, pagination
+Output: list of rental requests for the tool
+Business Logic:
+1. Extract `user_id` from JWT token.
+2. Verify the tool exists and `user_id` is the owner of the tool.
+3. Query `rentals` where `tool_id` matches the input.
+4. Apply `organization_id` and `status` filters if provided (0 = all organizations or statuses).
+5. Order results by `created_on` DESC (most recent first).
+6. Apply pagination (page, page_size).
+7. Return list of rental requests with complete details:
+   - Rental ID, status, dates, cost
+   - Renter information (name, email)
+   - Request and completion timestamps
+8. Include summary metadata:
+   - Total rental count for this tool
+   - Count by status (completed, active, pending, etc.)
 
 ## Ledger
 

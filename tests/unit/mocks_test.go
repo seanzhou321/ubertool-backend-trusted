@@ -254,6 +254,10 @@ func (m *MockRentalRepo) ListByOwner(ctx context.Context, ownerID, orgID int32, 
 	args := m.Called(ctx, ownerID, orgID, status, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
 }
+func (m *MockRentalRepo) ListByTool(ctx context.Context, toolID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
+	args := m.Called(ctx, toolID, orgID, status, page, pageSize)
+	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
+}
 
 // MockLedgerRepo
 type MockLedgerRepo struct {
@@ -322,6 +326,11 @@ func (m *MockEmailService) SendRentalCancellationNotification(ctx context.Contex
 
 func (m *MockEmailService) SendRentalCompletionNotification(ctx context.Context, email, role, toolName string, amount int32) error {
 	args := m.Called(ctx, email, role, toolName, amount)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendRentalPickupNotification(ctx context.Context, email, name, toolName, startDate, endDate string) error {
+	args := m.Called(ctx, email, name, toolName, startDate, endDate)
 	return args.Error(0)
 }
 

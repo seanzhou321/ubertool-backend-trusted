@@ -37,13 +37,14 @@ func Test2FAFlow(t *testing.T) {
 	// Clean up any existing test user
 	_, _ = db.Exec("DELETE FROM users WHERE email = $1", email)
 
-	// Insert test user
+	// Insert test user with unique phone number
+	phoneNumber := "+1777" + time.Now().Format("150405") // Unique based on time
 	var userID int32
 	err = db.QueryRow(`
 		INSERT INTO users (email, phone_number, password_hash, name, created_on, updated_on)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id`,
-		email, "", string(hash), userName, time.Now(), time.Now(),
+		email, phoneNumber, string(hash), userName, time.Now(), time.Now(),
 	).Scan(&userID)
 	require.NoError(t, err, "Failed to create test user")
 	t.Logf("Test user created with ID: %d", userID)

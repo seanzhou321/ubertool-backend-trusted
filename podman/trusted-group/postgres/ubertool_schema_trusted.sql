@@ -133,6 +133,7 @@ CREATE TABLE rentals (
     total_cost_cents INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING',
     pickup_note TEXT,
+    rejection_reason TEXT,
     completed_by INTEGER,
     created_on DATE DEFAULT CURRENT_DATE,
     updated_on DATE DEFAULT CURRENT_DATE
