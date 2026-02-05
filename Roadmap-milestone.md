@@ -15,9 +15,9 @@
 ## Milestone 2: Pre-production
 1. email notifications
 2. image capture and display
-3. enable 2fa
+3. Add legal statements: community bylaws and rental pricing and cost agreement confirmation.
 4. refresh token enable
-5. Add legal statements: community bylaws and rental pricing and cost agreement confirmation.
+5. enable 2fa
 
 ## Milestone 3: Production - trial groups
 1. https certification
