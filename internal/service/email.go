@@ -205,6 +205,19 @@ func (s *emailService) SendRentalPickupNotification(ctx context.Context, email, 
 	})
 }
 
+func (s *emailService) SendReturnDateRejectionNotification(ctx context.Context, renterEmail, toolName, newEndDate, reason string, totalCostCents int32) error {
+	subject := fmt.Sprintf("Return Date Extension Rejected: %s", toolName)
+	costInDollars := float64(totalCostCents) / 100.0
+	body := fmt.Sprintf("Hello,\n\nYour request to extend the return date for %s has been rejected.\n\nRejection Reason: %s\nNew Return Date Set by Owner: %s\nUpdated Rental Cost: $%.2f\n\nPlease acknowledge this change to continue.",
+		toolName, reason, newEndDate, costInDollars)
+	return s.sendEmail(EmailMessage{
+		To:      []string{renterEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
 func (s *emailService) SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error {
 	return s.sendEmail(EmailMessage{
 		To:      []string{adminEmail},

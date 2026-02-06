@@ -457,19 +457,30 @@ Business Logic:
 7. Return the updated rental request object.
 
 ### Reject Return Date Change
-Purpose: Owner rejects a renter's request to extend the return date.
+Purpose: Owner rejects a renter's request to extend the return date and sets a new return date.
 
-Input: `request_id`, `reason`, `new_end_date`
+Input: `request_id`, `new_end_date`, `reason`
 Output: updated rental request object
 Business Logic:
 1. Verify the rental exists and status is 'RETURN_DATE_CHANGED'.
 2. Verify `user_id` is the tool owner.
-3. Update `rentals` status to 'RETURN_DATE_CHANGE_REJECTED'.
-4. Store rejection `reason` in the `rejection_reason` of the rental record.
-5. Update `rentals` with the new_end_date and recalculated `total_cost_cents`.
-6. Create a notification to the renter with attributes set to {topic:return_date_change_rejected; rental:rental_id; rejection_reason:reason; new_end_date:new_end_date; old_end_date:old_end_date; purpose:"owner rejected return date extension"}.
-7. Send email to renter about rejected return date extension with reason.
-8. Return the updated rental request object.
+3. Validate `new_end_date`:
+   - Must not be empty (mandatory field).
+   - Must be different from the requested end_date in the RETURN_DATE_CHANGED request.
+   - Must be a valid date in YYYY-MM-DD format.
+   - If validation fails, return error with message "New end date is required and must be different from the requested date".
+4. Update `rentals` status to 'RETURN_DATE_CHANGE_REJECTED'.
+5. Store rejection `reason` in the `rejection_reason` field of the rental record.
+6. Update `rentals.end_date` with the `new_end_date` set by owner.
+7. Recalculate `total_cost_cents` based on start_date and the new_end_date and update the record.
+8. Create a notification to the renter with attributes set to {topic:return_date_change_rejected; rental:rental_id; rejection_reason:reason; new_end_date:new_end_date; old_end_date:old_end_date; purpose:"owner rejected return date extension and set new return date"}.
+9. Send email to renter about rejected return date extension with:
+   - The rejection reason
+   - The new return date set by the owner
+   - The updated rental cost
+10. Return the updated rental request object.
+
+Note: The owner is required to set a counter-proposal return date when rejecting. This ensures the renter knows the actual expected return date.
 
 ### Acknowledge Return Date Rejection
 Purpose: Renter acknowledges the owner's rejection of return date change and reverts to original terms.

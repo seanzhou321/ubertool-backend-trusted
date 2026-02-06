@@ -48,6 +48,9 @@ func (m *MockEmailService) SendRentalApprovalNotification(ctx context.Context, r
 func (m *MockEmailService) SendRentalRejectionNotification(ctx context.Context, renterEmail, toolName, ownerName string, ccEmail string) error {
 	return nil
 }
+func (m *MockEmailService) SendReturnDateRejectionNotification(ctx context.Context, renterEmail, toolName, newEndDate, reason string, totalCostCents int32) error {
+	return nil
+}
 
 type MockNotificationRepo struct {
 	mock.Mock

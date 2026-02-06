@@ -103,6 +103,7 @@ type EmailService interface {
 	SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string, ccEmail string) error
 	SendRentalCompletionNotification(ctx context.Context, email, role, toolName string, amount int32) error
 	SendRentalPickupNotification(ctx context.Context, email, name, toolName, startDate, endDate string) error
+	SendReturnDateRejectionNotification(ctx context.Context, renterEmail, toolName, newEndDate, reason string, totalCostCents int32) error
 
 	// Admin Notifications
 	SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error

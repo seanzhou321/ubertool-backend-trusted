@@ -623,34 +623,63 @@ func (s *rentalService) RejectReturnDateChange(ctx context.Context, ownerID, ren
 	if rt.OwnerID != ownerID { return nil, errors.New("unauthorized") }
 	if rt.Status != domain.RentalStatusReturnDateChanged { return nil, errors.New("invalid status") }
 	
+	// Validate new_end_date is provided (mandatory)
+	if newEndDateStr == "" {
+		return nil, errors.New("new end date is required")
+	}
+	
+	// Parse and validate date format
+	newEndDate, err := time.Parse("2006-01-02", newEndDateStr)
+	if err != nil {
+		return nil, errors.New("invalid date format, expected YYYY-MM-DD")
+	}
+	
+	// Validate new_end_date is different from requested date
+	if rt.EndDate != nil && newEndDate.Format("2006-01-02") == rt.EndDate.Format("2006-01-02") {
+		return nil, errors.New("new end date must be different from the requested date")
+	}
+	
+	// Get tool for cost recalculation
+	tool, err := s.toolRepo.GetByID(ctx, rt.ToolID)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Update status and rejection reason
 	rt.Status = domain.RentalStatusReturnDateChangeRejected
 	rt.RejectionReason = reason
-	// "Update rentals with the new_end_date and recalculated total_cost_cents"
-	// Wait, ChangeDates *already* did this. 
-	// Maybe "new_end_date" arg here is to confirm what is being rejected?
-	// Or maybe the requirement implies reverting to a "negotiated" date?
-	// Given "Acknowledge" exists to "revert to original terms", Reject probably just marks the state.
-	// We leave cost/dates as "Requested" state until Acknowledge cleanup?
-	// "Acknowledge... Update scheduled_end_date by end_date..." 
-	// If `end_date` is the requested one, setting scheduled to it effectively APPROVES it.
-	// This contradicts "Acknowledge Rejection".
 	
-	// Let's assume my hypothesis about `end_date` holding the request is correct.
-	// If I Acknowledge Rejection, I should REVERT `total_cost` and clear `end_date`.
-	// For Reject, I just mark status.
+	// Update end_date with owner's counter-proposal
+	rt.EndDate = &newEndDate
+	
+	// Recalculate total_cost_cents based on new end date
+	days := int32(newEndDate.Sub(rt.StartDate).Hours()/24) + 1
+	if days <= 0 {
+		return nil, errors.New("invalid date range")
+	}
+	rt.TotalCostCents = tool.PricePerDayCents * days
 	
 	if err := s.rentalRepo.Update(ctx, rt); err != nil { return nil, err }
 	
-	// Notify Renter
-	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
+	// Notify Renter with counter-proposal details
 	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
 	if renter != nil && tool != nil {
 		notif := &domain.Notification{
-			UserID: renter.ID, OrgID: rt.OrgID, Title: "Extension Rejected",
-			Message: fmt.Sprintf("Extension for %s rejected: %s", tool.Name, reason),
-			Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_REJECTED", "rental_id": fmt.Sprintf("%d", rt.ID)},
+			UserID: renter.ID, OrgID: rt.OrgID, 
+			Title: "Extension Rejected - Counter-Proposal",
+			Message: fmt.Sprintf("Extension for %s rejected. Owner set new return date: %s. Reason: %s. Updated cost: $%.2f", 
+				tool.Name, newEndDate.Format("2006-01-02"), reason, float64(rt.TotalCostCents)/100),
+			Attributes: map[string]string{
+				"type": "RETURN_DATE_CHANGE_REJECTED", 
+				"rental_id": fmt.Sprintf("%d", rt.ID),
+				"new_end_date": newEndDate.Format("2006-01-02"),
+				"total_cost_cents": fmt.Sprintf("%d", rt.TotalCostCents),
+			},
 		}
 		s.noteRepo.Create(ctx, notif)
+		
+		// Send email notification to renter
+		_ = s.emailSvc.SendReturnDateRejectionNotification(ctx, renter.Email, tool.Name, newEndDate.Format("2006-01-02"), reason, rt.TotalCostCents)
 	}
 	return rt, nil
 }

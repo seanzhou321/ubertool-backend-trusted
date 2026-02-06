@@ -334,6 +334,11 @@ func (m *MockEmailService) SendRentalPickupNotification(ctx context.Context, ema
 	return args.Error(0)
 }
 
+func (m *MockEmailService) SendReturnDateRejectionNotification(ctx context.Context, renterEmail, toolName, newEndDate, reason string, totalCostCents int32) error {
+	args := m.Called(ctx, renterEmail, toolName, newEndDate, reason, totalCostCents)
+	return args.Error(0)
+}
+
 func (m *MockEmailService) SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error {
 	args := m.Called(ctx, adminEmail, subject, message)
 	return args.Error(0)

@@ -54,8 +54,8 @@ func TestRentalRepository_GetByID(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
-		rows := sqlmock.NewRows([]string{"id", "org_id", "tool_id", "renter_id", "owner_id", "start_date", "scheduled_end_date", "end_date", "total_cost_cents", "status", "pickup_note", "completed_by", "created_on", "updated_on"}).
-			AddRow(1, 1, 2, 3, 4, time.Now(), time.Now(), nil, 1000, "PENDING", "Note", nil, time.Now(), time.Now())
+		rows := sqlmock.NewRows([]string{"id", "org_id", "tool_id", "renter_id", "owner_id", "start_date", "scheduled_end_date", "end_date", "total_cost_cents", "status", "pickup_note", "rejection_reason", "completed_by", "created_on", "updated_on"}).
+			AddRow(1, 1, 2, 3, 4, time.Now(), time.Now(), nil, 1000, "PENDING", "Note", "", nil, time.Now(), time.Now())
 
 		mock.ExpectQuery("SELECT (.+) FROM rentals WHERE id = \\$1").
 			WithArgs(int32(1)).

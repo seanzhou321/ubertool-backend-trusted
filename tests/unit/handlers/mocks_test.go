@@ -102,6 +102,56 @@ func (m *MockRentalService) ListLendings(ctx context.Context, userID, orgID int3
 	args := m.Called(ctx, userID, orgID, status, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
 }
+func (m *MockRentalService) ActivateRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error) {
+	args := m.Called(ctx, ownerID, rentalID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Rental), args.Error(1)
+}
+func (m *MockRentalService) ChangeRentalDates(ctx context.Context, userID, rentalID int32, newStart, newEnd, oldStart, oldEnd string) (*domain.Rental, error) {
+	args := m.Called(ctx, userID, rentalID, newStart, newEnd, oldStart, oldEnd)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Rental), args.Error(1)
+}
+func (m *MockRentalService) ApproveReturnDateChange(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error) {
+	args := m.Called(ctx, ownerID, rentalID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Rental), args.Error(1)
+}
+func (m *MockRentalService) RejectReturnDateChange(ctx context.Context, ownerID, rentalID int32, reason, newEndDate string) (*domain.Rental, error) {
+	args := m.Called(ctx, ownerID, rentalID, reason, newEndDate)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Rental), args.Error(1)
+}
+func (m *MockRentalService) AcknowledgeReturnDateRejection(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error) {
+	args := m.Called(ctx, renterID, rentalID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Rental), args.Error(1)
+}
+func (m *MockRentalService) CancelReturnDateChange(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error) {
+	args := m.Called(ctx, renterID, rentalID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Rental), args.Error(1)
+}
+func (m *MockRentalService) ListToolRentals(ctx context.Context, ownerID, toolID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
+	args := m.Called(ctx, ownerID, toolID, orgID, status, page, pageSize)
+	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
+}
+func (m *MockRentalService) Update(ctx context.Context, rental *domain.Rental) error {
+	args := m.Called(ctx, rental)
+	return args.Error(0)
+}
 
 // MockUserService
 type MockUserService struct {
