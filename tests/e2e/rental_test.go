@@ -181,7 +181,7 @@ func TestRentalService_E2E(t *testing.T) {
 
 		rejectResp, err := rentalClient.RejectRentalRequest(ctx2, rejectReq)
 		require.NoError(t, err)
-		assert.Equal(t, pb.RentalStatus_RENTAL_STATUS_CANCELLED, rejectResp.RentalRequest.Status)
+		assert.Equal(t, pb.RentalStatus_RENTAL_STATUS_REJECTED, rejectResp.RentalRequest.Status)
 
 		// Verify: Notification sent to renter
 		var notifCount int

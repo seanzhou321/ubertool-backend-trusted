@@ -94,12 +94,12 @@ func (m *MockRentalService) GetRental(ctx context.Context, userID, rentalID int3
 	args := m.Called(ctx, userID, rentalID)
 	return args.Get(0).(*domain.Rental), args.Error(1)
 }
-func (m *MockRentalService) ListRentals(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
-	args := m.Called(ctx, userID, orgID, status, page, pageSize)
+func (m *MockRentalService) ListRentals(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
+	args := m.Called(ctx, userID, orgID, statuses, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
 }
-func (m *MockRentalService) ListLendings(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
-	args := m.Called(ctx, userID, orgID, status, page, pageSize)
+func (m *MockRentalService) ListLendings(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
+	args := m.Called(ctx, userID, orgID, statuses, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
 }
 func (m *MockRentalService) ActivateRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error) {
@@ -144,8 +144,8 @@ func (m *MockRentalService) CancelReturnDateChange(ctx context.Context, renterID
 	}
 	return args.Get(0).(*domain.Rental), args.Error(1)
 }
-func (m *MockRentalService) ListToolRentals(ctx context.Context, ownerID, toolID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
-	args := m.Called(ctx, ownerID, toolID, orgID, status, page, pageSize)
+func (m *MockRentalService) ListToolRentals(ctx context.Context, ownerID, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
+	args := m.Called(ctx, ownerID, toolID, orgID, statuses, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
 }
 func (m *MockRentalService) Update(ctx context.Context, rental *domain.Rental) error {

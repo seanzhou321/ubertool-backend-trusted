@@ -35,21 +35,23 @@ const (
 	RentalStatus_RENTAL_STATUS_OVERDUE                     RentalStatus = 7
 	RentalStatus_RENTAL_STATUS_RETURN_DATE_CHANGED         RentalStatus = 8
 	RentalStatus_RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED RentalStatus = 9
+	RentalStatus_RENTAL_STATUS_REJECTED                    RentalStatus = 10
 )
 
 // Enum value maps for RentalStatus.
 var (
 	RentalStatus_name = map[int32]string{
-		0: "RENTAL_STATUS_UNSPECIFIED",
-		1: "RENTAL_STATUS_PENDING",
-		2: "RENTAL_STATUS_APPROVED",
-		3: "RENTAL_STATUS_SCHEDULED",
-		4: "RENTAL_STATUS_ACTIVE",
-		5: "RENTAL_STATUS_COMPLETED",
-		6: "RENTAL_STATUS_CANCELLED",
-		7: "RENTAL_STATUS_OVERDUE",
-		8: "RENTAL_STATUS_RETURN_DATE_CHANGED",
-		9: "RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED",
+		0:  "RENTAL_STATUS_UNSPECIFIED",
+		1:  "RENTAL_STATUS_PENDING",
+		2:  "RENTAL_STATUS_APPROVED",
+		3:  "RENTAL_STATUS_SCHEDULED",
+		4:  "RENTAL_STATUS_ACTIVE",
+		5:  "RENTAL_STATUS_COMPLETED",
+		6:  "RENTAL_STATUS_CANCELLED",
+		7:  "RENTAL_STATUS_OVERDUE",
+		8:  "RENTAL_STATUS_RETURN_DATE_CHANGED",
+		9:  "RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED",
+		10: "RENTAL_STATUS_REJECTED",
 	}
 	RentalStatus_value = map[string]int32{
 		"RENTAL_STATUS_UNSPECIFIED":                 0,
@@ -62,6 +64,7 @@ var (
 		"RENTAL_STATUS_OVERDUE":                     7,
 		"RENTAL_STATUS_RETURN_DATE_CHANGED":         8,
 		"RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED": 9,
+		"RENTAL_STATUS_REJECTED":                    10,
 	}
 )
 
@@ -697,8 +700,8 @@ func (x *GetRentalResponse) GetRentalRequest() *RentalRequest {
 // List my rentals request
 type ListMyRentalsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`     // Organization context
-	Status         RentalStatus           `protobuf:"varint,2,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"` // Filter by status (optional, 0 = all)
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"` // Organization context
+	Status         []RentalStatus         `protobuf:"varint,2,rep,packed,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"`
 	Page           int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize       int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -742,11 +745,11 @@ func (x *ListMyRentalsRequest) GetOrganizationId() int32 {
 	return 0
 }
 
-func (x *ListMyRentalsRequest) GetStatus() RentalStatus {
+func (x *ListMyRentalsRequest) GetStatus() []RentalStatus {
 	if x != nil {
 		return x.Status
 	}
-	return RentalStatus_RENTAL_STATUS_UNSPECIFIED
+	return nil
 }
 
 func (x *ListMyRentalsRequest) GetPage() int32 {
@@ -819,8 +822,8 @@ func (x *ListRentalsResponse) GetTotalCount() int32 {
 // List my lendings request
 type ListMyLendingsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`     // Organization context
-	Status         RentalStatus           `protobuf:"varint,2,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"` // Filter by status (optional, 0 = all)
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`            // Organization context
+	Status         []RentalStatus         `protobuf:"varint,2,rep,packed,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"` // Filter by status (optional, 0 = all)
 	Page           int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize       int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -864,11 +867,11 @@ func (x *ListMyLendingsRequest) GetOrganizationId() int32 {
 	return 0
 }
 
-func (x *ListMyLendingsRequest) GetStatus() RentalStatus {
+func (x *ListMyLendingsRequest) GetStatus() []RentalStatus {
 	if x != nil {
 		return x.Status
 	}
-	return RentalStatus_RENTAL_STATUS_UNSPECIFIED
+	return nil
 }
 
 func (x *ListMyLendingsRequest) GetPage() int32 {
@@ -888,9 +891,9 @@ func (x *ListMyLendingsRequest) GetPageSize() int32 {
 // List tool rentals request (for rental history of a specific tool)
 type ListToolRentalsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	ToolId         int32                  `protobuf:"varint,1,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`                             // Tool ID to get rental history for
-	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`     // Organization context
-	Status         RentalStatus           `protobuf:"varint,3,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"` // Filter by status (optional, 0 = all)
+	ToolId         int32                  `protobuf:"varint,1,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`                                    // Tool ID to get rental history for
+	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`            // Organization context
+	Status         []RentalStatus         `protobuf:"varint,3,rep,packed,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"` // Filter by status (optional, 0 = all)
 	Page           int32                  `protobuf:"varint,4,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize       int32                  `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	unknownFields  protoimpl.UnknownFields
@@ -941,11 +944,11 @@ func (x *ListToolRentalsRequest) GetOrganizationId() int32 {
 	return 0
 }
 
-func (x *ListToolRentalsRequest) GetStatus() RentalStatus {
+func (x *ListToolRentalsRequest) GetStatus() []RentalStatus {
 	if x != nil {
 		return x.Status
 	}
-	return RentalStatus_RENTAL_STATUS_UNSPECIFIED
+	return nil
 }
 
 func (x *ListToolRentalsRequest) GetPage() int32 {
@@ -1858,7 +1861,7 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xaf\x01\n" +
 	"\x14ListMyRentalsRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12=\n" +
-	"\x06status\x18\x02 \x01(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
+	"\x06status\x18\x02 \x03(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"x\n" +
 	"\x13ListRentalsResponse\x12@\n" +
@@ -1867,13 +1870,13 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"totalCount\"\xb0\x01\n" +
 	"\x15ListMyLendingsRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12=\n" +
-	"\x06status\x18\x02 \x01(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
+	"\x06status\x18\x02 \x03(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\xca\x01\n" +
 	"\x16ListToolRentalsRequest\x12\x17\n" +
 	"\atool_id\x18\x01 \x01(\x05R\x06toolId\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12=\n" +
-	"\x06status\x18\x03 \x01(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
+	"\x06status\x18\x03 \x03(\x0e2%.ubertool.trusted.api.v1.RentalStatusR\x06status\x12\x12\n" +
 	"\x04page\x18\x04 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x05 \x01(\x05R\bpageSize\"V\n" +
 	"\x1cFinalizeRentalRequestRequest\x12\x1d\n" +
@@ -1944,7 +1947,7 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\n" +
 	"created_on\x18\x0e \x01(\tR\tcreatedOn\x12\x1d\n" +
 	"\n" +
-	"updated_on\x18\x0f \x01(\tR\tupdatedOn*\xc6\x02\n" +
+	"updated_on\x18\x0f \x01(\tR\tupdatedOn*\xe2\x02\n" +
 	"\fRentalStatus\x12\x1d\n" +
 	"\x19RENTAL_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15RENTAL_STATUS_PENDING\x10\x01\x12\x1a\n" +
@@ -1955,7 +1958,9 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\x17RENTAL_STATUS_CANCELLED\x10\x06\x12\x19\n" +
 	"\x15RENTAL_STATUS_OVERDUE\x10\a\x12%\n" +
 	"!RENTAL_STATUS_RETURN_DATE_CHANGED\x10\b\x12-\n" +
-	")RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED\x10\t2\xf2\x0f\n" +
+	")RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED\x10\t\x12\x1a\n" +
+	"\x16RENTAL_STATUS_REJECTED\x10\n" +
+	"2\xf2\x0f\n" +
 	"\rRentalService\x12\x80\x01\n" +
 	"\x13CreateRentalRequest\x123.ubertool.trusted.api.v1.CreateRentalRequestRequest\x1a4.ubertool.trusted.api.v1.CreateRentalRequestResponse\x12\x83\x01\n" +
 	"\x14ApproveRentalRequest\x124.ubertool.trusted.api.v1.ApproveRentalRequestRequest\x1a5.ubertool.trusted.api.v1.ApproveRentalRequestResponse\x12\x80\x01\n" +

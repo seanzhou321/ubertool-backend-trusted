@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
@@ -40,17 +41,21 @@ func (r *rentalRepository) Update(ctx context.Context, rt *domain.Rental) error 
 	return err
 }
 
-func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
+func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
 	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on 
 	        FROM rentals WHERE renter_id = $1 AND org_id = $2`
 	
 	args := []interface{}{renterID, orgID}
 	argIdx := 3
-	if status != "" {
-		sql += " AND status = $3"
-		args = append(args, status)
-		argIdx++
+	if len(statuses) > 0 {
+		placeholders := make([]string, len(statuses))
+		for i, status := range statuses {
+			placeholders[i] = fmt.Sprintf("$%d", argIdx)
+			args = append(args, status)
+			argIdx++
+		}
+		sql += " AND status IN (" + strings.Join(placeholders, ", ") + ")"
 	}
 
 	var count int32
@@ -80,17 +85,21 @@ func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int
 	return rentals, count, nil
 }
 
-func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
+func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
 	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on 
 	        FROM rentals WHERE owner_id = $1 AND org_id = $2`
 	
 	args := []interface{}{ownerID, orgID}
 	argIdx := 3
-	if status != "" {
-		sql += " AND status = $3"
-		args = append(args, status)
-		argIdx++
+	if len(statuses) > 0 {
+		placeholders := make([]string, len(statuses))
+		for i, status := range statuses {
+			placeholders[i] = fmt.Sprintf("$%d", argIdx)
+			args = append(args, status)
+			argIdx++
+		}
+		sql += " AND status IN (" + strings.Join(placeholders, ", ") + ")"
 	}
 
 	var count int32
@@ -120,7 +129,7 @@ func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32
 	return rentals, count, nil
 }
 
-func (r *rentalRepository) ListByTool(ctx context.Context, toolID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
+func (r *rentalRepository) ListByTool(ctx context.Context, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
 	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on 
 	        FROM rentals WHERE tool_id = $1`
@@ -134,10 +143,14 @@ func (r *rentalRepository) ListByTool(ctx context.Context, toolID, orgID int32, 
 		argIdx++
 	}
 
-	if status != "" {
-		sql += fmt.Sprintf(" AND status = $%d", argIdx)
-		args = append(args, status)
-		argIdx++
+	if len(statuses) > 0 {
+		placeholders := make([]string, len(statuses))
+		for i, status := range statuses {
+			placeholders[i] = fmt.Sprintf("$%d", argIdx)
+			args = append(args, status)
+			argIdx++
+		}
+		sql += " AND status IN (" + strings.Join(placeholders, ", ") + ")"
 	}
 
 	var count int32

@@ -129,7 +129,7 @@ message GetRentalResponse {
 // List my rentals request
 message ListMyRentalsRequest {
   int32 organization_id = 1;           // Organization context
-  RentalStatus status = 2;             // Filter by status (optional, 0 = all)
+  repeated RentalStatus status = 2;
   int32 page = 3;
   int32 page_size = 4;
 }
@@ -143,7 +143,7 @@ message ListRentalsResponse {
 // List my lendings request
 message ListMyLendingsRequest {
   int32 organization_id = 1;           // Organization context
-  RentalStatus status = 2;             // Filter by status (optional, 0 = all)
+  repeated RentalStatus status = 2;             // Filter by status (optional, 0 = all)
   int32 page = 3;
   int32 page_size = 4;
 }
@@ -152,7 +152,7 @@ message ListMyLendingsRequest {
 message ListToolRentalsRequest {
   int32 tool_id = 1;                   // Tool ID to get rental history for
   int32 organization_id = 2;           // Organization context
-  RentalStatus status = 3;             // Filter by status (optional, 0 = all)
+  repeated RentalStatus status = 3;             // Filter by status (optional, 0 = all)
   int32 page = 4;
   int32 page_size = 5;
 }
@@ -260,5 +260,6 @@ enum RentalStatus {
   RENTAL_STATUS_OVERDUE = 7;
   RENTAL_STATUS_RETURN_DATE_CHANGED = 8;
   RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED = 9;
+  RENTAL_STATUS_REJECTED = 10;
 }
 

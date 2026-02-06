@@ -109,7 +109,7 @@ func (h *RentalHandler) ListMyRentals(ctx context.Context, req *pb.ListMyRentals
 	if err != nil {
 		return nil, err
 	}
-	statusStr := MapProtoRentalStatusToDomain(req.Status)
+	statuses := MapProtoRentalStatusesToDomain(req.Status)
 	page := req.Page
 	if page <= 0 {
 		page = 1
@@ -118,7 +118,7 @@ func (h *RentalHandler) ListMyRentals(ctx context.Context, req *pb.ListMyRentals
 	if pageSize <= 0 {
 		pageSize = 10
 	}
-	rentals, count, err := h.rentalSvc.ListRentals(ctx, userID, req.OrganizationId, statusStr, page, pageSize)
+	rentals, count, err := h.rentalSvc.ListRentals(ctx, userID, req.OrganizationId, statuses, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (h *RentalHandler) ListMyLendings(ctx context.Context, req *pb.ListMyLendin
 	if err != nil {
 		return nil, err
 	}
-	statusStr := MapProtoRentalStatusToDomain(req.Status)
+	statuses := MapProtoRentalStatusesToDomain(req.Status)
 	page := req.Page
 	if page <= 0 {
 		page = 1
@@ -146,7 +146,7 @@ func (h *RentalHandler) ListMyLendings(ctx context.Context, req *pb.ListMyLendin
 	if pageSize <= 0 {
 		pageSize = 10
 	}
-	rentals, count, err := h.rentalSvc.ListLendings(ctx, userID, req.OrganizationId, statusStr, page, pageSize)
+	rentals, count, err := h.rentalSvc.ListLendings(ctx, userID, req.OrganizationId, statuses, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -260,13 +260,13 @@ func (h *RentalHandler) CancelReturnDateChange(ctx context.Context, req *pb.Canc
 func (h *RentalHandler) ListToolRentals(ctx context.Context, req *pb.ListToolRentalsRequest) (*pb.ListRentalsResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
 	if err != nil { return nil, err }
-	statusStr := MapProtoRentalStatusToDomain(req.Status)
+	statuses := MapProtoRentalStatusesToDomain(req.Status)
 	page := req.Page
 	if page <= 0 { page = 1 }
 	pageSize := req.PageSize
 	if pageSize <= 0 { pageSize = 10 }
 	
-	rentals, count, err := h.rentalSvc.ListToolRentals(ctx, userID, req.ToolId, req.OrganizationId, statusStr, page, pageSize)
+	rentals, count, err := h.rentalSvc.ListToolRentals(ctx, userID, req.ToolId, req.OrganizationId, statuses, page, pageSize)
 	if err != nil { return nil, err }
 	
 	protoRentals := make([]*pb.RentalRequest, len(rentals))

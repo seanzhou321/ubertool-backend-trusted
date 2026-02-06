@@ -376,20 +376,20 @@ Business Logic:
 ### List My Rentals
 Purpose: View history/status of tools borrowed.
 
-Input: `organization_id`, status filter
+Input: `organization_id`, status filter (array)
 Output: list of rentals
 Business Logic:
-1. Filter the rental requests of the user as the renter by the status. 
-2. If organization_is is given, filter only the requests from that organization.
+1. Filter the rental requests of the user as the renter by the status. Multiple statuses can be provided and should be applied with OR logic (match any of the given statuses). If status array is empty, return all statuses.
+2. If organization_id is given, filter only the requests from that organization.
 
 ### List My Lendings
 Purpose: View history/status of tools lent to others.
 
-Input: `organization_id`, status filter
+Input: `organization_id`, status filter (array)
 Output: list of lendings
 Business Logic:
-1. Filter the rental requests of the user as the owner by the status. 
-2. If organization_is is given, filter only the requests from that organization.
+1. Filter the rental requests of the user as the owner by the status. Multiple statuses can be provided and should be applied with OR logic (match any of the given statuses). If status array is empty, return all statuses.
+2. If organization_id is given, filter only the requests from that organization.
 
 ### Activate Rental
 Purpose: Mark a rental as picked up and in use (transition from SCHEDULED to ACTIVE).
@@ -515,20 +515,21 @@ Business Logic:
 ### List Tool Rentals
 Purpose: View complete rental history for a specific tool (for tool owners).
 
-Input: `tool_id`, `organization_id`, status filter, pagination
+Input: `tool_id`, `organization_id`, status filter (array), pagination
 Output: list of rental requests for the tool
 Business Logic:
 1. Extract `user_id` from JWT token.
 2. Verify the tool exists and `user_id` is the owner of the tool.
 3. Query `rentals` where `tool_id` matches the input.
-4. Apply `organization_id` and `status` filters if provided (0 = all organizations or statuses).
-5. Order results by `created_on` DESC (most recent first).
-6. Apply pagination (page, page_size).
-7. Return list of rental requests with complete details:
+4. Apply `organization_id` filter if provided.
+5. Apply `status` filter if provided. Multiple statuses can be provided and should be applied with OR logic (match any of the given statuses). If status array is empty, return all statuses.
+6. Order results by `created_on` DESC (most recent first).
+7. Apply pagination (page, page_size).
+8. Return list of rental requests with complete details:
    - Rental ID, status, dates, cost
    - Renter information (name, email)
    - Request and completion timestamps
-8. Include summary metadata:
+9. Include summary metadata:
    - Total rental count for this tool
    - Count by status (completed, active, pending, etc.)
 

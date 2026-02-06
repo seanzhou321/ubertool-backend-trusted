@@ -58,8 +58,8 @@ type RentalService interface {
 	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, []domain.Rental, []domain.Rental, error)
 	CompleteRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
 	Update(ctx context.Context, rt *domain.Rental) error
-	ListRentals(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
-	ListLendings(ctx context.Context, userID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
+	ListRentals(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
+	ListLendings(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 	GetRental(ctx context.Context, userID, rentalID int32) (*domain.Rental, error)
 	
 	// New methods
@@ -69,7 +69,7 @@ type RentalService interface {
 	RejectReturnDateChange(ctx context.Context, ownerID, rentalID int32, reason, newEndDate string) (*domain.Rental, error)
 	AcknowledgeReturnDateRejection(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error)
 	CancelReturnDateChange(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error)
-	ListToolRentals(ctx context.Context, ownerID, toolID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
+	ListToolRentals(ctx context.Context, ownerID, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 }
 
 type LedgerService interface {

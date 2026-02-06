@@ -148,16 +148,22 @@ func MapDomainRentalStatusToProto(s domain.RentalStatus) pb.RentalStatus {
 		return pb.RentalStatus_RENTAL_STATUS_PENDING
 	case domain.RentalStatusApproved:
 		return pb.RentalStatus_RENTAL_STATUS_APPROVED
+	case domain.RentalStatusRejected:
+		return pb.RentalStatus_RENTAL_STATUS_REJECTED
 	case domain.RentalStatusScheduled:
 		return pb.RentalStatus_RENTAL_STATUS_SCHEDULED
 	case domain.RentalStatusActive:
 		return pb.RentalStatus_RENTAL_STATUS_ACTIVE
 	case domain.RentalStatusCompleted:
 		return pb.RentalStatus_RENTAL_STATUS_COMPLETED
-	case domain.RentalStatusCancelled, domain.RentalStatusRejected:
+	case domain.RentalStatusCancelled:
 		return pb.RentalStatus_RENTAL_STATUS_CANCELLED
 	case domain.RentalStatusOverdue:
 		return pb.RentalStatus_RENTAL_STATUS_OVERDUE
+	case domain.RentalStatusReturnDateChanged:
+		return pb.RentalStatus_RENTAL_STATUS_RETURN_DATE_CHANGED
+	case domain.RentalStatusReturnDateChangeRejected:
+		return pb.RentalStatus_RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED
 	default:
 		return pb.RentalStatus_RENTAL_STATUS_UNSPECIFIED
 	}
@@ -169,6 +175,8 @@ func MapProtoRentalStatusToDomain(s pb.RentalStatus) string {
 		return string(domain.RentalStatusPending)
 	case pb.RentalStatus_RENTAL_STATUS_APPROVED:
 		return string(domain.RentalStatusApproved)
+	case pb.RentalStatus_RENTAL_STATUS_REJECTED:
+		return string(domain.RentalStatusRejected)
 	case pb.RentalStatus_RENTAL_STATUS_SCHEDULED:
 		return string(domain.RentalStatusScheduled)
 	case pb.RentalStatus_RENTAL_STATUS_ACTIVE:
@@ -179,9 +187,26 @@ func MapProtoRentalStatusToDomain(s pb.RentalStatus) string {
 		return string(domain.RentalStatusCancelled)
 	case pb.RentalStatus_RENTAL_STATUS_OVERDUE:
 		return string(domain.RentalStatusOverdue)
+	case pb.RentalStatus_RENTAL_STATUS_RETURN_DATE_CHANGED:
+		return string(domain.RentalStatusReturnDateChanged)
+	case pb.RentalStatus_RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED:
+		return string(domain.RentalStatusReturnDateChangeRejected)
 	default:
 		return ""
 	}
+}
+
+func MapProtoRentalStatusesToDomain(statuses []pb.RentalStatus) []string {
+	if len(statuses) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(statuses))
+	for _, s := range statuses {
+		if statusStr := MapProtoRentalStatusToDomain(s); statusStr != "" {
+			result = append(result, statusStr)
+		}
+	}
+	return result
 }
 
 func MapDomainTransactionToProto(t *domain.LedgerTransaction) *pb.Transaction {

@@ -246,16 +246,16 @@ func (m *MockRentalRepo) Update(ctx context.Context, rental *domain.Rental) erro
 	args := m.Called(ctx, rental)
 	return args.Error(0)
 }
-func (m *MockRentalRepo) ListByRenter(ctx context.Context, renterID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
-	args := m.Called(ctx, renterID, orgID, status, page, pageSize)
+func (m *MockRentalRepo) ListByRenter(ctx context.Context, renterID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
+	args := m.Called(ctx, renterID, orgID, statuses, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
 }
-func (m *MockRentalRepo) ListByOwner(ctx context.Context, ownerID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
-	args := m.Called(ctx, ownerID, orgID, status, page, pageSize)
+func (m *MockRentalRepo) ListByOwner(ctx context.Context, ownerID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
+	args := m.Called(ctx, ownerID, orgID, statuses, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
 }
-func (m *MockRentalRepo) ListByTool(ctx context.Context, toolID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error) {
-	args := m.Called(ctx, toolID, orgID, status, page, pageSize)
+func (m *MockRentalRepo) ListByTool(ctx context.Context, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
+	args := m.Called(ctx, toolID, orgID, statuses, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
 }
 

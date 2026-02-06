@@ -53,9 +53,9 @@ type RentalRepository interface {
 	Create(ctx context.Context, rental *domain.Rental) error
 	GetByID(ctx context.Context, id int32) (*domain.Rental, error)
 	Update(ctx context.Context, rental *domain.Rental) error
-	ListByRenter(ctx context.Context, renterID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
-	ListByOwner(ctx context.Context, ownerID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
-	ListByTool(ctx context.Context, toolID, orgID int32, status string, page, pageSize int32) ([]domain.Rental, int32, error)
+	ListByRenter(ctx context.Context, renterID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
+	ListByOwner(ctx context.Context, ownerID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
+	ListByTool(ctx context.Context, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 }
 
 type LedgerRepository interface {

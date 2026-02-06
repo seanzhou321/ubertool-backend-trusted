@@ -35,6 +35,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		Name:             "Tool",
 		OwnerID:          10,
 		PricePerDayCents: 1000,
+		DurationUnit:     domain.ToolDurationUnitDay,
 	}
 
 	t.Run("Success", func(t *testing.T) {
@@ -168,9 +169,9 @@ func TestRentalService_FinalizeRentalRequest(t *testing.T) {
 		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
 
 		// 6. List Related Rentals
-		rentalRepo.On("ListByTool", ctx, mock.Anything, mock.Anything, string(domain.RentalStatusApproved), mock.Anything, mock.Anything).
+		rentalRepo.On("ListByTool", ctx, mock.Anything, mock.Anything, []string{string(domain.RentalStatusApproved)}, mock.Anything, mock.Anything).
 			Return([]domain.Rental{approvedRental}, int32(1), nil)
-		rentalRepo.On("ListByTool", ctx, mock.Anything, mock.Anything, string(domain.RentalStatusPending), mock.Anything, mock.Anything).
+		rentalRepo.On("ListByTool", ctx, mock.Anything, mock.Anything, []string{string(domain.RentalStatusPending)}, mock.Anything, mock.Anything).
 			Return([]domain.Rental{pendingRental}, int32(1), nil)
 
 		res, approved, pending, err := svc.FinalizeRentalRequest(ctx, renterID, rentalID)
@@ -254,7 +255,12 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		StartDate: time.Now(), ScheduledEndDate: time.Now().Add(24 * time.Hour),
 		TotalCostCents: 1000,
 	}
-	tool := &domain.Tool{ID: toolID, Name: "Drill", PricePerDayCents: 1000}
+	tool := &domain.Tool{
+		ID: toolID, 
+		Name: "Drill", 
+		PricePerDayCents: 1000,
+		DurationUnit: domain.ToolDurationUnitDay,
+	}
 
 	t.Run("Renter Extension Active", func(t *testing.T) {
 		r := *baseRental
@@ -267,7 +273,7 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		rentalRepo.On("Update", ctx, mock.MatchedBy(func(u *domain.Rental) bool {
 			return u.Status == domain.RentalStatusReturnDateChanged &&
 				u.EndDate != nil &&
-				u.TotalCostCents == 2000 // 2 days * 1000
+				u.TotalCostCents == 3000 // 3 days inclusive (today to +48h) * 1000
 		})).Return(nil)
 
 		// Notifications
@@ -295,7 +301,12 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 	requestedEndDate := time.Now().Add(72 * time.Hour) // 3 days
 	scheduledEndDate := time.Now().Add(24 * time.Hour) // 1 day
 
-	tool := &domain.Tool{ID: toolID, Name: "Power Drill", PricePerDayCents: 1000}
+	tool := &domain.Tool{
+		ID: toolID, 
+		Name: "Power Drill", 
+		PricePerDayCents: 1000,
+		DurationUnit: domain.ToolDurationUnitDay,
+	}
 	renter := &domain.User{ID: renterID, Email: "renter@test.com", Name: "Renter"}
 
 	t.Run("Success - Owner sets counter-proposal", func(t *testing.T) {
@@ -326,7 +337,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 				u.RejectionReason == reason &&
 				u.EndDate != nil &&
 				u.EndDate.Format("2006-01-02") == counterProposalDate &&
-				u.TotalCostCents == 2000 // Recalculated based on 2 days
+				u.TotalCostCents == 3000 // Recalculated based on 3 days inclusive (today to +48h)
 		})).Return(nil)
 
 		// Expect notification to renter
@@ -339,14 +350,14 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		})).Return(nil)
 
 		// Expect email notification
-		emailSvc.On("SendReturnDateRejectionNotification", ctx, renter.Email, tool.Name, counterProposalDate, reason, int32(2000)).Return(nil)
+		emailSvc.On("SendReturnDateRejectionNotification", ctx, renter.Email, tool.Name, counterProposalDate, reason, int32(3000)).Return(nil)
 
 		result, err := svc.RejectReturnDateChange(ctx, ownerID, rentalID, reason, counterProposalDate)
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, domain.RentalStatusReturnDateChangeRejected, result.Status)
 		assert.Equal(t, reason, result.RejectionReason)
-		assert.Equal(t, int32(2000), result.TotalCostCents)
+		assert.Equal(t, int32(3000), result.TotalCostCents)
 	})
 
 	t.Run("Error - Unauthorized (not owner)", func(t *testing.T) {
@@ -502,7 +513,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		result, err := svc.RejectReturnDateChange(ctx, ownerID, rentalID, "reason", pastDate)
 		assert.Error(t, err)
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "invalid date range")
+		assert.Contains(t, err.Error(), "end date must be >= start date")
 	})
 
 	t.Run("Success - Notifications sent even if email fails", func(t *testing.T) {
@@ -532,7 +543,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
 
 		// Email fails but operation should still succeed
-		emailSvc.On("SendReturnDateRejectionNotification", ctx, renter.Email, tool.Name, counterProposalDate, reason, int32(2000)).Return(fmt.Errorf("email error"))
+		emailSvc.On("SendReturnDateRejectionNotification", ctx, renter.Email, tool.Name, counterProposalDate, reason, int32(3000)).Return(fmt.Errorf("email error"))
 
 		result, err := svc.RejectReturnDateChange(ctx, ownerID, rentalID, reason, counterProposalDate)
 		assert.NoError(t, err) // Email error is ignored
