@@ -193,7 +193,7 @@ func calculateWeekUnitCost(tool *domain.Tool, diff DateDifference) int32 {
 
 	// Add cost for full months (converted to weeks)
 	monthsCost := int32(diff.Months) * tool.PricePerMonthCents
-	weeksCost := weeks * tool.PricePerWeekCents
+	weeksCost := min(weeks*tool.PricePerWeekCents, tool.PricePerMonthCents) // Cap week cost at month cost
 
 	return monthsCost + weeksCost
 }
@@ -208,8 +208,8 @@ func calculateDayUnitCost(tool *domain.Tool, diff DateDifference) int32 {
 
 	// Calculate costs
 	monthsCost := int32(diff.Months) * tool.PricePerMonthCents
-	weeksCost := weeks * tool.PricePerWeekCents
-	daysCost := days * tool.PricePerDayCents
+	weeksCost := min(weeks*tool.PricePerWeekCents, tool.PricePerMonthCents) // Cap week cost at month cost
+	daysCost := min(days*tool.PricePerDayCents, tool.PricePerWeekCents)     // Cap day cost at week cost
 
 	return monthsCost + weeksCost + daysCost
 }

@@ -31,13 +31,14 @@ func TestToolService_E2E(t *testing.T) {
 		defer cancel()
 
 		req := &pb.AddToolRequest{
-			Name:              "E2E Test Drill",
-			Description:       "A powerful drill for testing",
-			Categories:        []string{"Power Tools", "Construction"},
-			PricePerDayCents:  1000,
-			PricePerWeekCents: 5000,
-			Condition:         pb.ToolCondition_TOOL_CONDITION_EXCELLENT,
-			Metro:             "San Jose",
+			Name:               "E2E Test Drill",
+			Description:        "A powerful drill for testing",
+			Categories:         []string{"Power Tools", "Construction"},
+			PricePerDayCents:   1000,
+			PricePerWeekCents:  5000,
+			PricePerMonthCents: 15000,
+			Condition:          pb.ToolCondition_TOOL_CONDITION_EXCELLENT,
+			Metro:              "San Jose",
 		}
 
 		resp, err := toolClient.AddTool(ctx, req)
@@ -126,12 +127,13 @@ func TestToolService_E2E(t *testing.T) {
 		defer cancel()
 
 		req := &pb.UpdateToolRequest{
-			ToolId:            toolID,
-			Name:              "Updated Tool Name",
-			Description:       "Updated description",
-			PricePerDayCents:  1200,
-			PricePerWeekCents: 6000,
-			Condition:         pb.ToolCondition_TOOL_CONDITION_GOOD,
+			ToolId:             toolID,
+			Name:               "Updated Tool Name",
+			Description:        "Updated description",
+			PricePerDayCents:   1200,
+			PricePerWeekCents:  6000,
+			PricePerMonthCents: 18000,
+			Condition:          pb.ToolCondition_TOOL_CONDITION_GOOD,
 		}
 
 		resp, err := toolClient.UpdateTool(ctx, req)

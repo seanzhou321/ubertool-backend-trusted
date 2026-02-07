@@ -32,15 +32,17 @@ func TestToolRepository_Integration(t *testing.T) {
 
 	t.Run("Create and Get", func(t *testing.T) {
 		tool := &domain.Tool{
-			OwnerID:          owner.ID,
-			Name:             "Hammer",
-			Description:      "Heavy hammer",
-			Categories:       []string{"Hand Tools"},
-			PricePerDayCents: 100,
-			DurationUnit:     domain.ToolDurationUnitDay,
-			Condition:        domain.ToolConditionExcellent,
-			Metro:            "San Jose",
-			Status:           domain.ToolStatusAvailable,
+			OwnerID:             owner.ID,
+			Name:                "Hammer",
+			Description:         "Heavy hammer",
+			Categories:          []string{"Hand Tools"},
+			PricePerDayCents:    100,
+			PricePerWeekCents:   600,
+			PricePerMonthCents:  2000,
+			DurationUnit:        domain.ToolDurationUnitDay,
+			Condition:           domain.ToolConditionExcellent,
+			Metro:               "San Jose",
+			Status:              domain.ToolStatusAvailable,
 		}
 
 		err := repo.Create(ctx, tool)
@@ -57,15 +59,17 @@ func TestToolRepository_Integration(t *testing.T) {
 		// Metro is set to "San Jose" in previous test
 		// Let's create another one in "San Francisco"
 		tool2 := &domain.Tool{
-			OwnerID:          owner.ID,
-			Name:             "Screwdriver",
-			Description:      "Manual screwdriver",
-			Categories:       []string{"Hand Tools"},
-			PricePerDayCents: 50,
-			DurationUnit:     domain.ToolDurationUnitDay,
-			Condition:        domain.ToolConditionGood,
-			Metro:            "San Francisco",
-			Status:           domain.ToolStatusAvailable,
+			OwnerID:             owner.ID,
+			Name:                "Screwdriver",
+			Description:         "Manual screwdriver",
+			Categories:          []string{"Hand Tools"},
+			PricePerDayCents:    50,
+			PricePerWeekCents:   300,
+			PricePerMonthCents:  1000,
+			DurationUnit:        domain.ToolDurationUnitDay,
+			Condition:           domain.ToolConditionGood,
+			Metro:               "San Francisco",
+			Status:              domain.ToolStatusAvailable,
 		}
 		repo.Create(ctx, tool2)
 

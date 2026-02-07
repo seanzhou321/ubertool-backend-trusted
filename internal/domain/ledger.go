@@ -7,6 +7,7 @@ type TransactionType string
 const (
 	TransactionTypeRentalDebit   TransactionType = "RENTAL_DEBIT"
 	TransactionTypeLendingCredit TransactionType = "LENDING_CREDIT"
+	TransactionTypeLendingDebit  TransactionType = "LENDING_DEBIT"
 	TransactionTypeRefund        TransactionType = "REFUND"
 	TransactionTypeAdjustment    TransactionType = "ADJUSTMENT"
 )

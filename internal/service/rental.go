@@ -238,20 +238,7 @@ func (s *rentalService) FinalizeRentalRequest(ctx context.Context, renterID, ren
 		return nil, nil, nil, errors.New("rental is not approved by owner")
 	}
 
-	// Deduct balance
-	debit := &domain.LedgerTransaction{
-		OrgID:  rt.OrgID,
-		UserID: rt.RenterID,
-		Amount: -rt.TotalCostCents,
-		Type:   domain.TransactionTypeRentalDebit, // Or some type for holding?
-		// Usually we hold/escrow, but for simplicity debit now?
-		// Design says "Deduct from renter's balance".
-		RelatedRentalID: &rt.ID,
-		Description:     fmt.Sprintf("Rental Payment for tool %d", rt.ToolID),
-	}
-	if err := s.ledgerRepo.CreateTransaction(ctx, debit); err != nil {
-		return nil, nil, nil, fmt.Errorf("payment failed: %w", err)
-	}
+	// No payment deduction at this stage - all transactions happen at rental completion
 
 	// Update rental
 	rt.Status = domain.RentalStatusScheduled
@@ -743,7 +730,7 @@ func (s *rentalService) Update(ctx context.Context, rt *domain.Rental) error {
 	return s.rentalRepo.Update(ctx, rt)
 }
 
-func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error) {
+func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
 		return nil, err
@@ -752,23 +739,46 @@ func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID in
 		return nil, errors.New("unauthorized")
 	}
 
-	// Transaction: Renter -> Owner (Credit Owner)
-	// Renter was debited at Finalize. Now we credit owner.
-	credit := &domain.LedgerTransaction{
+	// Set return condition and surcharge/credit
+	rt.ReturnCondition = returnCondition
+	rt.SurchargeOrCreditCents = surchargeOrCreditCents
+
+	// Calculate the full settlement amount (base rental + surcharge or - credit)
+	settlementAmount := rt.TotalCostCents + surchargeOrCreditCents
+
+	// In double-entry bookkeeping, credit and debit must run in pairs
+	// All transactions happen at rental completion (not at finalize)
+
+	// Credit owner with full settlement amount
+	ownerCredit := &domain.LedgerTransaction{
 		OrgID:           rt.OrgID,
 		UserID:          rt.OwnerID,
-		Amount:          rt.TotalCostCents,
+		Amount:          settlementAmount,
 		Type:            domain.TransactionTypeLendingCredit,
 		RelatedRentalID: &rt.ID,
 		Description:     fmt.Sprintf("Earnings from rental of tool %d", rt.ToolID),
 	}
-	if err := s.ledgerRepo.CreateTransaction(ctx, credit); err != nil {
+	if err := s.ledgerRepo.CreateTransaction(ctx, ownerCredit); err != nil {
+		return nil, err
+	}
+
+	// Debit renter with full settlement amount (paired transaction)
+	renterDebit := &domain.LedgerTransaction{
+		OrgID:           rt.OrgID,
+		UserID:          rt.RenterID,
+		Amount:          -settlementAmount,
+		Type:            domain.TransactionTypeLendingDebit,
+		RelatedRentalID: &rt.ID,
+		Description:     fmt.Sprintf("Settlement for rental of tool %d", rt.ToolID),
+	}
+	if err := s.ledgerRepo.CreateTransaction(ctx, renterDebit); err != nil {
 		return nil, err
 	}
 
 	now := time.Now()
 	rt.EndDate = now
 	rt.Status = domain.RentalStatusCompleted
+	rt.CompletedBy = &ownerID
 	if err := s.rentalRepo.Update(ctx, rt); err != nil {
 		return nil, err
 	}
@@ -786,8 +796,8 @@ func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID in
 	owner, _ := s.userRepo.GetByID(ctx, ownerID)
 
 	if renter != nil && owner != nil && tool != nil {
-		_ = s.emailSvc.SendRentalCompletionNotification(ctx, owner.Email, "Owner", tool.Name, rt.TotalCostCents)
-		_ = s.emailSvc.SendRentalCompletionNotification(ctx, renter.Email, "Renter", tool.Name, rt.TotalCostCents)
+		_ = s.emailSvc.SendRentalCompletionNotification(ctx, owner.Email, "Owner", tool.Name, settlementAmount)
+		_ = s.emailSvc.SendRentalCompletionNotification(ctx, renter.Email, "Renter", tool.Name, settlementAmount)
 
 		// Notifications...
 	}

@@ -104,7 +104,7 @@ func TestRentalAndLedger_Integration(t *testing.T) {
 	})
 
 	tool := &domain.Tool{
-		OwnerID: owner.ID, Name: "Drill", PricePerDayCents: 1000, DurationUnit: domain.ToolDurationUnitDay, Condition: domain.ToolConditionExcellent, Metro: "San Jose", Status: domain.ToolStatusAvailable,
+		OwnerID: owner.ID, Name: "Drill", PricePerDayCents: 1000, PricePerWeekCents: 6000, PricePerMonthCents: 20000, DurationUnit: domain.ToolDurationUnitDay, Condition: domain.ToolConditionExcellent, Metro: "San Jose", Status: domain.ToolStatusAvailable,
 	}
 	toolRepo.Create(ctx, tool)
 
@@ -191,7 +191,7 @@ func TestRentalDateChange_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	tool := &domain.Tool{
-		OwnerID: owner.ID, Name: "Drill", PricePerDayCents: 1000, DurationUnit: domain.ToolDurationUnitDay, Metro: "San Jose", Status: domain.ToolStatusAvailable,
+		OwnerID: owner.ID, Name: "Drill", PricePerDayCents: 1000, PricePerWeekCents: 6000, PricePerMonthCents: 20000, DurationUnit: domain.ToolDurationUnitDay, Metro: "San Jose", Status: domain.ToolStatusAvailable,
 	}
 	err = toolRepo.Create(ctx, tool)
 	require.NoError(t, err)

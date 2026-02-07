@@ -519,10 +519,12 @@ func (x *CancelRentalResponse) GetRentalRequest() *RentalRequest {
 
 // Complete rental
 type CompleteRentalRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     int32                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	RequestId              int32                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ReturnCondition        string                 `protobuf:"bytes,2,opt,name=return_condition,json=returnCondition,proto3" json:"return_condition,omitempty"`                           // Optional condition note for the returned tool
+	SurchargeOrCreditCents int32                  `protobuf:"varint,3,opt,name=surcharge_or_credit_cents,json=surchargeOrCreditCents,proto3" json:"surcharge_or_credit_cents,omitempty"` // Optional fee or credit for late return, damage, or early return
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CompleteRentalRequest) Reset() {
@@ -558,6 +560,20 @@ func (*CompleteRentalRequest) Descriptor() ([]byte, []int) {
 func (x *CompleteRentalRequest) GetRequestId() int32 {
 	if x != nil {
 		return x.RequestId
+	}
+	return 0
+}
+
+func (x *CompleteRentalRequest) GetReturnCondition() string {
+	if x != nil {
+		return x.ReturnCondition
+	}
+	return ""
+}
+
+func (x *CompleteRentalRequest) GetSurchargeOrCreditCents() int32 {
+	if x != nil {
+		return x.SurchargeOrCreditCents
 	}
 	return 0
 }
@@ -1661,24 +1677,26 @@ func (x *CancelReturnDateChangeResponse) GetRentalRequest() *RentalRequest {
 
 // Rental request message
 type RentalRequest struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	Id                 int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	ToolId             int32                  `protobuf:"varint,2,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
-	ToolName           string                 `protobuf:"bytes,3,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
-	RenterId           int32                  `protobuf:"varint,4,opt,name=renter_id,json=renterId,proto3" json:"renter_id,omitempty"`
-	RenterName         string                 `protobuf:"bytes,5,opt,name=renter_name,json=renterName,proto3" json:"renter_name,omitempty"`
-	OwnerId            int32                  `protobuf:"varint,6,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
-	OwnerName          string                 `protobuf:"bytes,7,opt,name=owner_name,json=ownerName,proto3" json:"owner_name,omitempty"`
-	OrganizationId     int32                  `protobuf:"varint,8,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	StartDate          string                 `protobuf:"bytes,9,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"` // Date string YYYY-MM-DD
-	EndDate            string                 `protobuf:"bytes,10,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`      // Date string YYYY-MM-DD
-	TotalCostCents     int32                  `protobuf:"varint,11,opt,name=total_cost_cents,json=totalCostCents,proto3" json:"total_cost_cents,omitempty"`
-	Status             RentalStatus           `protobuf:"varint,12,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"`
-	PickupInstructions string                 `protobuf:"bytes,13,opt,name=pickup_instructions,json=pickupInstructions,proto3" json:"pickup_instructions,omitempty"`
-	CreatedOn          string                 `protobuf:"bytes,14,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"` // Date string YYYY-MM-DD
-	UpdatedOn          string                 `protobuf:"bytes,15,opt,name=updated_on,json=updatedOn,proto3" json:"updated_on,omitempty"` // Date string YYYY-MM-DD
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Id                     int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	ToolId                 int32                  `protobuf:"varint,2,opt,name=tool_id,json=toolId,proto3" json:"tool_id,omitempty"`
+	ToolName               string                 `protobuf:"bytes,3,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	RenterId               int32                  `protobuf:"varint,4,opt,name=renter_id,json=renterId,proto3" json:"renter_id,omitempty"`
+	RenterName             string                 `protobuf:"bytes,5,opt,name=renter_name,json=renterName,proto3" json:"renter_name,omitempty"`
+	OwnerId                int32                  `protobuf:"varint,6,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
+	OwnerName              string                 `protobuf:"bytes,7,opt,name=owner_name,json=ownerName,proto3" json:"owner_name,omitempty"`
+	OrganizationId         int32                  `protobuf:"varint,8,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	StartDate              string                 `protobuf:"bytes,9,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"` // Date string YYYY-MM-DD
+	EndDate                string                 `protobuf:"bytes,10,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`      // Date string YYYY-MM-DD
+	TotalCostCents         int32                  `protobuf:"varint,11,opt,name=total_cost_cents,json=totalCostCents,proto3" json:"total_cost_cents,omitempty"`
+	Status                 RentalStatus           `protobuf:"varint,12,opt,name=status,proto3,enum=ubertool.trusted.api.v1.RentalStatus" json:"status,omitempty"`
+	PickupInstructions     string                 `protobuf:"bytes,13,opt,name=pickup_instructions,json=pickupInstructions,proto3" json:"pickup_instructions,omitempty"`
+	CreatedOn              string                 `protobuf:"bytes,14,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"`                                             // Date string YYYY-MM-DD
+	UpdatedOn              string                 `protobuf:"bytes,15,opt,name=updated_on,json=updatedOn,proto3" json:"updated_on,omitempty"`                                             // Date string YYYY-MM-DD
+	ReturnCondition        string                 `protobuf:"bytes,16,opt,name=return_condition,json=returnCondition,proto3" json:"return_condition,omitempty"`                           // Condition note when tool was returned
+	SurchargeOrCreditCents int32                  `protobuf:"varint,17,opt,name=surcharge_or_credit_cents,json=surchargeOrCreditCents,proto3" json:"surcharge_or_credit_cents,omitempty"` // Surcharge or credit applied at completion
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *RentalRequest) Reset() {
@@ -1816,6 +1834,20 @@ func (x *RentalRequest) GetUpdatedOn() string {
 	return ""
 }
 
+func (x *RentalRequest) GetReturnCondition() string {
+	if x != nil {
+		return x.ReturnCondition
+	}
+	return ""
+}
+
+func (x *RentalRequest) GetSurchargeOrCreditCents() int32 {
+	if x != nil {
+		return x.SurchargeOrCreditCents
+	}
+	return 0
+}
+
 var File_ubertool_trusted_backend_v1_rental_service_proto protoreflect.FileDescriptor
 
 const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
@@ -1848,10 +1880,12 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x7f\n" +
 	"\x14CancelRentalResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12M\n" +
-	"\x0erental_request\x18\x02 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"6\n" +
+	"\x0erental_request\x18\x02 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\x9c\x01\n" +
 	"\x15CompleteRentalRequest\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\x05R\trequestId\"g\n" +
+	"request_id\x18\x01 \x01(\x05R\trequestId\x12)\n" +
+	"\x10return_condition\x18\x02 \x01(\tR\x0freturnCondition\x129\n" +
+	"\x19surcharge_or_credit_cents\x18\x03 \x01(\x05R\x16surchargeOrCreditCents\"g\n" +
 	"\x16CompleteRentalResponse\x12M\n" +
 	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"1\n" +
 	"\x10GetRentalRequest\x12\x1d\n" +
@@ -1925,7 +1959,7 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\"o\n" +
 	"\x1eCancelReturnDateChangeResponse\x12M\n" +
-	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\x88\x04\n" +
+	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xee\x04\n" +
 	"\rRentalRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x17\n" +
 	"\atool_id\x18\x02 \x01(\x05R\x06toolId\x12\x1b\n" +
@@ -1947,7 +1981,9 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\n" +
 	"created_on\x18\x0e \x01(\tR\tcreatedOn\x12\x1d\n" +
 	"\n" +
-	"updated_on\x18\x0f \x01(\tR\tupdatedOn*\xe2\x02\n" +
+	"updated_on\x18\x0f \x01(\tR\tupdatedOn\x12)\n" +
+	"\x10return_condition\x18\x10 \x01(\tR\x0freturnCondition\x129\n" +
+	"\x19surcharge_or_credit_cents\x18\x11 \x01(\x05R\x16surchargeOrCreditCents*\xe2\x02\n" +
 	"\fRentalStatus\x12\x1d\n" +
 	"\x19RENTAL_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15RENTAL_STATUS_PENDING\x10\x01\x12\x1a\n" +

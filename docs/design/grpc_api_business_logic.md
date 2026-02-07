@@ -341,29 +341,28 @@ Business Logic:
 ### Complete Rental
 Purpose: Mark tool as returned.
 
-Input: `request_id`, `start_date`, `end_date`
+Input: `request_id`, `return_condition`, `surcharge_or_credit_cents`
 Output: updated rental status
 Business Logic:
 1. Either owner or renter can signal completion.
 2. Verify the rental status is 'ACTIVE', 'SCHEDULED', or 'OVERDUE'. Report error if otherwise.
 3. Calculate `total_cost_cents` based on duration from start_date to end_date and tool price. 
-4. The calculation of the cost is based on the none zero price fields and taking the lowest cost option. For example, if the tool has only weekly price and zero on daily price, if the rental duation is 3 days, it will be charged by the weekly price. However, if the tool has both weekly price and daily price and the weekly price is equivalent of 3 times of the daily price, if the duration is 4 days, the cost will be the weekly price because it is cheaper than 4 daily prices. By the same principle, if the duration is 8 days, the price will be one weekly price plus one daily price.
-5. The duration calculation should include both the start and the end dates. For example, if start_date="Jan 2, 2026" and end_date="Jan 4, 2026", the duration is 3 to count both start and end dates.
-6. Update `rentals` status to 'COMPLETED' and set `start_date`, `end_date`, `completed_by` to `user_id`, and `total_cost_cents`.
-7. Add `total_cost_cents` to owner's balance in `users_orgs`.
-8. Create a `ledger_transactions` entry of type 'LENDING_CREDIT' to the owner using the org_id from the rentals.org_id and `total_cost_cents` for the amount.
-9. Update owner's user_org record by adding `total_cost_cents` to the balance_cents field and set the last_balance_updated_on to today.
-10. Create a notification to the owner with attributes set to {topic:rental_credit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id}
-11. Send email to owner to inform the credit update from the rental.
-12. Create a `ledger_transactions` record of type 'LENDING_DEBIT' to the renter using the org_id from the rentals.org_id
-13. Update renter's user_org record by adding `total_cost_cents` to the balance_cents field and set the last_balance_updated_on to today.
-14. Create a notification to the renter with attributes set to {topic:rental_debit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id}
-15. Send email to the renter to inform the debit update from the rental.
-16. Set `tools.status` back to 'AVAILABLE' if the tool has no more 'ACTIVE' or 'SCHEDULED' rental requests. Otherwise, set to 'RENTED'
-17. Create a notification to owner to inform the completion of the rental and the tool status change with attributes set to {topic:rental_completion; rental:rental_id}.
-18. Send email to owner to inform the completion of the rental and the tool status change.
-19. Create a notification to the renter to inform the completion of the rental with attributes set to {topic:rental_completion; rental:rental_id}.
-20. Send email to renter to inform the completion of the rental and the tool status change.
+4. The calculation of the cost is based on a tiered pricing structure. The owner can set the duration unit to monthly, weekly, or daily. Please refer tool-rental-pricing-instruction.md and tool-rental-pricing-algorith.md files for detail. 
+5. Update `rentals` status to 'COMPLETED' and set `completed_by` to `user_id`, `return_condition`, `surcharge_or_credit_cents`, and `total_cost_cents`.
+6. Add `total_cost_cents`+`surcharge_or_credit_cents` to owner's balance in `users_orgs`.
+7. Create a `ledger_transactions` entry of type 'LENDING_CREDIT' to the owner using the org_id from the rentals.org_id and `total_cost_cents`+`surcharge_or_credit_cents` for the amount.
+8. Update owner's user_org record by adding `total_cost_cents` to the balance_cents field and set the last_balance_updated_on to today.
+9. Create a notification to the owner with attributes set to {topic:rental_credit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id}
+10. Send email to owner to inform the credit update from the rental.
+11. Create a `ledger_transactions` record of type 'LENDING_DEBIT' to the renter using the org_id from the rentals.org_id
+12. Update renter's user_org record by adding `total_cost_cents`+`surcharge_or_credit_cents` to the balance_cents field and set the last_balance_updated_on to today.
+13. Create a notification to the renter with attributes set to {topic:rental_debit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id}
+14. Send email to the renter to inform the debit update from the rental.
+15. Set `tools.status` back to 'AVAILABLE' if the tool has no more 'ACTIVE' or 'SCHEDULED' rental requests. Otherwise, set to 'RENTED'
+16. Create a notification to owner to inform the completion of the rental and the tool status change with attributes set to {topic:rental_completion; rental:rental_id}.
+17. Send email to owner to inform the completion of the rental and the tool status change.
+18. Create a notification to the renter to inform the completion of the rental with attributes set to {topic:rental_completion; rental:rental_id}.
+19. Send email to renter to inform the completion of the rental and the tool status change.
 
 ### Get Rental
 Purpose: View rental details.

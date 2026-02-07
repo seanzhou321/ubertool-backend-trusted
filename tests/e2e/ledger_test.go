@@ -160,7 +160,7 @@ func TestLedgerService_E2E(t *testing.T) {
 		_, err = rentalClient.FinalizeRentalRequest(ctx3, finalizeReq)
 		require.NoError(t, err)
 
-		// Check renter's balance after finalization
+		// Check renter's balance after finalization (unchanged - no transaction at finalize)
 		ctx4, cancel4 := ContextWithUserIDAndTimeout(renterID, 5*time.Second)
 		defer cancel4()
 
@@ -169,18 +169,29 @@ func TestLedgerService_E2E(t *testing.T) {
 		}
 		balanceResp, err := ledgerClient.GetBalance(ctx4, balanceReq)
 		require.NoError(t, err)
-		// Should be 10000 - 4000 (2 days * 2000/day) = 6000
-		assert.Equal(t, int32(6000), balanceResp.Balance)
+		assert.Equal(t, int32(10000), balanceResp.Balance) // Balance unchanged at finalize
 
 		// Complete rental
 		ctx5, cancel5 := ContextWithUserIDAndTimeout(ownerID, 5*time.Second)
 		defer cancel5()
 
 		completeReq := &pb.CompleteRentalRequest{
-			RequestId: rentalID,
+			RequestId:              rentalID,
+			ReturnCondition:        "Good condition",
+			SurchargeOrCreditCents: 0,
 		}
 		_, err = rentalClient.CompleteRental(ctx5, completeReq)
 		require.NoError(t, err)
+
+		// Check renter's balance after completion (now debited)
+		// Use renter's context to check renter's balance
+		ctx5b, cancel5b := ContextWithUserIDAndTimeout(renterID, 5*time.Second)
+		defer cancel5b()
+
+		balanceResp2, err := ledgerClient.GetBalance(ctx5b, balanceReq)
+		require.NoError(t, err)
+		// Should be 10000 - 4000 (2 days * 2000/day) = 6000
+		assert.Equal(t, int32(6000), balanceResp2.Balance)
 
 		// Check owner's balance after completion
 		ctx6, cancel6 := ContextWithUserIDAndTimeout(ownerID, 5*time.Second)
@@ -195,4 +206,3 @@ func TestLedgerService_E2E(t *testing.T) {
 		assert.Equal(t, int32(4000), ownerBalanceResp.Balance)
 	})
 }
-

@@ -123,21 +123,23 @@ func MapDomainRentalToProtoWithNames(r *domain.Rental, renterName, ownerName, to
 		return nil
 	}
 	proto := &pb.RentalRequest{
-		Id:                 r.ID,
-		OrganizationId:     r.OrgID,
-		ToolId:             r.ToolID,
-		ToolName:           toolName,
-		RenterId:           r.RenterID,
-		RenterName:         renterName,
-		OwnerId:            r.OwnerID,
-		OwnerName:          ownerName,
-		StartDate:          r.StartDate.Format("2006-01-02"),
-		EndDate:            r.EndDate.Format("2006-01-02"),
-		TotalCostCents:     r.TotalCostCents,
-		Status:             MapDomainRentalStatusToProto(r.Status),
-		PickupInstructions: r.PickupNote,
-		CreatedOn:          r.CreatedOn.Format("2006-01-02"),
-		UpdatedOn:          r.UpdatedOn.Format("2006-01-02"),
+		Id:                     r.ID,
+		OrganizationId:         r.OrgID,
+		ToolId:                 r.ToolID,
+		ToolName:               toolName,
+		RenterId:               r.RenterID,
+		RenterName:             renterName,
+		OwnerId:                r.OwnerID,
+		OwnerName:              ownerName,
+		StartDate:              r.StartDate.Format("2006-01-02"),
+		EndDate:                r.EndDate.Format("2006-01-02"),
+		TotalCostCents:         r.TotalCostCents,
+		Status:                 MapDomainRentalStatusToProto(r.Status),
+		PickupInstructions:     r.PickupNote,
+		ReturnCondition:        r.ReturnCondition,
+		SurchargeOrCreditCents: r.SurchargeOrCreditCents,
+		CreatedOn:              r.CreatedOn.Format("2006-01-02"),
+		UpdatedOn:              r.UpdatedOn.Format("2006-01-02"),
 	}
 	return proto
 }
@@ -234,6 +236,8 @@ func MapDomainTransactionTypeToProto(t domain.TransactionType) pb.TransactionTyp
 		return pb.TransactionType_TRANSACTION_TYPE_RENTAL_DEBIT
 	case domain.TransactionTypeLendingCredit:
 		return pb.TransactionType_TRANSACTION_TYPE_LENDING_CREDIT
+	case domain.TransactionTypeLendingDebit:
+		return pb.TransactionType_TRANSACTION_TYPE_LENDING_DEBIT
 	case domain.TransactionTypeRefund:
 		return pb.TransactionType_TRANSACTION_TYPE_REFUND
 	case domain.TransactionTypeAdjustment:

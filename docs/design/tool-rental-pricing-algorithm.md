@@ -334,7 +334,7 @@ func calculateWeekUnitCost(prices RentalPrices, diff DateDifference) (RentalCost
         weeks += 1
     
     monthCost := diff.Months * prices.MonthlyRate
-    weekCost := diff.Weeks * prices.WeeklyRate
+    weekCost := min(diff.Weeks * prices.WeeklyRate, prices.MonthlyRate)
     
     return RentalCost{
         Months:     diff.Months,
@@ -356,8 +356,8 @@ func calculateDayUnitCost(prices RentalPrices, diff DateDifference) (RentalCost,
     
     // Step 2: Calculate costs
     monthsCost := diff.Months * prices.MonthlyRate
-    weeksCost := weeks * prices.WeeklyRate
-    daysCost := days * prices.DailyRate
+    weeksCost := min(weeks * prices.WeeklyRate, prices.MonthlyRate)
+    daysCost := min(days * prices.DailyRate, prices.WeeklyRate)
     
     return RentalCost{
         Months:     months,
@@ -603,7 +603,7 @@ func calculateWeekUnitCost(prices RentalPrices, diff DateDifference) (RentalCost
         weeks += 1
     
     monthCost := diff.Months * prices.MonthlyRate
-    weekCost := diff.Weeks * prices.WeeklyRate
+    weekCost := min(diff.Weeks * prices.WeeklyRate, prices.MonthlyRate)
     
     return RentalCost{
         Months:     diff.Months,
@@ -625,8 +625,8 @@ func calculateDayUnitCost(prices RentalPrices, diff DateDifference) (RentalCost,
     
     // Step 2: Calculate costs
     monthsCost := diff.Months * prices.MonthlyRate
-    weeksCost := weeks * prices.WeeklyRate
-    daysCost := days * prices.DailyRate
+    weeksCost := min(weeks * prices.WeeklyRate, pricesMonthlyRate)
+    daysCost := min(days * prices.DailyRate, prices.WeeklyRate)
     
     return RentalCost{
         Months:     months,

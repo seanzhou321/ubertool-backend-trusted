@@ -89,19 +89,17 @@ func TestRentalService_E2E(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, pb.RentalStatus_RENTAL_STATUS_SCHEDULED, finalizeResp.RentalRequest.Status)
 
-		// Verify: Renter's balance was debited
+		// Verify: Renter's balance unchanged (no transaction at finalize)
 		var renterBalance int32
 		err = db.QueryRow("SELECT balance_cents FROM users_orgs WHERE user_id = $1 AND org_id = $2", renterID, orgID).Scan(&renterBalance)
 		assert.NoError(t, err)
-		// Original balance 5000 - rental cost (should be 3000 for 3 days inclusive)
-		expectedBalance := int32(5000 - 3000)
-		assert.Equal(t, expectedBalance, renterBalance)
+		assert.Equal(t, int32(5000), renterBalance) // Balance unchanged
 
-		// Verify: Ledger transaction created (debit)
-		var debitCount int
-		err = db.QueryRow("SELECT COUNT(*) FROM ledger_transactions WHERE user_id = $1 AND org_id = $2", renterID, orgID).Scan(&debitCount)
+		// Verify: No ledger transaction at finalize
+		var txCount int
+		err = db.QueryRow("SELECT COUNT(*) FROM ledger_transactions WHERE user_id = $1 AND org_id = $2", renterID, orgID).Scan(&txCount)
 		assert.NoError(t, err)
-		assert.Equal(t, 1, debitCount)
+		assert.Equal(t, 0, txCount) // No transactions yet
 
 		// Verify: Tool status updated to RENTED
 		var toolStatus string
@@ -114,18 +112,31 @@ func TestRentalService_E2E(t *testing.T) {
 		defer cancel4()
 
 		completeReq := &pb.CompleteRentalRequest{
-			RequestId: rentalID,
+			RequestId:              rentalID,
+			ReturnCondition:        "Good condition",
+			SurchargeOrCreditCents: 0,
 		}
 
 		completeResp, err := rentalClient.CompleteRental(ctx4, completeReq)
 		require.NoError(t, err)
 		assert.Equal(t, pb.RentalStatus_RENTAL_STATUS_COMPLETED, completeResp.RentalRequest.Status)
 
+		// Verify: Renter's balance was debited at completion
+		err = db.QueryRow("SELECT balance_cents FROM users_orgs WHERE user_id = $1 AND org_id = $2", renterID, orgID).Scan(&renterBalance)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(2000), renterBalance) // 5000 - 3000 = 2000
+
 		// Verify: Owner's balance was credited
 		var ownerBalance int32
 		err = db.QueryRow("SELECT balance_cents FROM users_orgs WHERE user_id = $1 AND org_id = $2", ownerID, orgID).Scan(&ownerBalance)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(3000), ownerBalance) // Owner receives the rental cost
+
+		// Verify: Ledger transactions created (2 paired transactions: owner credit + renter debit)
+		var renterDebitCount int
+		err = db.QueryRow("SELECT COUNT(*) FROM ledger_transactions WHERE user_id = $1 AND org_id = $2 AND type = 'LENDING_DEBIT'", renterID, orgID).Scan(&renterDebitCount)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, renterDebitCount)
 
 		// Verify: Ledger transaction created (credit)
 		var creditCount int

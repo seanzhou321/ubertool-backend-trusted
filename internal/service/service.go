@@ -56,7 +56,7 @@ type RentalService interface {
 	RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
 	CancelRental(ctx context.Context, renterID, rentalID int32, reason string) (*domain.Rental, error)
 	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, []domain.Rental, []domain.Rental, error)
-	CompleteRental(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
+	CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32) (*domain.Rental, error)
 	Update(ctx context.Context, rt *domain.Rental) error
 	ListRentals(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListLendings(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)

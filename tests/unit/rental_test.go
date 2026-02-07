@@ -31,11 +31,13 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 	endDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
 
 	tool := &domain.Tool{
-		ID:               toolID,
-		Name:             "Tool",
-		OwnerID:          10,
-		PricePerDayCents: 1000,
-		DurationUnit:     domain.ToolDurationUnitDay,
+		ID:                  toolID,
+		Name:                "Tool",
+		OwnerID:             10,
+		PricePerDayCents:    1000,
+		PricePerWeekCents:   6000,
+		PricePerMonthCents:  20000,
+		DurationUnit:        domain.ToolDurationUnitDay,
 	}
 
 	t.Run("Success", func(t *testing.T) {
@@ -104,12 +106,12 @@ func TestRentalService_CompleteRental(t *testing.T) {
 		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{Email: "owner@test.com"}, nil)
 		emailSvc.On("SendRentalCompletionNotification", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		res, err := svc.CompleteRental(ctx, ownerID, rentalID)
+		res, err := svc.CompleteRental(ctx, ownerID, rentalID, "Good condition", 0)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 
-		// One transaction should be created: credit owner (debit was at finalize)
-		ledgerRepo.AssertNumberOfCalls(t, "CreateTransaction", 1)
+		// Two transactions should be created: credit owner + debit renter (paired)
+		ledgerRepo.AssertNumberOfCalls(t, "CreateTransaction", 2)
 	})
 }
 
@@ -146,29 +148,24 @@ func TestRentalService_FinalizeRentalRequest(t *testing.T) {
 		// 1. Get Rental
 		rentalRepo.On("GetByID", ctx, rentalID).Return(requestRental, nil)
 
-		// 2. Debit Ledger
-		ledgerRepo.On("CreateTransaction", ctx, mock.MatchedBy(func(tx *domain.LedgerTransaction) bool {
-			return tx.Amount == -5000 && tx.UserID == renterID
-		})).Return(nil)
-
-		// 3. Update Rental Status
+		// 2. Update Rental Status (no ledger transaction at finalize)
 		rentalRepo.On("Update", ctx, mock.MatchedBy(func(r *domain.Rental) bool {
 			return r.Status == domain.RentalStatusScheduled
 		})).Return(nil)
 
-		// 4. Update Tool Status
+		// 3. Update Tool Status
 		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
 		toolRepo.On("Update", ctx, mock.MatchedBy(func(tl *domain.Tool) bool {
 			return tl.Status == domain.ToolStatusRented
 		})).Return(nil)
 
-		// 5. Notifications
+		// 4. Notifications
 		userRepo.On("GetByID", ctx, renterID).Return(renter, nil)
 		userRepo.On("GetByID", ctx, ownerID).Return(owner, nil)
 		emailSvc.On("SendRentalConfirmationNotification", ctx, owner.Email, renter.Name, tool.Name, renter.Email).Return(nil)
 		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
 
-		// 6. List Related Rentals
+		// 5. List Related Rentals
 		rentalRepo.On("ListByTool", ctx, mock.Anything, mock.Anything, []string{string(domain.RentalStatusApproved)}, mock.Anything, mock.Anything).
 			Return([]domain.Rental{approvedRental}, int32(1), nil)
 		rentalRepo.On("ListByTool", ctx, mock.Anything, mock.Anything, []string{string(domain.RentalStatusPending)}, mock.Anything, mock.Anything).
@@ -256,10 +253,12 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		TotalCostCents: 1000,
 	}
 	tool := &domain.Tool{
-		ID: toolID, 
-		Name: "Drill", 
-		PricePerDayCents: 1000,
-		DurationUnit: domain.ToolDurationUnitDay,
+		ID:                 toolID,
+		Name:               "Drill",
+		PricePerDayCents:   1000,
+		PricePerWeekCents:  6000,
+		PricePerMonthCents: 20000,
+		DurationUnit:       domain.ToolDurationUnitDay,
 	}
 
 	t.Run("Renter Extension Active", func(t *testing.T) {
@@ -346,10 +345,12 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 	lastAgreedEndDate := time.Now().Add(24 * time.Hour) // 1 day
 
 	tool := &domain.Tool{
-		ID: toolID, 
-		Name: "Power Drill", 
-		PricePerDayCents: 1000,
-		DurationUnit: domain.ToolDurationUnitDay,
+		ID:                 toolID,
+		Name:               "Power Drill",
+		PricePerDayCents:   1000,
+		PricePerWeekCents:  6000,
+		PricePerMonthCents: 20000,
+		DurationUnit:       domain.ToolDurationUnitDay,
 	}
 	renter := &domain.User{ID: renterID, Email: "renter@test.com", Name: "Renter"}
 

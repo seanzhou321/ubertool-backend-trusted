@@ -10,8 +10,8 @@
 
 3. The total rental cost is calculated using a tiered approach:
    - First, count the number of full months and multiply by the monthly price
-   - Then, count the remaining full weeks and multiply by the weekly price
-   - Finally, count the remaining days and multiply by the daily price
+   - Then, count the remaining full weeks and multiply by the weekly price. The toal of weeks price is capped at the monthly price.
+   - Finally, count the remaining days and multiply by the daily price. The total of days price is capped at the weekly price.
    - The sum of these three amounts equals the total rental cost
 
 ## Pricing Recommendations

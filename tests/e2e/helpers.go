@@ -170,10 +170,10 @@ func (db *TestDB) CreateTestTool(ownerID int32, name string, pricePerDay int32) 
 	}
 	var toolID int32
 	err := db.QueryRow(`
-		INSERT INTO tools (owner_id, name, description, price_per_day_cents, condition, metro, status)
-		VALUES ($1, $2, 'Test tool description', $3, 'EXCELLENT', 'San Jose', 'AVAILABLE')
+		INSERT INTO tools (owner_id, name, description, price_per_day_cents, price_per_week_cents, price_per_month_cents, condition, metro, status)
+		VALUES ($1, $2, 'Test tool description', $3, $4, $5, 'EXCELLENT', 'San Jose', 'AVAILABLE')
 		RETURNING id
-	`, ownerID, name, pricePerDay).Scan(&toolID)
+	`, ownerID, name, pricePerDay, pricePerDay*6, pricePerDay*20).Scan(&toolID)
 	if err != nil {
 		db.t.Fatalf("failed to create test tool: %v", err)
 	}
@@ -187,10 +187,10 @@ func (db *TestDB) CreateTestToolWithMetro(ownerID int32, name, metro string, pri
 	}
 	var toolID int32
 	err := db.QueryRow(`
-		INSERT INTO tools (owner_id, name, description, price_per_day_cents, condition, metro, status)
-		VALUES ($1, $2, 'Test tool description', $3, 'EXCELLENT', $4, 'AVAILABLE')
+		INSERT INTO tools (owner_id, name, description, price_per_day_cents, price_per_week_cents, price_per_month_cents, condition, metro, status)
+		VALUES ($1, $2, 'Test tool description', $3, $4, $5, 'EXCELLENT', $6, 'AVAILABLE')
 		RETURNING id
-	`, ownerID, name, pricePerDay, metro).Scan(&toolID)
+	`, ownerID, name, pricePerDay, pricePerDay*6, pricePerDay*20, metro).Scan(&toolID)
 	if err != nil {
 		db.t.Fatalf("failed to create test tool: %v", err)
 	}

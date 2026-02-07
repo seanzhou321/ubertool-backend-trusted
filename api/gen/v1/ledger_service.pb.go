@@ -28,8 +28,9 @@ const (
 	TransactionType_TRANSACTION_TYPE_UNSPECIFIED    TransactionType = 0
 	TransactionType_TRANSACTION_TYPE_RENTAL_DEBIT   TransactionType = 1
 	TransactionType_TRANSACTION_TYPE_LENDING_CREDIT TransactionType = 2
-	TransactionType_TRANSACTION_TYPE_REFUND         TransactionType = 3
-	TransactionType_TRANSACTION_TYPE_ADJUSTMENT     TransactionType = 4
+	TransactionType_TRANSACTION_TYPE_LENDING_DEBIT  TransactionType = 3
+	TransactionType_TRANSACTION_TYPE_REFUND         TransactionType = 4
+	TransactionType_TRANSACTION_TYPE_ADJUSTMENT     TransactionType = 5
 )
 
 // Enum value maps for TransactionType.
@@ -38,15 +39,17 @@ var (
 		0: "TRANSACTION_TYPE_UNSPECIFIED",
 		1: "TRANSACTION_TYPE_RENTAL_DEBIT",
 		2: "TRANSACTION_TYPE_LENDING_CREDIT",
-		3: "TRANSACTION_TYPE_REFUND",
-		4: "TRANSACTION_TYPE_ADJUSTMENT",
+		3: "TRANSACTION_TYPE_LENDING_DEBIT",
+		4: "TRANSACTION_TYPE_REFUND",
+		5: "TRANSACTION_TYPE_ADJUSTMENT",
 	}
 	TransactionType_value = map[string]int32{
 		"TRANSACTION_TYPE_UNSPECIFIED":    0,
 		"TRANSACTION_TYPE_RENTAL_DEBIT":   1,
 		"TRANSACTION_TYPE_LENDING_CREDIT": 2,
-		"TRANSACTION_TYPE_REFUND":         3,
-		"TRANSACTION_TYPE_ADJUSTMENT":     4,
+		"TRANSACTION_TYPE_LENDING_DEBIT":  3,
+		"TRANSACTION_TYPE_REFUND":         4,
+		"TRANSACTION_TYPE_ADJUSTMENT":     5,
 	}
 )
 
@@ -532,13 +535,14 @@ const file_ubertool_trusted_backend_v1_ledger_service_proto_rawDesc = "" +
 	"\x0erelated_rental\x18\x06 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrelatedRental\x12 \n" +
 	"\vdescription\x18\a \x01(\tR\vdescription\x12\x1d\n" +
 	"\n" +
-	"charged_on\x18\b \x01(\tR\tchargedOn*\xb9\x01\n" +
+	"charged_on\x18\b \x01(\tR\tchargedOn*\xdd\x01\n" +
 	"\x0fTransactionType\x12 \n" +
 	"\x1cTRANSACTION_TYPE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dTRANSACTION_TYPE_RENTAL_DEBIT\x10\x01\x12#\n" +
-	"\x1fTRANSACTION_TYPE_LENDING_CREDIT\x10\x02\x12\x1b\n" +
-	"\x17TRANSACTION_TYPE_REFUND\x10\x03\x12\x1f\n" +
-	"\x1bTRANSACTION_TYPE_ADJUSTMENT\x10\x042\xe5\x02\n" +
+	"\x1fTRANSACTION_TYPE_LENDING_CREDIT\x10\x02\x12\"\n" +
+	"\x1eTRANSACTION_TYPE_LENDING_DEBIT\x10\x03\x12\x1b\n" +
+	"\x17TRANSACTION_TYPE_REFUND\x10\x04\x12\x1f\n" +
+	"\x1bTRANSACTION_TYPE_ADJUSTMENT\x10\x052\xe5\x02\n" +
 	"\rLedgerService\x12e\n" +
 	"\n" +
 	"GetBalance\x12*.ubertool.trusted.api.v1.GetBalanceRequest\x1a+.ubertool.trusted.api.v1.GetBalanceResponse\x12t\n" +
