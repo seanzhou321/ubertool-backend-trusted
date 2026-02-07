@@ -285,7 +285,7 @@ Input: `tool_id`, `start_date`, `end_date`, `organization_id`
 Output: rental request details
 Business Logic:
 1. Verify the tool is either available or its rental schedule is free for the specified start_date and end_date.
-2. Calculate `total_cost_cents` based on duration and tool price.
+2. Calculate `total_cost_cents` based on duration from start_date to end_date and tool price.
 3. Insert into `rentals` with status 'PENDING'.
 4. Create a notification to the owner with attributes set to {topic:rental_request; rental:rental_id; purpose:"request for approval"}
 5. Send an email to the tool owner to notify the rental request, cc to the renter (user_id parsed from the JWT token).
@@ -319,7 +319,7 @@ Input: `request_id`
 Output: updated rental request object, list of approved rental request objects, list of pending rental objects of the same type of tools
 Business Logic:
 1. Verify `user_id` is the renter.
-2. Set `scheduled_end_date` by `end_date`.
+2. Copy `end_date` to `last_agreed_end_date` (save the agreed-upon date for potential rollback).
 3. Update `rentals` status to 'SCHEDULED'.
 4. Update the tool status to 'RENTED'.
 5. Create a notification to the owner with attributes set to {topic: rental_request; rental:rental_id; purpose:"rental request confirmed"}
@@ -346,7 +346,7 @@ Output: updated rental status
 Business Logic:
 1. Either owner or renter can signal completion.
 2. Verify the rental status is 'ACTIVE', 'SCHEDULED', or 'OVERDUE'. Report error if otherwise.
-3. Calculate `total_cost_cents` according to the price and duration of the rental. 
+3. Calculate `total_cost_cents` based on duration from start_date to end_date and tool price. 
 4. The calculation of the cost is based on the none zero price fields and taking the lowest cost option. For example, if the tool has only weekly price and zero on daily price, if the rental duation is 3 days, it will be charged by the weekly price. However, if the tool has both weekly price and daily price and the weekly price is equivalent of 3 times of the daily price, if the duration is 4 days, the cost will be the weekly price because it is cheaper than 4 daily prices. By the same principle, if the duration is 8 days, the price will be one weekly price plus one daily price.
 5. The duration calculation should include both the start and the end dates. For example, if start_date="Jan 2, 2026" and end_date="Jan 4, 2026", the duration is 3 to count both start and end dates.
 6. Update `rentals` status to 'COMPLETED' and set `start_date`, `end_date`, `completed_by` to `user_id`, and `total_cost_cents`.
@@ -417,7 +417,7 @@ Business Logic:
 
 **Case 1: Renter changes dates in PENDING, APPROVED, or SCHEDULED status**
    - Verify `user_id` is the renter.
-   - Calculate new `total_cost_cents` based on new dates and tool pricing.
+   - Calculate new `total_cost_cents` based on duration from new start_date to new end_date and tool pricing.
    - Update `rentals` with new start_date, end_date, and total_cost_cents.
    - Set status to 'PENDING' (requires owner re-approval).
    - Create a notification to the owner with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"renter changed dates, requires re-approval"}.
@@ -425,7 +425,7 @@ Business Logic:
 
 **Case 2: Owner changes dates in PENDING, APPROVED, or SCHEDULED status**
    - Verify `user_id` is the tool owner.
-   - Calculate new `total_cost_cents` based on new dates and tool pricing.
+   - Calculate new `total_cost_cents` based on duration from new start_date to new end_date and tool pricing.
    - Update `rentals` with new start_date, end_date, and total_cost_cents.
    - Set status to 'APPROVED' (requires renter confirmation).
    - Create a notification to the renter with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"owner changed dates, requires confirmation"}.
@@ -434,7 +434,7 @@ Business Logic:
 **Case 3: Renter extends return date in ACTIVE or OVERDUE status**
    - Verify `user_id` is the renter.
    - Verify only `new_end_date` is changed (start date cannot change for active rentals).
-   - Calculate new `total_cost_cents` based on original start_date and new end_date.
+   - Calculate new `total_cost_cents` based on duration from start_date to new end_date and tool pricing.
    - Update `rentals` with new end_date and total_cost_cents.
    - Set status to 'RETURN_DATE_CHANGED'.
    - Create a notification to the owner with attributes set to {topic:return_date_change_request; rental:rental_id; old_date:old_end_date; new_date:new_end_date; purpose:"renter requests return date extension"}.
@@ -450,8 +450,8 @@ Output: updated rental request object
 Business Logic:
 1. Verify the rental exists and status is 'RETURN_DATE_CHANGED'.
 2. Verify `user_id` is the tool owner.
-3. Update `rentals` status to 'ACTIVE' (or 'OVERDUE' if new end_date has passed).
-4. The new end_date and total_cost_cents remain as previously set by ChangeRentalDates.
+3. Copy `end_date` to `last_agreed_end_date` (save the newly approved date for potential future rollback).
+4. Update `rentals` status to 'ACTIVE' (or 'OVERDUE' if new end_date has passed).
 5. Create a notification to the renter with attributes set to {topic:return_date_change_approved; rental:rental_id; tool_name:tool_name; purpose:"owner approved return date change."}.
 6. Send email to renter about approved return date extension.
 7. Return the updated rental request object.
@@ -472,7 +472,7 @@ Business Logic:
 4. Update `rentals` status to 'RETURN_DATE_CHANGE_REJECTED'.
 5. Store rejection `reason` in the `rejection_reason` field of the rental record.
 6. Update `rentals.end_date` with the `new_end_date` set by owner.
-7. Recalculate `total_cost_cents` based on start_date and the new_end_date and update the record.
+7. Recalculate `total_cost_cents` based on duration from start_date to new_end_date and tool pricing, then update the record.
 8. Create a notification to the renter with attributes set to {topic:return_date_change_rejected; rental:rental_id; rejection_reason:reason; new_end_date:new_end_date; old_end_date:old_end_date; purpose:"owner rejected return date extension and set new return date"}.
 9. Send email to renter about rejected return date extension with:
    - The rejection reason
@@ -490,13 +490,14 @@ Output: updated rental request object
 Business Logic:
 1. Verify the rental exists and status is 'RETURN_DATE_CHANGE_REJECTED'.
 2. Verify `user_id` is the renter.
-3. Determine appropriate status based on current date vs original end_date:
-   - If current_date <= original_end_date: Set status to 'ACTIVE'
-   - If current_date > original_end_date: Set status to 'OVERDUE'
-4. Update `scheduled_end_date` by `end_date` and newly calculated `total_cost_cents` field.
+3. Copy `last_agreed_end_date` back to `end_date` (rollback to the last agreed date).
+4. Recalculate `total_cost_cents` based on duration from start_date to end_date (now restored) and tool pricing.
 5. Clear rejection_reason field.
-6. Create a notification to the owner with attributes set to {topic:return_date_rejection_acknowledged; rental:rental_id; purpose:"renter acknowledged rejection"}.
-7. Return the updated rental request object.
+6. Determine appropriate status based on current date vs end_date:
+   - If current_date <= end_date: Set status to 'ACTIVE'
+   - If current_date > end_date: Set status to 'OVERDUE'
+7. Create a notification to the owner with attributes set to {topic:return_date_rejection_acknowledged; rental:rental_id; purpose:"renter acknowledged rejection"}.
+8. Return the updated rental request object.
 
 ### Cancel Return Date Change
 Purpose: Renter cancels their own pending return date change request.
@@ -506,11 +507,14 @@ Output: updated rental request object
 Business Logic:
 1. Verify the rental exists and status is 'RETURN_DATE_CHANGED'.
 2. Verify `user_id` is the renter.
-3. Reset end_date by scheduled_end_date and newly calculated total_cost_cents.
-4. Update `rentals` status to 'ACTIVE' (or 'OVERDUE' if original end_date has passed).
-5. Create a notification to the owner with attributes set to {topic:return_date_change_cancelled; rental:rental_id; purpose:"renter cancelled return date change request"}.
-6. Send email to owner about cancelled return date change request.
-7. Return the updated rental request object.
+3. Copy `last_agreed_end_date` back to `end_date` (rollback to the last agreed date).
+4. Recalculate `total_cost_cents` based on duration from start_date to end_date (now restored) and tool pricing.
+5. Determine appropriate status based on current date vs end_date:
+   - If current_date <= end_date: Set status to 'ACTIVE'
+   - If current_date > end_date: Set status to 'OVERDUE'
+6. Create a notification to the owner with attributes set to {topic:return_date_change_cancelled; rental:rental_id; purpose:"renter cancelled return date change request"}.
+7. Send email to owner about cancelled return date change request.
+8. Return the updated rental request object.
 
 ### List Tool Rentals
 Purpose: View complete rental history for a specific tool (for tool owners).
