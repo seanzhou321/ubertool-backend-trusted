@@ -617,152 +617,11 @@ func (x *JoinOrganizationResponse) GetMessage() string {
 	return ""
 }
 
-// Organization message
-type Organization struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Address       string                 `protobuf:"bytes,4,opt,name=address,proto3" json:"address,omitempty"`
-	Metro         string                 `protobuf:"bytes,5,opt,name=metro,proto3" json:"metro,omitempty"`
-	MemberCount   int32                  `protobuf:"varint,6,opt,name=member_count,json=memberCount,proto3" json:"member_count,omitempty"`
-	IsPrimary     bool                   `protobuf:"varint,7,opt,name=is_primary,json=isPrimary,proto3" json:"is_primary,omitempty"`
-	UserBalance   int32                  `protobuf:"varint,8,opt,name=user_balance,json=userBalance,proto3" json:"user_balance,omitempty"` // User's balance in this org (cents)
-	ActiveItems   int32                  `protobuf:"varint,9,opt,name=active_items,json=activeItems,proto3" json:"active_items,omitempty"` // User's active rentals/lendings
-	CreatedOn     string                 `protobuf:"bytes,10,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"`       // Date string YYYY-MM-DD
-	AdminEmail    string                 `protobuf:"bytes,11,opt,name=admin_email,json=adminEmail,proto3" json:"admin_email,omitempty"`
-	AdminPhone    string                 `protobuf:"bytes,12,opt,name=admin_phone,json=adminPhone,proto3" json:"admin_phone,omitempty"`
-	UserRole      string                 `protobuf:"bytes,13,opt,name=user_role,json=userRole,proto3" json:"user_role,omitempty"` // Role of the user in this organization (SUPER_ADMIN, ADMIN, MEMBER, NULL)
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Organization) Reset() {
-	*x = Organization{}
-	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Organization) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Organization) ProtoMessage() {}
-
-func (x *Organization) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Organization.ProtoReflect.Descriptor instead.
-func (*Organization) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_organization_service_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *Organization) GetId() int32 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-func (x *Organization) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *Organization) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *Organization) GetAddress() string {
-	if x != nil {
-		return x.Address
-	}
-	return ""
-}
-
-func (x *Organization) GetMetro() string {
-	if x != nil {
-		return x.Metro
-	}
-	return ""
-}
-
-func (x *Organization) GetMemberCount() int32 {
-	if x != nil {
-		return x.MemberCount
-	}
-	return 0
-}
-
-func (x *Organization) GetIsPrimary() bool {
-	if x != nil {
-		return x.IsPrimary
-	}
-	return false
-}
-
-func (x *Organization) GetUserBalance() int32 {
-	if x != nil {
-		return x.UserBalance
-	}
-	return 0
-}
-
-func (x *Organization) GetActiveItems() int32 {
-	if x != nil {
-		return x.ActiveItems
-	}
-	return 0
-}
-
-func (x *Organization) GetCreatedOn() string {
-	if x != nil {
-		return x.CreatedOn
-	}
-	return ""
-}
-
-func (x *Organization) GetAdminEmail() string {
-	if x != nil {
-		return x.AdminEmail
-	}
-	return ""
-}
-
-func (x *Organization) GetAdminPhone() string {
-	if x != nil {
-		return x.AdminPhone
-	}
-	return ""
-}
-
-func (x *Organization) GetUserRole() string {
-	if x != nil {
-		return x.UserRole
-	}
-	return ""
-}
-
 var File_ubertool_trusted_backend_v1_organization_service_proto protoreflect.FileDescriptor
 
 const file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc = "" +
 	"\n" +
-	"6ubertool_trusted_backend/v1/organization_service.proto\x12\x17ubertool.trusted.api.v1\"\x1c\n" +
+	"6ubertool_trusted_backend/v1/organization_service.proto\x12\x17ubertool.trusted.api.v1\x1a1ubertool_trusted_backend/v1/ubertool_schema.proto\"\x1c\n" +
 	"\x1aListMyOrganizationsRequest\"h\n" +
 	"\x19ListOrganizationsResponse\x12K\n" +
 	"\rorganizations\x18\x01 \x03(\v2%.ubertool.trusted.api.v1.OrganizationR\rorganizations\"A\n" +
@@ -801,26 +660,7 @@ const file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc = "" +
 	"\x18JoinOrganizationResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12I\n" +
 	"\forganization\x18\x02 \x01(\v2%.ubertool.trusted.api.v1.OrganizationR\forganization\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"\x8a\x03\n" +
-	"\fOrganization\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x18\n" +
-	"\aaddress\x18\x04 \x01(\tR\aaddress\x12\x14\n" +
-	"\x05metro\x18\x05 \x01(\tR\x05metro\x12!\n" +
-	"\fmember_count\x18\x06 \x01(\x05R\vmemberCount\x12\x1d\n" +
-	"\n" +
-	"is_primary\x18\a \x01(\bR\tisPrimary\x12!\n" +
-	"\fuser_balance\x18\b \x01(\x05R\vuserBalance\x12!\n" +
-	"\factive_items\x18\t \x01(\x05R\vactiveItems\x12\x1d\n" +
-	"\n" +
-	"created_on\x18\n" +
-	" \x01(\tR\tcreatedOn\x12\x1f\n" +
-	"\vadmin_email\x18\v \x01(\tR\n" +
-	"adminEmail\x12\x1f\n" +
-	"\vadmin_phone\x18\f \x01(\tR\n" +
-	"adminPhone\x12\x1b\n" +
-	"\tuser_role\x18\r \x01(\tR\buserRole2\x8d\x06\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage2\x8d\x06\n" +
 	"\x13OrganizationService\x12~\n" +
 	"\x13ListMyOrganizations\x123.ubertool.trusted.api.v1.ListMyOrganizationsRequest\x1a2.ubertool.trusted.api.v1.ListOrganizationsResponse\x12t\n" +
 	"\x0fGetOrganization\x12/.ubertool.trusted.api.v1.GetOrganizationRequest\x1a0.ubertool.trusted.api.v1.GetOrganizationResponse\x12}\n" +
@@ -842,7 +682,7 @@ func file_ubertool_trusted_backend_v1_organization_service_proto_rawDescGZIP() [
 	return file_ubertool_trusted_backend_v1_organization_service_proto_rawDescData
 }
 
-var file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_ubertool_trusted_backend_v1_organization_service_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_ubertool_trusted_backend_v1_organization_service_proto_goTypes = []any{
 	(*ListMyOrganizationsRequest)(nil), // 0: ubertool.trusted.api.v1.ListMyOrganizationsRequest
 	(*ListOrganizationsResponse)(nil),  // 1: ubertool.trusted.api.v1.ListOrganizationsResponse
@@ -887,13 +727,14 @@ func file_ubertool_trusted_backend_v1_organization_service_proto_init() {
 	if File_ubertool_trusted_backend_v1_organization_service_proto != nil {
 		return
 	}
+	file_ubertool_trusted_backend_v1_ubertool_schema_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc), len(file_ubertool_trusted_backend_v1_organization_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

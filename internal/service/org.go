@@ -36,7 +36,30 @@ func (s *organizationService) GetOrganization(ctx context.Context, id int32) (*d
 }
 
 func (s *organizationService) SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error) {
-	return s.orgRepo.Search(ctx, name, metro)
+	orgs, err := s.orgRepo.Search(ctx, name, metro)
+	if err != nil {
+		return nil, err
+	}
+
+	// Populate admins for each organization
+	for i := range orgs {
+		users, userOrgs, err := s.userRepo.ListMembersByOrg(ctx, orgs[i].ID)
+		if err != nil {
+			logger.Warn("Failed to fetch members for org", "orgID", orgs[i].ID, "error", err)
+			continue
+		}
+
+		// Filter for SUPER_ADMIN and ADMIN roles
+		var admins []domain.User
+		for j, userOrg := range userOrgs {
+			if userOrg.Role == domain.UserOrgRoleSuperAdmin || userOrg.Role == domain.UserOrgRoleAdmin {
+				admins = append(admins, users[j])
+			}
+		}
+		orgs[i].Admins = admins
+	}
+
+	return orgs, nil
 }
 
 func (s *organizationService) CreateOrganization(ctx context.Context, userID int32, org *domain.Organization) error {

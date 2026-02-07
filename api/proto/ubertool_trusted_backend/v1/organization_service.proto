@@ -4,6 +4,7 @@ package ubertool.trusted.api.v1;
 
 option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
+import "ubertool_trusted_backend/v1/ubertool_schema.proto";
 
 option java_multiple_files = true;
 option java_package = "com.ubertool.trusted.api.v1";
@@ -95,21 +96,4 @@ message JoinOrganizationResponse {
   bool success = 1;
   Organization organization = 2;
   string message = 3;
-}
-
-// Organization message
-message Organization {
-  int32 id = 1;
-  string name = 2;
-  string description = 3;
-  string address = 4;
-  string metro = 5;
-  int32 member_count = 6;
-  bool is_primary = 7;
-  int32 user_balance = 8; // User's balance in this org (cents)
-  int32 active_items = 9; // User's active rentals/lendings
-  string created_on = 10; // Date string YYYY-MM-DD
-  string admin_email = 11;
-  string admin_phone = 12;
-  string user_role = 13; // Role of the user in this organization (SUPER_ADMIN, ADMIN, MEMBER, NULL)
 }

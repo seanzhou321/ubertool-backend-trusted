@@ -1196,7 +1196,7 @@ var File_ubertool_trusted_backend_v1_tool_service_proto protoreflect.FileDescrip
 
 const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\n" +
-	".ubertool_trusted_backend/v1/tool_service.proto\x12\x17ubertool.trusted.api.v1\x1a.ubertool_trusted_backend/v1/user_service.proto\"Y\n" +
+	".ubertool_trusted_backend/v1/tool_service.proto\x12\x17ubertool.trusted.api.v1\x1a1ubertool_trusted_backend/v1/ubertool_schema.proto\"Y\n" +
 	"\x10ListToolsRequest\x12\x14\n" +
 	"\x05metro\x18\x01 \x01(\tR\x05metro\x12\x12\n" +
 	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x1b\n" +
@@ -1390,7 +1390,7 @@ func file_ubertool_trusted_backend_v1_tool_service_proto_init() {
 	if File_ubertool_trusted_backend_v1_tool_service_proto != nil {
 		return
 	}
-	file_ubertool_trusted_backend_v1_user_service_proto_init()
+	file_ubertool_trusted_backend_v1_ubertool_schema_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

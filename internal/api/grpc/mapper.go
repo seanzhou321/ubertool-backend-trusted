@@ -36,6 +36,16 @@ func MapDomainOrgToProto(o *domain.Organization, userRole string) *pb.Organizati
 	if o == nil {
 		return nil
 	}
+
+	// Map admins if present
+	var protoAdmins []*pb.User
+	if o.Admins != nil {
+		protoAdmins = make([]*pb.User, len(o.Admins))
+		for i, admin := range o.Admins {
+			protoAdmins[i] = MapDomainUserToProto(&admin)
+		}
+	}
+
 	return &pb.Organization{
 		Id:          o.ID,
 		Name:        o.Name,
@@ -46,6 +56,7 @@ func MapDomainOrgToProto(o *domain.Organization, userRole string) *pb.Organizati
 		AdminPhone:  o.AdminPhoneNumber,
 		CreatedOn:   o.CreatedOn.Format("2006-01-02"),
 		UserRole:    userRole,
+		Admins:      protoAdmins,
 	}
 }
 

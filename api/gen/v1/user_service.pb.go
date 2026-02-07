@@ -217,104 +217,11 @@ func (x *UpdateProfileResponse) GetUser() *User {
 	return nil
 }
 
-// User message
-type User struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
-	Phone         string                 `protobuf:"bytes,4,opt,name=phone,proto3" json:"phone,omitempty"`
-	AvatarUrl     string                 `protobuf:"bytes,5,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
-	Orgs          []*Organization        `protobuf:"bytes,6,rep,name=orgs,proto3" json:"orgs,omitempty"`
-	CreatedOn     string                 `protobuf:"bytes,7,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"` // Date string YYYY-MM-DD
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *User) Reset() {
-	*x = User{}
-	mi := &file_ubertool_trusted_backend_v1_user_service_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *User) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*User) ProtoMessage() {}
-
-func (x *User) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_user_service_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use User.ProtoReflect.Descriptor instead.
-func (*User) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_user_service_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *User) GetId() int32 {
-	if x != nil {
-		return x.Id
-	}
-	return 0
-}
-
-func (x *User) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *User) GetEmail() string {
-	if x != nil {
-		return x.Email
-	}
-	return ""
-}
-
-func (x *User) GetPhone() string {
-	if x != nil {
-		return x.Phone
-	}
-	return ""
-}
-
-func (x *User) GetAvatarUrl() string {
-	if x != nil {
-		return x.AvatarUrl
-	}
-	return ""
-}
-
-func (x *User) GetOrgs() []*Organization {
-	if x != nil {
-		return x.Orgs
-	}
-	return nil
-}
-
-func (x *User) GetCreatedOn() string {
-	if x != nil {
-		return x.CreatedOn
-	}
-	return ""
-}
-
 var File_ubertool_trusted_backend_v1_user_service_proto protoreflect.FileDescriptor
 
 const file_ubertool_trusted_backend_v1_user_service_proto_rawDesc = "" +
 	"\n" +
-	".ubertool_trusted_backend/v1/user_service.proto\x12\x17ubertool.trusted.api.v1\x1a6ubertool_trusted_backend/v1/organization_service.proto\"\x10\n" +
+	".ubertool_trusted_backend/v1/user_service.proto\x12\x17ubertool.trusted.api.v1\x1a1ubertool_trusted_backend/v1/ubertool_schema.proto\"\x10\n" +
 	"\x0eGetUserRequest\"D\n" +
 	"\x0fGetUserResponse\x121\n" +
 	"\x04user\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user\"u\n" +
@@ -325,17 +232,7 @@ const file_ubertool_trusted_backend_v1_user_service_proto_rawDesc = "" +
 	"\n" +
 	"avatar_url\x18\x04 \x01(\tR\tavatarUrl\"J\n" +
 	"\x15UpdateProfileResponse\x121\n" +
-	"\x04user\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user\"\xcf\x01\n" +
-	"\x04User\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
-	"\x05phone\x18\x04 \x01(\tR\x05phone\x12\x1d\n" +
-	"\n" +
-	"avatar_url\x18\x05 \x01(\tR\tavatarUrl\x129\n" +
-	"\x04orgs\x18\x06 \x03(\v2%.ubertool.trusted.api.v1.OrganizationR\x04orgs\x12\x1d\n" +
-	"\n" +
-	"created_on\x18\a \x01(\tR\tcreatedOn2\xdb\x01\n" +
+	"\x04user\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x04user2\xdb\x01\n" +
 	"\vUserService\x12\\\n" +
 	"\aGetUser\x12'.ubertool.trusted.api.v1.GetUserRequest\x1a(.ubertool.trusted.api.v1.GetUserResponse\x12n\n" +
 	"\rUpdateProfile\x12-.ubertool.trusted.api.v1.UpdateProfileRequest\x1a..ubertool.trusted.api.v1.UpdateProfileResponseBb\n" +
@@ -353,28 +250,26 @@ func file_ubertool_trusted_backend_v1_user_service_proto_rawDescGZIP() []byte {
 	return file_ubertool_trusted_backend_v1_user_service_proto_rawDescData
 }
 
-var file_ubertool_trusted_backend_v1_user_service_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_ubertool_trusted_backend_v1_user_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_ubertool_trusted_backend_v1_user_service_proto_goTypes = []any{
 	(*GetUserRequest)(nil),        // 0: ubertool.trusted.api.v1.GetUserRequest
 	(*GetUserResponse)(nil),       // 1: ubertool.trusted.api.v1.GetUserResponse
 	(*UpdateProfileRequest)(nil),  // 2: ubertool.trusted.api.v1.UpdateProfileRequest
 	(*UpdateProfileResponse)(nil), // 3: ubertool.trusted.api.v1.UpdateProfileResponse
 	(*User)(nil),                  // 4: ubertool.trusted.api.v1.User
-	(*Organization)(nil),          // 5: ubertool.trusted.api.v1.Organization
 }
 var file_ubertool_trusted_backend_v1_user_service_proto_depIdxs = []int32{
 	4, // 0: ubertool.trusted.api.v1.GetUserResponse.user:type_name -> ubertool.trusted.api.v1.User
 	4, // 1: ubertool.trusted.api.v1.UpdateProfileResponse.user:type_name -> ubertool.trusted.api.v1.User
-	5, // 2: ubertool.trusted.api.v1.User.orgs:type_name -> ubertool.trusted.api.v1.Organization
-	0, // 3: ubertool.trusted.api.v1.UserService.GetUser:input_type -> ubertool.trusted.api.v1.GetUserRequest
-	2, // 4: ubertool.trusted.api.v1.UserService.UpdateProfile:input_type -> ubertool.trusted.api.v1.UpdateProfileRequest
-	1, // 5: ubertool.trusted.api.v1.UserService.GetUser:output_type -> ubertool.trusted.api.v1.GetUserResponse
-	3, // 6: ubertool.trusted.api.v1.UserService.UpdateProfile:output_type -> ubertool.trusted.api.v1.UpdateProfileResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0, // 2: ubertool.trusted.api.v1.UserService.GetUser:input_type -> ubertool.trusted.api.v1.GetUserRequest
+	2, // 3: ubertool.trusted.api.v1.UserService.UpdateProfile:input_type -> ubertool.trusted.api.v1.UpdateProfileRequest
+	1, // 4: ubertool.trusted.api.v1.UserService.GetUser:output_type -> ubertool.trusted.api.v1.GetUserResponse
+	3, // 5: ubertool.trusted.api.v1.UserService.UpdateProfile:output_type -> ubertool.trusted.api.v1.UpdateProfileResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_user_service_proto_init() }
@@ -382,14 +277,14 @@ func file_ubertool_trusted_backend_v1_user_service_proto_init() {
 	if File_ubertool_trusted_backend_v1_user_service_proto != nil {
 		return
 	}
-	file_ubertool_trusted_backend_v1_organization_service_proto_init()
+	file_ubertool_trusted_backend_v1_ubertool_schema_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ubertool_trusted_backend_v1_user_service_proto_rawDesc), len(file_ubertool_trusted_backend_v1_user_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

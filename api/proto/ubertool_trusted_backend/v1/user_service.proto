@@ -5,7 +5,7 @@ package ubertool.trusted.api.v1;
 option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
 
-import "ubertool_trusted_backend/v1/organization_service.proto";
+import "ubertool_trusted_backend/v1/ubertool_schema.proto";
 
 option java_multiple_files = true;
 option java_package = "com.ubertool.trusted.api.v1";
@@ -41,15 +41,3 @@ message UpdateProfileRequest {
 message UpdateProfileResponse {
   User user = 1;
 }
-
-// User message
-message User {
-  int32 id = 1;
-  string name = 2;
-  string email = 3;
-  string phone = 4;
-  string avatar_url = 5;
-  repeated Organization orgs = 6;
-  string created_on = 7; // Date string YYYY-MM-DD
-}
-
