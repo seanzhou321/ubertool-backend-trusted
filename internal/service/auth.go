@@ -76,8 +76,8 @@ func (s *authService) ValidateInvite(ctx context.Context, inviteCode, email stri
 	return true, "", user, nil
 }
 
-func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, email, note string) error {
-	logger.EnterMethod("authService.RequestToJoin", "orgID", orgID, "name", name, "email", email)
+func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, email, note, adminEmail string) error {
+	logger.EnterMethod("authService.RequestToJoin", "orgID", orgID, "name", name, "email", email, "adminEmail", adminEmail)
 
 	// 1. Verify org exists
 	logger.Debug("Fetching organization", "orgID", orgID)
@@ -126,75 +126,71 @@ func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, emai
 	logger.DatabaseResult("INSERT", 1, nil, "requestID", req.ID)
 	logger.Info("Join request created successfully", "requestID", req.ID, "orgID", orgID, "email", email)
 
-	// 4. Find admin users to notify
-	logger.Debug("Fetching admin users for notifications", "orgID", orgID)
-	logger.DatabaseCall("SELECT", "users JOIN users_orgs WHERE org_id = $1 AND role IN ('ADMIN', 'SUPER_ADMIN')")
-	users, userOrgs, err := s.userRepo.ListMembersByOrg(ctx, orgID)
-	logger.DatabaseResult("SELECT", int64(len(users)), err)
+	// 4. Verify admin_email is an admin/super_admin in the organization
+	logger.Debug("Verifying admin email", "adminEmail", adminEmail, "orgID", orgID)
+	logger.DatabaseCall("SELECT", "users WHERE email = $1")
+	adminUser, err := s.userRepo.GetByEmail(ctx, adminEmail)
+	logger.DatabaseResult("SELECT", 1, err)
 	if err != nil {
-		// Log error but don't fail the request? Or fail? Better to fail or log.
-		// For prototype, returning error is safer to detect issues.
-		logger.ExitMethodWithError("authService.RequestToJoin", err, "reason", "failed to list admins for notification")
-		return fmt.Errorf("failed to list admins for notification: %w", err)
+		logger.ExitMethodWithError("authService.RequestToJoin", err, "reason", "admin user not found")
+		return fmt.Errorf("admin email %s not found: %w", adminEmail, err)
 	}
-	logger.Debug("Members retrieved", "totalMembers", len(users))
-
-	adminCount := 0
-	notificationsSent := 0
-	notificationsFailed := 0
-
-	for i, u := range users {
-		uo := userOrgs[i]
-		if uo.Role == domain.UserOrgRoleAdmin || uo.Role == domain.UserOrgRoleSuperAdmin {
-			adminCount++
-			logger.Debug("Processing admin notification", "adminID", u.ID, "adminEmail", u.Email, "adminName", u.Name, "role", uo.Role)
-
-			// 5. Send Email
-			subject := fmt.Sprintf("New Join Request for %s", org.Name)
-			message := fmt.Sprintf("User %s (%s) has requested to join %s.\nMessage: %s", name, email, org.Name, note)
-
-			logger.ExternalServiceCall("email", "SendAdminNotification", "to", u.Email, "subject", subject)
-			// We act on best effort for notifications?
-			emailErr := s.emailSvc.SendAdminNotification(ctx, u.Email, subject, message)
-			logger.ExternalServiceResult("email", "SendAdminNotification", emailErr, "to", u.Email)
-			if emailErr != nil {
-				logger.Warn("Failed to send email notification to admin", "adminID", u.ID, "email", u.Email, "error", emailErr)
-			}
-
-			// 6. Create Notification
-			notif := &domain.Notification{
-				UserID:  u.ID,
-				OrgID:   orgID,
-				Title:   "New Join Request",
-				Message: fmt.Sprintf("%s requested to join %s", name, org.Name),
-				IsRead:  false,
-				Attributes: map[string]string{
-					"type":      "JOIN_REQUEST",
-					"reference": fmt.Sprintf("join_request:%d", req.ID),
-				},
-				CreatedOn: time.Now(),
-			}
-
-			logger.Debug("Creating notification for admin", "adminID", u.ID, "notifTitle", notif.Title)
-			logger.DatabaseCall("INSERT", "notifications (user_id, org_id, title, message, is_read, attributes)")
-			notifErr := s.noteRepo.Create(ctx, notif)
-			logger.DatabaseResult("INSERT", 1, notifErr, "adminID", u.ID)
-
-			if notifErr != nil {
-				logger.Error("CRITICAL: Failed to create notification for admin", "adminID", u.ID, "adminEmail", u.Email, "error", notifErr)
-				notificationsFailed++
-			} else {
-				logger.Info("Notification created successfully", "adminID", u.ID, "notificationID", notif.ID)
-				notificationsSent++
-			}
-		}
+	if adminUser == nil {
+		logger.ExitMethodWithError("authService.RequestToJoin", fmt.Errorf("admin email not found"), "adminEmail", adminEmail)
+		return fmt.Errorf("admin email %s not found", adminEmail)
 	}
 
-	logger.Info("Join request processing completed",
-		"requestID", req.ID,
-		"adminsFound", adminCount,
-		"notificationsSent", notificationsSent,
-		"notificationsFailed", notificationsFailed)
+	// Verify the admin user is a member of the organization with admin/super_admin role
+	logger.DatabaseCall("SELECT", "users_orgs WHERE user_id = $1 AND org_id = $2")
+	adminUserOrg, err := s.userRepo.GetUserOrg(ctx, adminUser.ID, orgID)
+	logger.DatabaseResult("SELECT", 1, err)
+	if err != nil {
+		logger.ExitMethodWithError("authService.RequestToJoin", err, "reason", "admin not member of org")
+		return fmt.Errorf("admin email %s is not a member of organization %d: %w", adminEmail, orgID, err)
+	}
+	if adminUserOrg.Role != domain.UserOrgRoleAdmin && adminUserOrg.Role != domain.UserOrgRoleSuperAdmin {
+		logger.ExitMethodWithError("authService.RequestToJoin", fmt.Errorf("insufficient permissions"), "adminEmail", adminEmail, "role", adminUserOrg.Role)
+		return fmt.Errorf("user %s does not have admin permissions in organization %d", adminEmail, orgID)
+	}
+	logger.Debug("Admin verified", "adminID", adminUser.ID, "adminEmail", adminEmail, "role", adminUserOrg.Role)
+
+	// 5. Send Email to the specified admin
+	subject := fmt.Sprintf("New Join Request for %s", org.Name)
+	message := fmt.Sprintf("User %s (%s) has requested to join %s.\nMessage: %s", name, email, org.Name, note)
+
+	logger.ExternalServiceCall("email", "SendAdminNotification", "to", adminUser.Email, "subject", subject)
+	emailErr := s.emailSvc.SendAdminNotification(ctx, adminUser.Email, subject, message)
+	logger.ExternalServiceResult("email", "SendAdminNotification", emailErr, "to", adminUser.Email)
+	if emailErr != nil {
+		logger.Warn("Failed to send email notification to admin", "adminID", adminUser.ID, "email", adminUser.Email, "error", emailErr)
+	}
+
+	// 6. Create Notification for the specified admin
+	notif := &domain.Notification{
+		UserID:  adminUser.ID,
+		OrgID:   orgID,
+		Title:   "New Join Request",
+		Message: fmt.Sprintf("%s requested to join %s", name, org.Name),
+		IsRead:  false,
+		Attributes: map[string]string{
+			"type":      "JOIN_REQUEST",
+			"reference": fmt.Sprintf("join_request:%d", req.ID),
+		},
+		CreatedOn: time.Now(),
+	}
+
+	logger.Debug("Creating notification for admin", "adminID", adminUser.ID, "notifTitle", notif.Title)
+	logger.DatabaseCall("INSERT", "notifications (user_id, org_id, title, message, is_read, attributes)")
+	notifErr := s.noteRepo.Create(ctx, notif)
+	logger.DatabaseResult("INSERT", 1, notifErr, "adminID", adminUser.ID)
+
+	if notifErr != nil {
+		logger.Error("CRITICAL: Failed to create notification for admin", "adminID", adminUser.ID, "adminEmail", adminUser.Email, "error", notifErr)
+	} else {
+		logger.Info("Notification created successfully", "adminID", adminUser.ID, "notificationID", notif.ID)
+	}
+
+	logger.Info("Join request processing completed", "requestID", req.ID, "adminEmail", adminEmail)
 
 	logger.ExitMethod("authService.RequestToJoin", "requestID", req.ID)
 	return nil

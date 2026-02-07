@@ -57,7 +57,7 @@ func (h *AuthHandler) RequestToJoinOrganization(ctx context.Context, req *pb.Req
 		"email", req.Email)
 	logger.EnterMethod("AuthHandler.RequestToJoinOrganization", "organizationID", req.OrganizationId, "email", req.Email)
 
-	err := h.authSvc.RequestToJoin(ctx, req.OrganizationId, req.Name, req.Email, req.Message)
+	err := h.authSvc.RequestToJoin(ctx, req.OrganizationId, req.Name, req.Email, req.Message, req.AdminEmail)
 	if err != nil {
 		logger.ExitMethodWithError("AuthHandler.RequestToJoinOrganization", err, "organizationID", req.OrganizationId, "email", req.Email)
 		logger.Error("=== API RequestToJoinOrganization FAILED ===", "error", err)

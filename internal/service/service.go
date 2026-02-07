@@ -7,7 +7,7 @@ import (
 
 type AuthService interface {
 	ValidateInvite(ctx context.Context, inviteCode, email string) (bool, string, *domain.User, error)
-	RequestToJoin(ctx context.Context, orgID int32, name, email, note string) error
+	RequestToJoin(ctx context.Context, orgID int32, name, email, note, adminEmail string) error
 	Signup(ctx context.Context, inviteToken, name, email, phone, password string) error
 	Login(ctx context.Context, email, password string) (string, string, string, bool, error) // access, refresh, session, requires2FA
 	Verify2FA(ctx context.Context, userID int32, code string) (string, string, *domain.User, error)

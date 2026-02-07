@@ -83,6 +83,7 @@ func TestAuthService_E2E(t *testing.T) {
 			Name:           "Applicant User",
 			Email:          applicantEmail,
 			Message:        "I would like to join",
+			AdminEmail:     "e2e-test-admin2@test.com",
 		}
 
 		resp, err := authClient.RequestToJoinOrganization(ctx, req)

@@ -22,17 +22,18 @@ Note: The presence of a User object in the response indicates the user is logged
 ### Request To Join Organization
 Purpose: A user who is not part of an organization wants to join. They search for the organization and submit a request.
 
-Input: `organization_id`, `name`, `email`, `message`
+Input: `organization_id`, `name`, `email`, `message`, `admin_email`
 Output: success/failure, message
 Business Logic:
 1. Verify the organization exists in the `orgs` table.
-2. Search the `users` table for the user with the given `email`.
-3. Create a new entry in the `join_requests` table with `status` set to 'PENDING'.
-4. The `user_id` in `join_requests` may be assigned from the user found by the email, or should be null if the user is not found.
-5. Find the admin users in `organization_id`. 
-6. Send emails to the admin users with the new user email, name, and the message.
-7. Create a list of notifications to each admin users that the email was sent.
-8. Return success/failure and message, "Your request to join the organization has been submitted."
+2. Verify the admin_email is one of the admin/super_admin users in the organization_id. 
+3. Search the `users` table for the user with the given `email`.
+4. Create a new entry in the `join_requests` table with `status` set to 'PENDING'.
+5. The `user_id` in `join_requests` may be assigned from the user found by the email, or should be null if the user is not found.
+6. Find the admin users in `organization_id`. 
+7. Send emails to the admin user by `admin_email` with the new user email, name, and the message.
+8. Create a list of notifications to each admin users that the email was sent.
+9. Return success/failure and message, "Your request to join the organization has been submitted."
 
 ### User Signup
 Purpose: Register a new user account.

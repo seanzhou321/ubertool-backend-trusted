@@ -681,6 +681,7 @@ type RequestToJoinRequest struct {
 	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Email          string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
 	Message        string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	AdminEmail     string                 `protobuf:"bytes,5,opt,name=admin_email,json=adminEmail,proto3" json:"admin_email,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -739,6 +740,13 @@ func (x *RequestToJoinRequest) GetEmail() string {
 func (x *RequestToJoinRequest) GetMessage() string {
 	if x != nil {
 		return x.Message
+	}
+	return ""
+}
+
+func (x *RequestToJoinRequest) GetAdminEmail() string {
+	if x != nil {
+		return x.AdminEmail
 	}
 	return ""
 }
@@ -840,12 +848,14 @@ const file_ubertool_trusted_backend_v1_auth_service_proto_rawDesc = "" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"\x0f\n" +
 	"\rLogoutRequest\"*\n" +
 	"\x0eLogoutResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x83\x01\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\xa4\x01\n" +
 	"\x14RequestToJoinRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12\x18\n" +
-	"\amessage\x18\x04 \x01(\tR\amessage\"K\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12\x1f\n" +
+	"\vadmin_email\x18\x05 \x01(\tR\n" +
+	"adminEmail\"K\n" +
 	"\x15RequestToJoinResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage2\xdf\x05\n" +

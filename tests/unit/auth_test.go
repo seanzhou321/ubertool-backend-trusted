@@ -98,14 +98,22 @@ func TestAuthService_RequestToJoin(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		orgID := int32(1)
 		email := "email@test.com"
+		adminEmail := "admin@test.com"
 		orgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Org"}, nil)
 		userRepo.On("GetByEmail", ctx, email).Return(nil, nil)
 		reqRepo.On("Create", ctx, mock.AnythingOfType("*domain.JoinRequest")).Return(nil)
 
-		// Mock ListUsers for admin notification logic
-		userRepo.On("ListMembersByOrg", ctx, orgID).Return([]domain.User{}, []domain.UserOrg{}, nil)
+		// Mock admin verification
+		adminUser := &domain.User{ID: 2, Email: adminEmail, Name: "Admin"}
+		userRepo.On("GetByEmail", ctx, adminEmail).Return(adminUser, nil)
+		adminUserOrg := &domain.UserOrg{UserID: 2, OrgID: orgID, Role: domain.UserOrgRoleAdmin}
+		userRepo.On("GetUserOrg", ctx, int32(2), orgID).Return(adminUserOrg, nil)
 
-		err := svc.RequestToJoin(ctx, orgID, "Name", email, "Note")
+		// Mock notification creation
+		emailSvc.On("SendAdminNotification", ctx, adminEmail, mock.Anything, mock.Anything).Return(nil)
+		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
+
+		err := svc.RequestToJoin(ctx, orgID, "Name", email, "Note", adminEmail)
 		assert.NoError(t, err)
 	})
 }

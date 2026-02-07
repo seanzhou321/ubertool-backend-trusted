@@ -9,7 +9,7 @@
 6. (done) Add change/extend rental period capability
 7. (done) Add rental history to the tool detail screen. 
 8. (done) Add return condition logging and repair/replacement charge screen at the rental completion stage.
-9. Add admin name/email to the signon Request screen/api
+9. (done) Add admin name/email to the signon Request screen/api
 10. Split bills at the end of months; notifications and confirmations. 
 
 ## Milestone 2: Pre-production

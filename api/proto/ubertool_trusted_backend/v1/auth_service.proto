@@ -123,6 +123,7 @@ message RequestToJoinRequest {
   string name = 2;
   string email = 3;
   string message = 4;
+  string admin_email = 5; 
 }
 
 // Request to join response
