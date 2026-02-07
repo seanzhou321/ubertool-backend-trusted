@@ -8,18 +8,17 @@
 5. (done) Add pickup button and move the rental request from SCHEDULED to ACTIVE state.
 6. (done) Add change/extend rental period capability
 7. (done) Add rental history to the tool detail screen. 
-8. Add return condition logging and repair/replacement charge screen
-9. Owner surcharge/rebate after rental.
-10. Add admin name/email to the signon Request screen/api
-11. Split bills at the end of months; notifications and confirmations. 
-12. Add a cron job to mark the overdue rentals OVERDUE. 
+8. (done) Add return condition logging and repair/replacement charge screen at the rental completion stage.
+9. Add admin name/email to the signon Request screen/api
+10. Split bills at the end of months; notifications and confirmations. 
 
 ## Milestone 2: Pre-production
 1. email notifications
-2. image capture and display
-3. Add legal statements: community bylaws and rental pricing and cost agreement confirmation.
-4. refresh token enable
-5. enable 2fa
+2. Add a cron job to mark the overdue rentals OVERDUE, send overdue reminders to renter daily. 
+3. image capture and display
+4. Add legal statements: community bylaws and rental pricing and cost agreement confirmation.
+5. enable refresh token
+6. enable 2fa
 
 ## Milestone 3: Production - trial groups
 1. https certification
