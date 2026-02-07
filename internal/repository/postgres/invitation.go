@@ -31,7 +31,7 @@ func (r *invitationRepository) Create(ctx context.Context, inv *domain.Invitatio
 
 		// Check if this code already exists for this email
 		var exists bool
-		checkQuery := `SELECT EXISTS(SELECT 1 FROM invitations WHERE invitation_code = $1 AND email = $2)`
+		checkQuery := `SELECT EXISTS(SELECT 1 FROM invitations WHERE invitation_code = $1 AND LOWER(email) = LOWER($2))`
 		err = r.db.QueryRowContext(ctx, checkQuery, invitationCode, inv.Email).Scan(&exists)
 		if err != nil {
 			return err
@@ -72,7 +72,7 @@ func (r *invitationRepository) GetByInvitationCodeAndEmail(ctx context.Context, 
 	inv := &domain.Invitation{}
 	query := `SELECT id, invitation_code, org_id, email, created_by, expires_on, used_on, used_by_user_id, created_on 
 	          FROM invitations 
-	          WHERE invitation_code = $1 AND email = $2`
+	          WHERE invitation_code = $1 AND LOWER(email) = LOWER($2)`
 	err := r.db.QueryRowContext(ctx, query, invitationCode, email).Scan(&inv.ID, &inv.InvitationCode, &inv.OrgID, &inv.Email, &inv.CreatedBy, &inv.ExpiresOn, &inv.UsedOn, &inv.UsedByUserID, &inv.CreatedOn)
 	if err != nil {
 		return nil, err

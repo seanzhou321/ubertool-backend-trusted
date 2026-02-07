@@ -5,9 +5,9 @@
 2. (done) Add overall balance across all orgs.
 3. (done) Redo pricing and rental cost instructions in Add New Tool screen. 
 4. Add rental cost agreement in the renter confirmation screen.
-5. Add pickup button and move the rental request from SCHEDULED to ACTIVE state.
-6. Add change/extend rental period capability
-7. Add rental history to the tool detail screen. 
+5. (done) Add pickup button and move the rental request from SCHEDULED to ACTIVE state.
+6. (done) Add change/extend rental period capability
+7. (done) Add rental history to the tool detail screen. 
 8. Add return condition logging and repair/replacement charge screen
 9. Owner surcharge/rebate after rental.
 10. Add admin name/email to the signon Request screen/api

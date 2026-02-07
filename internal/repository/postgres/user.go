@@ -36,7 +36,7 @@ func (r *userRepository) GetByID(ctx context.Context, id int32) (*domain.User, e
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	u := &domain.User{}
-	query := `SELECT id, email, phone_number, password_hash, name, COALESCE(avatar_url, ''), created_on, updated_on FROM users WHERE email = $1`
+	query := `SELECT id, email, phone_number, password_hash, name, COALESCE(avatar_url, ''), created_on, updated_on FROM users WHERE LOWER(email) = LOWER($1)`
 	err := r.db.QueryRowContext(ctx, query, email).Scan(&u.ID, &u.Email, &u.PhoneNumber, &u.PasswordHash, &u.Name, &u.AvatarURL, &u.CreatedOn, &u.UpdatedOn)
 	if err != nil {
 		return nil, err
