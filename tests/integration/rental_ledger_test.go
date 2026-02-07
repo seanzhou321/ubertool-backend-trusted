@@ -112,7 +112,7 @@ func TestRentalAndLedger_Integration(t *testing.T) {
 		// 2. Create Rental Request
 		rental := &domain.Rental{
 			OrgID: orgID, ToolID: tool.ID, RenterID: renter.ID, OwnerID: owner.ID,
-			StartDate: time.Now(), ScheduledEndDate: time.Now().Add(24 * time.Hour),
+			StartDate: time.Now(), EndDate: time.Now().Add(24 * time.Hour),
 			TotalCostCents: 1000, Status: domain.RentalStatusPending,
 		}
 		err := rentalRepo.Create(ctx, rental)
@@ -205,7 +205,7 @@ func TestRentalDateChange_Integration(t *testing.T) {
 		// Create Scheduled Rental manually
 		rental := &domain.Rental{
 			OrgID: orgID, ToolID: tool.ID, RenterID: renter.ID, OwnerID: owner.ID,
-			StartDate: startDate, ScheduledEndDate: endDate,
+			StartDate: startDate, EndDate: endDate,
 			TotalCostCents: 1000, Status: domain.RentalStatusScheduled,
 		}
 		err = rentalRepo.Create(ctx, rental)
@@ -239,8 +239,8 @@ func TestRentalDateChange_Integration(t *testing.T) {
 		}
 		require.NoError(t, err)
 		require.NotNil(t, chgRental)
-		t.Logf("ChangeRental Result: Status=%s, Cost=%d, EndDate=%v, ScheduledEndDate=%v",
-			chgRental.Status, chgRental.TotalCostCents, chgRental.EndDate, chgRental.ScheduledEndDate)
+		t.Logf("ChangeRental Result: Status=%s, Cost=%d, EndDate=%v, LastAgreedEndDate=%v",
+			chgRental.Status, chgRental.TotalCostCents, chgRental.EndDate, chgRental.LastAgreedEndDate)
 		assert.Equal(t, domain.RentalStatusReturnDateChanged, chgRental.Status)
 		// Cost should be 3 days (2025-01-01 to 2025-01-03 inclusive) * 1000 = 3000
 		assert.Equal(t, int32(3000), chgRental.TotalCostCents)
@@ -252,10 +252,11 @@ func TestRentalDateChange_Integration(t *testing.T) {
 		require.NotNil(t, appRental)
 		// Note: Status becomes OVERDUE because the rental dates are in the past
 		assert.Equal(t, domain.RentalStatusOverdue, appRental.Status)
-		assert.Nil(t, appRental.EndDate) // Should be cleared
-		// Verify ScheduledEndDate is updated (check logic persistence)
+		assert.NotNil(t, appRental.LastAgreedEndDate) // Should be set to approved date
+		// Verify EndDate and LastAgreedEndDate are updated (check logic persistence)
 		// Since we use DB, let's fetch fresh
 		finalRental, _ := rentalRepo.GetByID(ctx, rental.ID)
-		assert.Equal(t, newEnd, finalRental.ScheduledEndDate.Format("2006-01-02"))
+		assert.Equal(t, newEnd, finalRental.EndDate.Format("2006-01-02"))
+		assert.Equal(t, newEnd, finalRental.LastAgreedEndDate.Format("2006-01-02"))
 	})
 }

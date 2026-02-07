@@ -127,7 +127,7 @@ func TestMapDomainRentalToProto(t *testing.T) {
 		RenterID:         4,
 		OwnerID:          5,
 		StartDate:        now,
-		ScheduledEndDate: now.Add(24 * time.Hour),
+		EndDate:          now.Add(24 * time.Hour),
 		TotalCostCents:   2000,
 		Status:           domain.RentalStatusApproved,
 		PickupNote:       "Leave at front door",

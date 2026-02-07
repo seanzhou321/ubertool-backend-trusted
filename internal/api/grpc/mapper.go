@@ -132,7 +132,7 @@ func MapDomainRentalToProtoWithNames(r *domain.Rental, renterName, ownerName, to
 		OwnerId:            r.OwnerID,
 		OwnerName:          ownerName,
 		StartDate:          r.StartDate.Format("2006-01-02"),
-		EndDate:            r.ScheduledEndDate.Format("2006-01-02"),
+		EndDate:            r.EndDate.Format("2006-01-02"),
 		TotalCostCents:     r.TotalCostCents,
 		Status:             MapDomainRentalStatusToProto(r.Status),
 		PickupInstructions: r.PickupNote,

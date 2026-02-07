@@ -20,15 +20,15 @@ func NewRentalRepository(db *sql.DB) repository.RentalRepository {
 }
 
 func (r *rentalRepository) Create(ctx context.Context, rt *domain.Rental) error {
-	query := `INSERT INTO rentals (org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, total_cost_cents, status, created_on, updated_on) 
+	query := `INSERT INTO rentals (org_id, tool_id, renter_id, owner_id, start_date, end_date, total_cost_cents, status, created_on, updated_on) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`
-	return r.db.QueryRowContext(ctx, query, rt.OrgID, rt.ToolID, rt.RenterID, rt.OwnerID, rt.StartDate, rt.ScheduledEndDate, rt.TotalCostCents, rt.Status, time.Now(), time.Now()).Scan(&rt.ID)
+	return r.db.QueryRowContext(ctx, query, rt.OrgID, rt.ToolID, rt.RenterID, rt.OwnerID, rt.StartDate, rt.EndDate, rt.TotalCostCents, rt.Status, time.Now(), time.Now()).Scan(&rt.ID)
 }
 
 func (r *rentalRepository) GetByID(ctx context.Context, id int32) (*domain.Rental, error) {
 	rt := &domain.Rental{}
-	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on FROM rentals WHERE id = $1`
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &rt.StartDate, &rt.ScheduledEndDate, &rt.EndDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.CreatedOn, &rt.UpdatedOn)
+	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on FROM rentals WHERE id = $1`
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &rt.StartDate, &rt.LastAgreedEndDate, &rt.EndDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.CreatedOn, &rt.UpdatedOn)
 	if err != nil {
 		return nil, err
 	}
@@ -36,16 +36,16 @@ func (r *rentalRepository) GetByID(ctx context.Context, id int32) (*domain.Renta
 }
 
 func (r *rentalRepository) Update(ctx context.Context, rt *domain.Rental) error {
-	query := `UPDATE rentals SET status=$1, pickup_note=$2, start_date=$3, scheduled_end_date=$4, end_date=$5, total_cost_cents=$6, rejection_reason=$7, completed_by=$8, updated_on=$9 WHERE id=$10`
-	_, err := r.db.ExecContext(ctx, query, rt.Status, rt.PickupNote, rt.StartDate, rt.ScheduledEndDate, rt.EndDate, rt.TotalCostCents, rt.RejectionReason, rt.CompletedBy, time.Now(), rt.ID)
+	query := `UPDATE rentals SET status=$1, pickup_note=$2, start_date=$3, last_agreed_end_date=$4, end_date=$5, total_cost_cents=$6, rejection_reason=$7, completed_by=$8, updated_on=$9 WHERE id=$10`
+	_, err := r.db.ExecContext(ctx, query, rt.Status, rt.PickupNote, rt.StartDate, rt.LastAgreedEndDate, rt.EndDate, rt.TotalCostCents, rt.RejectionReason, rt.CompletedBy, time.Now(), rt.ID)
 	return err
 }
 
 func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
-	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on 
+	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on 
 	        FROM rentals WHERE renter_id = $1 AND org_id = $2`
-	
+
 	args := []interface{}{renterID, orgID}
 	argIdx := 3
 	if len(statuses) > 0 {
@@ -77,7 +77,7 @@ func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int
 	var rentals []domain.Rental
 	for rows.Next() {
 		var rt domain.Rental
-		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &rt.StartDate, &rt.ScheduledEndDate, &rt.EndDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.CreatedOn, &rt.UpdatedOn); err != nil {
+		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &rt.StartDate, &rt.LastAgreedEndDate, &rt.EndDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.CreatedOn, &rt.UpdatedOn); err != nil {
 			return nil, 0, err
 		}
 		rentals = append(rentals, rt)
@@ -87,9 +87,9 @@ func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int
 
 func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
-	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on 
+	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on 
 	        FROM rentals WHERE owner_id = $1 AND org_id = $2`
-	
+
 	args := []interface{}{ownerID, orgID}
 	argIdx := 3
 	if len(statuses) > 0 {
@@ -121,7 +121,7 @@ func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32
 	var rentals []domain.Rental
 	for rows.Next() {
 		var rt domain.Rental
-		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &rt.StartDate, &rt.ScheduledEndDate, &rt.EndDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.CreatedOn, &rt.UpdatedOn); err != nil {
+		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &rt.StartDate, &rt.LastAgreedEndDate, &rt.EndDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.CreatedOn, &rt.UpdatedOn); err != nil {
 			return nil, 0, err
 		}
 		rentals = append(rentals, rt)
@@ -131,9 +131,9 @@ func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32
 
 func (r *rentalRepository) ListByTool(ctx context.Context, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
-	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, scheduled_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on 
+	sql := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, created_on, updated_on 
 	        FROM rentals WHERE tool_id = $1`
-	
+
 	args := []interface{}{toolID}
 	argIdx := 2
 
@@ -172,7 +172,7 @@ func (r *rentalRepository) ListByTool(ctx context.Context, toolID, orgID int32, 
 	var rentals []domain.Rental
 	for rows.Next() {
 		var rt domain.Rental
-		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &rt.StartDate, &rt.ScheduledEndDate, &rt.EndDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.CreatedOn, &rt.UpdatedOn); err != nil {
+		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &rt.StartDate, &rt.LastAgreedEndDate, &rt.EndDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.CreatedOn, &rt.UpdatedOn); err != nil {
 			return nil, 0, err
 		}
 		rentals = append(rentals, rt)

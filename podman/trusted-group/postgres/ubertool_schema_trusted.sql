@@ -128,8 +128,8 @@ CREATE TABLE rentals (
     renter_id INTEGER REFERENCES users(id),
     owner_id INTEGER REFERENCES users(id),
     start_date DATE NOT NULL,
-    scheduled_end_date DATE NOT NULL, -- Scheduled return date
-    end_date DATE, -- Actual return date
+    last_agreed_end_date DATE, -- Last agreed return date (agreed by both renter and owner,can be updated with return date change flow)
+    end_date DATE NOT NULL, -- Actual return date
     total_cost_cents INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING',
     pickup_note TEXT,

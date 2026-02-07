@@ -45,7 +45,7 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 	}
 	// Verify tool availability (simplified: check status)
 	// Ideally check if tool is already rented in this period.
-	
+
 	start, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
 		return nil, err
@@ -72,14 +72,14 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 	// }
 
 	rental := &domain.Rental{
-		OrgID:            orgID,
-		ToolID:           toolID,
-		RenterID:         renterID,
-		OwnerID:          tool.OwnerID,
-		StartDate:        start,
-		ScheduledEndDate: end,
-		TotalCostCents:   totalCost,
-		Status:           domain.RentalStatusPending,
+		OrgID:          orgID,
+		ToolID:         toolID,
+		RenterID:       renterID,
+		OwnerID:        tool.OwnerID,
+		StartDate:      start,
+		EndDate:        end,
+		TotalCostCents: totalCost,
+		Status:         domain.RentalStatusPending,
 	}
 
 	if err := s.rentalRepo.Create(ctx, rental); err != nil {
@@ -91,14 +91,14 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 	renter, _ := s.userRepo.GetByID(ctx, renterID)
 	if owner != nil && renter != nil {
 		_ = s.emailSvc.SendRentalRequestNotification(ctx, owner.Email, renter.Name, tool.Name, renter.Email)
-		
+
 		notif := &domain.Notification{
 			UserID:  owner.ID,
 			OrgID:   orgID,
 			Title:   "New Rental Request",
 			Message: fmt.Sprintf("%s requested to rent %s", renter.Name, tool.Name),
 			Attributes: map[string]string{
-				"type": "RENTAL_REQUEST",
+				"type":      "RENTAL_REQUEST",
 				"rental_id": fmt.Sprintf("%d", rental.ID),
 			},
 		}
@@ -130,7 +130,7 @@ func (s *rentalService) ApproveRentalRequest(ctx context.Context, ownerID, renta
 	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
 	owner, _ := s.userRepo.GetByID(ctx, ownerID)
 	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
-	
+
 	if renter != nil && owner != nil && tool != nil {
 		_ = s.emailSvc.SendRentalApprovalNotification(ctx, renter.Email, tool.Name, owner.Name, pickupNote, owner.Email)
 
@@ -140,7 +140,7 @@ func (s *rentalService) ApproveRentalRequest(ctx context.Context, ownerID, renta
 			Title:   "Rental Approved",
 			Message: fmt.Sprintf("Your rental request for %s by %s was approved", tool.Name, owner.Name),
 			Attributes: map[string]string{
-				"type": "RENTAL_APPROVED",
+				"type":      "RENTAL_APPROVED",
 				"rental_id": fmt.Sprintf("%d", rt.ID),
 			},
 		}
@@ -168,7 +168,7 @@ func (s *rentalService) RejectRentalRequest(ctx context.Context, ownerID, rental
 	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
 	owner, _ := s.userRepo.GetByID(ctx, ownerID)
 	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
-	
+
 	if renter != nil && owner != nil && tool != nil {
 		_ = s.emailSvc.SendRentalRejectionNotification(ctx, renter.Email, tool.Name, owner.Name, owner.Email)
 
@@ -178,7 +178,7 @@ func (s *rentalService) RejectRentalRequest(ctx context.Context, ownerID, rental
 			Title:   "Rental Rejected",
 			Message: fmt.Sprintf("Your rental request for %s by %s was rejected", tool.Name, owner.Name),
 			Attributes: map[string]string{
-				"type": "RENTAL_REJECTED",
+				"type":      "RENTAL_REJECTED",
 				"rental_id": fmt.Sprintf("%d", rt.ID),
 			},
 		}
@@ -206,17 +206,17 @@ func (s *rentalService) CancelRental(ctx context.Context, renterID, rentalID int
 	renter, _ := s.userRepo.GetByID(ctx, renterID)
 	owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
 	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
-	
+
 	if renter != nil && owner != nil && tool != nil {
 		_ = s.emailSvc.SendRentalCancellationNotification(ctx, owner.Email, renter.Name, tool.Name, reason, renter.Email)
-		
+
 		notif := &domain.Notification{
 			UserID:  owner.ID,
 			OrgID:   rt.OrgID,
 			Title:   "Rental Cancelled",
 			Message: fmt.Sprintf("%s cancelled rental request for %s", renter.Name, tool.Name),
 			Attributes: map[string]string{
-				"type": "RENTAL_CANCELLED",
+				"type":      "RENTAL_CANCELLED",
 				"rental_id": fmt.Sprintf("%d", rt.ID),
 			},
 		}
@@ -240,10 +240,10 @@ func (s *rentalService) FinalizeRentalRequest(ctx context.Context, renterID, ren
 
 	// Deduct balance
 	debit := &domain.LedgerTransaction{
-		OrgID:           rt.OrgID,
-		UserID:          rt.RenterID,
-		Amount:          -rt.TotalCostCents,
-		Type:            domain.TransactionTypeRentalDebit, // Or some type for holding?
+		OrgID:  rt.OrgID,
+		UserID: rt.RenterID,
+		Amount: -rt.TotalCostCents,
+		Type:   domain.TransactionTypeRentalDebit, // Or some type for holding?
 		// Usually we hold/escrow, but for simplicity debit now?
 		// Design says "Deduct from renter's balance".
 		RelatedRentalID: &rt.ID,
@@ -255,6 +255,8 @@ func (s *rentalService) FinalizeRentalRequest(ctx context.Context, renterID, ren
 
 	// Update rental
 	rt.Status = domain.RentalStatusScheduled
+	// Copy EndDate to LastAgreedEndDate since renter has confirmed the rental
+	rt.LastAgreedEndDate = &rt.EndDate
 	if err := s.rentalRepo.Update(ctx, rt); err != nil {
 		return nil, nil, nil, err
 	}
@@ -269,17 +271,17 @@ func (s *rentalService) FinalizeRentalRequest(ctx context.Context, renterID, ren
 	// Notify owner
 	renter, _ := s.userRepo.GetByID(ctx, renterID)
 	owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
-	
+
 	if renter != nil && owner != nil && tool != nil {
 		_ = s.emailSvc.SendRentalConfirmationNotification(ctx, owner.Email, renter.Name, tool.Name, renter.Email)
-		
+
 		notif := &domain.Notification{
 			UserID:  owner.ID,
 			OrgID:   rt.OrgID,
 			Title:   "Rental Confirmed",
 			Message: fmt.Sprintf("%s confirmed rental for %s", renter.Name, tool.Name),
 			Attributes: map[string]string{
-				"type": "RENTAL_CONFIRMED",
+				"type":      "RENTAL_CONFIRMED",
 				"rental_id": fmt.Sprintf("%d", rt.ID),
 			},
 		}
@@ -348,15 +350,15 @@ func (s *rentalService) ActivateRental(ctx context.Context, userID, rentalID int
 	}
 
 	if otherEmail != "" {
-		_ = s.emailSvc.SendRentalPickupNotification(ctx, otherEmail, otherName, toolName, rt.StartDate.Format("2006-01-02"), rt.ScheduledEndDate.Format("2006-01-02"))
-		
+		_ = s.emailSvc.SendRentalPickupNotification(ctx, otherEmail, otherName, toolName, rt.StartDate.Format("2006-01-02"), rt.EndDate.Format("2006-01-02"))
+
 		notif := &domain.Notification{
 			UserID:  otherID,
 			OrgID:   rt.OrgID,
 			Title:   "Rental Picked Up",
 			Message: fmt.Sprintf("Rental for %s has been picked up by %s", toolName, myName),
 			Attributes: map[string]string{
-				"type": "RENTAL_PICKUP",
+				"type":      "RENTAL_PICKUP",
 				"rental_id": fmt.Sprintf("%d", rt.ID),
 			},
 		}
@@ -398,7 +400,7 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 	if newEnd != "" {
 		nEnd, _ = time.Parse("2006-01-02", newEnd)
 	} else {
-		nEnd = rt.ScheduledEndDate
+		nEnd = rt.EndDate
 	}
 	// Verify old dates match (optimistic locking check) - skipping for simplicity as per requirement focus
 
@@ -409,12 +411,12 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 	}
 
 	// Logic Branching
-	if (rt.Status == domain.RentalStatusPending || rt.Status == domain.RentalStatusApproved || rt.Status == domain.RentalStatusScheduled) {
+	if rt.Status == domain.RentalStatusPending || rt.Status == domain.RentalStatusApproved || rt.Status == domain.RentalStatusScheduled {
 		// Pre-active changes
 		rt.StartDate = nStart
-		rt.ScheduledEndDate = nEnd
+		rt.EndDate = nEnd
 		rt.TotalCostCents = newCost
-		
+
 		if isRenter {
 			rt.Status = domain.RentalStatusPending
 			// Notify Owner
@@ -423,10 +425,10 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 				// Send email/notif about date change requiring approval
 				// Simplified notification dispatch
 				notif := &domain.Notification{
-					UserID: owner.ID,
-					OrgID: rt.OrgID,
-					Title: "Rental Dates Changed",
-					Message: fmt.Sprintf("Renter changed dates for %s. Please re-approve.", tool.Name),
+					UserID:     owner.ID,
+					OrgID:      rt.OrgID,
+					Title:      "Rental Dates Changed",
+					Message:    fmt.Sprintf("Renter changed dates for %s. Please re-approve.", tool.Name),
 					Attributes: map[string]string{"type": "RENTAL_DATE_CHANGE", "rental_id": fmt.Sprintf("%d", rt.ID)},
 				}
 				s.noteRepo.Create(ctx, notif)
@@ -438,10 +440,10 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 			if renter != nil {
 				// Send email/notif about date change
 				notif := &domain.Notification{
-					UserID: renter.ID,
-					OrgID: rt.OrgID,
-					Title: "Rental Dates Updated",
-					Message: fmt.Sprintf("Owner updated dates for %s. Please confirm.", tool.Name),
+					UserID:     renter.ID,
+					OrgID:      rt.OrgID,
+					Title:      "Rental Dates Updated",
+					Message:    fmt.Sprintf("Owner updated dates for %s. Please confirm.", tool.Name),
 					Attributes: map[string]string{"type": "RENTAL_DATE_CHANGE", "rental_id": fmt.Sprintf("%d", rt.ID)},
 				}
 				s.noteRepo.Create(ctx, notif)
@@ -452,22 +454,45 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 		if newStart != "" && !nStart.Equal(rt.StartDate) {
 			return nil, errors.New("cannot change start date of active rental")
 		}
-		
-		// Store the requested new end date in the end_date field temporarily
-		// The scheduled_end_date remains the original agreed date
-		rt.EndDate = &nEnd
+
+		// Store the requested new end date in the end_date field
+		// The last_agreed_end_date stores the original agreed date for potential rollback
+		rt.EndDate = nEnd
 		rt.TotalCostCents = newCost
 		rt.Status = domain.RentalStatusReturnDateChanged
-		
+
 		// Notify Owner
 		owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
 		if owner != nil {
 			notif := &domain.Notification{
-				UserID: owner.ID,
-				OrgID: rt.OrgID,
-				Title: "Return Date Extension Request",
-				Message: fmt.Sprintf("Renter requests to extend return date for %s to %s.", tool.Name, nEnd.Format("2006-01-02")),
+				UserID:     owner.ID,
+				OrgID:      rt.OrgID,
+				Title:      "Return Date Extension Request",
+				Message:    fmt.Sprintf("Renter requests to extend return date for %s to %s.", tool.Name, nEnd.Format("2006-01-02")),
 				Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_REQUEST", "rental_id": fmt.Sprintf("%d", rt.ID)},
+			}
+			s.noteRepo.Create(ctx, notif)
+		}
+	} else if rt.Status == domain.RentalStatusReturnDateChanged && isRenter {
+		// Renter is updating their pending extension request
+		if newStart != "" && !nStart.Equal(rt.StartDate) {
+			return nil, errors.New("cannot change start date of active rental")
+		}
+
+		// Update the requested new end date in the end_date field
+		rt.EndDate = nEnd
+		rt.TotalCostCents = newCost
+		// Status remains RETURN_DATE_CHANGED
+
+		// Notify Owner about the updated request
+		owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
+		if owner != nil {
+			notif := &domain.Notification{
+				UserID:     owner.ID,
+				OrgID:      rt.OrgID,
+				Title:      "Extension Request Updated",
+				Message:    fmt.Sprintf("Renter updated their extension request for %s to %s.", tool.Name, nEnd.Format("2006-01-02")),
+				Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_REQUEST_UPDATED", "rental_id": fmt.Sprintf("%d", rt.ID)},
 			}
 			s.noteRepo.Create(ctx, notif)
 		}
@@ -483,29 +508,36 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 
 func (s *rentalService) ApproveReturnDateChange(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
-	if err != nil { return nil, err }
-	if rt.OwnerID != ownerID { return nil, errors.New("unauthorized") }
-	if rt.Status != domain.RentalStatusReturnDateChanged { return nil, errors.New("invalid status") }
-	if rt.EndDate == nil { return nil, errors.New("no requested date found") }
+	if err != nil {
+		return nil, err
+	}
+	if rt.OwnerID != ownerID {
+		return nil, errors.New("unauthorized")
+	}
+	if rt.Status != domain.RentalStatusReturnDateChanged {
+		return nil, errors.New("invalid status")
+	}
 
-	// Apply change
-	rt.ScheduledEndDate = *rt.EndDate
-	rt.EndDate = nil // Clear temp
+	// Copy EndDate to LastAgreedEndDate to save the new agreed date
+	rt.LastAgreedEndDate = &rt.EndDate
 	rt.Status = domain.RentalStatusActive
+
 	// Check overdue?
-	if time.Now().After(rt.ScheduledEndDate) {
+	if time.Now().After(rt.EndDate) {
 		rt.Status = domain.RentalStatusOverdue
 	}
-	
-	if err := s.rentalRepo.Update(ctx, rt); err != nil { return nil, err }
-	
+
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+
 	// Notify Renter
 	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
 	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
 	if renter != nil && tool != nil {
 		notif := &domain.Notification{
 			UserID: renter.ID, OrgID: rt.OrgID, Title: "Extension Approved",
-			Message: fmt.Sprintf("Extension for %s approved.", tool.Name),
+			Message:    fmt.Sprintf("Extension for %s approved.", tool.Name),
 			Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_APPROVED", "rental_id": fmt.Sprintf("%d", rt.ID)},
 		}
 		s.noteRepo.Create(ctx, notif)
@@ -515,65 +547,73 @@ func (s *rentalService) ApproveReturnDateChange(ctx context.Context, ownerID, re
 
 func (s *rentalService) RejectReturnDateChange(ctx context.Context, ownerID, rentalID int32, reason, newEndDateStr string) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
-	if err != nil { return nil, err }
-	if rt.OwnerID != ownerID { return nil, errors.New("unauthorized") }
-	if rt.Status != domain.RentalStatusReturnDateChanged { return nil, errors.New("invalid status") }
-	
+	if err != nil {
+		return nil, err
+	}
+	if rt.OwnerID != ownerID {
+		return nil, errors.New("unauthorized")
+	}
+	if rt.Status != domain.RentalStatusReturnDateChanged {
+		return nil, errors.New("invalid status")
+	}
+
 	// Validate new_end_date is provided (mandatory)
 	if newEndDateStr == "" {
 		return nil, errors.New("new end date is required")
 	}
-	
+
 	// Parse and validate date format
 	newEndDate, err := time.Parse("2006-01-02", newEndDateStr)
 	if err != nil {
 		return nil, errors.New("invalid date format, expected YYYY-MM-DD")
 	}
-	
+
 	// Validate new_end_date is different from requested date
-	if rt.EndDate != nil && newEndDate.Format("2006-01-02") == rt.EndDate.Format("2006-01-02") {
+	if newEndDate.Format("2006-01-02") == rt.EndDate.Format("2006-01-02") {
 		return nil, errors.New("new end date must be different from the requested date")
 	}
-	
+
 	// Get tool for cost recalculation
 	tool, err := s.toolRepo.GetByID(ctx, rt.ToolID)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Update status and rejection reason
 	rt.Status = domain.RentalStatusReturnDateChangeRejected
 	rt.RejectionReason = reason
-	
+
 	// Update end_date with owner's counter-proposal
-	rt.EndDate = &newEndDate
-	
+	rt.EndDate = newEndDate
+
 	// Recalculate total_cost_cents based on new end date using tiered pricing
 	newCost, err := utils.CalculateRentalCost(rt.StartDate, newEndDate, tool)
 	if err != nil {
 		return nil, err
 	}
 	rt.TotalCostCents = newCost
-	
-	if err := s.rentalRepo.Update(ctx, rt); err != nil { return nil, err }
-	
+
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+
 	// Notify Renter with counter-proposal details
 	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
 	if renter != nil && tool != nil {
 		notif := &domain.Notification{
-			UserID: renter.ID, OrgID: rt.OrgID, 
+			UserID: renter.ID, OrgID: rt.OrgID,
 			Title: "Extension Rejected - Counter-Proposal",
-			Message: fmt.Sprintf("Extension for %s rejected. Owner set new return date: %s. Reason: %s. Updated cost: $%.2f", 
+			Message: fmt.Sprintf("Extension for %s rejected. Owner set new return date: %s. Reason: %s. Updated cost: $%.2f",
 				tool.Name, newEndDate.Format("2006-01-02"), reason, float64(rt.TotalCostCents)/100),
 			Attributes: map[string]string{
-				"type": "RETURN_DATE_CHANGE_REJECTED", 
-				"rental_id": fmt.Sprintf("%d", rt.ID),
-				"new_end_date": newEndDate.Format("2006-01-02"),
+				"type":             "RETURN_DATE_CHANGE_REJECTED",
+				"rental_id":        fmt.Sprintf("%d", rt.ID),
+				"new_end_date":     newEndDate.Format("2006-01-02"),
 				"total_cost_cents": fmt.Sprintf("%d", rt.TotalCostCents),
 			},
 		}
 		s.noteRepo.Create(ctx, notif)
-		
+
 		// Send email notification to renter
 		_ = s.emailSvc.SendReturnDateRejectionNotification(ctx, renter.Email, tool.Name, newEndDate.Format("2006-01-02"), reason, rt.TotalCostCents)
 	}
@@ -582,38 +622,51 @@ func (s *rentalService) RejectReturnDateChange(ctx context.Context, ownerID, ren
 
 func (s *rentalService) AcknowledgeReturnDateRejection(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
-	if err != nil { return nil, err }
-	if rt.RenterID != renterID { return nil, errors.New("unauthorized") }
-	if rt.Status != domain.RentalStatusReturnDateChangeRejected { return nil, errors.New("invalid status") }
+	if err != nil {
+		return nil, err
+	}
+	if rt.RenterID != renterID {
+		return nil, errors.New("unauthorized")
+	}
+	if rt.Status != domain.RentalStatusReturnDateChangeRejected {
+		return nil, errors.New("invalid status")
+	}
 
-	// Revert to original terms
-	// StartDate is unchanged. ScheduledEndDate is unchanged (since we used `end_date` for request).
-	// We just need to fix `total_cost`.
+	// Get tool for cost recalculation
 	tool, err := s.toolRepo.GetByID(ctx, rt.ToolID)
-	if err != nil { return nil, err }
-	
-	// Recalculate cost using original scheduled end date and tiered pricing
-	originalCost, err := utils.CalculateRentalCost(rt.StartDate, rt.ScheduledEndDate, tool)
-	if err != nil { return nil, err }
-	rt.TotalCostCents = originalCost
-	
-	rt.EndDate = nil // Clear request
+	if err != nil {
+		return nil, err
+	}
+
+	// Rollback: Copy LastAgreedEndDate back to EndDate
+	if rt.LastAgreedEndDate != nil {
+		rt.EndDate = *rt.LastAgreedEndDate
+		// Recalculate cost using the last agreed end date
+		originalCost, err := utils.CalculateRentalCost(rt.StartDate, rt.EndDate, tool)
+		if err != nil {
+			return nil, err
+		}
+		rt.TotalCostCents = originalCost
+	}
+
 	rt.RejectionReason = ""
-	
-	if time.Now().After(rt.ScheduledEndDate) {
+
+	if time.Now().After(rt.EndDate) {
 		rt.Status = domain.RentalStatusOverdue
 	} else {
 		rt.Status = domain.RentalStatusActive
 	}
 
-	if err := s.rentalRepo.Update(ctx, rt); err != nil { return nil, err }
-	
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+
 	// Notify Owner
 	owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
 	if owner != nil {
 		notif := &domain.Notification{
 			UserID: owner.ID, OrgID: rt.OrgID, Title: "Rejection Acknowledged",
-			Message: "Renter acknowledged extension rejection.",
+			Message:    "Renter acknowledged extension rejection.",
 			Attributes: map[string]string{"type": "RETURN_DATE_REJECTION_ACKNOWLEDGED", "rental_id": fmt.Sprintf("%d", rt.ID)},
 		}
 		s.noteRepo.Create(ctx, notif)
@@ -623,34 +676,49 @@ func (s *rentalService) AcknowledgeReturnDateRejection(ctx context.Context, rent
 
 func (s *rentalService) CancelReturnDateChange(ctx context.Context, renterID, rentalID int32) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
-	if err != nil { return nil, err }
-	if rt.RenterID != renterID { return nil, errors.New("unauthorized") }
-	if rt.Status != domain.RentalStatusReturnDateChanged { return nil, errors.New("invalid status") }
-	
-	// Revert
+	if err != nil {
+		return nil, err
+	}
+	if rt.RenterID != renterID {
+		return nil, errors.New("unauthorized")
+	}
+	if rt.Status != domain.RentalStatusReturnDateChanged {
+		return nil, errors.New("invalid status")
+	}
+
+	// Get tool for cost recalculation
 	tool, err := s.toolRepo.GetByID(ctx, rt.ToolID)
-	if err != nil { return nil, err }
-	
-	// Recalculate cost using original scheduled end date and tiered pricing
-	originalCost, err := utils.CalculateRentalCost(rt.StartDate, rt.ScheduledEndDate, tool)
-	if err != nil { return nil, err }
-	rt.TotalCostCents = originalCost
-	
-	rt.EndDate = nil
-	if time.Now().After(rt.ScheduledEndDate) {
+	if err != nil {
+		return nil, err
+	}
+
+	// Rollback: Copy LastAgreedEndDate back to EndDate
+	if rt.LastAgreedEndDate != nil {
+		rt.EndDate = *rt.LastAgreedEndDate
+		// Recalculate cost using the last agreed end date
+		originalCost, err := utils.CalculateRentalCost(rt.StartDate, rt.EndDate, tool)
+		if err != nil {
+			return nil, err
+		}
+		rt.TotalCostCents = originalCost
+	}
+
+	if time.Now().After(rt.EndDate) {
 		rt.Status = domain.RentalStatusOverdue
 	} else {
 		rt.Status = domain.RentalStatusActive
 	}
-	
-	if err := s.rentalRepo.Update(ctx, rt); err != nil { return nil, err }
-	
+
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+
 	// Notify Owner
 	owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
 	if owner != nil {
 		notif := &domain.Notification{
 			UserID: owner.ID, OrgID: rt.OrgID, Title: "Extension Request Cancelled",
-			Message: "Renter cancelled extension request.",
+			Message:    "Renter cancelled extension request.",
 			Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_CANCELLED", "rental_id": fmt.Sprintf("%d", rt.ID)},
 		}
 		s.noteRepo.Create(ctx, notif)
@@ -661,9 +729,13 @@ func (s *rentalService) CancelReturnDateChange(ctx context.Context, renterID, re
 func (s *rentalService) ListToolRentals(ctx context.Context, ownerID, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	// Verify ownership
 	tool, err := s.toolRepo.GetByID(ctx, toolID)
-	if err != nil { return nil, 0, err }
-	if tool.OwnerID != ownerID { return nil, 0, errors.New("unauthorized") }
-	
+	if err != nil {
+		return nil, 0, err
+	}
+	if tool.OwnerID != ownerID {
+		return nil, 0, errors.New("unauthorized")
+	}
+
 	return s.rentalRepo.ListByTool(ctx, toolID, orgID, statuses, page, pageSize)
 }
 
@@ -679,7 +751,7 @@ func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID in
 	if rt.OwnerID != ownerID {
 		return nil, errors.New("unauthorized")
 	}
-	
+
 	// Transaction: Renter -> Owner (Credit Owner)
 	// Renter was debited at Finalize. Now we credit owner.
 	credit := &domain.LedgerTransaction{
@@ -695,7 +767,7 @@ func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID in
 	}
 
 	now := time.Now()
-	rt.EndDate = &now
+	rt.EndDate = now
 	rt.Status = domain.RentalStatusCompleted
 	if err := s.rentalRepo.Update(ctx, rt); err != nil {
 		return nil, err
@@ -712,11 +784,11 @@ func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID in
 	// Notify both
 	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
 	owner, _ := s.userRepo.GetByID(ctx, ownerID)
-	
+
 	if renter != nil && owner != nil && tool != nil {
 		_ = s.emailSvc.SendRentalCompletionNotification(ctx, owner.Email, "Owner", tool.Name, rt.TotalCostCents)
 		_ = s.emailSvc.SendRentalCompletionNotification(ctx, renter.Email, "Renter", tool.Name, rt.TotalCostCents)
-		
+
 		// Notifications...
 	}
 

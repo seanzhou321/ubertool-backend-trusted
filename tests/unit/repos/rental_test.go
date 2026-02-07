@@ -28,13 +28,13 @@ func TestRentalRepository_Create(t *testing.T) {
 			RenterID:         3,
 			OwnerID:          4,
 			StartDate:        time.Now(),
-			ScheduledEndDate: time.Now().Add(24 * time.Hour),
+			EndDate:          time.Now().Add(24 * time.Hour),
 			TotalCostCents:   1000,
 			Status:           domain.RentalStatusPending,
 		}
 
 		mock.ExpectQuery("INSERT INTO rentals").
-			WithArgs(rental.OrgID, rental.ToolID, rental.RenterID, rental.OwnerID, rental.StartDate, rental.ScheduledEndDate, rental.TotalCostCents, rental.Status, sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WithArgs(rental.OrgID, rental.ToolID, rental.RenterID, rental.OwnerID, rental.StartDate, rental.EndDate, rental.TotalCostCents, rental.Status, sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 
 		err := repo.Create(ctx, rental)
@@ -54,8 +54,8 @@ func TestRentalRepository_GetByID(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
-		rows := sqlmock.NewRows([]string{"id", "org_id", "tool_id", "renter_id", "owner_id", "start_date", "scheduled_end_date", "end_date", "total_cost_cents", "status", "pickup_note", "rejection_reason", "completed_by", "created_on", "updated_on"}).
-			AddRow(1, 1, 2, 3, 4, time.Now(), time.Now(), nil, 1000, "PENDING", "Note", "", nil, time.Now(), time.Now())
+		rows := sqlmock.NewRows([]string{"id", "org_id", "tool_id", "renter_id", "owner_id", "start_date", "last_agreed_end_date", "end_date", "total_cost_cents", "status", "pickup_note", "rejection_reason", "completed_by", "created_on", "updated_on"}).
+			AddRow(1, 1, 2, 3, 4, time.Now(), time.Now(), time.Now(), 1000, "PENDING", "Note", "", nil, time.Now(), time.Now())
 
 		mock.ExpectQuery("SELECT (.+) FROM rentals WHERE id = \\$1").
 			WithArgs(int32(1)).

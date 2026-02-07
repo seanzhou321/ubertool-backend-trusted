@@ -205,7 +205,7 @@ func TestRentalService_ActivateRental(t *testing.T) {
 	rental := &domain.Rental{
 		ID: rentalID, OwnerID: ownerID, RenterID: renterID, ToolID: toolID,
 		Status:    domain.RentalStatusScheduled,
-		StartDate: time.Now(), ScheduledEndDate: time.Now().Add(24 * time.Hour),
+		StartDate: time.Now(), EndDate: time.Now().Add(24 * time.Hour),
 		OrgID: 3,
 	}
 	tool := &domain.Tool{ID: toolID, Name: "Tool"}
@@ -252,7 +252,7 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 	baseRental := &domain.Rental{
 		ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
 		Status:    domain.RentalStatusActive,
-		StartDate: time.Now(), ScheduledEndDate: time.Now().Add(24 * time.Hour),
+		StartDate: time.Now(), EndDate: time.Now().Add(24 * time.Hour),
 		TotalCostCents: 1000,
 	}
 	tool := &domain.Tool{
@@ -272,7 +272,6 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		// Expect update with temp status and new cost
 		rentalRepo.On("Update", ctx, mock.MatchedBy(func(u *domain.Rental) bool {
 			return u.Status == domain.RentalStatusReturnDateChanged &&
-				u.EndDate != nil &&
 				u.TotalCostCents == 3000 // 3 days inclusive (today to +48h) * 1000
 		})).Return(nil)
 
@@ -285,6 +284,51 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 
 		_, err := svc.ChangeRentalDates(ctx, renterID, rentalID, "", newEnd, "", "")
 		assert.NoError(t, err)
+	})
+
+	t.Run("Renter Updates Pending Extension Request", func(t *testing.T) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		emailSvc := new(MockEmailService)
+		userRepo := new(MockUserRepo)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+
+		requestedEndDate := time.Now().Add(48 * time.Hour)
+		lastAgreedEndDate := time.Now().Add(24 * time.Hour)
+		r := &domain.Rental{
+			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
+			Status:           domain.RentalStatusReturnDateChanged,
+			StartDate:        time.Now(),
+			LastAgreedEndDate: &lastAgreedEndDate,
+			EndDate:          requestedEndDate, // Already has a pending request
+			TotalCostCents:   2000,
+		}
+		
+		// Renter wants to update their request to a different date
+		updatedEndDate := time.Now().Add(72 * time.Hour).Format("2006-01-02")
+
+		rentalRepo.On("GetByID", ctx, rentalID).Return(r, nil)
+		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
+
+		// Expect update with new end date and cost
+		rentalRepo.On("Update", ctx, mock.MatchedBy(func(u *domain.Rental) bool {
+			return u.Status == domain.RentalStatusReturnDateChanged &&
+				u.TotalCostCents == 4000 // 4 days inclusive * 1000
+		})).Return(nil)
+
+		// Notifications
+		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{ID: ownerID, Email: "owner@a.com"}, nil)
+		noteRepo.On("Create", ctx, mock.MatchedBy(func(n *domain.Notification) bool {
+			return n.UserID == ownerID && n.Title == "Extension Request Updated"
+		})).Return(nil)
+
+		result, err := svc.ChangeRentalDates(ctx, renterID, rentalID, "", updatedEndDate, "", "")
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, domain.RentalStatusReturnDateChanged, result.Status)
+		assert.Equal(t, int32(4000), result.TotalCostCents)
+		assert.NotNil(t, result.EndDate)
 	})
 }
 
@@ -299,7 +343,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 
 	startDate := time.Now()
 	requestedEndDate := time.Now().Add(72 * time.Hour) // 3 days
-	scheduledEndDate := time.Now().Add(24 * time.Hour) // 1 day
+	lastAgreedEndDate := time.Now().Add(24 * time.Hour) // 1 day
 
 	tool := &domain.Tool{
 		ID: toolID, 
@@ -321,8 +365,8 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
 			Status:           domain.RentalStatusReturnDateChanged,
 			StartDate:        startDate,
-			ScheduledEndDate: scheduledEndDate,
-			EndDate:          &requestedEndDate,
+			LastAgreedEndDate: &lastAgreedEndDate,
+			EndDate:          requestedEndDate,
 			TotalCostCents:   3000,
 		}
 		counterProposalDate := time.Now().Add(48 * time.Hour).Format("2006-01-02") // 2 days
@@ -335,7 +379,6 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		rentalRepo.On("Update", ctx, mock.MatchedBy(func(u *domain.Rental) bool {
 			return u.Status == domain.RentalStatusReturnDateChangeRejected &&
 				u.RejectionReason == reason &&
-				u.EndDate != nil &&
 				u.EndDate.Format("2006-01-02") == counterProposalDate &&
 				u.TotalCostCents == 3000 // Recalculated based on 3 days inclusive (today to +48h)
 		})).Return(nil)
@@ -372,8 +415,8 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
 			Status:           domain.RentalStatusReturnDateChanged,
 			StartDate:        startDate,
-			ScheduledEndDate: scheduledEndDate,
-			EndDate:          &requestedEndDate,
+			LastAgreedEndDate: &lastAgreedEndDate,
+			EndDate:          requestedEndDate,
 			TotalCostCents:   3000,
 		}
 		unauthorizedUserID := int32(999)
@@ -399,7 +442,8 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
 			Status:           domain.RentalStatusActive, // Wrong status
 			StartDate:        startDate,
-			ScheduledEndDate: scheduledEndDate,
+			LastAgreedEndDate: &lastAgreedEndDate,
+			EndDate:          lastAgreedEndDate,
 			TotalCostCents:   1000,
 		}
 		counterProposalDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
@@ -424,8 +468,8 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
 			Status:           domain.RentalStatusReturnDateChanged,
 			StartDate:        startDate,
-			ScheduledEndDate: scheduledEndDate,
-			EndDate:          &requestedEndDate,
+			LastAgreedEndDate: &lastAgreedEndDate,
+			EndDate:          requestedEndDate,
 			TotalCostCents:   3000,
 		}
 
@@ -449,8 +493,8 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
 			Status:           domain.RentalStatusReturnDateChanged,
 			StartDate:        startDate,
-			ScheduledEndDate: scheduledEndDate,
-			EndDate:          &requestedEndDate,
+			LastAgreedEndDate: &lastAgreedEndDate,
+			EndDate:          requestedEndDate,
 			TotalCostCents:   3000,
 		}
 		invalidDate := "2024/01/01" // Wrong format
@@ -475,8 +519,8 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
 			Status:           domain.RentalStatusReturnDateChanged,
 			StartDate:        startDate,
-			ScheduledEndDate: scheduledEndDate,
-			EndDate:          &requestedEndDate,
+			LastAgreedEndDate: &lastAgreedEndDate,
+			EndDate:          requestedEndDate,
 			TotalCostCents:   3000,
 		}
 		sameAsRequested := requestedEndDate.Format("2006-01-02")
@@ -501,8 +545,8 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
 			Status:           domain.RentalStatusReturnDateChanged,
 			StartDate:        startDate,
-			ScheduledEndDate: scheduledEndDate,
-			EndDate:          &requestedEndDate,
+			LastAgreedEndDate: &lastAgreedEndDate,
+			EndDate:          requestedEndDate,
 			TotalCostCents:   3000,
 		}
 		pastDate := startDate.Add(-24 * time.Hour).Format("2006-01-02")
@@ -528,8 +572,8 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
 			Status:           domain.RentalStatusReturnDateChanged,
 			StartDate:        startDate,
-			ScheduledEndDate: scheduledEndDate,
-			EndDate:          &requestedEndDate,
+			LastAgreedEndDate: &lastAgreedEndDate,
+			EndDate:          requestedEndDate,
 			TotalCostCents:   3000,
 		}
 		counterProposalDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
