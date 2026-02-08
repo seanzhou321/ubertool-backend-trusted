@@ -32,7 +32,20 @@ func (s *organizationService) ListOrganizations(ctx context.Context) ([]domain.O
 }
 
 func (s *organizationService) GetOrganization(ctx context.Context, id int32) (*domain.Organization, error) {
-	return s.orgRepo.GetByID(ctx, id)
+	org, err := s.orgRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get member count (non-blocked users)
+	memberCount, err := s.userRepo.CountMembersByOrg(ctx, id)
+	if err != nil {
+		logger.Warn("Failed to fetch member count for org", "orgID", id, "error", err)
+	} else {
+		org.MemberCount = memberCount
+	}
+
+	return org, nil
 }
 
 func (s *organizationService) SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error) {
@@ -41,7 +54,7 @@ func (s *organizationService) SearchOrganizations(ctx context.Context, name, met
 		return nil, err
 	}
 
-	// Populate admins for each organization
+	// Populate admins and member count for each organization
 	for i := range orgs {
 		users, userOrgs, err := s.userRepo.ListMembersByOrg(ctx, orgs[i].ID)
 		if err != nil {
@@ -57,6 +70,14 @@ func (s *organizationService) SearchOrganizations(ctx context.Context, name, met
 			}
 		}
 		orgs[i].Admins = admins
+
+		// Get member count (non-blocked users)
+		memberCount, err := s.userRepo.CountMembersByOrg(ctx, orgs[i].ID)
+		if err != nil {
+			logger.Warn("Failed to fetch member count for org", "orgID", orgs[i].ID, "error", err)
+		} else {
+			orgs[i].MemberCount = memberCount
+		}
 	}
 
 	return orgs, nil
@@ -97,6 +118,13 @@ func (s *organizationService) ListMyOrganizations(ctx context.Context, userID in
 			continue
 		}
 		if org != nil {
+			// Get member count (non-blocked users)
+			memberCount, err := s.userRepo.CountMembersByOrg(ctx, org.ID)
+			if err != nil {
+				logger.Warn("Failed to fetch member count for org", "orgID", org.ID, "error", err)
+			} else {
+				org.MemberCount = memberCount
+			}
 			orgs = append(orgs, *org)
 		}
 	}

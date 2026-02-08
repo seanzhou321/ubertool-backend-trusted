@@ -58,6 +58,10 @@ func (m *MockUserRepo) ListMembersByOrg(ctx context.Context, orgID int32) ([]dom
 	args := m.Called(ctx, orgID)
 	return args.Get(0).([]domain.User), args.Get(1).([]domain.UserOrg), args.Error(2)
 }
+func (m *MockUserRepo) CountMembersByOrg(ctx context.Context, orgID int32) (int32, error) {
+	args := m.Called(ctx, orgID)
+	return args.Get(0).(int32), args.Error(1)
+}
 func (m *MockUserRepo) SearchMembersByOrg(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error) {
 	args := m.Called(ctx, orgID, query)
 	return args.Get(0).([]domain.User), args.Get(1).([]domain.UserOrg), args.Error(2)

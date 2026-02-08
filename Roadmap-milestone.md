@@ -14,7 +14,7 @@
 
 ## Milestone 2: Pre-production
 1. email notifications
-2. Add a cron job to mark the overdue rentals OVERDUE, send overdue reminders to renter daily. 
+2. Add a cron job to mark the overdue rentals OVERDUE, send overdue reminders to renter daily, and send daily bill splitting process reminders. 
 3. image capture and display
 4. Add legal statements: community bylaws and rental pricing and cost agreement confirmation.
 5. enable refresh token

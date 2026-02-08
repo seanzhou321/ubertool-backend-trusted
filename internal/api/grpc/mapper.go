@@ -52,6 +52,7 @@ func MapDomainOrgToProto(o *domain.Organization, userRole string) *pb.Organizati
 		Description: o.Description,
 		Address:     o.Address,
 		Metro:       o.Metro,
+		MemberCount: o.MemberCount,
 		AdminEmail:  o.AdminEmail,
 		AdminPhone:  o.AdminPhoneNumber,
 		CreatedOn:   o.CreatedOn.Format("2006-01-02"),

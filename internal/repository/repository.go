@@ -17,6 +17,7 @@ type UserRepository interface {
 	ListUserOrgs(ctx context.Context, userID int32) ([]domain.UserOrg, error)
 	UpdateUserOrg(ctx context.Context, userOrg *domain.UserOrg) error
 	ListMembersByOrg(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error)
+	CountMembersByOrg(ctx context.Context, orgID int32) (int32, error)
 	SearchMembersByOrg(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error)
 }
 

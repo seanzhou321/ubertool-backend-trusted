@@ -133,6 +133,16 @@ func (r *userRepository) ListMembersByOrg(ctx context.Context, orgID int32) ([]d
 	return users, uos, nil
 }
 
+func (r *userRepository) CountMembersByOrg(ctx context.Context, orgID int32) (int32, error) {
+	query := `SELECT COUNT(*) FROM users_orgs WHERE org_id = $1 AND status != 'BLOCK'`
+	var count int32
+	err := r.db.QueryRowContext(ctx, query, orgID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (r *userRepository) SearchMembersByOrg(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error) {
 	sqlQuery := `SELECT u.id, u.email, u.phone_number, u.password_hash, u.name, u.avatar_url, u.created_on, u.updated_on,
 	                 uo.user_id, uo.org_id, uo.joined_on, uo.balance_cents, uo.status, uo.role, uo.blocked_date, uo.block_reason
