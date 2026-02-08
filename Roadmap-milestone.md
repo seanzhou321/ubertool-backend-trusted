@@ -14,11 +14,16 @@
 
 ## Milestone 2: Pre-production
 1. email notifications
-2. Add a cron job to mark the overdue rentals OVERDUE, send overdue reminders to renter daily, and send daily bill splitting process reminders. 
-3. image capture and display
-4. Add legal statements: community bylaws and rental pricing and cost agreement confirmation.
-5. enable refresh token
-6. enable 2fa
+2. Build a cron job engine for below tasks
+- mark the overdue rentals OVERDUE (nightly), 
+- send overdue reminders to renter (nightly), 
+- perform monthly bill splitting operation. 
+- send nightly bill splitting notice reminders for both creditors and debtors. 
+3. Build UI screen and api to handle bill payment acknowledgements and ledger transactions
+4. image capture and display
+5. Add legal statements: community bylaws and rental pricing and cost agreement confirmation.
+6. enable refresh token
+7. enable 2fa
 
 ## Milestone 3: Production - trial groups
 1. https certification
