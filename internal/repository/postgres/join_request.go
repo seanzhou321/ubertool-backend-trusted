@@ -56,7 +56,20 @@ func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]d
 	query := `
 		SELECT jr.id, jr.org_id, jr.user_id, jr.name, jr.email, jr.note, jr.status, jr.created_on, i.used_on
 		FROM join_requests jr
-		LEFT JOIN invitations i ON jr.email = i.email AND jr.org_id = i.org_id
+		LEFT JOIN LATERAL (
+			SELECT used_on
+			FROM invitations
+			WHERE LOWER(invitations.email) = LOWER(jr.email)
+			  AND invitations.org_id = jr.org_id
+			  AND invitations.used_on IS NOT NULL
+			ORDER BY 
+			  CASE 
+			    WHEN jr.user_id IS NOT NULL AND invitations.used_by_user_id = jr.user_id THEN 0
+			    ELSE 1
+			  END,
+			  invitations.used_on DESC
+			LIMIT 1
+		) i ON true
 		WHERE jr.org_id = $1
 	`
 	rows, err := r.db.QueryContext(ctx, query, orgID)
