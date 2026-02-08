@@ -589,6 +589,7 @@ type JoinRequestProfile struct {
 	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
 	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
 	RequestDate   string                 `protobuf:"bytes,6,opt,name=request_date,json=requestDate,proto3" json:"request_date,omitempty"`
+	UsedOn        string                 `protobuf:"bytes,7,opt,name=used_on,json=usedOn,proto3" json:"used_on,omitempty"` // Date when invitation code was used (YYYY-MM-DD), empty if not used
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -661,6 +662,13 @@ func (x *JoinRequestProfile) GetMessage() string {
 func (x *JoinRequestProfile) GetRequestDate() string {
 	if x != nil {
 		return x.RequestDate
+	}
+	return ""
+}
+
+func (x *JoinRequestProfile) GetUsedOn() string {
+	if x != nil {
+		return x.UsedOn
 	}
 	return ""
 }
@@ -749,7 +757,7 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x13SearchUsersResponse\x12<\n" +
 	"\x05users\x18\x01 \x03(\v2&.ubertool.trusted.api.v1.MemberProfileR\x05users\"B\n" +
 	"\x17ListJoinRequestsRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"\xb3\x01\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"\xcc\x01\n" +
 	"\x12JoinRequestProfile\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\x12\x17\n" +
@@ -757,7 +765,8 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
 	"\x05email\x18\x04 \x01(\tR\x05email\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage\x12!\n" +
-	"\frequest_date\x18\x06 \x01(\tR\vrequestDate\"c\n" +
+	"\frequest_date\x18\x06 \x01(\tR\vrequestDate\x12\x17\n" +
+	"\aused_on\x18\a \x01(\tR\x06usedOn\"c\n" +
 	"\x18ListJoinRequestsResponse\x12G\n" +
 	"\brequests\x18\x01 \x03(\v2+.ubertool.trusted.api.v1.JoinRequestProfileR\brequests2\xea\x04\n" +
 	"\fAdminService\x12\x83\x01\n" +

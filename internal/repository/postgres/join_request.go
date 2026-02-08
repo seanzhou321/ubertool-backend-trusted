@@ -53,7 +53,12 @@ func (r *joinRequestRepository) Update(ctx context.Context, req *domain.JoinRequ
 }
 
 func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]domain.JoinRequest, error) {
-	query := `SELECT id, org_id, user_id, name, email, note, status, created_on FROM join_requests WHERE org_id = $1`
+	query := `
+		SELECT jr.id, jr.org_id, jr.user_id, jr.name, jr.email, jr.note, jr.status, jr.created_on, i.used_on
+		FROM join_requests jr
+		LEFT JOIN invitations i ON jr.email = i.email AND jr.org_id = i.org_id
+		WHERE jr.org_id = $1
+	`
 	rows, err := r.db.QueryContext(ctx, query, orgID)
 	if err != nil {
 		return nil, err
@@ -63,7 +68,7 @@ func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]d
 	var reqs []domain.JoinRequest
 	for rows.Next() {
 		var req domain.JoinRequest
-		if err := rows.Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &req.CreatedOn); err != nil {
+		if err := rows.Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &req.CreatedOn, &req.UsedOn); err != nil {
 			return nil, err
 		}
 		reqs = append(reqs, req)

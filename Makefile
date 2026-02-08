@@ -46,6 +46,9 @@ test-e2e:
 test-ext-integration:
 	go test -v ./tests/ext-integration/... -run Gmail -config=config/config.test.yaml
 
+test-e2e-admin-retrieve:
+	go test -v ./tests/e2e -run "TestOrganizationService_E2E/SearchOrganizations_-_Verify_Admins_Array_Populated"
+
 setup-test-data:
 	@echo "Populating test data from YAML..."
 	go run ./tests/data-setup/setup.go

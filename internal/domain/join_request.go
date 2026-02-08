@@ -19,4 +19,5 @@ type JoinRequest struct {
 	Note      string            `json:"note"`
 	Status    JoinRequestStatus `json:"status"`
 	CreatedOn time.Time         `json:"created_on"`
+	UsedOn    *time.Time        `json:"used_on,omitempty"` // Date when invitation code was used
 }

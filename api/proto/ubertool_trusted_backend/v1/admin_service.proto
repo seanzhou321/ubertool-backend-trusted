@@ -89,6 +89,7 @@ message JoinRequestProfile {
   string email = 4;
   string message = 5;
   string request_date = 6;
+  string used_on = 7; // Date when invitation code was used (YYYY-MM-DD), empty if not used
 }
 
 message ListJoinRequestsResponse {

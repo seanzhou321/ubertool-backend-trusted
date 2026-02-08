@@ -304,6 +304,9 @@ func MapDomainJoinRequestProfileToProto(jr *domain.JoinRequest) *pb.JoinRequestP
 	if jr.UserID != nil {
 		proto.UserId = *jr.UserID
 	}
+	if jr.UsedOn != nil {
+		proto.UsedOn = jr.UsedOn.Format("2006-01-02")
+	}
 	return proto
 }
 
