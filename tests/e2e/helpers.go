@@ -95,6 +95,10 @@ func PrepareDB(t *testing.T) *TestDB {
 func (db *TestDB) Cleanup() {
 	db.Exec("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
 	db.Exec("DELETE FROM ledger_transactions WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
+	// Delete bill_actions first (foreign key to bills)
+	db.Exec("DELETE FROM bill_actions WHERE bill_id IN (SELECT id FROM bills WHERE debtor_user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%') OR creditor_user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%'))")
+	// Delete bills (foreign key to users and orgs)
+	db.Exec("DELETE FROM bills WHERE debtor_user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%') OR creditor_user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
 	db.Exec("DELETE FROM rentals WHERE renter_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
 	db.Exec("DELETE FROM tool_images WHERE tool_id IN (SELECT id FROM tools WHERE owner_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%'))")
 	db.Exec("DELETE FROM tools WHERE owner_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
@@ -319,4 +323,116 @@ func ContextWithUserIDAndTimeout(userID int32, timeout time.Duration) (context.C
 	}
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	return context.WithTimeout(ctx, timeout)
+}
+
+// CreateTestBill creates a test bill
+func (db *TestDB) CreateTestBill(debtorID, creditorID, orgID int32, amountCents int32, settlementMonth, status string) int32 {
+	var billID int32
+	err := db.QueryRow(`
+		INSERT INTO bills (org_id, debtor_user_id, creditor_user_id, amount_cents, settlement_month, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+		RETURNING id
+	`, orgID, debtorID, creditorID, amountCents, settlementMonth, status).Scan(&billID)
+	if err != nil {
+		db.t.Fatalf("failed to create test bill: %v", err)
+	}
+	return billID
+}
+
+// GetBillByID retrieves a bill by ID
+func (db *TestDB) GetBillByID(billID int32) map[string]interface{} {
+	var id, debtorID, creditorID, orgID, amountCents int32
+	var settlementMonth, status, disputeReason, resolutionOutcome, resolutionNotes string
+	var noticeSentAt, debtorAck, creditorAck, disputedAt, resolvedAt sql.NullTime
+
+	err := db.QueryRow(`
+		SELECT id, org_id, debtor_user_id, creditor_user_id, amount_cents, settlement_month, status,
+		       notice_sent_at, debtor_acknowledged_at, creditor_acknowledged_at, disputed_at, resolved_at,
+		       dispute_reason, resolution_outcome, resolution_notes
+		FROM bills WHERE id = $1
+	`, billID).Scan(&id, &orgID, &debtorID, &creditorID, &amountCents, &settlementMonth, &status,
+		&noticeSentAt, &debtorAck, &creditorAck, &disputedAt, &resolvedAt,
+		&disputeReason, &resolutionOutcome, &resolutionNotes)
+
+	if err != nil {
+		db.t.Fatalf("failed to get bill: %v", err)
+	}
+
+	return map[string]interface{}{
+		"id":                       id,
+		"org_id":                   orgID,
+		"debtor_user_id":           debtorID,
+		"creditor_user_id":         creditorID,
+		"amount_cents":             amountCents,
+		"settlement_month":         settlementMonth,
+		"status":                   status,
+		"notice_sent_at":           noticeSentAt,
+		"debtor_acknowledged_at":   debtorAck,
+		"creditor_acknowledged_at": creditorAck,
+		"disputed_at":              disputedAt,
+		"resolved_at":              resolvedAt,
+		"dispute_reason":           disputeReason,
+		"resolution_outcome":       resolutionOutcome,
+		"resolution_notes":         resolutionNotes,
+	}
+}
+
+// GetUserBalance retrieves a user's balance in an organization
+func (db *TestDB) GetUserBalance(userID, orgID int32) int32 {
+	var balance int32
+	err := db.QueryRow("SELECT balance_cents FROM users_orgs WHERE user_id = $1 AND org_id = $2", userID, orgID).Scan(&balance)
+	if err != nil {
+		db.t.Fatalf("failed to get user balance: %v", err)
+	}
+	return balance
+}
+
+// SetUserBalance sets a user's balance in an organization
+func (db *TestDB) SetUserBalance(userID, orgID int32, balanceCents int32) {
+	_, err := db.Exec("UPDATE users_orgs SET balance_cents = $1 WHERE user_id = $2 AND org_id = $3", balanceCents, userID, orgID)
+	if err != nil {
+		db.t.Fatalf("failed to set user balance: %v", err)
+	}
+}
+
+// CountBillActions counts the number of actions for a bill
+func (db *TestDB) CountBillActions(billID int32) int {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM bill_actions WHERE bill_id = $1", billID).Scan(&count)
+	if err != nil {
+		db.t.Fatalf("failed to count bill actions: %v", err)
+	}
+	return count
+}
+
+// GetLatestBillAction retrieves the latest action for a bill
+func (db *TestDB) GetLatestBillAction(billID int32) map[string]interface{} {
+	var id, actorUserID sql.NullInt32
+	var actionType, actionDetails, notes string
+	var createdAt time.Time
+
+	err := db.QueryRow(`
+		SELECT id, actor_user_id, action_type, action_details, notes, created_at
+		FROM bill_actions
+		WHERE bill_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, billID).Scan(&id, &actorUserID, &actionType, &actionDetails, &notes, &createdAt)
+
+	if err != nil {
+		db.t.Fatalf("failed to get latest bill action: %v", err)
+	}
+
+	result := map[string]interface{}{
+		"action_type":    actionType,
+		"action_details": actionDetails,
+		"notes":          notes,
+		"created_at":     createdAt,
+	}
+
+	if actorUserID.Valid {
+		result["actor_user_id"] = actorUserID.Int32
+	}
+
+	return result
 }

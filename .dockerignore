@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Build artifacts
+bin/
+*.exe
+*.test
+*.out
+
+# Test files
+tests/
+*.test.yaml
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+test-uploads/
+uploads/
+
+# Config (sensitive data)
+config/*.yaml
+!config/config.*.template.yaml
+
+# Documentation
+*.md
+docs/
+Roadmap-milestone.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Podman/Docker
+podman/
+docker-compose*.yaml
+.dockerignore
+
+# Go specific
+go.sum
+vendor/

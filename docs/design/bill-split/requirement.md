@@ -35,4 +35,6 @@ When a payment dispute cannot be resolved between the parties involved, admin an
 
 3. **Both parties are at fault.** The debtor will be blocked from renting and the creditor will be blocked from lending tools within the community.
 
-The admin/super admin must determine which outcome applies when a resolution cannot be reached. If no admin/super admin action is taken on an unresolved disputed payment, the app will automatically block both the creditor and debtor from lending and renting within the organization. This default decision will be triggered at the end of the month and can be reversed by admin/super admin action.
+The admin/super admin must determine which outcome applies when a resolution cannot be reached. If no admin/super admin action is taken on an unresolved disputed payment, the app will automatically block both the creditor and debtor from lending and renting within the organization. This default judgement will be triggered at the end of the month and can be reversed by admin/super admin action.
+
+To be fair, admins/super admins cannot resolve the dispute they are involved. Other admins/super admins has to be involved. 

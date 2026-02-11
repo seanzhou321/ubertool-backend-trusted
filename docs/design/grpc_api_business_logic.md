@@ -22,18 +22,17 @@ Note: The presence of a User object in the response indicates the user is logged
 ### Request To Join Organization
 Purpose: A user who is not part of an organization wants to join. They search for the organization and submit a request.
 
-Input: `organization_id`, `name`, `email`, `message`, `admin_email`
+Input: `organization_id`, `name`, `email`, `message`
 Output: success/failure, message
 Business Logic:
 1. Verify the organization exists in the `orgs` table.
-2. Verify the admin_email is one of the admin/super_admin users in the organization_id. 
-3. Search the `users` table for the user with the given `email`.
-4. Create a new entry in the `join_requests` table with `status` set to 'PENDING'.
-5. The `user_id` in `join_requests` may be assigned from the user found by the email, or should be null if the user is not found.
-6. Find the admin users in `organization_id`. 
-7. Send emails to the admin user by `admin_email` with the new user email, name, and the message.
-8. Create a list of notifications to each admin users that the email was sent.
-9. Return success/failure and message, "Your request to join the organization has been submitted."
+2. Search the `users` table for the user with the given `email`.
+3. Create a new entry in the `join_requests` table with `status` set to 'PENDING'.
+4. The `user_id` in `join_requests` may be assigned from the user found by the email, or should be null if the user is not found.
+5. Find the admin users in `organization_id`. 
+6. Send emails to the admin users with the new user email, name, and the message.
+7. Create a list of notifications to each admin users that the email was sent.
+8. Return success/failure and message, "Your request to join the organization has been submitted."
 
 ### User Signup
 Purpose: Register a new user account.
@@ -201,13 +200,129 @@ Business Logic:
 1. Query `orgs` based on name and/or metro.
 
 ### Update Organization
-Purpose: Modify organization settings.
+Purpose: Update organization details.
 
-Input: `organization_id`, `description`, `admin_email`, `admin_phone_number`.
+Input: `organization_id`, `name`, `description`, `address`, `metro`, `admin_email`, `admin_phone`
 Output: updated organization info
 Business Logic:
-1. Verify caller is an 'ADMIN' or 'SUPER_ADMIN'.
-2. Update the `orgs` record.
+1. Verify user is `SUPER_ADMIN` of the organization.
+2. Update the organization record in `orgs` table.
+3. Return updated organization details.
+
+## Bill Split
+
+### Get Global Bill Split Summary
+Purpose: Get aggregated counts of payments and receipts for the dashboard.
+
+Input: none (uses user_id from token)
+Output: BillSplitSummary (payments_to_make, receipts_to_verify, payments_in_dispute, receipts_in_dispute)
+Business Logic:
+1. Verify user is authenticated.
+2. Aggregate counts from all organizations the user belongs to.
+3. Count pending payments (where user is debtor, status is PENDING).
+4. Count pending receipts (where user is creditor, status is PAID, meaning debtor paid but creditor hasn't verified).
+5. Count payments in dispute (where user is debtor).
+6. Count receipts in dispute (where user is creditor).
+7. Return the aggregated numbers.
+
+### Get Organization Bill Split Summary
+Purpose: Get bill split summary for each organization.
+
+Input: none
+Output: List of OrganizationBillSplitSummary
+Business Logic:
+1. Verify user is authenticated.
+2. For each organization the user is a member of, calculate the BillSplitSummary (same logic as Global but per org).
+3. Return the list.
+
+### List Payments
+Purpose: List payment items for a specific organization.
+
+Input: `organization_id`, `show_history`
+Output: List of PaymentItem
+Business Logic:
+1. Verify user is a member of `organization_id`.
+2. Retrieve payments where user is either debtor or creditor.
+3. If `show_history` is false, filter for active items (To Pay, To Ack, In Dispute).
+4. If `show_history` is true, return completed items.
+5. Map internal status to PaymentCategory.
+6. Populate `PaymentItem` fields from `bills` table:
+    - `payment_id`, `debtor_id`, `creditor_id`, `amount_cents`
+    - `settlement_month`, `status`
+    - Timestamps (Epoch ms): `notice_sent_at`, `debtor_acknowledged_at`, `creditor_acknowledged_at`, `disputed_at`, `resolved_at`
+    - Dispute details: `dispute_reason`, `resolution_outcome`
+7. Sort by `notice_sent_at` or `created_on` descending.
+
+### Get Payment Detail
+Purpose: Get details of a specific payment/bill.
+
+Input: `payment_id`
+Output: PaymentItem, history of actions, can_acknowledge flag
+Business Logic:
+1. Verify user is involved in the payment (debtor, creditor) or is Admin/Super Admin of the org.
+2. Retrieve `bills` record and map to `PaymentItem` (as above).
+3. Retrieve `bill_actions` for this bill and map to `PaymentAction`:
+    - `actor_user_id`, `actor_name`
+    - `action_type`, `notes`, `created_on`
+    - `action_details_json`
+4. Determine `can_acknowledge`:
+    - If user is Debtor and status is PENDING_PAYMENT -> True.
+    - If user is Creditor and status is PENDING_RECEIPT_ACK -> True.
+    - Otherwise -> False.
+
+### Acknowledge Payment
+Purpose: User acknowledges sending payment (Debtor) or receiving payment (Creditor).
+
+Input: `payment_id`
+Output: success, message
+Business Logic:
+1. Verify user is involved.
+2. If Debtor:
+    - Check status (must be PENDING_PAYMENT).
+    - Update status to PENDING_RECEIPT_ACK.
+    - Modify dispute timer if applicable.
+    - Notify Creditor.
+3. If Creditor:
+    - Check status (must be PENDING_RECEIPT_ACK).
+    - Update status to COMPLETED.
+    - Update balances in ledger/balances table.
+    - Notify Debtor.
+
+### List Disputed Payments
+Purpose: Admin lists disputes requiring intervention.
+
+Input: `organization_id`
+Output: List of DisputedPaymentItem
+Business Logic:
+1. Verify user is ADMIN/SUPER_ADMIN of `organization_id`.
+2. Query payments with status IN_DISPUTE.
+3. Filter out disputes involving the current admin (Admins cannot resolve their own disputes).
+4. Return list.
+
+### List Resolved Disputes
+Purpose: Admin lists history of resolved disputes.
+
+Input: `organization_id`
+Output: List of DisputedPaymentItem (resolved)
+Business Logic:
+1. Verify user is ADMIN/SUPER_ADMIN of `organization_id`.
+2. Query payments that were disputed but are now resolved.
+3. Return list.
+
+### Resolve Dispute
+Purpose: Admin resolves a dispute.
+
+Input: `payment_id`, `resolution` (DEBTOR_AT_FAULT, CREDITOR_AT_FAULT, BOTH_AT_FAULT)
+Output: success, message
+Business Logic:
+1. Verify user is ADMIN/SUPER_ADMIN of the org of the payment.
+2. Verify admin is NOT involved in the payment.
+3. Update payment status/resolution based on input.
+    - DEBTOR_AT_FAULT: Block debtor renting.
+    - CREDITOR_AT_FAULT: Mark payment as valid (system treats as resolved/paid), optionally block creditor.
+    - BOTH_AT_FAULT: Block debtor renting, creditor lending.
+4. Record admin action in history.
+5. Notify both parties.
 
 ## Tools
 
@@ -358,7 +473,7 @@ Business Logic:
 11. Create a `ledger_transactions` record of type 'LENDING_DEBIT' to the renter using the org_id from the rentals.org_id
 12. Update renter's user_org record by adding `total_cost_cents`+`surcharge_or_credit_cents` to the balance_cents field and set the last_balance_updated_on to today.
 13. Create a notification to the renter with attributes set to {topic:rental_debit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id}
-14. Send email to the renter to inform the debit update from the rental.
+14. Send email to renter to inform the debit update from the rental.
 15. Set `tools.status` back to 'AVAILABLE' if the tool has no more 'ACTIVE' or 'SCHEDULED' rental requests. Otherwise, set to 'RENTED'
 16. Create a notification to owner to inform the completion of the rental and the tool status change with attributes set to {topic:rental_completion; rental:rental_id}.
 17. Send email to owner to inform the completion of the rental and the tool status change.
@@ -761,3 +876,4 @@ Input: `name`, `email`, `phone`, `avatar_url`
 Output: updated user profile
 Business Logic:
 1. Update `users` table for the `user_id` in JWT.
+

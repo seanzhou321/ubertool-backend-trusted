@@ -1,0 +1,174 @@
+syntax = "proto3";
+
+package ubertool.trusted.api.v1;
+
+option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
+option java_multiple_files = true;
+option java_package = "com.ubertool.trusted.api.v1";
+option java_outer_classname = "BillSplitServiceProto";
+
+service BillSplitService {
+  // User: Get global summary (4 numbers)
+  rpc GetGlobalBillSplitSummary(GetGlobalBillSplitSummaryRequest) returns (GetGlobalBillSplitSummaryResponse);
+
+  // User: Get summary per organization
+  rpc GetOrganizationBillSplitSummary(GetOrganizationBillSplitSummaryRequest) returns (GetOrganizationBillSplitSummaryResponse);
+
+  // User: List payments in an organization
+  rpc ListPayments(ListPaymentsRequest) returns (ListPaymentsResponse);
+
+  // User: Get payment details
+  rpc GetPaymentDetail(GetPaymentDetailRequest) returns (GetPaymentDetailResponse);
+
+  // User: Acknowledge payment (as debtor sending or creditor receiving)
+  rpc AcknowledgePayment(AcknowledgePaymentRequest) returns (AcknowledgePaymentResponse);
+
+  // Admin: List disputed payments requiring intervention
+  rpc ListDisputedPayments(ListDisputedPaymentsRequest) returns (ListDisputedPaymentsResponse);
+
+  // Admin: List resolved disputes (History)
+  rpc ListResolvedDisputes(ListResolvedDisputesRequest) returns (ListResolvedDisputesResponse);
+
+  // Admin: Resolve a dispute
+  rpc ResolveDispute(ResolveDisputeRequest) returns (ResolveDisputeResponse);
+}
+
+message BillSplitSummary {
+  int32 payments_to_make = 1;
+  int32 receipts_to_verify = 2;
+  int32 payments_in_dispute = 3;
+  int32 receipts_in_dispute = 4;
+}
+
+message GetGlobalBillSplitSummaryRequest {}
+
+message GetGlobalBillSplitSummaryResponse {
+  BillSplitSummary summary = 1;
+}
+
+message GetOrganizationBillSplitSummaryRequest {}
+
+message OrganizationBillSplitSummary {
+  int32 organization_id = 1;
+  string organization_name = 2;
+  BillSplitSummary summary = 3;
+}
+
+message GetOrganizationBillSplitSummaryResponse {
+  repeated OrganizationBillSplitSummary org_summaries = 1;
+}
+
+message ListPaymentsRequest {
+  int32 organization_id = 1;
+  bool show_history = 2; // If true, show completed payments
+}
+
+enum PaymentCategory {
+  PAYMENT_CATEGORY_UNSPECIFIED = 0;
+  PAYMENT_TO_MAKE = 1;
+  RECEIPT_TO_VERIFY = 2;
+  PAYMENT_IN_DISPUTE = 3;
+  RECEIPT_IN_DISPUTE = 4;
+  COMPLETED = 5;
+}
+
+message PaymentItem {
+  int32 payment_id = 1;      // bills.id
+  int32 debtor_id = 2;       // bills.debtor_user_id
+  string debtor_name = 3;    // Derived
+  int32 creditor_id = 4;     // bills.creditor_user_id
+  string creditor_name = 5;  // Derived
+  int32 amount_cents = 6;    // bills.amount_cents
+  string settlement_month = 7; // bills.settlement_month
+  string status = 8;         // bills.status (PENDING, PAID, DISPUTED, etc.)
+  PaymentCategory category = 9; // UI Helper category
+  int64 notice_sent_at = 10; // bills.notice_sent_at (Epoch Milliseconds)
+  int64 debtor_acknowledged_at = 11; // bills.debtor_acknowledged_at (Epoch Milliseconds)
+  int64 creditor_acknowledged_at = 12; // bills.creditor_acknowledged_at (Epoch Milliseconds)
+  int64 disputed_at = 13;   // bills.disputed_at (Epoch Milliseconds)
+  int64 resolved_at = 14;   // bills.resolved_at (Epoch Milliseconds)
+  string dispute_reason = 15; // bills.dispute_reason
+  string resolution_outcome = 16; // bills.resolution_outcome
+  string resolution_notes = 17;   // bills.resolution_notes
+  int64 created_at = 18;   // bills.created_on (Epoch Milliseconds)
+}
+
+message ListPaymentsResponse {
+  repeated PaymentItem payments = 1;
+}
+
+message GetPaymentDetailRequest {
+  int32 payment_id = 1;
+}
+
+message PaymentAction {
+  int32 actor_user_id = 1; // bill_actions.actor_user_id
+  string actor_name = 2;   // Derived
+  string action_type = 3;  // bill_actions.action_type
+  string notes = 4;        // bill_actions.notes
+  string action_details_json = 5; // bill_actions.action_details
+  int64 created_at = 6;   // bill_actions.created_on (Epoch Milliseconds)
+}
+
+message GetPaymentDetailResponse {
+  PaymentItem payment = 1;
+  repeated PaymentAction history = 2;
+  bool can_acknowledge = 3; // Based on user role (debtor/creditor) and state
+}
+
+message AcknowledgePaymentRequest {
+  int32 payment_id = 1;
+}
+
+message AcknowledgePaymentResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ListDisputedPaymentsRequest {
+  int32 organization_id = 1;
+}
+
+message DisputedPaymentItem {
+  int32 payment_id = 1;
+  int32 debtor_id = 2;
+  string debtor_name = 3;
+  int32 creditor_id = 4;
+  string creditor_name = 5;
+  int32 amount_cents = 6;
+  int64 disputed_at = 7; // bills.disputed_at (Epoch Milliseconds)
+  int64 resolved_at = 8; // bills.resolved_at (Epoch Milliseconds)
+  string reason = 9;
+  bool is_resolved = 10;
+  string resolution = 11;
+}
+
+message ListDisputedPaymentsResponse {
+  repeated DisputedPaymentItem disputes = 1;
+}
+
+message ListResolvedDisputesRequest {
+  int32 organization_id = 1;
+}
+
+message ListResolvedDisputesResponse {
+  repeated DisputedPaymentItem disputes = 1;
+}
+
+enum DisputeResolution {
+  DISPUTE_RESOLUTION_UNSPECIFIED = 0;
+  DEBTOR_AT_FAULT = 1;
+  CREDITOR_AT_FAULT = 2;
+  BOTH_AT_FAULT = 3;
+}
+
+message ResolveDisputeRequest {
+  int32 payment_id = 1;
+  DisputeResolution resolution = 2;
+}
+
+message ResolveDisputeResponse {
+  bool success = 1;
+  string message = 2;
+}
+

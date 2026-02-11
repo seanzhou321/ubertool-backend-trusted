@@ -348,6 +348,89 @@ func (m *MockEmailService) SendAdminNotification(ctx context.Context, adminEmail
 	return args.Error(0)
 }
 
+func (m *MockEmailService) SendBillPaymentNotice(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error {
+	args := m.Called(ctx, debtorEmail, debtorName, creditorName, amountCents, settlementMonth, orgName)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendBillPaymentAcknowledgment(ctx context.Context, creditorEmail, creditorName, debtorName string, amountCents int32, settlementMonth string, orgName string) error {
+	args := m.Called(ctx, creditorEmail, creditorName, debtorName, amountCents, settlementMonth, orgName)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendBillReceiptConfirmation(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error {
+	args := m.Called(ctx, debtorEmail, debtorName, creditorName, amountCents, settlementMonth, orgName)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendBillDisputeNotification(ctx context.Context, email, name, otherPartyName string, amountCents int32, reason string, orgName string) error {
+	args := m.Called(ctx, email, name, otherPartyName, amountCents, reason, orgName)
+	return args.Error(0)
+}
+
+func (m *MockEmailService) SendBillDisputeResolutionNotification(ctx context.Context, email, name string, amountCents int32, resolution, notes string, orgName string) error {
+	args := m.Called(ctx, email, name, amountCents, resolution, notes, orgName)
+	return args.Error(0)
+}
+
+// MockBillRepo
+type MockBillRepo struct {
+	mock.Mock
+}
+
+func (m *MockBillRepo) Create(ctx context.Context, bill *domain.Bill) error {
+	args := m.Called(ctx, bill)
+	return args.Error(0)
+}
+
+func (m *MockBillRepo) GetByID(ctx context.Context, id int32) (*domain.Bill, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Bill), args.Error(1)
+}
+
+func (m *MockBillRepo) Update(ctx context.Context, bill *domain.Bill) error {
+	args := m.Called(ctx, bill)
+	return args.Error(0)
+}
+
+func (m *MockBillRepo) ListByDebtor(ctx context.Context, debtorID int32, orgID int32, statuses []domain.BillStatus) ([]domain.Bill, error) {
+	args := m.Called(ctx, debtorID, orgID, statuses)
+	return args.Get(0).([]domain.Bill), args.Error(1)
+}
+
+func (m *MockBillRepo) ListByCreditor(ctx context.Context, creditorID int32, orgID int32, statuses []domain.BillStatus) ([]domain.Bill, error) {
+	args := m.Called(ctx, creditorID, orgID, statuses)
+	return args.Get(0).([]domain.Bill), args.Error(1)
+}
+
+func (m *MockBillRepo) ListByUser(ctx context.Context, userID int32, orgID int32, statuses []domain.BillStatus) ([]domain.Bill, error) {
+	args := m.Called(ctx, userID, orgID, statuses)
+	return args.Get(0).([]domain.Bill), args.Error(1)
+}
+
+func (m *MockBillRepo) ListDisputedByOrg(ctx context.Context, orgID int32, excludeUserID *int32) ([]domain.Bill, error) {
+	args := m.Called(ctx, orgID, excludeUserID)
+	return args.Get(0).([]domain.Bill), args.Error(1)
+}
+
+func (m *MockBillRepo) ListResolvedDisputesByOrg(ctx context.Context, orgID int32) ([]domain.Bill, error) {
+	args := m.Called(ctx, orgID)
+	return args.Get(0).([]domain.Bill), args.Error(1)
+}
+
+func (m *MockBillRepo) CreateAction(ctx context.Context, action *domain.BillAction) error {
+	args := m.Called(ctx, action)
+	return args.Error(0)
+}
+
+func (m *MockBillRepo) ListActionsByBill(ctx context.Context, billID int32) ([]domain.BillAction, error) {
+	args := m.Called(ctx, billID)
+	return args.Get(0).([]domain.BillAction), args.Error(1)
+}
+
 // MockNotificationRepo
 type MockNotificationRepo struct {
 	mock.Mock

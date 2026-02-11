@@ -31,12 +31,17 @@ const (
 )
 
 type UserOrg struct {
-	UserID       int32         `json:"user_id"`
-	OrgID        int32         `json:"org_id"`
-	JoinedOn     time.Time     `json:"joined_on"`
-	BalanceCents int32         `json:"balance_cents"`
-	Status       UserOrgStatus `json:"status"`
-	Role         UserOrgRole   `json:"role"`
-	BlockedDate  *time.Time    `json:"blocked_date"`
-	BlockReason  string        `json:"block_reason"`
+	UserID              int32         `json:"user_id"`
+	OrgID               int32         `json:"org_id"`
+	JoinedOn            time.Time     `json:"joined_on"`
+	BalanceCents        int32         `json:"balance_cents"`
+	LastBalanceUpdateOn *time.Time    `json:"last_balance_updated_on"`
+	Status              UserOrgStatus `json:"status"`
+	Role                UserOrgRole   `json:"role"`
+	BlockedDate         *time.Time    `json:"blocked_date"`
+	BlockReason         string        `json:"block_reason"`
+	RentingBlocked      bool          `json:"renting_blocked"`
+	LendingBlocked      bool          `json:"lending_blocked"`
+	BlockedDueToBillID  *int32        `json:"blocked_due_to_bill_id"`
+	BillBlockReason     string        `json:"bill_block_reason"`
 }

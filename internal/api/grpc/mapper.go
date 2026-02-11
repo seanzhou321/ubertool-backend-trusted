@@ -1,8 +1,12 @@
 package grpc
 
 import (
+	"context"
+	"time"
+	
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/service"
 )
 
 func MapDomainUserToProto(u *domain.User) *pb.User {
@@ -347,4 +351,178 @@ func MapDomainToolImageToProto(t *domain.ToolImage) *pb.ToolImage {
 		CreatedOn:     createdOn,
 		ConfirmedOn:   confirmedOn,
 	}
+}
+
+// Bill Split Mappers
+
+func MapDomainBillToPaymentItem(ctx context.Context, bill *domain.Bill, userID int32, userSvc service.UserService) (*pb.PaymentItem, error) {
+	if bill == nil {
+		return nil, nil
+	}
+
+	// Get debtor and creditor names
+	debtor, _, _, err := userSvc.GetUserProfile(ctx, bill.DebtorUserID)
+	if err != nil {
+		return nil, err
+	}
+	creditor, _, _, err := userSvc.GetUserProfile(ctx, bill.CreditorUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	debtorName := ""
+	creditorName := ""
+	if debtor != nil {
+		debtorName = debtor.Name
+	}
+	if creditor != nil {
+		creditorName = creditor.Name
+	}
+
+	category := MapDomainPaymentCategoryToProto(bill.GetPaymentCategory(userID))
+
+	payment := &pb.PaymentItem{
+		PaymentId:      bill.ID,
+		DebtorId:       bill.DebtorUserID,
+		DebtorName:     debtorName,
+		CreditorId:     bill.CreditorUserID,
+		CreditorName:   creditorName,
+		AmountCents:    bill.AmountCents,
+		SettlementMonth: bill.SettlementMonth,
+		Status:         string(bill.Status),
+		Category:       category,
+		DisputeReason:  bill.DisputeReason,
+		ResolutionOutcome: bill.ResolutionOutcome,
+		ResolutionNotes: bill.ResolutionNotes,
+		CreatedAt:      timeToEpochMillis(bill.CreatedAt),
+	}
+
+	if bill.NoticeSentAt != nil {
+		payment.NoticeSentAt = timeToEpochMillis(*bill.NoticeSentAt)
+	}
+	if bill.DebtorAcknowledgedAt != nil {
+		payment.DebtorAcknowledgedAt = timeToEpochMillis(*bill.DebtorAcknowledgedAt)
+	}
+	if bill.CreditorAcknowledgedAt != nil {
+		payment.CreditorAcknowledgedAt = timeToEpochMillis(*bill.CreditorAcknowledgedAt)
+	}
+	if bill.DisputedAt != nil {
+		payment.DisputedAt = timeToEpochMillis(*bill.DisputedAt)
+	}
+	if bill.ResolvedAt != nil {
+		payment.ResolvedAt = timeToEpochMillis(*bill.ResolvedAt)
+	}
+
+	return payment, nil
+}
+
+func MapDomainBillActionToProto(ctx context.Context, action *domain.BillAction, userSvc service.UserService) (*pb.PaymentAction, error) {
+	if action == nil {
+		return nil, nil
+	}
+
+	actorName := "System"
+	if action.ActorUserID != nil {
+		actor, _, _, err := userSvc.GetUserProfile(ctx, *action.ActorUserID)
+		if err == nil && actor != nil {
+			actorName = actor.Name
+		}
+	}
+
+	actorUserID := int32(0)
+	if action.ActorUserID != nil {
+		actorUserID = *action.ActorUserID
+	}
+
+	return &pb.PaymentAction{
+		ActorUserId:        actorUserID,
+		ActorName:          actorName,
+		ActionType:         string(action.ActionType),
+		Notes:              action.Notes,
+		ActionDetailsJson:  action.ActionDetails,
+		CreatedAt:          timeToEpochMillis(action.CreatedAt),
+	}, nil
+}
+
+func MapDomainBillToDisputedPaymentItem(ctx context.Context, bill *domain.Bill, userSvc service.UserService) (*pb.DisputedPaymentItem, error) {
+	if bill == nil {
+		return nil, nil
+	}
+
+	// Get debtor and creditor names
+	debtor, _, _, err := userSvc.GetUserProfile(ctx, bill.DebtorUserID)
+	if err != nil {
+		return nil, err
+	}
+	creditor, _, _, err := userSvc.GetUserProfile(ctx, bill.CreditorUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	debtorName := ""
+	creditorName := ""
+	if debtor != nil {
+		debtorName = debtor.Name
+	}
+	if creditor != nil {
+		creditorName = creditor.Name
+	}
+
+	item := &pb.DisputedPaymentItem{
+		PaymentId:    bill.ID,
+		DebtorId:     bill.DebtorUserID,
+		DebtorName:   debtorName,
+		CreditorId:   bill.CreditorUserID,
+		CreditorName: creditorName,
+		AmountCents:  bill.AmountCents,
+		Reason:       bill.DisputeReason,
+		IsResolved:   bill.ResolvedAt != nil,
+		Resolution:   bill.ResolutionOutcome,
+	}
+
+	if bill.DisputedAt != nil {
+		item.DisputedAt = timeToEpochMillis(*bill.DisputedAt)
+	}
+	if bill.ResolvedAt != nil {
+		item.ResolvedAt = timeToEpochMillis(*bill.ResolvedAt)
+	}
+
+	return item, nil
+}
+
+func MapDomainPaymentCategoryToProto(category string) pb.PaymentCategory {
+	switch category {
+	case "PAYMENT_TO_MAKE":
+		return pb.PaymentCategory_PAYMENT_TO_MAKE
+	case "RECEIPT_TO_VERIFY":
+		return pb.PaymentCategory_RECEIPT_TO_VERIFY
+	case "PAYMENT_IN_DISPUTE":
+		return pb.PaymentCategory_PAYMENT_IN_DISPUTE
+	case "RECEIPT_IN_DISPUTE":
+		return pb.PaymentCategory_RECEIPT_IN_DISPUTE
+	case "COMPLETED":
+		return pb.PaymentCategory_COMPLETED
+	default:
+		return pb.PaymentCategory_PAYMENT_CATEGORY_UNSPECIFIED
+	}
+}
+
+func MapProtoDisputeResolutionToDomain(resolution pb.DisputeResolution) string {
+	switch resolution {
+	case pb.DisputeResolution_DEBTOR_AT_FAULT:
+		return string(domain.ResolutionOutcomeDebtorFault)
+	case pb.DisputeResolution_CREDITOR_AT_FAULT:
+		return string(domain.ResolutionOutcomeCreditorFault)
+	case pb.DisputeResolution_BOTH_AT_FAULT:
+		return string(domain.ResolutionOutcomeBothFault)
+	default:
+		return string(domain.ResolutionOutcomeGraceful)
+	}
+}
+
+func timeToEpochMillis(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.UnixNano() / 1000000
 }

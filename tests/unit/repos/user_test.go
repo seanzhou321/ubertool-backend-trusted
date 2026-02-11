@@ -85,8 +85,9 @@ func TestUserRepository_ListMembersByOrg(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"id", "email", "phone_number", "password_hash", "name", "avatar_url", "created_on", "updated_on",
-			"user_id", "org_id", "joined_on", "balance_cents", "status", "role", "blocked_date", "block_reason"}).
-			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, "ACTIVE", "MEMBER", nil, "")
+			"user_id", "org_id", "joined_on", "balance_cents", "last_balance_updated_on", "status", "role", "blocked_date", "block_reason",
+			"renting_blocked", "lending_blocked", "blocked_due_to_bill_id", "bill_block_reason"}).
+			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, nil, "ACTIVE", "MEMBER", nil, "", false, false, nil, "")
 
 		mock.ExpectQuery("SELECT (.+) FROM users u JOIN users_orgs uo").
 			WithArgs(int32(1)).
@@ -112,8 +113,9 @@ func TestUserRepository_SearchMembersByOrg(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"id", "email", "phone_number", "password_hash", "name", "avatar_url", "created_on", "updated_on",
-			"user_id", "org_id", "joined_on", "balance_cents", "status", "role", "blocked_date", "block_reason"}).
-			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, "ACTIVE", "MEMBER", nil, "")
+			"user_id", "org_id", "joined_on", "balance_cents", "last_balance_updated_on", "status", "role", "blocked_date", "block_reason",
+			"renting_blocked", "lending_blocked", "blocked_due_to_bill_id", "bill_block_reason"}).
+			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, nil, "ACTIVE", "MEMBER", nil, "", false, false, nil, "")
 
 		mock.ExpectQuery("SELECT (.+) FROM users u JOIN users_orgs uo").
 			WithArgs(int32(1), "%search%").

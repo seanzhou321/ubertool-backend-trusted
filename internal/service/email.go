@@ -226,3 +226,65 @@ func (s *emailService) SendAdminNotification(ctx context.Context, adminEmail, su
 		IsHTML:  false,
 	})
 }
+
+// Bill Split Email Methods
+
+func (s *emailService) SendBillPaymentNotice(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error {
+	subject := fmt.Sprintf("Payment Notice: $%.2f Due to %s (%s)", float64(amountCents)/100, creditorName, orgName)
+	body := fmt.Sprintf("Hello %s,\n\nYou have a payment due for the %s settlement period.\n\nAmount: $%.2f\nPayable to: %s\nOrganization: %s\n\nPlease settle this payment using your mutually agreed-upon payment method, then acknowledge the payment in the app.\n\nBest regards,\nUbertool Team",
+		debtorName, settlementMonth, float64(amountCents)/100, creditorName, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{debtorEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *emailService) SendBillPaymentAcknowledgment(ctx context.Context, creditorEmail, creditorName, debtorName string, amountCents int32, settlementMonth string, orgName string) error {
+	subject := fmt.Sprintf("Payment Acknowledgment: %s sent $%.2f (%s)", debtorName, float64(amountCents)/100, orgName)
+	body := fmt.Sprintf("Hello %s,\n\n%s has acknowledged sending you a payment for the %s settlement period.\n\nAmount: $%.2f\nOrganization: %s\n\nPlease confirm receipt of this payment in the app once you have received it.\n\nBest regards,\nUbertool Team",
+		creditorName, debtorName, settlementMonth, float64(amountCents)/100, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{creditorEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *emailService) SendBillReceiptConfirmation(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error {
+	subject := fmt.Sprintf("Receipt Confirmed: %s received $%.2f (%s)", creditorName, float64(amountCents)/100, orgName)
+	body := fmt.Sprintf("Hello %s,\n\n%s has confirmed receiving your payment for the %s settlement period.\n\nAmount: $%.2f\nOrganization: %s\n\nYour account balances have been updated accordingly.\n\nBest regards,\nUbertool Team",
+		debtorName, creditorName, settlementMonth, float64(amountCents)/100, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{debtorEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *emailService) SendBillDisputeNotification(ctx context.Context, email, name, otherPartyName string, amountCents int32, reason string, orgName string) error {
+	subject := fmt.Sprintf("Payment Dispute Opened: $%.2f with %s (%s)", float64(amountCents)/100, otherPartyName, orgName)
+	body := fmt.Sprintf("Hello %s,\n\nA payment dispute has been opened for a $%.2f transaction with %s.\n\nReason: %s\nOrganization: %s\n\nPlease work with the other party to resolve this dispute. If the dispute cannot be resolved, an admin may need to intervene.\n\nBest regards,\nUbertool Team",
+		name, float64(amountCents)/100, otherPartyName, reason, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *emailService) SendBillDisputeResolutionNotification(ctx context.Context, email, name string, amountCents int32, resolution, notes string, orgName string) error {
+	subject := fmt.Sprintf("Dispute Resolved: $%.2f Payment (%s)", float64(amountCents)/100, orgName)
+	body := fmt.Sprintf("Hello %s,\n\nThe dispute for a $%.2f payment has been resolved by an admin.\n\nResolution: %s\nNotes: %s\nOrganization: %s\n\nPlease check the app for details and any actions you may need to take.\n\nBest regards,\nUbertool Team",
+		name, float64(amountCents)/100, resolution, notes, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}

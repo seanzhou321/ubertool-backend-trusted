@@ -85,3 +85,22 @@ type JoinRequestRepository interface {
 	Update(ctx context.Context, req *domain.JoinRequest) error
 	ListByOrg(ctx context.Context, orgID int32) ([]domain.JoinRequest, error)
 }
+
+type BillRepository interface {
+	Create(ctx context.Context, bill *domain.Bill) error
+	GetByID(ctx context.Context, id int32) (*domain.Bill, error)
+	Update(ctx context.Context, bill *domain.Bill) error
+	
+	// Query bills by user involvement
+	ListByDebtor(ctx context.Context, debtorID int32, orgID int32, statuses []domain.BillStatus) ([]domain.Bill, error)
+	ListByCreditor(ctx context.Context, creditorID int32, orgID int32, statuses []domain.BillStatus) ([]domain.Bill, error)
+	ListByUser(ctx context.Context, userID int32, orgID int32, statuses []domain.BillStatus) ([]domain.Bill, error)
+	
+	// Query for disputed bills
+	ListDisputedByOrg(ctx context.Context, orgID int32, excludeUserID *int32) ([]domain.Bill, error)
+	ListResolvedDisputesByOrg(ctx context.Context, orgID int32) ([]domain.Bill, error)
+	
+	// Bill actions
+	CreateAction(ctx context.Context, action *domain.BillAction) error
+	ListActionsByBill(ctx context.Context, billID int32) ([]domain.BillAction, error)
+}

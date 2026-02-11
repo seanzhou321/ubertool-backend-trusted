@@ -52,6 +52,23 @@ func (m *MockEmailService) SendReturnDateRejectionNotification(ctx context.Conte
 	return nil
 }
 
+// Bill Split Notifications
+func (m *MockEmailService) SendBillPaymentNotice(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error {
+	return nil
+}
+func (m *MockEmailService) SendBillPaymentAcknowledgment(ctx context.Context, creditorEmail, creditorName, debtorName string, amountCents int32, settlementMonth string, orgName string) error {
+	return nil
+}
+func (m *MockEmailService) SendBillReceiptConfirmation(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error {
+	return nil
+}
+func (m *MockEmailService) SendBillDisputeNotification(ctx context.Context, email, name, otherPartyName string, amountCents int32, reason string, orgName string) error {
+	return nil
+}
+func (m *MockEmailService) SendBillDisputeResolutionNotification(ctx context.Context, email, name string, amountCents int32, resolution, notes string, orgName string) error {
+	return nil
+}
+
 type MockNotificationRepo struct {
 	mock.Mock
 }

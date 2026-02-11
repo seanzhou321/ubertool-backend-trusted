@@ -42,7 +42,9 @@ message ApproveRequestToJoinResponse {
 message AdminBlockUserAccountRequest {
   int32 blocked_user_id = 1;
   int32 organization_id = 2;
-  string reason = 3;
+  bool block_renting = 3;
+  bool block_lending = 4;
+  string reason = 5;
 }
 
 message AdminBlockUserAccountResponse {

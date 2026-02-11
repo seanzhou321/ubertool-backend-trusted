@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  cronjob:
+    build:
+      context: ../../..
+      dockerfile: podman/trusted-group/Dockerfile_services_cronjobs
+    image: ubertool-backend:latest
+    container_name: ubertool-cronjob
+    command: ["/app/cronjob", "--config=/config/config.yaml"]
+    volumes:
+      - ../../../config:/config:ro
+      - ../../../logs:/app/logs
+    environment:
+      - TZ=UTC
+    networks:
+      - ubertool-network
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Reference to postgres from services compose
+  postgres:
+    image: postgres:15
+    container_name: ubertool-postgres
+    environment:
+      POSTGRES_USER: ubertool
+      POSTGRES_PASSWORD: ubertool_password
+      POSTGRES_DB: ubertool_trusted
+    volumes:
+      - ../postgres/ubertool_schema_trusted.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ubertool-network
+    restart: unless-stopped
+
+networks:
+  ubertool-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

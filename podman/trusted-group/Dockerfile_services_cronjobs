@@ -1,0 +1,52 @@
+# Multi-stage Dockerfile for Ubertool Backend
+# Builds both server and cronjob binaries from the same codebase
+
+# Stage 1: Build both binaries
+FROM golang:1.24-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git make
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy the entire source code
+COPY . .
+
+# Build server binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /bin/server ./cmd/server
+
+# Build cronjob binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /bin/cronjob ./cmd/cronjob
+
+# Stage 2: Runtime image (minimal)
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS and timezone data
+RUN apk --no-cache add ca-certificates tzdata
+
+# Create app user
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy both binaries from builder
+COPY --from=builder /bin/server /app/server
+COPY --from=builder /bin/cronjob /app/cronjob
+
+# Set ownership
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Default command (can be overridden in compose/k8s)
+CMD ["/app/server", "--config=/config/config.yaml"]

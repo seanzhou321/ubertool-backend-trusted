@@ -61,7 +61,7 @@ type RentalService interface {
 	ListRentals(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListLendings(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 	GetRental(ctx context.Context, userID, rentalID int32) (*domain.Rental, error)
-	
+
 	// New methods
 	ActivateRental(ctx context.Context, userID, rentalID int32) (*domain.Rental, error)
 	ChangeRentalDates(ctx context.Context, userID, rentalID int32, newStart, newEnd, oldStart, oldEnd string) (*domain.Rental, error)
@@ -91,6 +91,17 @@ type AdminService interface {
 	ListJoinRequests(ctx context.Context, orgID int32) ([]domain.JoinRequest, error)
 }
 
+type BillSplitService interface {
+	GetGlobalBillSplitSummary(ctx context.Context, userID int32) (paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute int32, err error)
+	GetOrganizationBillSplitSummary(ctx context.Context, userID int32) ([]domain.Organization, []int32, []int32, []int32, []int32, error)
+	ListPayments(ctx context.Context, userID, orgID int32, showHistory bool) ([]domain.Bill, error)
+	GetPaymentDetail(ctx context.Context, userID, paymentID int32) (*domain.Bill, []domain.BillAction, bool, error)
+	AcknowledgePayment(ctx context.Context, userID, paymentID int32) error
+	ListDisputedPayments(ctx context.Context, adminID, orgID int32) ([]domain.Bill, error)
+	ListResolvedDisputes(ctx context.Context, adminID, orgID int32) ([]domain.Bill, error)
+	ResolveDispute(ctx context.Context, adminID, paymentID int32, resolution string) error
+}
+
 type EmailService interface {
 	SendInvitation(ctx context.Context, email, name, token string, orgName string, ccEmail string) error
 	SendAccountStatusNotification(ctx context.Context, email, name, orgName, status, reason string) error
@@ -107,4 +118,11 @@ type EmailService interface {
 
 	// Admin Notifications
 	SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error
+
+	// Bill Split Notifications
+	SendBillPaymentNotice(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error
+	SendBillPaymentAcknowledgment(ctx context.Context, creditorEmail, creditorName, debtorName string, amountCents int32, settlementMonth string, orgName string) error
+	SendBillReceiptConfirmation(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error
+	SendBillDisputeNotification(ctx context.Context, email, name, otherPartyName string, amountCents int32, reason string, orgName string) error
+	SendBillDisputeResolutionNotification(ctx context.Context, email, name string, amountCents int32, resolution, notes string, orgName string) error
 }

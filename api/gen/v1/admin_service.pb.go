@@ -145,7 +145,9 @@ type AdminBlockUserAccountRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	BlockedUserId  int32                  `protobuf:"varint,1,opt,name=blocked_user_id,json=blockedUserId,proto3" json:"blocked_user_id,omitempty"`
 	OrganizationId int32                  `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	Reason         string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	BlockRenting   bool                   `protobuf:"varint,3,opt,name=block_renting,json=blockRenting,proto3" json:"block_renting,omitempty"`
+	BlockLending   bool                   `protobuf:"varint,4,opt,name=block_lending,json=blockLending,proto3" json:"block_lending,omitempty"`
+	Reason         string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -192,6 +194,20 @@ func (x *AdminBlockUserAccountRequest) GetOrganizationId() int32 {
 		return x.OrganizationId
 	}
 	return 0
+}
+
+func (x *AdminBlockUserAccountRequest) GetBlockRenting() bool {
+	if x != nil {
+		return x.BlockRenting
+	}
+	return false
+}
+
+func (x *AdminBlockUserAccountRequest) GetBlockLending() bool {
+	if x != nil {
+		return x.BlockLending
+	}
+	return false
 }
 
 func (x *AdminBlockUserAccountRequest) GetReason() string {
@@ -729,11 +745,13 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x1cApproveRequestToJoinResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12'\n" +
-	"\x0finvitation_code\x18\x03 \x01(\tR\x0einvitationCode\"\x87\x01\n" +
+	"\x0finvitation_code\x18\x03 \x01(\tR\x0einvitationCode\"\xd1\x01\n" +
 	"\x1cAdminBlockUserAccountRequest\x12&\n" +
 	"\x0fblocked_user_id\x18\x01 \x01(\x05R\rblockedUserId\x12'\n" +
-	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"^\n" +
+	"\x0forganization_id\x18\x02 \x01(\x05R\x0eorganizationId\x12#\n" +
+	"\rblock_renting\x18\x03 \x01(\bR\fblockRenting\x12#\n" +
+	"\rblock_lending\x18\x04 \x01(\bR\fblockLending\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"^\n" +
 	"\x1dAdminBlockUserAccountResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"=\n" +
