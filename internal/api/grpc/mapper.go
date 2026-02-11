@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 	"time"
-	
+
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
@@ -30,7 +30,7 @@ func MapDomainUserToProto(u *domain.User) *pb.User {
 		Name:      u.Name,
 		AvatarUrl: u.AvatarURL,
 		Orgs:      protoOrgs,
-		CreatedOn: u.CreatedOn.Format("2006-01-02"),
+		CreatedOn: u.CreatedOn,
 	}
 }
 
@@ -59,7 +59,7 @@ func MapDomainOrgToProto(o *domain.Organization, userRole string) *pb.Organizati
 		MemberCount: o.MemberCount,
 		AdminEmail:  o.AdminEmail,
 		AdminPhone:  o.AdminPhoneNumber,
-		CreatedOn:   o.CreatedOn.Format("2006-01-02"),
+		CreatedOn:   o.CreatedOn,
 		UserRole:    userRole,
 		Admins:      protoAdmins,
 	}
@@ -82,8 +82,8 @@ func MapDomainToolToProto(t *domain.Tool) *pb.Tool {
 		Owner:                MapDomainUserToProto(t.Owner),
 		Metro:                t.Metro,
 		Status:               MapDomainToolStatusToProto(t.Status),
-		CreatedOn:            t.CreatedOn.Format("2006-01-02"),
-		UpdatedOn:            t.CreatedOn.Format("2006-01-02"),
+		CreatedOn:            t.CreatedOn,
+		UpdatedOn:            t.CreatedOn,
 	}
 }
 
@@ -147,15 +147,15 @@ func MapDomainRentalToProtoWithNames(r *domain.Rental, renterName, ownerName, to
 		RenterName:             renterName,
 		OwnerId:                r.OwnerID,
 		OwnerName:              ownerName,
-		StartDate:              r.StartDate.Format("2006-01-02"),
-		EndDate:                r.EndDate.Format("2006-01-02"),
+		StartDate:              r.StartDate,
+		EndDate:                r.EndDate,
 		TotalCostCents:         r.TotalCostCents,
 		Status:                 MapDomainRentalStatusToProto(r.Status),
 		PickupInstructions:     r.PickupNote,
 		ReturnCondition:        r.ReturnCondition,
 		SurchargeOrCreditCents: r.SurchargeOrCreditCents,
-		CreatedOn:              r.CreatedOn.Format("2006-01-02"),
-		UpdatedOn:              r.UpdatedOn.Format("2006-01-02"),
+		CreatedOn:              r.CreatedOn,
+		UpdatedOn:              r.UpdatedOn,
 	}
 	return proto
 }
@@ -238,7 +238,7 @@ func MapDomainTransactionToProto(t *domain.LedgerTransaction) *pb.Transaction {
 		Amount:         t.Amount,
 		Type:           MapDomainTransactionTypeToProto(t.Type),
 		Description:    t.Description,
-		ChargedOn:      t.ChargedOn.Format("2006-01-02"),
+		ChargedOn:      t.ChargedOn,
 	}
 	if t.RelatedRentalID != nil {
 		// proto.RelatedRentalId = *t.RelatedRentalID // Error: proto expects Object, domain has ID
@@ -275,7 +275,7 @@ func MapDomainNotificationToProto(n *domain.Notification) *pb.Notification {
 		Message:        n.Message,
 		Read:           n.IsRead,
 		Attributes:     n.Attributes,
-		CreatedOn:      n.CreatedOn.Format("2006-01-02"),
+		CreatedOn:      n.CreatedOn,
 	}
 }
 
@@ -285,13 +285,15 @@ func MapDomainMemberProfileToProto(u domain.User, uo domain.UserOrg) *pb.MemberP
 		Name:        u.Name,
 		Email:       u.Email,
 		Balance:     uo.BalanceCents,
-		MemberSince: uo.JoinedOn.Format("2006-01-02"),
+		MemberSince: uo.JoinedOn,
 		IsBlocked:   uo.Status == domain.UserOrgStatusBlock,
-		BlockReason: uo.BlockReason,
+		// BlockedReason: uo.BlockedReason, // Not present in proto
 	}
-	if uo.BlockedDate != nil {
-		proto.BlockedDate = uo.BlockedDate.Format("2006-01-02")
-	}
+	/*
+		if uo.BlockedOn != nil {
+			proto.BlockedOn = *uo.BlockedOn // Not present in proto
+		}
+	*/
 	return proto
 }
 
@@ -304,13 +306,13 @@ func MapDomainJoinRequestProfileToProto(jr *domain.JoinRequest) *pb.JoinRequestP
 		Name:        jr.Name,
 		Email:       jr.Email,
 		Message:     jr.Note,
-		RequestDate: jr.CreatedOn.Format("2006-01-02"),
+		RequestDate: jr.CreatedOn,
 	}
 	if jr.UserID != nil {
 		proto.UserId = *jr.UserID
 	}
 	if jr.UsedOn != nil {
-		proto.UsedOn = jr.UsedOn.Format("2006-01-02")
+		proto.UsedOn = *jr.UsedOn
 	}
 	return proto
 }
@@ -382,19 +384,19 @@ func MapDomainBillToPaymentItem(ctx context.Context, bill *domain.Bill, userID i
 	category := MapDomainPaymentCategoryToProto(bill.GetPaymentCategory(userID))
 
 	payment := &pb.PaymentItem{
-		PaymentId:      bill.ID,
-		DebtorId:       bill.DebtorUserID,
-		DebtorName:     debtorName,
-		CreditorId:     bill.CreditorUserID,
-		CreditorName:   creditorName,
-		AmountCents:    bill.AmountCents,
-		SettlementMonth: bill.SettlementMonth,
-		Status:         string(bill.Status),
-		Category:       category,
-		DisputeReason:  bill.DisputeReason,
+		PaymentId:         bill.ID,
+		DebtorId:          bill.DebtorUserID,
+		DebtorName:        debtorName,
+		CreditorId:        bill.CreditorUserID,
+		CreditorName:      creditorName,
+		AmountCents:       bill.AmountCents,
+		SettlementMonth:   bill.SettlementMonth,
+		Status:            string(bill.Status),
+		Category:          category,
+		DisputeReason:     bill.DisputeReason,
 		ResolutionOutcome: bill.ResolutionOutcome,
-		ResolutionNotes: bill.ResolutionNotes,
-		CreatedAt:      timeToEpochMillis(bill.CreatedAt),
+		ResolutionNotes:   bill.ResolutionNotes,
+		CreatedAt:         timeToEpochMillis(bill.CreatedAt),
 	}
 
 	if bill.NoticeSentAt != nil {
@@ -435,12 +437,12 @@ func MapDomainBillActionToProto(ctx context.Context, action *domain.BillAction, 
 	}
 
 	return &pb.PaymentAction{
-		ActorUserId:        actorUserID,
-		ActorName:          actorName,
-		ActionType:         string(action.ActionType),
-		Notes:              action.Notes,
-		ActionDetailsJson:  action.ActionDetails,
-		CreatedAt:          timeToEpochMillis(action.CreatedAt),
+		ActorUserId:       actorUserID,
+		ActorName:         actorName,
+		ActionType:        string(action.ActionType),
+		Notes:             action.Notes,
+		ActionDetailsJson: action.ActionDetails,
+		CreatedAt:         timeToEpochMillis(action.CreatedAt),
 	}, nil
 }
 

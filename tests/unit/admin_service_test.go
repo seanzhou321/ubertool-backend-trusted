@@ -28,7 +28,7 @@ func TestAdminService_BlockUser(t *testing.T) {
 		mockUserRepo.On("GetByID", ctx, int32(1)).Return(&domain.User{ID: 1, Name: "User 1", Email: "u1@test.com"}, nil).Once()
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(&domain.Organization{ID: 1, Name: "Test Org"}, nil).Once()
 		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(u *domain.UserOrg) bool {
-			return u.Status == domain.UserOrgStatusBlock && u.BlockReason == "violation" && u.BlockedDate != nil
+			return u.Status == domain.UserOrgStatusBlock && u.BlockedReason == "violation" && u.BlockedOn != nil
 		})).Return(nil).Once()
 		mockEmailSvc.On("SendAccountStatusNotification", ctx, "u1@test.com", "User 1", "Test Org", "BLOCK", "violation").Return(nil).Once()
 
@@ -37,13 +37,13 @@ func TestAdminService_BlockUser(t *testing.T) {
 	})
 
 	t.Run("Unblock", func(t *testing.T) {
-		now := time.Now()
-		uo := &domain.UserOrg{UserID: 1, OrgID: 1, Status: domain.UserOrgStatusBlock, BlockReason: "violation", BlockedDate: &now}
+		dateStr := time.Now().Format("2006-01-02")
+		uo := &domain.UserOrg{UserID: 1, OrgID: 1, Status: domain.UserOrgStatusBlock, BlockedReason: "violation", BlockedOn: &dateStr}
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(uo, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(1)).Return(&domain.User{ID: 1, Name: "User 1", Email: "u1@test.com"}, nil).Once()
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(&domain.Organization{ID: 1, Name: "Test Org"}, nil).Once()
 		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(u *domain.UserOrg) bool {
-			return u.Status == domain.UserOrgStatusActive && u.BlockReason == "" && u.BlockedDate == nil
+			return u.Status == domain.UserOrgStatusActive && u.BlockedReason == "" && u.BlockedOn == nil
 		})).Return(nil).Once()
 		mockEmailSvc.On("SendAccountStatusNotification", ctx, "u1@test.com", "User 1", "Test Org", "ACTIVE", "").Return(nil).Once()
 

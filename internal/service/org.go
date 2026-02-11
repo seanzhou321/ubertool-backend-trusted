@@ -92,7 +92,7 @@ func (s *organizationService) CreateOrganization(ctx context.Context, userID int
 	userOrg := &domain.UserOrg{
 		UserID:       userID,
 		OrgID:        org.ID,
-		JoinedOn:     time.Now(),
+		JoinedOn:     time.Now().Format("2006-01-02"),
 		BalanceCents: 0,
 		Status:       domain.UserOrgStatusActive,
 		Role:         domain.UserOrgRoleSuperAdmin,
@@ -146,7 +146,8 @@ func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, us
 	if inv.UsedOn != nil {
 		return nil, nil, errors.New("invitation already used")
 	}
-	if inv.ExpiresOn.Before(time.Now()) {
+	expiresOn, _ := time.Parse("2006-01-02", inv.ExpiresOn)
+	if expiresOn.Before(time.Now()) {
 		return nil, nil, errors.New("invitation code is invalid or expired")
 	}
 
@@ -168,8 +169,8 @@ func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, us
 	}
 
 	// 7. Update the invitations record
-	now := time.Now()
-	inv.UsedOn = &now
+	nowStr := time.Now().Format("2006-01-02")
+	inv.UsedOn = &nowStr
 	inv.UsedByUserID = &userID
 	if err := s.inviteRepo.Update(ctx, inv); err != nil {
 		return nil, nil, err
@@ -181,7 +182,7 @@ func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, us
 		OrgID:        inv.OrgID,
 		Role:         domain.UserOrgRoleMember,
 		Status:       domain.UserOrgStatusActive,
-		JoinedOn:     time.Now(),
+		JoinedOn:     time.Now().Format("2006-01-02"),
 		BalanceCents: 0,
 	}
 	if err := s.userRepo.AddUserToOrg(ctx, userOrg); err != nil {
@@ -212,7 +213,7 @@ func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, us
 						"type":      "MEMBER_JOINED",
 						"reference": fmt.Sprintf("user:%d", userID),
 					},
-					CreatedOn: time.Now(),
+					CreatedOn: time.Now().Format("2006-01-02"),
 				}
 
 				notifErr := s.noteRepo.Create(ctx, notif)

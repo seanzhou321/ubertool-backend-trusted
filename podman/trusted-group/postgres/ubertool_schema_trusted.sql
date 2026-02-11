@@ -46,7 +46,8 @@ CREATE TABLE users_orgs (
     renting_blocked BOOLEAN DEFAULT FALSE,
     lending_blocked BOOLEAN DEFAULT FALSE,
     blocked_due_to_bill_id INTEGER, -- FK constrain added after bills table creation
-    bill_block_reason TEXT,
+    blocked_reason TEXT,
+    blocked_on Date,
     PRIMARY KEY (user_id, org_id)
 );
 
@@ -320,7 +321,7 @@ BEGIN
         UPDATE users_orgs
         SET renting_blocked = TRUE,
             blocked_due_to_bill_id = bill_record.id,
-            bill_block_reason = 'Blocked due to unresolved payment dispute'
+            blocked_reason = 'Blocked due to unresolved payment dispute'
         WHERE user_id = bill_record.debtor_user_id 
             AND org_id = p_org_id;
         
@@ -328,7 +329,7 @@ BEGIN
         UPDATE users_orgs
         SET lending_blocked = TRUE,
             blocked_due_to_bill_id = bill_record.id,
-            bill_block_reason = 'Blocked due to unresolved payment dispute'
+            blocked_reason = 'Blocked due to unresolved payment dispute'
         WHERE user_id = bill_record.creditor_user_id 
             AND org_id = p_org_id;
         

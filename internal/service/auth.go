@@ -55,7 +55,11 @@ func (s *authService) ValidateInvite(ctx context.Context, inviteCode, email stri
 		return false, "invitation already used", nil, ErrInviteUsed
 	}
 	// Explicitly check expiration and return error
-	if inv.ExpiresOn.Before(time.Now()) {
+	expiresOn, err := time.Parse("2006-01-02", inv.ExpiresOn)
+	if err != nil {
+		return false, "invalid expiration date format", nil, err
+	}
+	if expiresOn.Before(time.Now()) {
 		return false, "invitation has expired", nil, ErrInviteExpired
 	}
 
@@ -176,7 +180,7 @@ func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, emai
 			"type":      "JOIN_REQUEST",
 			"reference": fmt.Sprintf("join_request:%d", req.ID),
 		},
-		CreatedOn: time.Now(),
+		CreatedOn: time.Now().Format("2006-01-02"),
 	}
 
 	logger.Debug("Creating notification for admin", "adminID", adminUser.ID, "notifTitle", notif.Title)
@@ -236,8 +240,8 @@ func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phon
 	}
 
 	// 6. Mark invite as used
-	now := time.Now()
-	inv.UsedOn = &now
+	nowStr := time.Now().Format("2006-01-02")
+	inv.UsedOn = &nowStr
 	inv.UsedByUserID = &user.ID
 	if err := s.inviteRepo.Update(ctx, inv); err != nil {
 		return err
@@ -249,7 +253,7 @@ func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phon
 		OrgID:        inv.OrgID,
 		Role:         domain.UserOrgRoleMember,
 		Status:       domain.UserOrgStatusActive,
-		JoinedOn:     time.Now(),
+		JoinedOn:     time.Now().Format("2006-01-02"),
 		BalanceCents: 0,
 	}
 	if err := s.userRepo.AddUserToOrg(ctx, userOrg); err != nil {

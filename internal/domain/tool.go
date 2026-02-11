@@ -42,8 +42,8 @@ type Tool struct {
 	Condition            ToolCondition    `json:"condition"`
 	Metro                string           `json:"metro"`
 	Status               ToolStatus       `json:"status"`
-	CreatedOn            time.Time        `json:"created_on"`
-	DeletedOn            *time.Time       `json:"deleted_on,omitempty"`
+	CreatedOn            string           `json:"created_on"`
+	DeletedOn            *string          `json:"deleted_on,omitempty"`
 }
 
 type ToolImage struct {

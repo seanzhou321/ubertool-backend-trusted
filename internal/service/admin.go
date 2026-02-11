@@ -52,7 +52,7 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 		userOrg := &domain.UserOrg{
 			UserID:       user.ID,
 			OrgID:        orgID,
-			JoinedOn:     time.Now(),
+			JoinedOn:     time.Now().Format("2006-01-02"),
 			Status:       domain.UserOrgStatusActive,
 			Role:         domain.UserOrgRoleMember,
 			BalanceCents: 0,
@@ -70,7 +70,7 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 			OrgID:     orgID,
 			Email:     email,
 			CreatedBy: adminID,
-			ExpiresOn: time.Now().Add(7 * 24 * time.Hour),
+			ExpiresOn: time.Now().Add(7 * 24 * time.Hour).Format("2006-01-02"),
 		}
 		if err := s.inviteRepo.Create(ctx, inv); err != nil {
 			return "", fmt.Errorf("failed to create invitation: %w", err)
@@ -132,13 +132,13 @@ func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int
 
 	if isBlock {
 		uo.Status = domain.UserOrgStatusBlock
-		uo.BlockReason = reason
-		now := time.Now()
-		uo.BlockedDate = &now
+		uo.BlockedReason = reason
+		now := time.Now().Format("2006-01-02")
+		uo.BlockedOn = &now
 	} else {
 		uo.Status = domain.UserOrgStatusActive
-		uo.BlockReason = ""
-		uo.BlockedDate = nil
+		uo.BlockedReason = ""
+		uo.BlockedOn = nil
 	}
 
 	if err := s.userRepo.UpdateUserOrg(ctx, uo); err != nil {

@@ -1,7 +1,5 @@
 package domain
 
-import "time"
-
 type TransactionType string
 
 const (
@@ -20,8 +18,8 @@ type LedgerTransaction struct {
 	Type            TransactionType `json:"type"`
 	RelatedRentalID *int32          `json:"related_rental_id,omitempty"`
 	Description     string          `json:"description"`
-	ChargedOn       time.Time       `json:"charged_on"`
-	CreatedOn       time.Time       `json:"created_on"`
+	ChargedOn       string          `json:"charged_on"`
+	CreatedOn       string          `json:"created_on"`
 }
 
 type LedgerSummary struct {

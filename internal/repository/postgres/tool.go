@@ -23,15 +23,23 @@ func NewToolRepository(db *sql.DB) repository.ToolRepository {
 func (r *toolRepository) Create(ctx context.Context, t *domain.Tool) error {
 	query := `INSERT INTO tools (owner_id, name, description, categories, price_per_day_cents, price_per_week_cents, price_per_month_cents, replacement_cost_cents, duration_unit, condition, metro, status, created_on) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`
-	return r.db.QueryRowContext(ctx, query, t.OwnerID, t.Name, t.Description, pq.Array(t.Categories), t.PricePerDayCents, t.PricePerWeekCents, t.PricePerMonthCents, t.ReplacementCostCents, "day", t.Condition, t.Metro, t.Status, time.Now()).Scan(&t.ID)
+	now := time.Now().Format("2006-01-02")
+	return r.db.QueryRowContext(ctx, query, t.OwnerID, t.Name, t.Description, pq.Array(t.Categories), t.PricePerDayCents, t.PricePerWeekCents, t.PricePerMonthCents, t.ReplacementCostCents, "day", t.Condition, t.Metro, t.Status, now).Scan(&t.ID)
 }
 
 func (r *toolRepository) GetByID(ctx context.Context, id int32) (*domain.Tool, error) {
 	t := &domain.Tool{}
 	query := `SELECT id, owner_id, name, COALESCE(description, ''), categories, price_per_day_cents, COALESCE(price_per_week_cents, 0), COALESCE(price_per_month_cents, 0), COALESCE(replacement_cost_cents, 0), condition, metro, status, created_on, deleted_on FROM tools WHERE id = $1`
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&t.ID, &t.OwnerID, &t.Name, &t.Description, pq.Array(&t.Categories), &t.PricePerDayCents, &t.PricePerWeekCents, &t.PricePerMonthCents, &t.ReplacementCostCents, &t.Condition, &t.Metro, &t.Status, &t.CreatedOn, &t.DeletedOn)
+	var createdOn time.Time
+	var deletedOn sql.NullTime
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&t.ID, &t.OwnerID, &t.Name, &t.Description, pq.Array(&t.Categories), &t.PricePerDayCents, &t.PricePerWeekCents, &t.PricePerMonthCents, &t.ReplacementCostCents, &t.Condition, &t.Metro, &t.Status, &createdOn, &deletedOn)
 	if err != nil {
 		return nil, err
+	}
+	t.CreatedOn = createdOn.Format("2006-01-02")
+	if deletedOn.Valid {
+		dateStr := deletedOn.Time.Format("2006-01-02")
+		t.DeletedOn = &dateStr
 	}
 	return t, nil
 }
@@ -44,7 +52,7 @@ func (r *toolRepository) Update(ctx context.Context, t *domain.Tool) error {
 
 func (r *toolRepository) Delete(ctx context.Context, id int32) error {
 	query := `UPDATE tools SET deleted_on = $1 WHERE id = $2`
-	_, err := r.db.ExecContext(ctx, query, time.Now(), id)
+	_, err := r.db.ExecContext(ctx, query, time.Now().Format("2006-01-02"), id)
 	return err
 }
 
@@ -109,62 +117,69 @@ func (r *toolRepository) ListByOwner(ctx context.Context, ownerID int32, page, p
 	var tools []domain.Tool
 	for rows.Next() {
 		var t domain.Tool
-		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Name, &t.Description, pq.Array(&t.Categories), &t.PricePerDayCents, &t.PricePerWeekCents, &t.PricePerMonthCents, &t.ReplacementCostCents, &t.Condition, &t.Metro, &t.Status, &t.CreatedOn, &t.DeletedOn); err != nil {
+		var createdOn time.Time
+		var deletedOn sql.NullTime
+		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Name, &t.Description, pq.Array(&t.Categories), &t.PricePerDayCents, &t.PricePerWeekCents, &t.PricePerMonthCents, &t.ReplacementCostCents, &t.Condition, &t.Metro, &t.Status, &createdOn, &deletedOn); err != nil {
 			return nil, 0, err
+		}
+		t.CreatedOn = createdOn.Format("2006-01-02")
+		if deletedOn.Valid {
+			dateStr := deletedOn.Time.Format("2006-01-02")
+			t.DeletedOn = &dateStr
 		}
 		tools = append(tools, t)
 	}
 	return tools, count, nil
 }
 
-func (r *toolRepository) Search(ctx context.Context, userID int32, metro, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
+func (r *toolRepository) Search(ctx context.Context, userID int32, metro, queryTerm string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error) {
 	offset := (page - 1) * pageSize
 	// Basic filters: metro, not deleted, not owner, status not UNAVAILABLE
-	sql := `SELECT id, owner_id, name, COALESCE(description, ''), categories, price_per_day_cents, COALESCE(price_per_week_cents, 0), COALESCE(price_per_month_cents, 0), COALESCE(replacement_cost_cents, 0), condition, metro, status, created_on, deleted_on 
+	query := `SELECT id, owner_id, name, COALESCE(description, ''), categories, price_per_day_cents, COALESCE(price_per_week_cents, 0), COALESCE(price_per_month_cents, 0), COALESCE(replacement_cost_cents, 0), condition, metro, status, created_on, deleted_on 
 	          FROM tools WHERE metro = $1 AND deleted_on IS NULL AND owner_id != $2 AND status != $3`
 
 	args := []interface{}{metro, userID, domain.ToolStatusUnavailable}
 	argIdx := 4
 
-	if query != "" {
-		sql += fmt.Sprintf(" AND (name ILIKE $%d OR description ILIKE $%d)", argIdx, argIdx)
-		args = append(args, "%"+query+"%")
+	if queryTerm != "" {
+		query += fmt.Sprintf(" AND (name ILIKE $%d OR description ILIKE $%d)", argIdx, argIdx)
+		args = append(args, "%"+queryTerm+"%")
 		argIdx++
 	}
 	if len(categories) > 0 {
-		sql += fmt.Sprintf(" AND categories && $%d", argIdx)
+		query += fmt.Sprintf(" AND categories && $%d", argIdx)
 		args = append(args, pq.Array(categories))
 		argIdx++
 	}
 	if maxPrice > 0 {
-		sql += fmt.Sprintf(" AND price_per_day_cents <= $%d", argIdx)
+		query += fmt.Sprintf(" AND price_per_day_cents <= $%d", argIdx)
 		args = append(args, maxPrice)
 		argIdx++
 	}
 	if condition != "" {
 		if condition == "NOT_DAMAGED" {
 			// Exclude damaged tools
-			sql += fmt.Sprintf(" AND condition != $%d", argIdx)
+			query += fmt.Sprintf(" AND condition != $%d", argIdx)
 			args = append(args, domain.ToolConditionDamaged)
 		} else {
 			// Specific condition filter
-			sql += fmt.Sprintf(" AND condition = $%d", argIdx)
+			query += fmt.Sprintf(" AND condition = $%d", argIdx)
 			args = append(args, condition)
 		}
 		argIdx++
 	}
 
 	var count int32
-	countSql := "SELECT count(*) FROM (" + sql + ") as sub"
-	err := r.db.QueryRowContext(ctx, countSql, args...).Scan(&count)
+	countQuery := "SELECT count(*) FROM (" + query + ") as sub"
+	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&count)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	sql += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
 	args = append(args, pageSize, offset)
 
-	rows, err := r.db.QueryContext(ctx, sql, args...)
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -173,8 +188,15 @@ func (r *toolRepository) Search(ctx context.Context, userID int32, metro, query 
 	var tools []domain.Tool
 	for rows.Next() {
 		var t domain.Tool
-		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Name, &t.Description, pq.Array(&t.Categories), &t.PricePerDayCents, &t.PricePerWeekCents, &t.PricePerMonthCents, &t.ReplacementCostCents, &t.Condition, &t.Metro, &t.Status, &t.CreatedOn, &t.DeletedOn); err != nil {
+		var createdOn time.Time
+		var deletedOn sql.NullTime
+		if err := rows.Scan(&t.ID, &t.OwnerID, &t.Name, &t.Description, pq.Array(&t.Categories), &t.PricePerDayCents, &t.PricePerWeekCents, &t.PricePerMonthCents, &t.ReplacementCostCents, &t.Condition, &t.Metro, &t.Status, &createdOn, &deletedOn); err != nil {
 			return nil, 0, err
+		}
+		t.CreatedOn = createdOn.Format("2006-01-02")
+		if deletedOn.Valid {
+			dateStr := deletedOn.Time.Format("2006-01-02")
+			t.DeletedOn = &dateStr
 		}
 		tools = append(tools, t)
 	}

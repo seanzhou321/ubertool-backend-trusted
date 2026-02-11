@@ -367,8 +367,8 @@ func (s *billSplitService) updateBalances(ctx context.Context, bill *domain.Bill
 		return err
 	}
 	creditorUserOrg.BalanceCents += bill.AmountCents
-	now := time.Now()
-	creditorUserOrg.LastBalanceUpdateOn = &now
+	nowDate := time.Now().Format("2006-01-02")
+	creditorUserOrg.LastBalanceUpdateOn = &nowDate
 	if err := s.userRepo.UpdateUserOrg(ctx, creditorUserOrg); err != nil {
 		return err
 	}
@@ -379,7 +379,7 @@ func (s *billSplitService) updateBalances(ctx context.Context, bill *domain.Bill
 		return err
 	}
 	debtorUserOrg.BalanceCents -= bill.AmountCents
-	debtorUserOrg.LastBalanceUpdateOn = &now
+	debtorUserOrg.LastBalanceUpdateOn = &nowDate
 	if err := s.userRepo.UpdateUserOrg(ctx, debtorUserOrg); err != nil {
 		return err
 	}
@@ -477,7 +477,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 		if err == nil {
 			debtorUserOrg.RentingBlocked = true
 			debtorUserOrg.BlockedDueToBillID = &bill.ID
-			debtorUserOrg.BillBlockReason = "Blocked due to unresolved payment dispute (debtor at fault)"
+			debtorUserOrg.BlockedReason = "Blocked due to unresolved payment dispute (debtor at fault)"
 			_ = s.userRepo.UpdateUserOrg(ctx, debtorUserOrg)
 		}
 		bill.ResolutionNotes = "Admin resolved: Debtor blocked from renting due to fault"
@@ -492,7 +492,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 		if err == nil {
 			creditorUserOrg.LendingBlocked = true
 			creditorUserOrg.BlockedDueToBillID = &bill.ID
-			creditorUserOrg.BillBlockReason = "Blocked due to dispute resolution (creditor at fault)"
+			creditorUserOrg.BlockedReason = "Blocked due to dispute resolution (creditor at fault)"
 			_ = s.userRepo.UpdateUserOrg(ctx, creditorUserOrg)
 		}
 		bill.ResolutionNotes = "Admin resolved: Creditor at fault, payment marked valid"
@@ -503,7 +503,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 		if err == nil {
 			debtorUserOrg.RentingBlocked = true
 			debtorUserOrg.BlockedDueToBillID = &bill.ID
-			debtorUserOrg.BillBlockReason = "Blocked due to unresolved payment dispute (both at fault)"
+			debtorUserOrg.BlockedReason = "Blocked due to unresolved payment dispute (both at fault)"
 			_ = s.userRepo.UpdateUserOrg(ctx, debtorUserOrg)
 		}
 
@@ -511,7 +511,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 		if err == nil {
 			creditorUserOrg.LendingBlocked = true
 			creditorUserOrg.BlockedDueToBillID = &bill.ID
-			creditorUserOrg.BillBlockReason = "Blocked due to unresolved payment dispute (both at fault)"
+			creditorUserOrg.BlockedReason = "Blocked due to unresolved payment dispute (both at fault)"
 			_ = s.userRepo.UpdateUserOrg(ctx, creditorUserOrg)
 		}
 		bill.ResolutionNotes = "Admin resolved: Both parties blocked from renting/lending"

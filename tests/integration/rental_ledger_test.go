@@ -9,6 +9,7 @@ import (
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/repository/postgres"
 	"ubertool-backend-trusted/internal/service"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,7 @@ import (
 type MockEmailService struct {
 	mock.Mock
 }
+
 func (m *MockEmailService) SendRentalRequestNotification(ctx context.Context, ownerEmail, renterName, toolName, renterEmail string) error {
 	return nil
 }
@@ -72,6 +74,7 @@ func (m *MockEmailService) SendBillDisputeResolutionNotification(ctx context.Con
 type MockNotificationRepo struct {
 	mock.Mock
 }
+
 func (m *MockNotificationRepo) Create(ctx context.Context, n *domain.Notification) error {
 	return nil
 }
@@ -99,19 +102,19 @@ func TestRentalAndLedger_Integration(t *testing.T) {
 	db.QueryRow("SELECT id FROM orgs WHERE name = $1", orgName).Scan(&orgID)
 
 	owner := &domain.User{
-		Email:       fmt.Sprintf("owner-%d@t.com", time.Now().UnixNano()),
-		PhoneNumber: fmt.Sprintf("p1-%d", time.Now().UnixNano()),
+		Email:        fmt.Sprintf("owner-%d@t.com", time.Now().UnixNano()),
+		PhoneNumber:  fmt.Sprintf("p1-%d", time.Now().UnixNano()),
 		PasswordHash: "h", Name: "Owner",
 	}
 	userRepo.Create(ctx, owner)
 
 	renter := &domain.User{
-		Email:       fmt.Sprintf("renter-%d@t.com", time.Now().UnixNano()),
-		PhoneNumber: fmt.Sprintf("p2-%d", time.Now().UnixNano()),
+		Email:        fmt.Sprintf("renter-%d@t.com", time.Now().UnixNano()),
+		PhoneNumber:  fmt.Sprintf("p2-%d", time.Now().UnixNano()),
 		PasswordHash: "h", Name: "Renter",
 	}
 	userRepo.Create(ctx, renter)
-	
+
 	// Set initial balance for renter
 	userRepo.AddUserToOrg(ctx, &domain.UserOrg{
 		UserID: renter.ID, OrgID: orgID, BalanceCents: 5000, Status: domain.UserOrgStatusActive, Role: domain.UserOrgRoleMember,
@@ -129,7 +132,7 @@ func TestRentalAndLedger_Integration(t *testing.T) {
 		// 2. Create Rental Request
 		rental := &domain.Rental{
 			OrgID: orgID, ToolID: tool.ID, RenterID: renter.ID, OwnerID: owner.ID,
-			StartDate: time.Now(), EndDate: time.Now().Add(24 * time.Hour),
+			StartDate: time.Now().Format("2006-01-02"), EndDate: time.Now().Add(24 * time.Hour).Format("2006-01-02"),
 			TotalCostCents: 1000, Status: domain.RentalStatusPending,
 		}
 		err := rentalRepo.Create(ctx, rental)
@@ -185,8 +188,8 @@ func TestRentalDateChange_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	owner := &domain.User{
-		Email: fmt.Sprintf("owner-d-%d@t.com", time.Now().UnixNano()),
-		PhoneNumber: fmt.Sprintf("+1555%d", time.Now().UnixNano()%10000000),
+		Email:        fmt.Sprintf("owner-d-%d@t.com", time.Now().UnixNano()),
+		PhoneNumber:  fmt.Sprintf("+1555%d", time.Now().UnixNano()%10000000),
 		PasswordHash: "h", Name: "Owner",
 	}
 	err = userRepo.Create(ctx, owner)
@@ -194,14 +197,14 @@ func TestRentalDateChange_Integration(t *testing.T) {
 	require.NotZero(t, owner.ID, "Owner ID should be set after creation")
 
 	renter := &domain.User{
-		Email: fmt.Sprintf("renter-d-%d@t.com", time.Now().UnixNano()),
-		PhoneNumber: fmt.Sprintf("+1666%d", time.Now().UnixNano()%10000000),
+		Email:        fmt.Sprintf("renter-d-%d@t.com", time.Now().UnixNano()),
+		PhoneNumber:  fmt.Sprintf("+1666%d", time.Now().UnixNano()%10000000),
 		PasswordHash: "h", Name: "Renter",
 	}
 	err = userRepo.Create(ctx, renter)
 	require.NoError(t, err)
 	require.NotZero(t, renter.ID, "Renter ID should be set after creation")
-	
+
 	err = userRepo.AddUserToOrg(ctx, &domain.UserOrg{UserID: renter.ID, OrgID: orgID, BalanceCents: 50000, Status: domain.UserOrgStatusActive})
 	require.NoError(t, err)
 	err = userRepo.AddUserToOrg(ctx, &domain.UserOrg{UserID: owner.ID, OrgID: orgID, BalanceCents: 0, Status: domain.UserOrgStatusActive})
@@ -216,9 +219,9 @@ func TestRentalDateChange_Integration(t *testing.T) {
 
 	t.Run("Activate -> Extend -> Approve", func(t *testing.T) {
 		// Use date-only format to match service parsing
-		startDate, _ := time.Parse("2006-01-02", "2025-01-01")
-		endDate, _ := time.Parse("2006-01-02", "2025-01-02")
-		
+		startDate := "2025-01-01"
+		endDate := "2025-01-02"
+
 		// Create Scheduled Rental manually
 		rental := &domain.Rental{
 			OrgID: orgID, ToolID: tool.ID, RenterID: renter.ID, OwnerID: owner.ID,
@@ -241,7 +244,9 @@ func TestRentalDateChange_Integration(t *testing.T) {
 
 		// 1. Activate
 		actRental, err := svc.ActivateRental(ctx, owner.ID, rental.ID)
-		if err != nil { t.Logf("Activate Error: %v", err) }
+		if err != nil {
+			t.Logf("Activate Error: %v", err)
+		}
 		require.NoError(t, err)
 		require.NotNil(t, actRental)
 		assert.Equal(t, domain.RentalStatusActive, actRental.Status)
@@ -264,7 +269,9 @@ func TestRentalDateChange_Integration(t *testing.T) {
 
 		// 3. Approve Extension
 		appRental, err := svc.ApproveReturnDateChange(ctx, owner.ID, rental.ID)
-		if err != nil { t.Logf("Approve Error: %v", err) }
+		if err != nil {
+			t.Logf("Approve Error: %v", err)
+		}
 		require.NoError(t, err)
 		require.NotNil(t, appRental)
 		// Note: Status becomes OVERDUE because the rental dates are in the past
@@ -273,7 +280,8 @@ func TestRentalDateChange_Integration(t *testing.T) {
 		// Verify EndDate and LastAgreedEndDate are updated (check logic persistence)
 		// Since we use DB, let's fetch fresh
 		finalRental, _ := rentalRepo.GetByID(ctx, rental.ID)
-		assert.Equal(t, newEnd, finalRental.EndDate.Format("2006-01-02"))
-		assert.Equal(t, newEnd, finalRental.LastAgreedEndDate.Format("2006-01-02"))
+		assert.Equal(t, newEnd, finalRental.EndDate)
+		assert.NotNil(t, finalRental.LastAgreedEndDate)
+		assert.Equal(t, newEnd, *finalRental.LastAgreedEndDate)
 	})
 }

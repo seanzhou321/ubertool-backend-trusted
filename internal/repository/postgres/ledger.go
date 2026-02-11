@@ -20,7 +20,8 @@ func NewLedgerRepository(db *sql.DB) repository.LedgerRepository {
 func (r *ledgerRepository) CreateTransaction(ctx context.Context, tx *domain.LedgerTransaction) error {
 	query := `INSERT INTO ledger_transactions (org_id, user_id, amount, type, related_rental_id, description, charged_on, created_on) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
-	return r.db.QueryRowContext(ctx, query, tx.OrgID, tx.UserID, tx.Amount, tx.Type, tx.RelatedRentalID, tx.Description, time.Now(), time.Now()).Scan(&tx.ID)
+	now := time.Now().Format("2006-01-02")
+	return r.db.QueryRowContext(ctx, query, tx.OrgID, tx.UserID, tx.Amount, tx.Type, tx.RelatedRentalID, tx.Description, now, now).Scan(&tx.ID)
 }
 
 func (r *ledgerRepository) GetBalance(ctx context.Context, userID, orgID int32) (int32, error) {
@@ -50,9 +51,12 @@ func (r *ledgerRepository) ListTransactions(ctx context.Context, userID, orgID i
 	var txs []domain.LedgerTransaction
 	for rows.Next() {
 		var tx domain.LedgerTransaction
-		if err := rows.Scan(&tx.ID, &tx.OrgID, &tx.UserID, &tx.Amount, &tx.Type, &tx.RelatedRentalID, &tx.Description, &tx.ChargedOn, &tx.CreatedOn); err != nil {
+		var chargedOn, createdOn time.Time
+		if err := rows.Scan(&tx.ID, &tx.OrgID, &tx.UserID, &tx.Amount, &tx.Type, &tx.RelatedRentalID, &tx.Description, &chargedOn, &createdOn); err != nil {
 			return nil, 0, err
 		}
+		tx.ChargedOn = chargedOn.Format("2006-01-02")
+		tx.CreatedOn = createdOn.Format("2006-01-02")
 		txs = append(txs, tx)
 	}
 	return txs, count, nil
@@ -61,7 +65,7 @@ func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID int32) 
 	summary := &domain.LedgerSummary{
 		StatusCount: make(map[string]int32),
 	}
-	
+
 	// Balance
 	balance, err := r.GetBalance(ctx, userID, orgID)
 	if err != nil {

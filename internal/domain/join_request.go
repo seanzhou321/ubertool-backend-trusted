@@ -1,7 +1,5 @@
 package domain
 
-import "time"
-
 type JoinRequestStatus string
 
 const (
@@ -18,6 +16,6 @@ type JoinRequest struct {
 	Email     string            `json:"email"`
 	Note      string            `json:"note"`
 	Status    JoinRequestStatus `json:"status"`
-	CreatedOn time.Time         `json:"created_on"`
-	UsedOn    *time.Time        `json:"used_on,omitempty"` // Date when invitation code was used
+	CreatedOn string            `json:"created_on"`
+	UsedOn    *string           `json:"used_on,omitempty"` // Date when invitation code was used
 }

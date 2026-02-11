@@ -34,7 +34,8 @@ func (r *notificationRepository) Create(ctx context.Context, n *domain.Notificat
 	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
 	logger.DatabaseCall("INSERT", "notifications", "userID", n.UserID, "orgID", n.OrgID)
 
-	err = r.db.QueryRowContext(ctx, query, n.UserID, n.OrgID, n.Title, n.Message, n.IsRead, attrs, time.Now()).Scan(&n.ID)
+	now := time.Now().Format("2006-01-02")
+	err = r.db.QueryRowContext(ctx, query, n.UserID, n.OrgID, n.Title, n.Message, n.IsRead, attrs, now).Scan(&n.ID)
 	logger.DatabaseResult("INSERT", 1, err, "notificationID", n.ID)
 
 	if err != nil {
@@ -65,9 +66,11 @@ func (r *notificationRepository) List(ctx context.Context, userID int32, limit, 
 	for rows.Next() {
 		var n domain.Notification
 		var attrs []byte
-		if err := rows.Scan(&n.ID, &n.UserID, &n.OrgID, &n.Title, &n.Message, &n.IsRead, &attrs, &n.CreatedOn); err != nil {
+		var createdOn time.Time
+		if err := rows.Scan(&n.ID, &n.UserID, &n.OrgID, &n.Title, &n.Message, &n.IsRead, &attrs, &createdOn); err != nil {
 			return nil, 0, err
 		}
+		n.CreatedOn = createdOn.Format("2006-01-02")
 		if len(attrs) > 0 {
 			if err := json.Unmarshal(attrs, &n.Attributes); err != nil {
 				return nil, 0, err

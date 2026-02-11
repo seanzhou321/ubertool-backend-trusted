@@ -33,8 +33,8 @@ erDiagram
         INT balance_cents
         TEXT status
         TEXT role
-        TEXT block_reason
-        DATE blocked_date
+        TEXT blocked_reason
+        DATE blocked_on
     }
 
     INVITATIONS {

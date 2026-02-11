@@ -20,16 +20,19 @@ func NewOrganizationRepository(db *sql.DB) repository.OrganizationRepository {
 func (r *organizationRepository) Create(ctx context.Context, o *domain.Organization) error {
 	query := `INSERT INTO orgs (name, description, address, metro, admin_phone_number, admin_email, created_on) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
-	return r.db.QueryRowContext(ctx, query, o.Name, o.Description, o.Address, o.Metro, o.AdminPhoneNumber, o.AdminEmail, time.Now()).Scan(&o.ID)
+	now := time.Now().Format("2006-01-02")
+	return r.db.QueryRowContext(ctx, query, o.Name, o.Description, o.Address, o.Metro, o.AdminPhoneNumber, o.AdminEmail, now).Scan(&o.ID)
 }
 
 func (r *organizationRepository) GetByID(ctx context.Context, id int32) (*domain.Organization, error) {
 	o := &domain.Organization{}
 	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on FROM orgs WHERE id = $1`
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &o.CreatedOn)
+	var createdOn time.Time
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &createdOn)
 	if err != nil {
 		return nil, err
 	}
+	o.CreatedOn = createdOn.Format("2006-01-02")
 	return o, nil
 }
 
@@ -44,9 +47,11 @@ func (r *organizationRepository) List(ctx context.Context) ([]domain.Organizatio
 	var orgs []domain.Organization
 	for rows.Next() {
 		var o domain.Organization
-		if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &o.CreatedOn); err != nil {
+		var createdOn time.Time
+		if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &createdOn); err != nil {
 			return nil, err
 		}
+		o.CreatedOn = createdOn.Format("2006-01-02")
 		orgs = append(orgs, o)
 	}
 	return orgs, nil
@@ -64,9 +69,11 @@ func (r *organizationRepository) Search(ctx context.Context, name, metro string)
 	var orgs []domain.Organization
 	for rows.Next() {
 		var o domain.Organization
-		if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &o.CreatedOn); err != nil {
+		var createdOn time.Time
+		if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &createdOn); err != nil {
 			return nil, err
 		}
+		o.CreatedOn = createdOn.Format("2006-01-02")
 		orgs = append(orgs, o)
 	}
 	return orgs, nil

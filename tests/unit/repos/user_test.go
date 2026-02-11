@@ -7,6 +7,7 @@ import (
 
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/repository/postgres"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 )
@@ -58,10 +59,10 @@ func TestUserRepository_Create(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		u := &domain.User{
-			Email:       "new@test.com",
-			PhoneNumber: "456",
+			Email:        "new@test.com",
+			PhoneNumber:  "456",
 			PasswordHash: "hash",
-			Name:        "New User",
+			Name:         "New User",
 		}
 
 		mock.ExpectQuery("INSERT INTO users").
@@ -85,9 +86,9 @@ func TestUserRepository_ListMembersByOrg(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"id", "email", "phone_number", "password_hash", "name", "avatar_url", "created_on", "updated_on",
-			"user_id", "org_id", "joined_on", "balance_cents", "last_balance_updated_on", "status", "role", "blocked_date", "block_reason",
-			"renting_blocked", "lending_blocked", "blocked_due_to_bill_id", "bill_block_reason"}).
-			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, nil, "ACTIVE", "MEMBER", nil, "", false, false, nil, "")
+			"user_id", "org_id", "joined_on", "balance_cents", "last_balance_updated_on", "status", "role", "blocked_on", "blocked_reason",
+			"renting_blocked", "lending_blocked", "blocked_due_to_bill_id"}).
+			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, nil, "ACTIVE", "MEMBER", nil, "", false, false, nil)
 
 		mock.ExpectQuery("SELECT (.+) FROM users u JOIN users_orgs uo").
 			WithArgs(int32(1)).
@@ -113,9 +114,9 @@ func TestUserRepository_SearchMembersByOrg(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		rows := sqlmock.NewRows([]string{"id", "email", "phone_number", "password_hash", "name", "avatar_url", "created_on", "updated_on",
-			"user_id", "org_id", "joined_on", "balance_cents", "last_balance_updated_on", "status", "role", "blocked_date", "block_reason",
-			"renting_blocked", "lending_blocked", "blocked_due_to_bill_id", "bill_block_reason"}).
-			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, nil, "ACTIVE", "MEMBER", nil, "", false, false, nil, "")
+			"user_id", "org_id", "joined_on", "balance_cents", "last_balance_updated_on", "status", "role", "blocked_on", "blocked_reason",
+			"renting_blocked", "lending_blocked", "blocked_due_to_bill_id"}).
+			AddRow(1, "u1@test.com", "111", "hash", "User 1", "url", time.Now(), time.Now(), 1, 1, time.Now(), 100, nil, "ACTIVE", "MEMBER", nil, "", false, false, nil)
 
 		mock.ExpectQuery("SELECT (.+) FROM users u JOIN users_orgs uo").
 			WithArgs(int32(1), "%search%").

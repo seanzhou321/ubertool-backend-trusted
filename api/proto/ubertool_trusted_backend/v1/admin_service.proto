@@ -63,8 +63,8 @@ message MemberProfile {
   int32 balance = 4;
   string member_since = 5;
   bool is_blocked = 6;
-  string blocked_date = 7;
-  string block_reason = 8;
+  string blocked_on = 7;
+  string blocked_reason = 8;
 }
 
 message ListMembersResponse {

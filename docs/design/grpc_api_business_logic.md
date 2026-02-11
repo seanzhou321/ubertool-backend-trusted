@@ -113,7 +113,7 @@ Output: success, error_message
 Business Logic:
 1. Verify caller admin rights.
 2. Update the `status` field in `users_orgs` to `BLOCK`.
-3. Set `blocked_date` and `block_reason`.
+3. Set `blocked_on` and `blocked_reason`.
 
 ### List Members
 Purpose: List all members of an organization.

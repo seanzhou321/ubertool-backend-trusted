@@ -25,7 +25,8 @@ func (r *joinRequestRepository) Create(ctx context.Context, req *domain.JoinRequ
 	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
 	logger.DatabaseCall("INSERT", "join_requests", "orgID", req.OrgID, "email", req.Email)
 
-	err := r.db.QueryRowContext(ctx, query, req.OrgID, req.UserID, req.Name, req.Email, req.Note, req.Status, time.Now()).Scan(&req.ID)
+	now := time.Now().Format("2006-01-02")
+	err := r.db.QueryRowContext(ctx, query, req.OrgID, req.UserID, req.Name, req.Email, req.Note, req.Status, now).Scan(&req.ID)
 	logger.DatabaseResult("INSERT", 1, err, "requestID", req.ID)
 
 	if err != nil {
@@ -39,10 +40,12 @@ func (r *joinRequestRepository) Create(ctx context.Context, req *domain.JoinRequ
 func (r *joinRequestRepository) GetByID(ctx context.Context, id int32) (*domain.JoinRequest, error) {
 	req := &domain.JoinRequest{}
 	query := `SELECT id, org_id, user_id, name, email, note, status, created_on FROM join_requests WHERE id = $1`
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &req.CreatedOn)
+	var createdOn time.Time
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &createdOn)
 	if err != nil {
 		return nil, err
 	}
+	req.CreatedOn = createdOn.Format("2006-01-02")
 	return req, nil
 }
 
@@ -81,8 +84,15 @@ func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]d
 	var reqs []domain.JoinRequest
 	for rows.Next() {
 		var req domain.JoinRequest
-		if err := rows.Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &req.CreatedOn, &req.UsedOn); err != nil {
+		var createdOn time.Time
+		var usedOn sql.NullTime
+		if err := rows.Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &createdOn, &usedOn); err != nil {
 			return nil, err
+		}
+		req.CreatedOn = createdOn.Format("2006-01-02")
+		if usedOn.Valid {
+			dateStr := usedOn.Time.Format("2006-01-02")
+			req.UsedOn = &dateStr
 		}
 		reqs = append(reqs, req)
 	}

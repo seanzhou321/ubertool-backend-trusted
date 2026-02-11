@@ -19,7 +19,7 @@ func TestMapDomainUserToProto(t *testing.T) {
 		PhoneNumber: "1234567890",
 		Name:        "Test User",
 		AvatarURL:   "http://avatar.com",
-		CreatedOn:   now,
+		CreatedOn:   now.Format("2006-01-02"),
 	}
 
 	proto := grpc.MapDomainUserToProto(u)
@@ -30,7 +30,7 @@ func TestMapDomainUserToProto(t *testing.T) {
 	assert.Equal(t, u.PhoneNumber, proto.Phone)
 	assert.Equal(t, u.Name, proto.Name)
 	assert.Equal(t, u.AvatarURL, proto.AvatarUrl)
-	assert.Equal(t, u.CreatedOn.Format("2006-01-02"), proto.CreatedOn)
+	assert.Equal(t, u.CreatedOn, proto.CreatedOn)
 
 	assert.Nil(t, grpc.MapDomainUserToProto(nil))
 }
@@ -41,10 +41,10 @@ func TestMapDomainUserToProto_WithOrgs(t *testing.T) {
 		ID:        1,
 		Email:     "test@example.com",
 		Name:      "Test User",
-		CreatedOn: now,
+		CreatedOn: now.Format("2006-01-02"),
 		Orgs: []domain.Organization{
-			{ID: 1, Name: "Org 1", Metro: "Metro 1", CreatedOn: now},
-			{ID: 2, Name: "Org 2", Metro: "Metro 2", CreatedOn: now},
+			{ID: 1, Name: "Org 1", Metro: "Metro 1", CreatedOn: now.Format("2006-01-02")},
+			{ID: 2, Name: "Org 2", Metro: "Metro 2", CreatedOn: now.Format("2006-01-02")},
 		},
 	}
 
@@ -68,7 +68,7 @@ func TestMapDomainOrgToProto(t *testing.T) {
 		Description: "Test Desc",
 		Address:     "123 Test St",
 		Metro:       "Test Metro",
-		CreatedOn:   now,
+		CreatedOn:   now.Format("2006-01-02"),
 	}
 
 	// Test with user role
@@ -80,7 +80,7 @@ func TestMapDomainOrgToProto(t *testing.T) {
 	assert.Equal(t, o.Description, proto.Description)
 	assert.Equal(t, o.Address, proto.Address)
 	assert.Equal(t, o.Metro, proto.Metro)
-	assert.Equal(t, o.CreatedOn.Format("2006-01-02"), proto.CreatedOn)
+	assert.Equal(t, o.CreatedOn, proto.CreatedOn)
 	assert.Equal(t, "ADMIN", proto.UserRole)
 
 	// Test without user role (empty string)
@@ -103,7 +103,7 @@ func TestMapDomainToolToProto(t *testing.T) {
 		ReplacementCostCents: 5000,
 		Condition:            domain.ToolConditionExcellent,
 		Status:               domain.ToolStatusAvailable,
-		CreatedOn:            now,
+		CreatedOn:            now.Format("2006-01-02"),
 	}
 
 	proto := grpc.MapDomainToolToProto(tool)
@@ -121,18 +121,18 @@ func TestMapDomainToolToProto(t *testing.T) {
 func TestMapDomainRentalToProto(t *testing.T) {
 	now := time.Now()
 	r := &domain.Rental{
-		ID:               1,
-		OrgID:            2,
-		ToolID:           3,
-		RenterID:         4,
-		OwnerID:          5,
-		StartDate:        now,
-		EndDate:          now.Add(24 * time.Hour),
-		TotalCostCents:   2000,
-		Status:           domain.RentalStatusApproved,
-		PickupNote:       "Leave at front door",
-		CreatedOn:        now,
-		UpdatedOn:        now,
+		ID:             1,
+		OrgID:          2,
+		ToolID:         3,
+		RenterID:       4,
+		OwnerID:        5,
+		StartDate:      now.Format("2006-01-02"),
+		EndDate:        now.Add(24 * time.Hour).Format("2006-01-02"),
+		TotalCostCents: 2000,
+		Status:         domain.RentalStatusApproved,
+		PickupNote:     "Leave at front door",
+		CreatedOn:      now.Format("2006-01-02"),
+		UpdatedOn:      now.Format("2006-01-02"),
 	}
 
 	proto := grpc.MapDomainRentalToProto(r)
@@ -156,7 +156,7 @@ func TestMapDomainTransactionToProto(t *testing.T) {
 		Amount:          -500,
 		Type:            domain.TransactionTypeRentalDebit,
 		Description:     "Test Tx",
-		ChargedOn:       now,
+		ChargedOn:       now.Format("2006-01-02"),
 		RelatedRentalID: &rentalID,
 	}
 

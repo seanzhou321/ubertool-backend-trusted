@@ -7,6 +7,7 @@ import (
 
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/repository/postgres"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,14 +24,14 @@ func TestRentalRepository_Create(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		rental := &domain.Rental{
-			OrgID:            1,
-			ToolID:           2,
-			RenterID:         3,
-			OwnerID:          4,
-			StartDate:        time.Now(),
-			EndDate:          time.Now().Add(24 * time.Hour),
-			TotalCostCents:   1000,
-			Status:           domain.RentalStatusPending,
+			OrgID:          1,
+			ToolID:         2,
+			RenterID:       3,
+			OwnerID:        4,
+			StartDate:      time.Now().Format("2006-01-02"),
+			EndDate:        time.Now().Add(24 * time.Hour).Format("2006-01-02"),
+			TotalCostCents: 1000,
+			Status:         domain.RentalStatusPending,
 		}
 
 		mock.ExpectQuery("INSERT INTO rentals").

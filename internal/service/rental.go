@@ -76,8 +76,8 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 		ToolID:         toolID,
 		RenterID:       renterID,
 		OwnerID:        tool.OwnerID,
-		StartDate:      start,
-		EndDate:        end,
+		StartDate:      start.Format("2006-01-02"),
+		EndDate:        end.Format("2006-01-02"),
 		TotalCostCents: totalCost,
 		Status:         domain.RentalStatusPending,
 	}
@@ -337,7 +337,7 @@ func (s *rentalService) ActivateRental(ctx context.Context, userID, rentalID int
 	}
 
 	if otherEmail != "" {
-		_ = s.emailSvc.SendRentalPickupNotification(ctx, otherEmail, otherName, toolName, rt.StartDate.Format("2006-01-02"), rt.EndDate.Format("2006-01-02"))
+		_ = s.emailSvc.SendRentalPickupNotification(ctx, otherEmail, otherName, toolName, rt.StartDate, rt.EndDate)
 
 		notif := &domain.Notification{
 			UserID:  otherID,
@@ -382,12 +382,12 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 	if newStart != "" {
 		nStart, _ = time.Parse("2006-01-02", newStart)
 	} else {
-		nStart = rt.StartDate // Default to existing if not provided
+		nStart, _ = time.Parse("2006-01-02", rt.StartDate)
 	}
 	if newEnd != "" {
 		nEnd, _ = time.Parse("2006-01-02", newEnd)
 	} else {
-		nEnd = rt.EndDate
+		nEnd, _ = time.Parse("2006-01-02", rt.EndDate)
 	}
 	// Verify old dates match (optimistic locking check) - skipping for simplicity as per requirement focus
 
@@ -400,8 +400,8 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 	// Logic Branching
 	if rt.Status == domain.RentalStatusPending || rt.Status == domain.RentalStatusApproved || rt.Status == domain.RentalStatusScheduled {
 		// Pre-active changes
-		rt.StartDate = nStart
-		rt.EndDate = nEnd
+		rt.StartDate = nStart.Format("2006-01-02")
+		rt.EndDate = nEnd.Format("2006-01-02")
 		rt.TotalCostCents = newCost
 
 		if isRenter {
@@ -438,13 +438,13 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 		}
 	} else if (rt.Status == domain.RentalStatusActive || rt.Status == domain.RentalStatusOverdue) && isRenter {
 		// Extension request
-		if newStart != "" && !nStart.Equal(rt.StartDate) {
+		if newStart != "" && nStart.Format("2006-01-02") != rt.StartDate {
 			return nil, errors.New("cannot change start date of active rental")
 		}
 
 		// Store the requested new end date in the end_date field
 		// The last_agreed_end_date stores the original agreed date for potential rollback
-		rt.EndDate = nEnd
+		rt.EndDate = nEnd.Format("2006-01-02")
 		rt.TotalCostCents = newCost
 		rt.Status = domain.RentalStatusReturnDateChanged
 
@@ -462,12 +462,12 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 		}
 	} else if rt.Status == domain.RentalStatusReturnDateChanged && isRenter {
 		// Renter is updating their pending extension request
-		if newStart != "" && !nStart.Equal(rt.StartDate) {
+		if newStart != "" && nStart.Format("2006-01-02") != rt.StartDate {
 			return nil, errors.New("cannot change start date of active rental")
 		}
 
 		// Update the requested new end date in the end_date field
-		rt.EndDate = nEnd
+		rt.EndDate = nEnd.Format("2006-01-02")
 		rt.TotalCostCents = newCost
 		// Status remains RETURN_DATE_CHANGED
 
@@ -510,7 +510,8 @@ func (s *rentalService) ApproveReturnDateChange(ctx context.Context, ownerID, re
 	rt.Status = domain.RentalStatusActive
 
 	// Check overdue?
-	if time.Now().After(rt.EndDate) {
+	endDate, _ := time.Parse("2006-01-02", rt.EndDate)
+	if time.Now().After(endDate) {
 		rt.Status = domain.RentalStatusOverdue
 	}
 
@@ -556,7 +557,7 @@ func (s *rentalService) RejectReturnDateChange(ctx context.Context, ownerID, ren
 	}
 
 	// Validate new_end_date is different from requested date
-	if newEndDate.Format("2006-01-02") == rt.EndDate.Format("2006-01-02") {
+	if newEndDate.Format("2006-01-02") == rt.EndDate {
 		return nil, errors.New("new end date must be different from the requested date")
 	}
 
@@ -571,10 +572,11 @@ func (s *rentalService) RejectReturnDateChange(ctx context.Context, ownerID, ren
 	rt.RejectionReason = reason
 
 	// Update end_date with owner's counter-proposal
-	rt.EndDate = newEndDate
+	rt.EndDate = newEndDate.Format("2006-01-02")
 
 	// Recalculate total_cost_cents based on new end date using tiered pricing
-	newCost, err := utils.CalculateRentalCost(rt.StartDate, newEndDate, tool)
+	startDate, _ := time.Parse("2006-01-02", rt.StartDate)
+	newCost, err := utils.CalculateRentalCost(startDate, newEndDate, tool)
 	if err != nil {
 		return nil, err
 	}
@@ -629,7 +631,9 @@ func (s *rentalService) AcknowledgeReturnDateRejection(ctx context.Context, rent
 	if rt.LastAgreedEndDate != nil {
 		rt.EndDate = *rt.LastAgreedEndDate
 		// Recalculate cost using the last agreed end date
-		originalCost, err := utils.CalculateRentalCost(rt.StartDate, rt.EndDate, tool)
+		startDate, _ := time.Parse("2006-01-02", rt.StartDate)
+		endDate, _ := time.Parse("2006-01-02", rt.EndDate)
+		originalCost, err := utils.CalculateRentalCost(startDate, endDate, tool)
 		if err != nil {
 			return nil, err
 		}
@@ -638,7 +642,8 @@ func (s *rentalService) AcknowledgeReturnDateRejection(ctx context.Context, rent
 
 	rt.RejectionReason = ""
 
-	if time.Now().After(rt.EndDate) {
+	endDate, _ := time.Parse("2006-01-02", rt.EndDate)
+	if time.Now().After(endDate) {
 		rt.Status = domain.RentalStatusOverdue
 	} else {
 		rt.Status = domain.RentalStatusActive
@@ -683,14 +688,17 @@ func (s *rentalService) CancelReturnDateChange(ctx context.Context, renterID, re
 	if rt.LastAgreedEndDate != nil {
 		rt.EndDate = *rt.LastAgreedEndDate
 		// Recalculate cost using the last agreed end date
-		originalCost, err := utils.CalculateRentalCost(rt.StartDate, rt.EndDate, tool)
+		startDate, _ := time.Parse("2006-01-02", rt.StartDate)
+		endDate, _ := time.Parse("2006-01-02", rt.EndDate)
+		originalCost, err := utils.CalculateRentalCost(startDate, endDate, tool)
 		if err != nil {
 			return nil, err
 		}
 		rt.TotalCostCents = originalCost
 	}
 
-	if time.Now().After(rt.EndDate) {
+	endDate, _ := time.Parse("2006-01-02", rt.EndDate)
+	if time.Now().After(endDate) {
 		rt.Status = domain.RentalStatusOverdue
 	} else {
 		rt.Status = domain.RentalStatusActive
@@ -776,7 +784,7 @@ func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID in
 	}
 
 	now := time.Now()
-	rt.EndDate = now
+	rt.EndDate = now.Format("2006-01-02")
 	rt.Status = domain.RentalStatusCompleted
 	rt.CompletedBy = &ownerID
 	if err := s.rentalRepo.Update(ctx, rt); err != nil {

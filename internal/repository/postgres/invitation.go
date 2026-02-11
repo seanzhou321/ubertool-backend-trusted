@@ -50,20 +50,31 @@ func (r *invitationRepository) Create(ctx context.Context, inv *domain.Invitatio
 
 	query := `INSERT INTO invitations (invitation_code, org_id, email, created_by, expires_on, created_on) 
 	          VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
-	err = r.db.QueryRowContext(ctx, query, invitationCode, inv.OrgID, inv.Email, inv.CreatedBy, inv.ExpiresOn, time.Now()).Scan(&inv.ID)
+	now := time.Now().Format("2006-01-02")
+	err = r.db.QueryRowContext(ctx, query, invitationCode, inv.OrgID, inv.Email, inv.CreatedBy, inv.ExpiresOn, now).Scan(&inv.ID)
 	if err != nil {
 		return err
 	}
 	inv.InvitationCode = invitationCode
+	inv.CreatedOn = now
 	return nil
 }
 
 func (r *invitationRepository) GetByInvitationCode(ctx context.Context, invitationCode string) (*domain.Invitation, error) {
 	inv := &domain.Invitation{}
 	query := `SELECT id, invitation_code, org_id, email, created_by, expires_on, used_on, used_by_user_id, created_on FROM invitations WHERE invitation_code = $1`
-	err := r.db.QueryRowContext(ctx, query, invitationCode).Scan(&inv.ID, &inv.InvitationCode, &inv.OrgID, &inv.Email, &inv.CreatedBy, &inv.ExpiresOn, &inv.UsedOn, &inv.UsedByUserID, &inv.CreatedOn)
+	var expiresOn, createdOn time.Time
+	var usedOn sql.NullTime
+
+	err := r.db.QueryRowContext(ctx, query, invitationCode).Scan(&inv.ID, &inv.InvitationCode, &inv.OrgID, &inv.Email, &inv.CreatedBy, &expiresOn, &usedOn, &inv.UsedByUserID, &createdOn)
 	if err != nil {
 		return nil, err
+	}
+	inv.ExpiresOn = expiresOn.Format("2006-01-02")
+	inv.CreatedOn = createdOn.Format("2006-01-02")
+	if usedOn.Valid {
+		dateStr := usedOn.Time.Format("2006-01-02")
+		inv.UsedOn = &dateStr
 	}
 	return inv, nil
 }
@@ -73,9 +84,18 @@ func (r *invitationRepository) GetByInvitationCodeAndEmail(ctx context.Context, 
 	query := `SELECT id, invitation_code, org_id, email, created_by, expires_on, used_on, used_by_user_id, created_on 
 	          FROM invitations 
 	          WHERE invitation_code = $1 AND LOWER(email) = LOWER($2)`
-	err := r.db.QueryRowContext(ctx, query, invitationCode, email).Scan(&inv.ID, &inv.InvitationCode, &inv.OrgID, &inv.Email, &inv.CreatedBy, &inv.ExpiresOn, &inv.UsedOn, &inv.UsedByUserID, &inv.CreatedOn)
+	var expiresOn, createdOn time.Time
+	var usedOn sql.NullTime
+
+	err := r.db.QueryRowContext(ctx, query, invitationCode, email).Scan(&inv.ID, &inv.InvitationCode, &inv.OrgID, &inv.Email, &inv.CreatedBy, &expiresOn, &usedOn, &inv.UsedByUserID, &createdOn)
 	if err != nil {
 		return nil, err
+	}
+	inv.ExpiresOn = expiresOn.Format("2006-01-02")
+	inv.CreatedOn = createdOn.Format("2006-01-02")
+	if usedOn.Valid {
+		dateStr := usedOn.Time.Format("2006-01-02")
+		inv.UsedOn = &dateStr
 	}
 	return inv, nil
 }

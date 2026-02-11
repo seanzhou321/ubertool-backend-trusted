@@ -15,10 +15,10 @@ import (
 
 // TestBillSplitService_Integration verifies the core workflows of the Bill Split Service.
 // It covers:
-// 1. "Full Bill Lifecycle": The happy path where a bill is created, the debtor acknowledges payment,
-//    and the creditor confirms receipt, resulting in a PAID status.
-// 2. "Dispute Lifecycle": The conflict path where a bill is disputed by a user and subsequently
-//    resolved by an admin (creditor), verifying status transitions and resolution outcomes.
+//  1. "Full Bill Lifecycle": The happy path where a bill is created, the debtor acknowledges payment,
+//     and the creditor confirms receipt, resulting in a PAID status.
+//  2. "Dispute Lifecycle": The conflict path where a bill is disputed by a user and subsequently
+//     resolved by an admin (creditor), verifying status transitions and resolution outcomes.
 func TestBillSplitService_Integration(t *testing.T) {
 	db := prepareDB(t)
 	defer db.Close()
@@ -59,20 +59,33 @@ func TestBillSplitService_Integration(t *testing.T) {
 	err = userRepo.Create(ctx, debtor)
 	assert.NoError(t, err)
 
+	// Admin (Neutral party for resolving disputes)
+	adminUser := &domain.User{
+		Email:        fmt.Sprintf("admin-%d@t.com", time.Now().UnixNano()),
+		PhoneNumber:  fmt.Sprintf("a1-%d", time.Now().UnixNano()),
+		PasswordHash: "h", Name: "Admin",
+	}
+	err = userRepo.Create(ctx, adminUser)
+	assert.NoError(t, err)
+
 	// Add users to Org
 	err = userRepo.AddUserToOrg(ctx, &domain.UserOrg{
-		UserID: creditor.ID, OrgID: org.ID, Role: domain.UserOrgRoleAdmin, Status: domain.UserOrgStatusActive,
+		UserID: creditor.ID, OrgID: org.ID, Role: domain.UserOrgRoleMember, Status: domain.UserOrgStatusActive,
 	})
 	assert.NoError(t, err)
 	err = userRepo.AddUserToOrg(ctx, &domain.UserOrg{
 		UserID: debtor.ID, OrgID: org.ID, Role: domain.UserOrgRoleMember, Status: domain.UserOrgStatusActive,
 	})
 	assert.NoError(t, err)
+	err = userRepo.AddUserToOrg(ctx, &domain.UserOrg{
+		UserID: adminUser.ID, OrgID: org.ID, Role: domain.UserOrgRoleAdmin, Status: domain.UserOrgStatusActive,
+	})
+	assert.NoError(t, err)
 
 	t.Run("Full Bill Lifecycle", func(t *testing.T) {
 		// Goal: Verify the standard payment flow:
 		// Created -> Pending -> Debtor Acknowledged -> Creditor Acknowledged -> Paid
-		
+
 		// 2. Create Bill (Pending)
 		settlementMonth := time.Now().Format("2006-01")
 		bill := &domain.Bill{
@@ -126,14 +139,16 @@ func TestBillSplitService_Integration(t *testing.T) {
 	t.Run("Dispute Lifecycle", func(t *testing.T) {
 		// Goal: Verify the dispute resolution flow:
 		// Created -> Pending -> Disputed -> Admin Resolved -> Paid
-		
+
 		// Create another bill
+		// Use previous month to avoid unique constraint conflict with the bill from "Full Bill Lifecycle"
+		prevMonth := time.Now().AddDate(0, -1, 0).Format("2006-01")
 		bill2 := &domain.Bill{
 			OrgID:           org.ID,
 			DebtorUserID:    debtor.ID,
 			CreditorUserID:  creditor.ID,
 			AmountCents:     2500,
-			SettlementMonth: time.Now().Format("2006-01"),
+			SettlementMonth: prevMonth,
 			Status:          domain.BillStatusPending,
 		}
 		err := billRepo.Create(ctx, bill2)
@@ -153,18 +168,18 @@ func TestBillSplitService_Integration(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify ListDisputedPayments
-		disputes, err := billSvc.ListDisputedPayments(ctx, creditor.ID, org.ID) // Creditor is admin
+		disputes, err := billSvc.ListDisputedPayments(ctx, adminUser.ID, org.ID) // Admin user
 		assert.NoError(t, err)
 		assert.NotEmpty(t, disputes)
 		assert.Equal(t, bill2.ID, disputes[0].ID)
 
 		// Resolve Dispute
-		err = billSvc.ResolveDispute(ctx, creditor.ID, bill2.ID, string(domain.ResolutionOutcomeDebtorFault))
+		err = billSvc.ResolveDispute(ctx, adminUser.ID, bill2.ID, string(domain.ResolutionOutcomeDebtorFault))
 		assert.NoError(t, err)
 
 		updatedBill, err := billRepo.GetByID(ctx, bill2.ID)
 		assert.NoError(t, err)
-		assert.Equal(t, domain.BillStatusPaid, updatedBill.Status) // Or whatever resolution maps to
+		assert.Equal(t, domain.BillStatusAdminResolved, updatedBill.Status)
 		assert.Equal(t, string(domain.ResolutionOutcomeDebtorFault), updatedBill.ResolutionOutcome)
 	})
 }

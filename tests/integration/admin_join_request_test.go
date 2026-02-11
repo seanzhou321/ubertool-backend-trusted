@@ -79,14 +79,14 @@ func TestAdminService_ListJoinRequests_UsedOnField(t *testing.T) {
 
 		var invID1, invID2 int32
 		err = db.QueryRow(`INSERT INTO invitations (invitation_code, org_id, email, created_by, expires_on, used_on, used_by_user_id) 
-			VALUES ($1, $2, $3, 1, $4, $5, $6) RETURNING id`,
-			fmt.Sprintf("INV-%d", time.Now().UnixNano()), orgID, email1,
+			VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+			fmt.Sprintf("INV-%d", time.Now().UnixNano()), orgID, email1, userID1,
 			time.Now().AddDate(0, 0, 30), usedDate1, userID1).Scan(&invID1)
 		require.NoError(t, err)
 
 		err = db.QueryRow(`INSERT INTO invitations (invitation_code, org_id, email, created_by, expires_on, used_on, used_by_user_id) 
-			VALUES ($1, $2, $3, 1, $4, $5, $6) RETURNING id`,
-			fmt.Sprintf("INV-%d", time.Now().UnixNano()+1), orgID, email2,
+			VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+			fmt.Sprintf("INV-%d", time.Now().UnixNano()+1), orgID, email2, userID1,
 			time.Now().AddDate(0, 0, 30), usedDate2, userID2).Scan(&invID2)
 		require.NoError(t, err)
 		t.Logf("Created invitations: id1=%d (used %s), id2=%d (used %s)",
@@ -105,16 +105,16 @@ func TestAdminService_ListJoinRequests_UsedOnField(t *testing.T) {
 			if req.ID == joinReqID1 {
 				foundReq1 = true
 				require.NotNil(t, req.UsedOn, "Join request 1 should have used_on populated")
-				assert.Equal(t, usedDate1.Format("2006-01-02"), req.UsedOn.Format("2006-01-02"),
+				assert.Equal(t, usedDate1.Format("2006-01-02"), *req.UsedOn,
 					"Join request 1 used_on should match invitation used_on")
-				t.Logf("✓ Join request 1: used_on=%s (correct)", req.UsedOn.Format("2006-01-02"))
+				t.Logf("✓ Join request 1: used_on=%s (correct)", *req.UsedOn)
 			}
 			if req.ID == joinReqID2 {
 				foundReq2 = true
 				require.NotNil(t, req.UsedOn, "Join request 2 should have used_on populated")
-				assert.Equal(t, usedDate2.Format("2006-01-02"), req.UsedOn.Format("2006-01-02"),
+				assert.Equal(t, usedDate2.Format("2006-01-02"), *req.UsedOn,
 					"Join request 2 used_on should match invitation used_on")
-				t.Logf("✓ Join request 2: used_on=%s (correct)", req.UsedOn.Format("2006-01-02"))
+				t.Logf("✓ Join request 2: used_on=%s (correct)", *req.UsedOn)
 			}
 		}
 

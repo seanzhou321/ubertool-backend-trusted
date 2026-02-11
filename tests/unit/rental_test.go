@@ -31,13 +31,13 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 	endDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
 
 	tool := &domain.Tool{
-		ID:                  toolID,
-		Name:                "Tool",
-		OwnerID:             10,
-		PricePerDayCents:    1000,
-		PricePerWeekCents:   6000,
-		PricePerMonthCents:  20000,
-		DurationUnit:        domain.ToolDurationUnitDay,
+		ID:                 toolID,
+		Name:               "Tool",
+		OwnerID:            10,
+		PricePerDayCents:   1000,
+		PricePerWeekCents:  6000,
+		PricePerMonthCents: 20000,
+		DurationUnit:       domain.ToolDurationUnitDay,
 	}
 
 	t.Run("Success", func(t *testing.T) {
@@ -202,7 +202,7 @@ func TestRentalService_ActivateRental(t *testing.T) {
 	rental := &domain.Rental{
 		ID: rentalID, OwnerID: ownerID, RenterID: renterID, ToolID: toolID,
 		Status:    domain.RentalStatusScheduled,
-		StartDate: time.Now(), EndDate: time.Now().Add(24 * time.Hour),
+		StartDate: time.Now().Format("2006-01-02"), EndDate: time.Now().Add(24 * time.Hour).Format("2006-01-02"),
 		OrgID: 3,
 	}
 	tool := &domain.Tool{ID: toolID, Name: "Tool"}
@@ -249,7 +249,7 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 	baseRental := &domain.Rental{
 		ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
 		Status:    domain.RentalStatusActive,
-		StartDate: time.Now(), EndDate: time.Now().Add(24 * time.Hour),
+		StartDate: time.Now().Format("2006-01-02"), EndDate: time.Now().Add(24 * time.Hour).Format("2006-01-02"),
 		TotalCostCents: 1000,
 	}
 	tool := &domain.Tool{
@@ -293,17 +293,17 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		noteRepo := new(MockNotificationRepo)
 		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
 
-		requestedEndDate := time.Now().Add(48 * time.Hour)
-		lastAgreedEndDate := time.Now().Add(24 * time.Hour)
+		requestedEndDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
+		lastAgreedEndDate := time.Now().Add(24 * time.Hour).Format("2006-01-02")
 		r := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
-			Status:           domain.RentalStatusReturnDateChanged,
-			StartDate:        time.Now(),
+			Status:            domain.RentalStatusReturnDateChanged,
+			StartDate:         time.Now().Format("2006-01-02"),
 			LastAgreedEndDate: &lastAgreedEndDate,
-			EndDate:          requestedEndDate, // Already has a pending request
-			TotalCostCents:   2000,
+			EndDate:           requestedEndDate, // Already has a pending request
+			TotalCostCents:    2000,
 		}
-		
+
 		// Renter wants to update their request to a different date
 		updatedEndDate := time.Now().Add(72 * time.Hour).Format("2006-01-02")
 
@@ -340,9 +340,9 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 	toolID := int32(200)
 	orgID := int32(3)
 
-	startDate := time.Now()
-	requestedEndDate := time.Now().Add(72 * time.Hour) // 3 days
-	lastAgreedEndDate := time.Now().Add(24 * time.Hour) // 1 day
+	startDate := time.Now().Format("2006-01-02")
+	requestedEndDate := time.Now().Add(72 * time.Hour).Format("2006-01-02")  // 3 days
+	lastAgreedEndDate := time.Now().Add(24 * time.Hour).Format("2006-01-02") // 1 day
 
 	tool := &domain.Tool{
 		ID:                 toolID,
@@ -364,11 +364,11 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
-			Status:           domain.RentalStatusReturnDateChanged,
-			StartDate:        startDate,
+			Status:            domain.RentalStatusReturnDateChanged,
+			StartDate:         startDate,
 			LastAgreedEndDate: &lastAgreedEndDate,
-			EndDate:          requestedEndDate,
-			TotalCostCents:   3000,
+			EndDate:           requestedEndDate,
+			TotalCostCents:    3000,
 		}
 		counterProposalDate := time.Now().Add(48 * time.Hour).Format("2006-01-02") // 2 days
 		reason := "I need the tool back sooner"
@@ -380,7 +380,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		rentalRepo.On("Update", ctx, mock.MatchedBy(func(u *domain.Rental) bool {
 			return u.Status == domain.RentalStatusReturnDateChangeRejected &&
 				u.RejectionReason == reason &&
-				u.EndDate.Format("2006-01-02") == counterProposalDate &&
+				u.EndDate == counterProposalDate &&
 				u.TotalCostCents == 3000 // Recalculated based on 3 days inclusive (today to +48h)
 		})).Return(nil)
 
@@ -414,11 +414,11 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
-			Status:           domain.RentalStatusReturnDateChanged,
-			StartDate:        startDate,
+			Status:            domain.RentalStatusReturnDateChanged,
+			StartDate:         startDate,
 			LastAgreedEndDate: &lastAgreedEndDate,
-			EndDate:          requestedEndDate,
-			TotalCostCents:   3000,
+			EndDate:           requestedEndDate,
+			TotalCostCents:    3000,
 		}
 		unauthorizedUserID := int32(999)
 		counterProposalDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
@@ -441,11 +441,11 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
-			Status:           domain.RentalStatusActive, // Wrong status
-			StartDate:        startDate,
+			Status:            domain.RentalStatusActive, // Wrong status
+			StartDate:         startDate,
 			LastAgreedEndDate: &lastAgreedEndDate,
-			EndDate:          lastAgreedEndDate,
-			TotalCostCents:   1000,
+			EndDate:           lastAgreedEndDate,
+			TotalCostCents:    1000,
 		}
 		counterProposalDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
 
@@ -467,11 +467,11 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
-			Status:           domain.RentalStatusReturnDateChanged,
-			StartDate:        startDate,
+			Status:            domain.RentalStatusReturnDateChanged,
+			StartDate:         startDate,
 			LastAgreedEndDate: &lastAgreedEndDate,
-			EndDate:          requestedEndDate,
-			TotalCostCents:   3000,
+			EndDate:           requestedEndDate,
+			TotalCostCents:    3000,
 		}
 
 		rentalRepo.On("GetByID", ctx, rentalID).Return(baseRental, nil)
@@ -492,11 +492,11 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
-			Status:           domain.RentalStatusReturnDateChanged,
-			StartDate:        startDate,
+			Status:            domain.RentalStatusReturnDateChanged,
+			StartDate:         startDate,
 			LastAgreedEndDate: &lastAgreedEndDate,
-			EndDate:          requestedEndDate,
-			TotalCostCents:   3000,
+			EndDate:           requestedEndDate,
+			TotalCostCents:    3000,
 		}
 		invalidDate := "2024/01/01" // Wrong format
 
@@ -518,13 +518,13 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
-			Status:           domain.RentalStatusReturnDateChanged,
-			StartDate:        startDate,
+			Status:            domain.RentalStatusReturnDateChanged,
+			StartDate:         startDate,
 			LastAgreedEndDate: &lastAgreedEndDate,
-			EndDate:          requestedEndDate,
-			TotalCostCents:   3000,
+			EndDate:           requestedEndDate,
+			TotalCostCents:    3000,
 		}
-		sameAsRequested := requestedEndDate.Format("2006-01-02")
+		sameAsRequested := requestedEndDate
 
 		rentalRepo.On("GetByID", ctx, rentalID).Return(baseRental, nil)
 
@@ -544,13 +544,13 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
-			Status:           domain.RentalStatusReturnDateChanged,
-			StartDate:        startDate,
+			Status:            domain.RentalStatusReturnDateChanged,
+			StartDate:         startDate,
 			LastAgreedEndDate: &lastAgreedEndDate,
-			EndDate:          requestedEndDate,
-			TotalCostCents:   3000,
+			EndDate:           requestedEndDate,
+			TotalCostCents:    3000,
 		}
-		pastDate := startDate.Add(-24 * time.Hour).Format("2006-01-02")
+		pastDate := time.Now().Add(-24 * time.Hour).Format("2006-01-02")
 
 		rentalRepo.On("GetByID", ctx, rentalID).Return(baseRental, nil)
 		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
@@ -571,11 +571,11 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
-			Status:           domain.RentalStatusReturnDateChanged,
-			StartDate:        startDate,
+			Status:            domain.RentalStatusReturnDateChanged,
+			StartDate:         startDate,
 			LastAgreedEndDate: &lastAgreedEndDate,
-			EndDate:          requestedEndDate,
-			TotalCostCents:   3000,
+			EndDate:           requestedEndDate,
+			TotalCostCents:    3000,
 		}
 		counterProposalDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
 		reason := "Tool needed urgently"

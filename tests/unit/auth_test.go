@@ -30,7 +30,7 @@ func TestAuthService_ValidateInvite(t *testing.T) {
 			InvitationCode: token,
 			Email:          email,
 			OrgID:          1,
-			ExpiresOn:      time.Now().Add(time.Hour),
+			ExpiresOn:      time.Now().Add(48 * time.Hour).Format("2006-01-02"), // Future
 		}
 		inviteRepo.ExpectedCalls = nil
 		userRepo.ExpectedCalls = nil
@@ -49,7 +49,7 @@ func TestAuthService_ValidateInvite(t *testing.T) {
 			InvitationCode: token,
 			Email:          email,
 			OrgID:          1,
-			ExpiresOn:      time.Now().Add(-time.Hour),
+			ExpiresOn:      time.Now().Add(-24 * time.Hour).Format("2006-01-02"), // Yesterday
 		}
 		inviteRepo.ExpectedCalls = nil
 		inviteRepo.On("GetByInvitationCodeAndEmail", ctx, token, email).Return(invite, nil)
@@ -63,12 +63,12 @@ func TestAuthService_ValidateInvite(t *testing.T) {
 	})
 
 	t.Run("Used Token", func(t *testing.T) {
-		now := time.Now()
+		now := time.Now().Format("2006-01-02")
 		invite := &domain.Invitation{
 			InvitationCode: token,
 			Email:          email,
 			OrgID:          1,
-			ExpiresOn:      time.Now().Add(time.Hour),
+			ExpiresOn:      time.Now().Add(48 * time.Hour).Format("2006-01-02"),
 			UsedOn:         &now,
 		}
 		inviteRepo.ExpectedCalls = nil

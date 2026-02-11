@@ -40,9 +40,9 @@ func TestAdminService_E2E(t *testing.T) {
 		defer cancel()
 
 		req := &pb.ApproveRequestToJoinRequest{
-			OrganizationId:  orgID,
-			ApplicantEmail:  "e2e-test-existing@test.com",
-			ApplicantName:   "Existing User",
+			OrganizationId: orgID,
+			ApplicantEmail: "e2e-test-existing@test.com",
+			ApplicantName:  "Existing User",
 		}
 
 		resp, err := adminClient.ApproveRequestToJoin(ctx, req)
@@ -82,9 +82,9 @@ func TestAdminService_E2E(t *testing.T) {
 		defer cancel()
 
 		req := &pb.ApproveRequestToJoinRequest{
-			OrganizationId:  orgID,
-			ApplicantEmail:  newUserEmail,
-			ApplicantName:   "New User",
+			OrganizationId: orgID,
+			ApplicantEmail: newUserEmail,
+			ApplicantName:  "New User",
 		}
 
 		resp, err := adminClient.ApproveRequestToJoin(ctx, req)
@@ -129,12 +129,12 @@ func TestAdminService_E2E(t *testing.T) {
 
 		// Verify: User status updated to BLOCK
 		var status, blockReason string
-		var blockedDate *time.Time
-		err = db.QueryRow("SELECT status, block_reason, blocked_date FROM users_orgs WHERE user_id = $1 AND org_id = $2", memberID, orgID).Scan(&status, &blockReason, &blockedDate)
+		var blockedOn *time.Time
+		err = db.QueryRow("SELECT status, blocked_reason, blocked_on FROM users_orgs WHERE user_id = $1 AND org_id = $2", memberID, orgID).Scan(&status, &blockReason, &blockedOn)
 		assert.NoError(t, err)
 		assert.Equal(t, "BLOCK", status)
 		assert.Equal(t, "Violated community guidelines", blockReason)
-		assert.NotNil(t, blockedDate)
+		assert.NotNil(t, blockedOn)
 	})
 
 	t.Run("ListMembers", func(t *testing.T) {
@@ -188,4 +188,3 @@ func TestAdminService_E2E(t *testing.T) {
 		assert.GreaterOrEqual(t, len(resp.Requests), 2)
 	})
 }
-
