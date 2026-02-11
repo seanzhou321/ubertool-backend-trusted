@@ -342,7 +342,8 @@ func (db *TestDB) CreateTestBill(debtorID, creditorID, orgID int32, amountCents 
 // GetBillByID retrieves a bill by ID
 func (db *TestDB) GetBillByID(billID int32) map[string]interface{} {
 	var id, debtorID, creditorID, orgID, amountCents int32
-	var settlementMonth, status, disputeReason, resolutionOutcome, resolutionNotes string
+	var settlementMonth, status string
+	var disputeReason, resolutionOutcome, resolutionNotes sql.NullString
 	var noticeSentAt, debtorAck, creditorAck, disputedAt, resolvedAt sql.NullTime
 
 	err := db.QueryRow(`
@@ -358,23 +359,42 @@ func (db *TestDB) GetBillByID(billID int32) map[string]interface{} {
 		db.t.Fatalf("failed to get bill: %v", err)
 	}
 
-	return map[string]interface{}{
-		"id":                       id,
-		"org_id":                   orgID,
-		"debtor_user_id":           debtorID,
-		"creditor_user_id":         creditorID,
-		"amount_cents":             amountCents,
-		"settlement_month":         settlementMonth,
-		"status":                   status,
-		"notice_sent_at":           noticeSentAt,
-		"debtor_acknowledged_at":   debtorAck,
-		"creditor_acknowledged_at": creditorAck,
-		"disputed_at":              disputedAt,
-		"resolved_at":              resolvedAt,
-		"dispute_reason":           disputeReason,
-		"resolution_outcome":       resolutionOutcome,
-		"resolution_notes":         resolutionNotes,
+	result := map[string]interface{}{
+		"id":               id,
+		"org_id":           orgID,
+		"debtor_user_id":   debtorID,
+		"creditor_user_id": creditorID,
+		"amount_cents":     amountCents,
+		"settlement_month": settlementMonth,
+		"status":           status,
 	}
+
+	if noticeSentAt.Valid {
+		result["notice_sent_at"] = noticeSentAt.Time
+	}
+	if debtorAck.Valid {
+		result["debtor_acknowledged_at"] = debtorAck.Time
+	}
+	if creditorAck.Valid {
+		result["creditor_acknowledged_at"] = creditorAck.Time
+	}
+	if disputedAt.Valid {
+		result["disputed_at"] = disputedAt.Time
+	}
+	if resolvedAt.Valid {
+		result["resolved_at"] = resolvedAt.Time
+	}
+	if disputeReason.Valid {
+		result["dispute_reason"] = disputeReason.String
+	}
+	if resolutionOutcome.Valid {
+		result["resolution_outcome"] = resolutionOutcome.String
+	}
+	if resolutionNotes.Valid {
+		result["resolution_notes"] = resolutionNotes.String
+	}
+
+	return result
 }
 
 // GetUserBalance retrieves a user's balance in an organization
@@ -408,7 +428,8 @@ func (db *TestDB) CountBillActions(billID int32) int {
 // GetLatestBillAction retrieves the latest action for a bill
 func (db *TestDB) GetLatestBillAction(billID int32) map[string]interface{} {
 	var id, actorUserID sql.NullInt32
-	var actionType, actionDetails, notes string
+	var actionType string
+	var actionDetails, notes sql.NullString
 	var createdAt time.Time
 
 	err := db.QueryRow(`
@@ -424,14 +445,18 @@ func (db *TestDB) GetLatestBillAction(billID int32) map[string]interface{} {
 	}
 
 	result := map[string]interface{}{
-		"action_type":    actionType,
-		"action_details": actionDetails,
-		"notes":          notes,
-		"created_at":     createdAt,
+		"action_type": actionType,
+		"created_at":  createdAt,
 	}
 
 	if actorUserID.Valid {
 		result["actor_user_id"] = actorUserID.Int32
+	}
+	if actionDetails.Valid {
+		result["action_details"] = actionDetails.String
+	}
+	if notes.Valid {
+		result["notes"] = notes.String
 	}
 
 	return result

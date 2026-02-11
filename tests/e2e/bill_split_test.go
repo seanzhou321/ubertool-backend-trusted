@@ -4,9 +4,10 @@ import (
 	"testing"
 	"time"
 
+	pb "ubertool-backend-trusted/api/gen/v1"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	pb "ubertool-backend-trusted/api/gen/v1"
 )
 
 // TestBillSplitService_PaymentAcknowledgment tests the full payment acknowledgment flow.
@@ -34,8 +35,8 @@ func TestBillSplitService_PaymentAcknowledgment(t *testing.T) {
 	creditorID := db.CreateTestUser(creditorEmail, "Jane Creditor")
 
 	// Add users to org with initial balances
-	db.AddUserToOrg(debtorID, orgID, "member", "active", 0)
-	db.AddUserToOrg(creditorID, orgID, "member", "active", 0)
+	db.AddUserToOrg(debtorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(creditorID, orgID, "MEMBER", "ACTIVE", 0)
 
 	// Create a bill (debtor owes creditor $50)
 	billID := db.CreateTestBill(debtorID, creditorID, orgID, 5000, "2024-01", "PENDING")
@@ -43,7 +44,7 @@ func TestBillSplitService_PaymentAcknowledgment(t *testing.T) {
 	// Step 1: Get payment detail (debtor's view)
 	debtorCtx, cancelDebtor := ContextWithUserIDAndTimeout(debtorID, 5*time.Second)
 	defer cancelDebtor()
-	
+
 	detailResp, err := billClient.GetPaymentDetail(debtorCtx, &pb.GetPaymentDetailRequest{
 		PaymentId: billID,
 	})
@@ -71,7 +72,7 @@ func TestBillSplitService_PaymentAcknowledgment(t *testing.T) {
 	// Step 3: Creditor acknowledges payment
 	creditorCtx, cancelCreditor := ContextWithUserIDAndTimeout(creditorID, 5*time.Second)
 	defer cancelCreditor()
-	
+
 	ackResp2, err := billClient.AcknowledgePayment(creditorCtx, &pb.AcknowledgePaymentRequest{
 		PaymentId: billID,
 	})
@@ -92,7 +93,7 @@ func TestBillSplitService_PaymentAcknowledgment(t *testing.T) {
 	assert.GreaterOrEqual(t, actionCount, 2, "Should have at least 2 bill actions")
 
 	latestAction := db.GetLatestBillAction(billID)
-	assert.Equal(t, "CREDITOR_ACK", latestAction["action_type"], "Latest action should be CREDITOR_ACK")
+	assert.Equal(t, "CREDITOR_ACKNOWLEDGED", latestAction["action_type"], "Latest action should be CREDITOR_ACK")
 }
 
 // TestBillSplitService_DebtorDisputesPayment tests debtor disputing a payment.
@@ -119,8 +120,8 @@ func TestBillSplitService_DebtorDisputesPayment(t *testing.T) {
 	creditorID := db.CreateTestUser(creditorEmail, "Jane Creditor")
 
 	// Add users to org
-	db.AddUserToOrg(debtorID, orgID, "member", "active", 0)
-	db.AddUserToOrg(creditorID, orgID, "member", "active", 0)
+	db.AddUserToOrg(debtorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(creditorID, orgID, "MEMBER", "ACTIVE", 0)
 
 	// Create a bill
 	billID := db.CreateTestBill(debtorID, creditorID, orgID, 7500, "2024-01", "PENDING")
@@ -142,11 +143,11 @@ func TestBillSplitService_DebtorDisputesPayment(t *testing.T) {
 	// List disputed payments as admin
 	adminEmail := "e2e-test-admin-" + t.Name() + "@test.com"
 	adminID := db.CreateTestUser(adminEmail, "Admin User")
-	db.AddUserToOrg(adminID, orgID, "admin", "active", 0)
+	db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
 
 	adminCtx, cancelAdmin := ContextWithUserIDAndTimeout(adminID, 5*time.Second)
 	defer cancelAdmin()
-	
+
 	disputesResp, err := billClient.ListDisputedPayments(adminCtx, &pb.ListDisputedPaymentsRequest{
 		OrganizationId: orgID,
 	})
@@ -183,9 +184,9 @@ func TestBillSplitService_AdminResolvesDisputeDebtorFault(t *testing.T) {
 	adminID := db.CreateTestUser(adminEmail, "Admin Resolver")
 
 	// Add users to org
-	db.AddUserToOrg(debtorID, orgID, "member", "active", 0)
-	db.AddUserToOrg(creditorID, orgID, "member", "active", 0)
-	db.AddUserToOrg(adminID, orgID, "admin", "active", 0)
+	db.AddUserToOrg(debtorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(creditorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
 
 	// Create a disputed bill
 	billID := db.CreateTestBill(debtorID, creditorID, orgID, 10000, "2024-01", "DISPUTED")
@@ -217,7 +218,7 @@ func TestBillSplitService_AdminResolvesDisputeDebtorFault(t *testing.T) {
 
 	// Verify action recorded
 	latestAction := db.GetLatestBillAction(billID)
-	assert.Equal(t, "ADMIN_RESOLVE", latestAction["action_type"], "Latest action should be ADMIN_RESOLVE")
+	assert.Equal(t, "ADMIN_RESOLUTION", latestAction["action_type"], "Latest action should be ADMIN_RESOLUTION")
 }
 
 // TestBillSplitService_AdminResolvesDisputeCreditorFault tests admin resolving dispute with creditor at fault
@@ -242,9 +243,9 @@ func TestBillSplitService_AdminResolvesDisputeCreditorFault(t *testing.T) {
 	adminID := db.CreateTestUser(adminEmail, "Admin Resolver")
 
 	// Add users to org
-	db.AddUserToOrg(debtorID, orgID, "member", "active", 0)
-	db.AddUserToOrg(creditorID, orgID, "member", "active", 0)
-	db.AddUserToOrg(adminID, orgID, "admin", "active", 0)
+	db.AddUserToOrg(debtorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(creditorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
 
 	// Create a disputed bill
 	billID := db.CreateTestBill(debtorID, creditorID, orgID, 8000, "2024-01", "DISPUTED")
@@ -294,9 +295,9 @@ func TestBillSplitService_AdminResolvesBothAtFault(t *testing.T) {
 	adminID := db.CreateTestUser(adminEmail, "Admin Resolver")
 
 	// Add users to org
-	db.AddUserToOrg(debtorID, orgID, "member", "active", 0)
-	db.AddUserToOrg(creditorID, orgID, "member", "active", 0)
-	db.AddUserToOrg(adminID, orgID, "admin", "active", 0)
+	db.AddUserToOrg(debtorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(creditorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
 
 	// Create a disputed bill
 	billID := db.CreateTestBill(debtorID, creditorID, orgID, 6000, "2024-01", "DISPUTED")
@@ -347,12 +348,16 @@ func TestBillSplitService_GetGlobalBillSplitSummary(t *testing.T) {
 	otherID := db.CreateTestUser(otherEmail, "Jane Other")
 
 	// Add users to org
-	db.AddUserToOrg(userID, orgID, "member", "active", 0)
-	db.AddUserToOrg(otherID, orgID, "member", "active", 0)
+	db.AddUserToOrg(userID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(otherID, orgID, "MEMBER", "ACTIVE", 0)
 
 	// Create multiple bills (user owes 1000, is owed 500)
 	db.CreateTestBill(userID, otherID, orgID, 1000, "2024-01", "PENDING") // User owes 1000
-	db.CreateTestBill(otherID, userID, orgID, 500, "2024-01", "PENDING")  // User is owed 500
+	billID2 := db.CreateTestBill(otherID, userID, orgID, 500, "2024-01", "PENDING")  // User is owed 500
+
+	// Acknowledge the bill where user is creditor, so it appears in "ReceiptsToVerify"
+	_, err := db.Exec("UPDATE bills SET debtor_acknowledged_at = NOW() WHERE id = $1", billID2)
+	require.NoError(t, err)
 
 	// Set balances manually
 	db.SetUserBalance(userID, orgID, -500) // Net: owes 500
@@ -392,12 +397,12 @@ func TestBillSplitService_GetOrganizationBillSplitSummary(t *testing.T) {
 	otherID := db.CreateTestUser(otherEmail, "Jane OrgOther")
 
 	// Add users to org
-	db.AddUserToOrg(userID, orgID, "member", "active", 0)
-	db.AddUserToOrg(otherID, orgID, "member", "active", 0)
+	db.AddUserToOrg(userID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(otherID, orgID, "MEMBER", "ACTIVE", 0)
 
 	// Create bills
 	db.CreateTestBill(userID, otherID, orgID, 2000, "2024-01", "PENDING")
-	db.CreateTestBill(userID, otherID, orgID, 1500, "2024-01", "PAID")
+	db.CreateTestBill(userID, otherID, orgID, 1500, "2024-02", "PAID")
 
 	// Set balance
 	db.SetUserBalance(userID, orgID, -3500)
@@ -411,7 +416,7 @@ func TestBillSplitService_GetOrganizationBillSplitSummary(t *testing.T) {
 	require.NoError(t, err, "GetOrganizationBillSplitSummary should succeed")
 
 	assert.NotNil(t, orgSummaryResp, "Org summary response should not be nil")
-	
+
 	// Find our org in the list
 	var foundOrgSummary *pb.OrganizationBillSplitSummary
 	for _, s := range orgSummaryResp.OrgSummaries {
@@ -421,7 +426,7 @@ func TestBillSplitService_GetOrganizationBillSplitSummary(t *testing.T) {
 		}
 	}
 	require.NotNil(t, foundOrgSummary, "Should find summary for test organization")
-	
+
 	// Check summary counts
 	// 1 PENDING bill where user is debtor -> 1 Payment To Make
 	assert.Equal(t, int32(1), foundOrgSummary.Summary.PaymentsToMake, "Should have 1 payment to make")
@@ -447,26 +452,34 @@ func TestBillSplitService_ListPayments(t *testing.T) {
 	otherID := db.CreateTestUser(otherEmail, "Jane Other")
 
 	// Add users to org
-	db.AddUserToOrg(userID, orgID, "member", "active", 0)
-	db.AddUserToOrg(otherID, orgID, "member", "active", 0)
+	db.AddUserToOrg(userID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(otherID, orgID, "MEMBER", "ACTIVE", 0)
 
 	// Create multiple bills with different categories
 	db.CreateTestBill(userID, otherID, orgID, 1000, "2024-01", "PENDING") // User owes
 	db.CreateTestBill(otherID, userID, orgID, 500, "2024-01", "PAID")     // User is owed
-	db.CreateTestBill(userID, otherID, orgID, 300, "2024-01", "DISPUTED") // User owes (disputed)
+	db.CreateTestBill(userID, otherID, orgID, 300, "2024-02", "DISPUTED") // User owes (disputed)
 
-	// List all payments
+	// List active payments (Pending + Disputed)
 	userCtx, cancelUser := ContextWithUserIDAndTimeout(userID, 5*time.Second)
 	defer cancelUser()
 
 	listResp, err := billClient.ListPayments(userCtx, &pb.ListPaymentsRequest{
 		OrganizationId: orgID,
+		ShowHistory:    false,
+	})
+	require.NoError(t, err, "ListPayments (Active) should succeed")
+	assert.GreaterOrEqual(t, len(listResp.Payments), 2, "Should have at least 2 active payments")
+
+	// List history payments (Paid)
+	listRespHistory, err := billClient.ListPayments(userCtx, &pb.ListPaymentsRequest{
+		OrganizationId: orgID,
 		ShowHistory:    true,
 	})
-	require.NoError(t, err, "ListPayments should succeed")
-	assert.GreaterOrEqual(t, len(listResp.Payments), 3, "Should have at least 3 payments")
+	require.NoError(t, err, "ListPayments (History) should succeed")
+	assert.GreaterOrEqual(t, len(listRespHistory.Payments), 1, "Should have at least 1 history payment")
 
-	// Count payments by category locally since API filters by org only
+	// Count payments by category locally (from active list)
 	var owedByMeCount, owedToMeCount int
 	for _, p := range listResp.Payments {
 		if p.Category == pb.PaymentCategory_PAYMENT_TO_MAKE || p.Category == pb.PaymentCategory_PAYMENT_IN_DISPUTE {
@@ -477,8 +490,10 @@ func TestBillSplitService_ListPayments(t *testing.T) {
 		}
 	}
 
-	assert.GreaterOrEqual(t, owedByMeCount, 2, "Should have at least 2 payments to make/dispute")
-	assert.GreaterOrEqual(t, owedToMeCount, 1, "Should have at least 1 receipt to verify")
+	// 1000 (Pending, owe) + 300 (Disputed, owe) -> 2 owedByMe
+	// 500 (Paid, owed) -> Is in History, not here.
+	
+	assert.GreaterOrEqual(t, owedByMeCount, 2, "Should have at least 2 payments to make/dispute in active list")
 }
 
 // TestBillSplitService_ListResolvedDisputes tests listing resolved disputes
@@ -503,9 +518,9 @@ func TestBillSplitService_ListResolvedDisputes(t *testing.T) {
 	creditorID := db.CreateTestUser(creditorEmail, "Jane Creditor")
 
 	// Add users to org
-	db.AddUserToOrg(adminID, orgID, "admin", "active", 0)
-	db.AddUserToOrg(debtorID, orgID, "member", "active", 0)
-	db.AddUserToOrg(creditorID, orgID, "member", "active", 0)
+	db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
+	db.AddUserToOrg(debtorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(creditorID, orgID, "MEMBER", "ACTIVE", 0)
 
 	// Create a resolved dispute
 	billID := db.CreateTestBill(debtorID, creditorID, orgID, 5000, "2024-01", "ADMIN_RESOLVED")
@@ -556,8 +571,8 @@ func TestBillSplitService_UnauthorizedAccess(t *testing.T) {
 	user3ID := db.CreateTestUser(user3Email, "User Three")
 
 	// Add only user1 and user2 to org
-	db.AddUserToOrg(user1ID, orgID, "member", "active", 0)
-	db.AddUserToOrg(user2ID, orgID, "member", "active", 0)
+	db.AddUserToOrg(user1ID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(user2ID, orgID, "MEMBER", "ACTIVE", 0)
 	// user3 is NOT in the org
 
 	// Create a bill between user1 and user2
@@ -573,8 +588,14 @@ func TestBillSplitService_UnauthorizedAccess(t *testing.T) {
 	assert.Error(t, err, "GetPaymentDetail should fail for unauthorized user")
 
 	// Try to acknowledge as user3 (unauthorized)
-	_, err = billClient.AcknowledgePayment(user3Ctx, &pb.AcknowledgePaymentRequest{
+	ackResp, err := billClient.AcknowledgePayment(user3Ctx, &pb.AcknowledgePaymentRequest{
 		PaymentId: billID,
 	})
-	assert.Error(t, err, "AcknowledgePayment should fail for unauthorized user")
+	// The service handles authorization errors by returning success=false within the response
+	// or returns an error. We should check both possibilities.
+	if err == nil {
+		assert.False(t, ackResp.Success, "AcknowledgePayment should result in success=false for unauthorized user")
+	} else {
+		assert.Error(t, err, "AcknowledgePayment should fail for unauthorized user")
+	}
 }

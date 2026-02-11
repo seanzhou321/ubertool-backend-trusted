@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository"
@@ -135,7 +136,7 @@ func (r *billRepository) ListByDebtor(ctx context.Context, debtorID int32, orgID
 			statusStrs[i] = string(s)
 		}
 		query += fmt.Sprintf(" AND status = ANY($%d)", argIndex)
-		args = append(args, statusStrs)
+		args = append(args, pq.Array(statusStrs))
 	}
 
 	query += " ORDER BY notice_sent_at DESC, created_at DESC"
@@ -195,7 +196,7 @@ func (r *billRepository) ListByCreditor(ctx context.Context, creditorID int32, o
 			statusStrs[i] = string(s)
 		}
 		query += fmt.Sprintf(" AND status = ANY($%d)", argIndex)
-		args = append(args, statusStrs)
+		args = append(args, pq.Array(statusStrs))
 	}
 
 	query += " ORDER BY notice_sent_at DESC, created_at DESC"
@@ -255,7 +256,7 @@ func (r *billRepository) ListByUser(ctx context.Context, userID int32, orgID int
 			statusStrs[i] = string(s)
 		}
 		query += fmt.Sprintf(" AND status = ANY($%d)", argIndex)
-		args = append(args, statusStrs)
+		args = append(args, pq.Array(statusStrs))
 	}
 
 	query += " ORDER BY notice_sent_at DESC, created_at DESC"

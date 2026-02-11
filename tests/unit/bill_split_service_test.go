@@ -34,10 +34,10 @@ func TestBillSplitService_GetGlobalBillSplitSummary(t *testing.T) {
 		now := time.Now()
 		mockBillRepo.On("ListByUser", ctx, int32(1), int32(1), []domain.BillStatus(nil)).
 			Return([]domain.Bill{
-				{ID: 1, DebtorUserID: 1, Status: domain.BillStatusPending, DebtorAcknowledgedAt: nil}, // Payment to make
+				{ID: 1, DebtorUserID: 1, Status: domain.BillStatusPending, DebtorAcknowledgedAt: nil},    // Payment to make
 				{ID: 2, CreditorUserID: 1, Status: domain.BillStatusPending, DebtorAcknowledgedAt: &now}, // Receipt to verify
-				{ID: 3, DebtorUserID: 1, Status: domain.BillStatusDisputed}, // Payment in dispute
-				{ID: 4, CreditorUserID: 1, Status: domain.BillStatusDisputed}, // Receipt in dispute
+				{ID: 3, DebtorUserID: 1, Status: domain.BillStatusDisputed},                              // Payment in dispute
+				{ID: 4, CreditorUserID: 1, Status: domain.BillStatusDisputed},                            // Receipt in dispute
 			}, nil).Once()
 
 		// Mock ListByUser for org 2 - returns one bill
@@ -127,8 +127,9 @@ func TestBillSplitService_ListPayments(t *testing.T) {
 // Goal: Verify that:
 // 1. Both Debtors and Creditors can retrieve details for bills they are involved in.
 // 2. The `CanAcknowledge` flag is correctly calculated:
-//    - True for Debtor if they haven't acknowledged yet.
-//    - True for Creditor only after Debtor has acknowledged.
+//   - True for Debtor if they haven't acknowledged yet.
+//   - True for Creditor only after Debtor has acknowledged.
+//
 // 3. Access is denied for users not involved in the bill.
 func TestBillSplitService_GetPaymentDetail(t *testing.T) {
 	mockBillRepo := new(MockBillRepo)
@@ -264,15 +265,21 @@ func TestBillSplitService_ListResolvedDisputes(t *testing.T) {
 // 3. User balances are corrected (Debtor pays, Creditor receives).
 // 4. Notifications are sent to both parties.
 func TestBillSplitService_ResolveDispute(t *testing.T) {
-	mockBillRepo := new(MockBillRepo)
-	mockUserRepo := new(MockUserRepo)
-	mockOrgRepo := new(MockOrganizationRepo)
-	mockNotifRepo := new(MockNotificationRepo)
-	mockEmailSvc := new(MockEmailService)
-	svc := service.NewBillSplitService(mockBillRepo, mockUserRepo, mockOrgRepo, mockNotifRepo, mockEmailSvc)
+	// Helper to setup fresh mocks for each subtest
+	setup := func() (service.BillSplitService, *MockBillRepo, *MockUserRepo, *MockOrganizationRepo, *MockNotificationRepo, *MockEmailService) {
+		mockBillRepo := new(MockBillRepo)
+		mockUserRepo := new(MockUserRepo)
+		mockOrgRepo := new(MockOrganizationRepo)
+		mockNotifRepo := new(MockNotificationRepo)
+		mockEmailSvc := new(MockEmailService)
+		svc := service.NewBillSplitService(mockBillRepo, mockUserRepo, mockOrgRepo, mockNotifRepo, mockEmailSvc)
+		return svc, mockBillRepo, mockUserRepo, mockOrgRepo, mockNotifRepo, mockEmailSvc
+	}
 	ctx := context.Background()
 
 	t.Run("Success_DebtorFault", func(t *testing.T) {
+		svc, mockBillRepo, mockUserRepo, mockOrgRepo, mockNotifRepo, mockEmailSvc := setup()
+
 		bill := &domain.Bill{
 			ID: 1, DebtorUserID: 2, CreditorUserID: 3, OrgID: 1,
 			AmountCents: 1000, Status: domain.BillStatusDisputed,
@@ -283,15 +290,28 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		debtor := &domain.User{ID: 2, Name: "Debtor", Email: "debtor@test.com"}
 		creditor := &domain.User{ID: 3, Name: "Creditor", Email: "creditor@test.com"}
 		debtorUO := &domain.UserOrg{UserID: 2, OrgID: 1, BalanceCents: 500}
+		creditorUO := &domain.UserOrg{UserID: 3, OrgID: 1, BalanceCents: 500}
 		
 		mockBillRepo.On("GetByID", ctx, int32(1)).Return(bill, nil).Once()
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(2)).Return(debtor, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(3)).Return(creditor, nil).Once()
-		mockUserRepo.On("GetUserOrg", ctx, int32(2), int32(1)).Return(debtorUO, nil).Once()
-		// mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil).Once()
+		
+		// updateBalances expectations (enforce payment)
+		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil).Once() // Creditor
+		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
+			return uo.UserID == 3 && uo.BalanceCents == 1500 // 500 + 1000
+		})).Return(nil).Once()
+		
+		mockUserRepo.On("GetUserOrg", ctx, int32(2), int32(1)).Return(debtorUO, nil).Twice() // Once for balance, once for blocking
 
+		// Update Debtor Balance
+		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
+			// First update: Balance changed to -500 (500-1000)
+			return uo.UserID == 2 && uo.BalanceCents == -500 && !uo.RentingBlocked
+		})).Return(nil).Once()
+		
 		// Update bill
 		mockBillRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool {
 			return b.Status == domain.BillStatusAdminResolved && b.ResolutionOutcome == string(domain.ResolutionOutcomeDebtorFault)
@@ -323,6 +343,8 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 	})
 
 	t.Run("Success_CreditorFault", func(t *testing.T) {
+		svc, mockBillRepo, mockUserRepo, mockOrgRepo, mockNotifRepo, mockEmailSvc := setup()
+
 		bill := &domain.Bill{
 			ID: 1, DebtorUserID: 2, CreditorUserID: 3, OrgID: 1,
 			AmountCents: 1000, Status: domain.BillStatusDisputed,
@@ -332,7 +354,6 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleAdmin}
 		debtor := &domain.User{ID: 2, Name: "Debtor", Email: "debtor@test.com"}
 		creditor := &domain.User{ID: 3, Name: "Creditor", Email: "creditor@test.com"}
-		debtorUO := &domain.UserOrg{UserID: 2, OrgID: 1, BalanceCents: 500}
 		creditorUO := &domain.UserOrg{UserID: 3, OrgID: 1, BalanceCents: -500}
 
 		mockBillRepo.On("GetByID", ctx, int32(1)).Return(bill, nil).Once()
@@ -340,8 +361,8 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(2)).Return(debtor, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(3)).Return(creditor, nil).Once()
-		mockUserRepo.On("GetUserOrg", ctx, int32(2), int32(1)).Return(debtorUO, nil)
-		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil)
+		// Get Creditor for penalty application
+		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil).Once()
 
 		mockBillRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool {
 			return b.Status == domain.BillStatusAdminResolved && b.ResolutionOutcome == string(domain.ResolutionOutcomeCreditorFault)
@@ -349,22 +370,14 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 
 		mockBillRepo.On("CreateAction", ctx, mock.Anything).Return(nil).Once()
 
-		// Creditor fault: payment marked valid -> balances update, and creditor blocked
-		// Balance checks: Debtor 500 -> -500. Creditor -500 -> 500.
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 3 && uo.BalanceCents == 500
-		})).Return(nil).Once() // Creditor balance update
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 2 && uo.BalanceCents == -500
-		})).Return(nil).Once() // Debtor balance update
-		
+		// Creditor at fault: Penalty applied (Balance reduced), and Lending blocked.
+		// Balance check: Creditor started at -500. Penalty -1000. New Balance -1500.
 		blockDueTo := int32(1)
 		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 3 && uo.LendingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
-		})).Return(nil).Once() // Creditor block
+			return uo.UserID == 3 && uo.BalanceCents == -1500 && uo.LendingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
+		})).Return(nil).Once()
 
 		mockNotifRepo.On("Create", ctx, mock.Anything).Return(nil).Times(2)
-		// SendBillDisputeResolutionNotification(ctx, email, userName, amount, resolution, notes, orgName)
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "CREDITOR_FAULT", "Admin resolved: Creditor at fault, payment marked valid", "Test Org").Return(nil).Once()
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "creditor@test.com", "Creditor", int32(1000), "CREDITOR_FAULT", "Admin resolved: Creditor at fault, payment marked valid", "Test Org").Return(nil).Once()
 
@@ -378,6 +391,8 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 	})
 
 	t.Run("Success_BothFault", func(t *testing.T) {
+		svc, mockBillRepo, mockUserRepo, mockOrgRepo, mockNotifRepo, mockEmailSvc := setup()
+
 		bill := &domain.Bill{
 			ID: 1, DebtorUserID: 2, CreditorUserID: 3, OrgID: 1,
 			AmountCents: 1000, Status: domain.BillStatusDisputed,
@@ -395,8 +410,10 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(2)).Return(debtor, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(3)).Return(creditor, nil).Once()
-		mockUserRepo.On("GetUserOrg", ctx, int32(2), int32(1)).Return(debtorUO, nil)
-		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil)
+		
+		// GetUserOrg calls for penalties
+		mockUserRepo.On("GetUserOrg", ctx, int32(2), int32(1)).Return(debtorUO, nil).Once()
+		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil).Once()
 
 		mockBillRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool {
 			return b.Status == domain.BillStatusAdminResolved && b.ResolutionOutcome == string(domain.ResolutionOutcomeBothFault)
@@ -405,12 +422,15 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockBillRepo.On("CreateAction", ctx, mock.Anything).Return(nil).Once()
 
 		blockDueTo := int32(1)
-		// Both blocked
+		// Both blocked and penalized
+		// Debtor: Balance 500 -> -500. Blocked.
 		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 2 && uo.RentingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
+			return uo.UserID == 2 && uo.BalanceCents == -500 && uo.RentingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
 		})).Return(nil).Once()
+		
+		// Creditor: Balance -500 -> -1500. Blocked.
 		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 3 && uo.LendingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
+			return uo.UserID == 3 && uo.BalanceCents == -1500 && uo.LendingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
 		})).Return(nil).Once()
 
 		mockNotifRepo.On("Create", ctx, mock.Anything).Return(nil).Times(2)
@@ -427,23 +447,26 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 	})
 
 	t.Run("Error_NotDisputed", func(t *testing.T) {
+		svc, mockBillRepo, mockUserRepo, mockOrgRepo, _, _ := setup()
+		
 		bill := &domain.Bill{ID: 1, Status: domain.BillStatusPaid, OrgID: 1}
 		org := &domain.Organization{ID: 1}
 		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleAdmin}
 
 		mockBillRepo.On("GetByID", ctx, int32(1)).Return(bill, nil).Once()
-		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once() // ResolveDispute expects GetByID(OrgID) check
+		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 
 		err := svc.ResolveDispute(ctx, 1, 1, "DEBTOR_FAULT")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "payment is not in disputed status")
 		mockBillRepo.AssertExpectations(t)
-		// mockOrgRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 	})
 
 	t.Run("Error_AdminInvolved", func(t *testing.T) {
+		svc, mockBillRepo, mockUserRepo, mockOrgRepo, _, _ := setup()
+
 		bill := &domain.Bill{ID: 1, DebtorUserID: 1, CreditorUserID: 3, OrgID: 1, Status: domain.BillStatusDisputed}
 		org := &domain.Organization{ID: 1}
 		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleAdmin}
@@ -456,11 +479,12 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "admins cannot resolve disputes they are involved in")
 		mockBillRepo.AssertExpectations(t)
-		// mockOrgRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 	})
 
 	t.Run("Error_InvalidResolution", func(t *testing.T) {
+		svc, mockBillRepo, mockUserRepo, mockOrgRepo, _, _ := setup()
+
 		bill := &domain.Bill{ID: 1, DebtorUserID: 2, CreditorUserID: 3, OrgID: 1, Status: domain.BillStatusDisputed}
 		org := &domain.Organization{ID: 1}
 		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleAdmin}
@@ -473,7 +497,6 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid resolution type")
 		mockBillRepo.AssertExpectations(t)
-		// mockOrgRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 	})
 }

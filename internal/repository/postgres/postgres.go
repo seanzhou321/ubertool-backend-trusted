@@ -17,6 +17,7 @@ type Store struct {
 	repository.NotificationRepository
 	repository.InvitationRepository
 	repository.JoinRequestRepository
+	repository.BillRepository
 }
 
 func NewStore(db *sql.DB) *Store {
@@ -30,5 +31,6 @@ func NewStore(db *sql.DB) *Store {
 		NotificationRepository: NewNotificationRepository(db),
 		InvitationRepository:   NewInvitationRepository(db),
 		JoinRequestRepository:  NewJoinRequestRepository(db),
+		BillRepository:         NewBillRepository(db),
 	}
 }

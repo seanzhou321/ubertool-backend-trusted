@@ -130,6 +130,13 @@ func main() {
 		store.InvitationRepository,
 		emailSvc,
 	)
+	billSplitSvc := service.NewBillSplitService(
+		store.BillRepository,
+		store.UserRepository,
+		store.OrganizationRepository,
+		store.NotificationRepository,
+		emailSvc,
+	)
 
 	// Initialize gRPC handlers
 	authHandler := api.NewAuthHandler(authSvc)
@@ -141,6 +148,7 @@ func main() {
 	notificationHandler := api.NewNotificationHandler(noteSvc)
 	adminHandler := api.NewAdminHandler(adminSvc)
 	imageHandler := api.NewImageStorageHandler(imageSvc)
+	billSplitHandler := api.NewBillSplitHandler(billSplitSvc, userSvc)
 
 	// Set up gRPC server
 	lis, err := net.Listen("tcp", cfg.GetServerAddress())
@@ -163,6 +171,7 @@ func main() {
 	pb.RegisterNotificationServiceServer(s, notificationHandler)
 	pb.RegisterAdminServiceServer(s, adminHandler)
 	pb.RegisterImageStorageServiceServer(s, imageHandler)
+	pb.RegisterBillSplitServiceServer(s, billSplitHandler)
 
 	// Register reflection service for grpcurl
 	reflection.Register(s)

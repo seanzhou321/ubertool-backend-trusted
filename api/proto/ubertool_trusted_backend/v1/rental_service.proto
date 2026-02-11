@@ -46,7 +46,6 @@ service RentalService {
 
   // Complete rental (mark as returned, owner only)
   rpc CompleteRental(CompleteRentalRequest) returns (CompleteRentalResponse);
-  // TODO: Dispute rental (both sides) should be in a designated dispute service
 
   // Get rental details (both sides)
   rpc GetRental(GetRentalRequest) returns (GetRentalResponse);
