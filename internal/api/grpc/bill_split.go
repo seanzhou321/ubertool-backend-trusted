@@ -201,7 +201,7 @@ func (h *BillSplitHandler) ResolveDispute(ctx context.Context, req *pb.ResolveDi
 	}
 
 	resolution := MapProtoDisputeResolutionToDomain(req.Resolution)
-	err = h.billSplitSvc.ResolveDispute(ctx, adminID, req.PaymentId, resolution)
+	err = h.billSplitSvc.ResolveDispute(ctx, adminID, req.PaymentId, resolution, req.Notes)
 	if err != nil {
 		return &pb.ResolveDisputeResponse{
 			Success: false,

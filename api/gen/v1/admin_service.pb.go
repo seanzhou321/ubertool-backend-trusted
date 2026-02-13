@@ -321,8 +321,8 @@ type MemberProfile struct {
 	Balance       int32                  `protobuf:"varint,4,opt,name=balance,proto3" json:"balance,omitempty"`
 	MemberSince   string                 `protobuf:"bytes,5,opt,name=member_since,json=memberSince,proto3" json:"member_since,omitempty"`
 	IsBlocked     bool                   `protobuf:"varint,6,opt,name=is_blocked,json=isBlocked,proto3" json:"is_blocked,omitempty"`
-	BlockedDate   string                 `protobuf:"bytes,7,opt,name=blocked_date,json=blockedDate,proto3" json:"blocked_date,omitempty"`
-	BlockReason   string                 `protobuf:"bytes,8,opt,name=block_reason,json=blockReason,proto3" json:"block_reason,omitempty"`
+	BlockedOn     string                 `protobuf:"bytes,7,opt,name=blocked_on,json=blockedOn,proto3" json:"blocked_on,omitempty"`
+	BlockedReason string                 `protobuf:"bytes,8,opt,name=blocked_reason,json=blockedReason,proto3" json:"blocked_reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -399,16 +399,16 @@ func (x *MemberProfile) GetIsBlocked() bool {
 	return false
 }
 
-func (x *MemberProfile) GetBlockedDate() string {
+func (x *MemberProfile) GetBlockedOn() string {
 	if x != nil {
-		return x.BlockedDate
+		return x.BlockedOn
 	}
 	return ""
 }
 
-func (x *MemberProfile) GetBlockReason() string {
+func (x *MemberProfile) GetBlockedReason() string {
 	if x != nil {
-		return x.BlockReason
+		return x.BlockedReason
 	}
 	return ""
 }
@@ -764,9 +764,10 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\abalance\x18\x04 \x01(\x05R\abalance\x12!\n" +
 	"\fmember_since\x18\x05 \x01(\tR\vmemberSince\x12\x1d\n" +
 	"\n" +
-	"is_blocked\x18\x06 \x01(\bR\tisBlocked\x12!\n" +
-	"\fblocked_date\x18\a \x01(\tR\vblockedDate\x12!\n" +
-	"\fblock_reason\x18\b \x01(\tR\vblockReason\"W\n" +
+	"is_blocked\x18\x06 \x01(\bR\tisBlocked\x12\x1d\n" +
+	"\n" +
+	"blocked_on\x18\a \x01(\tR\tblockedOn\x12%\n" +
+	"\x0eblocked_reason\x18\b \x01(\tR\rblockedReason\"W\n" +
 	"\x13ListMembersResponse\x12@\n" +
 	"\amembers\x18\x01 \x03(\v2&.ubertool.trusted.api.v1.MemberProfileR\amembers\"S\n" +
 	"\x12SearchUsersRequest\x12'\n" +

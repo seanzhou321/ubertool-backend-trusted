@@ -205,9 +205,9 @@ func (s *billSplitService) GetPaymentDetail(ctx context.Context, userID, payment
 
 	// Determine if user can acknowledge
 	canAcknowledge := false
-	if bill.DebtorUserID == userID && bill.Status == domain.BillStatusPending && bill.DebtorAcknowledgedAt == nil {
+	if bill.DebtorUserID == userID && (bill.Status == domain.BillStatusPending || bill.Status == domain.BillStatusDisputed) && bill.DebtorAcknowledgedAt == nil {
 		canAcknowledge = true
-	} else if bill.CreditorUserID == userID && bill.Status == domain.BillStatusPending && bill.DebtorAcknowledgedAt != nil && bill.CreditorAcknowledgedAt == nil {
+	} else if bill.CreditorUserID == userID && (bill.Status == domain.BillStatusPending || bill.Status == domain.BillStatusDisputed) && bill.DebtorAcknowledgedAt != nil && bill.CreditorAcknowledgedAt == nil {
 		canAcknowledge = true
 	}
 
@@ -235,8 +235,8 @@ func (s *billSplitService) AcknowledgePayment(ctx context.Context, userID, payme
 
 	if bill.DebtorUserID == userID {
 		// Debtor is acknowledging payment sent
-		if bill.Status != domain.BillStatusPending {
-			return fmt.Errorf("payment is not in pending status")
+		if bill.Status != domain.BillStatusPending && bill.Status != domain.BillStatusDisputed {
+			return fmt.Errorf("payment is not in pending or disputed status")
 		}
 		if bill.DebtorAcknowledgedAt != nil {
 			return fmt.Errorf("payment already acknowledged by debtor")
@@ -288,8 +288,8 @@ func (s *billSplitService) AcknowledgePayment(ctx context.Context, userID, payme
 
 	} else if bill.CreditorUserID == userID {
 		// Creditor is acknowledging payment received
-		if bill.Status != domain.BillStatusPending {
-			return fmt.Errorf("payment is not in pending status")
+		if bill.Status != domain.BillStatusPending && bill.Status != domain.BillStatusDisputed {
+			return fmt.Errorf("payment is not in pending or disputed status")
 		}
 		if bill.DebtorAcknowledgedAt == nil {
 			return fmt.Errorf("debtor has not acknowledged payment yet")
@@ -434,8 +434,8 @@ func (s *billSplitService) ListResolvedDisputes(ctx context.Context, adminID, or
 	return bills, nil
 }
 
-func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentID int32, resolution string) error {
-	logger.EnterMethod("billSplitService.ResolveDispute", "adminID", adminID, "paymentID", paymentID, "resolution", resolution)
+func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentID int32, resolution, notes string) error {
+	logger.EnterMethod("billSplitService.ResolveDispute", "adminID", adminID, "paymentID", paymentID, "resolution", resolution, "notes", notes)
 
 	// Get the bill
 	bill, err := s.billRepo.GetByID(ctx, paymentID)
@@ -468,6 +468,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 	bill.Status = domain.BillStatusAdminResolved
 	bill.ResolvedAt = &now
 	bill.ResolutionOutcome = resolution
+	bill.ResolutionNotes = notes
 
 	// Apply resolution based on type
 	switch resolution {
@@ -485,7 +486,6 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 			debtorUserOrg.BlockedReason = "Blocked due to unresolved payment dispute (debtor at fault)"
 			_ = s.userRepo.UpdateUserOrg(ctx, debtorUserOrg)
 		}
-		bill.ResolutionNotes = "Admin resolved: Debtor blocked from renting due to fault"
 
 	case string(domain.ResolutionOutcomeCreditorFault):
 		// Creditor was at fault (invalid bill): Do not process payment.
@@ -501,7 +501,6 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 			creditorUserOrg.BlockedReason = "Blocked due to dispute resolution (creditor at fault)"
 			_ = s.userRepo.UpdateUserOrg(ctx, creditorUserOrg)
 		}
-		bill.ResolutionNotes = "Admin resolved: Creditor at fault, payment marked valid"
 
 	case string(domain.ResolutionOutcomeBothFault):
 		// Block debtor from renting, creditor from lending. Apply penalty to both.
@@ -528,7 +527,13 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 			creditorUserOrg.BlockedReason = "Blocked due to unresolved payment dispute (both at fault)"
 			_ = s.userRepo.UpdateUserOrg(ctx, creditorUserOrg)
 		}
-		bill.ResolutionNotes = "Admin resolved: Both parties blocked from renting/lending"
+
+	case string(domain.ResolutionOutcomeGraceful):
+		// Non-forced resolution: Admin confirms parties resolved it offline
+		// Complete payment normally without penalties or blocking
+		if err := s.updateBalances(ctx, bill); err != nil {
+			return fmt.Errorf("failed to update balances: %w", err)
+		}
 
 	default:
 		return fmt.Errorf("invalid resolution type: %s", resolution)
@@ -544,7 +549,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 		BillID:      bill.ID,
 		ActorUserID: &adminID,
 		ActionType:  domain.BillActionTypeAdminResolution,
-		Notes:       fmt.Sprintf("Admin resolved dispute: %s", resolution),
+		Notes:       notes,
 		CreatedAt:   now,
 	}
 	_ = s.billRepo.CreateAction(ctx, action)

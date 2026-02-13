@@ -333,7 +333,7 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "DEBTOR_FAULT", "Admin resolved: Debtor blocked from renting due to fault", "Test Org").Return(nil).Once()
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "creditor@test.com", "Creditor", int32(1000), "DEBTOR_FAULT", "Admin resolved: Debtor blocked from renting due to fault", "Test Org").Return(nil).Once()
 
-		err := svc.ResolveDispute(ctx, 1, 1, "DEBTOR_FAULT")
+		err := svc.ResolveDispute(ctx, 1, 1, "DEBTOR_FAULT", "Admin resolved: Debtor blocked from renting due to fault")
 		assert.NoError(t, err)
 		mockBillRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
@@ -381,7 +381,7 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "CREDITOR_FAULT", "Admin resolved: Creditor at fault, payment marked valid", "Test Org").Return(nil).Once()
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "creditor@test.com", "Creditor", int32(1000), "CREDITOR_FAULT", "Admin resolved: Creditor at fault, payment marked valid", "Test Org").Return(nil).Once()
 
-		err := svc.ResolveDispute(ctx, 1, 1, "CREDITOR_FAULT")
+		err := svc.ResolveDispute(ctx, 1, 1, "CREDITOR_FAULT", "Admin resolved: Creditor at fault, payment marked valid")
 		assert.NoError(t, err)
 		mockBillRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
@@ -437,7 +437,7 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "BOTH_FAULT", "Admin resolved: Both parties blocked from renting/lending", "Test Org").Return(nil).Once()
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "creditor@test.com", "Creditor", int32(1000), "BOTH_FAULT", "Admin resolved: Both parties blocked from renting/lending", "Test Org").Return(nil).Once()
 
-		err := svc.ResolveDispute(ctx, 1, 1, "BOTH_FAULT")
+		err := svc.ResolveDispute(ctx, 1, 1, "BOTH_FAULT", "Admin resolved: Both parties blocked from renting/lending")
 		assert.NoError(t, err)
 		mockBillRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
@@ -457,7 +457,7 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 
-		err := svc.ResolveDispute(ctx, 1, 1, "DEBTOR_FAULT")
+		err := svc.ResolveDispute(ctx, 1, 1, "DEBTOR_FAULT", "Test notes")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "payment is not in disputed status")
 		mockBillRepo.AssertExpectations(t)
@@ -475,7 +475,7 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 
-		err := svc.ResolveDispute(ctx, 1, 1, "DEBTOR_FAULT")
+		err := svc.ResolveDispute(ctx, 1, 1, "DEBTOR_FAULT", "Test notes")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "admins cannot resolve disputes they are involved in")
 		mockBillRepo.AssertExpectations(t)
@@ -493,7 +493,7 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 
-		err := svc.ResolveDispute(ctx, 1, 1, "INVALID")
+		err := svc.ResolveDispute(ctx, 1, 1, "INVALID", "Test notes")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid resolution type")
 		mockBillRepo.AssertExpectations(t)

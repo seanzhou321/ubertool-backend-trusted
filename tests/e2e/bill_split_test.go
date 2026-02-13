@@ -200,6 +200,7 @@ func TestBillSplitService_AdminResolvesDisputeDebtorFault(t *testing.T) {
 	resolveResp, err := billClient.ResolveDispute(adminCtx, &pb.ResolveDisputeRequest{
 		PaymentId:  billID,
 		Resolution: pb.DisputeResolution_DEBTOR_AT_FAULT,
+		Notes:      "Admin resolved: Debtor at fault - unpaid bill",
 	})
 	require.NoError(t, err, "ResolveDispute should succeed")
 	assert.True(t, resolveResp.Success, "Resolution should be successful")
@@ -259,6 +260,7 @@ func TestBillSplitService_AdminResolvesDisputeCreditorFault(t *testing.T) {
 	resolveResp, err := billClient.ResolveDispute(adminCtx, &pb.ResolveDisputeRequest{
 		PaymentId:  billID,
 		Resolution: pb.DisputeResolution_CREDITOR_AT_FAULT,
+		Notes:      "Admin resolved: Creditor at fault - invalid bill",
 	})
 	require.NoError(t, err, "ResolveDispute should succeed")
 	assert.True(t, resolveResp.Success, "Resolution should be successful")
@@ -311,6 +313,7 @@ func TestBillSplitService_AdminResolvesBothAtFault(t *testing.T) {
 	resolveResp, err := billClient.ResolveDispute(adminCtx, &pb.ResolveDisputeRequest{
 		PaymentId:  billID,
 		Resolution: pb.DisputeResolution_BOTH_AT_FAULT,
+		Notes:      "Admin resolved: Both parties at fault - miscommunication",
 	})
 	require.NoError(t, err, "ResolveDispute should succeed")
 	assert.True(t, resolveResp.Success, "Resolution should be successful")

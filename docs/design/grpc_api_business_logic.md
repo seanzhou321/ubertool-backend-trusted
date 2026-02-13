@@ -1,6 +1,26 @@
 # Business Logic of Ubertool Trusted Backend
 
-The business logic should be implemented in the service layer. 
+The business logic should be implemented in the service layer.
+
+## Architectural Note: Bill Status Type Constraint Strategy
+
+**Bill Status Values**: `PENDING`, `PAID`, `DISPUTED`, `ADMIN_RESOLVED`, `SYSTEM_DEFAULT_ACTION`
+
+**Constraint Location**: 
+- ✅ **Domain Model** (`internal/domain/bill.go`): Defines `BillStatus` type with constants - **enforced here**
+- ❌ **Proto** (`bill_split_service.proto`): Uses `string` type - **not constrained**
+- ❌ **Database** (`ubertool_schema_trusted.sql`): Uses `TEXT` type with comment - **not constrained**
+
+**Rationale**:
+1. **Domain Model Constraint**: Application code must use type-safe constants (`domain.BillStatusPending`, etc.) preventing typos and invalid values at compile time.
+2. **Proto/DB Flexibility**: Keeping proto and database as `string`/`TEXT` allows future status additions without:
+   - Database migrations for enum type changes
+   - Proto breaking changes forcing client updates
+   - API version bumps
+3. **Migration Path**: New statuses can be added to domain model first, implemented in service layer, then deployed without coordinated DB/client updates.
+4. **Validation**: Service layer validates incoming proto string values against domain model constants before using them.
+
+**Implementation**: All service layer code must use `domain.BillStatus*` constants, never hardcoded strings. 
 
 ## Authentication
 
@@ -238,20 +258,26 @@ Business Logic:
 ### List Payments
 Purpose: List payment items for a specific organization.
 
-Input: `organization_id`, `show_history`
-Output: List of PaymentItem
+Input: `organization_id`, `show_history`, `settlement_month` (optional), `pagination` (optional)
+Output: List of PaymentItem, PaginationResponse
 Business Logic:
 1. Verify user is a member of `organization_id`.
 2. Retrieve payments where user is either debtor or creditor.
 3. If `show_history` is false, filter for active items (To Pay, To Ack, In Dispute).
 4. If `show_history` is true, return completed items.
-5. Map internal status to PaymentCategory.
-6. Populate `PaymentItem` fields from `bills` table:
+5. If `settlement_month` is provided, filter by exact settlement month (format: 'YYYY-MM').
+6. Map internal status to PaymentCategory.
+7. Populate `PaymentItem` fields from `bills` table:
     - `payment_id`, `debtor_id`, `creditor_id`, `amount_cents`
     - `settlement_month`, `status`
     - Timestamps (Epoch ms): `notice_sent_at`, `debtor_acknowledged_at`, `creditor_acknowledged_at`, `disputed_at`, `resolved_at`
     - Dispute details: `dispute_reason`, `resolution_outcome`
-7. Sort by `notice_sent_at` or `created_on` descending.
+8. Sort by `notice_sent_at` or `created_on` descending.
+9. Apply pagination:
+    - If `pagination.page_size` not provided, use default (50).
+    - If `pagination.page_token` provided, continue from that position.
+    - Return `next_page_token` if more results exist, empty string otherwise.
+    - Return `total_count` of all matching items across all pages.
 
 ### Get Payment Detail
 Purpose: Get details of a specific payment/bill.
@@ -266,63 +292,119 @@ Business Logic:
     - `action_type`, `notes`, `created_on`
     - `action_details_json`
 4. Determine `can_acknowledge`:
-    - If user is Debtor and status is PENDING_PAYMENT -> True.
-    - If user is Creditor and status is PENDING_RECEIPT_ACK -> True.
+    - If user is Debtor and (status is PENDING or DISPUTED) and debtor_acknowledged_at is NULL -> True.
+    - If user is Creditor and (status is PENDING or DISPUTED) and debtor_acknowledged_at is NOT NULL and creditor_acknowledged_at is NULL -> True.
     - Otherwise -> False.
+5. Note: Acknowledging a DISPUTED bill enables graceful resolution without admin intervention.
 
 ### Acknowledge Payment
-Purpose: User acknowledges sending payment (Debtor) or receiving payment (Creditor).
+Purpose: User acknowledges sending payment (Debtor) or receiving payment (Creditor). Enables graceful resolution even after dispute.
 
 Input: `payment_id`
 Output: success, message
 Business Logic:
-1. Verify user is involved.
-2. If Debtor:
-    - Check status (must be PENDING_PAYMENT).
-    - Update status to PENDING_RECEIPT_ACK.
-    - Modify dispute timer if applicable.
+1. Verify user is involved (debtor or creditor).
+2. Get bill and verify status is PENDING or DISPUTED.
+3. If Debtor:
+    - Check bill status is PENDING or DISPUTED.
+    - Check debtor has not already acknowledged.
+    - Set `debtor_acknowledged_at` = NOW().
+    - Create bill action: DEBTOR_ACKNOWLEDGED.
     - Notify Creditor.
-3. If Creditor:
-    - Check status (must be PENDING_RECEIPT_ACK).
-    - Update status to COMPLETED.
-    - Update balances in ledger/balances table.
+    - Note: Status remains PENDING or DISPUTED until creditor also acknowledges.
+4. If Creditor:
+    - Check bill status is PENDING or DISPUTED.
+    - Check debtor has already acknowledged (debtor_acknowledged_at is not null).
+    - Check creditor has not already acknowledged.
+    - Set `creditor_acknowledged_at` = NOW().
+    - Set `status` = PAID.
+    - Set `resolved_at` = NOW().
+    - Set `resolution_outcome` = GRACEFUL (both parties acknowledged).
+    - Create bill action: CREDITOR_ACKNOWLEDGED.
+    - Update balances in users_orgs table for both parties.
     - Notify Debtor.
+5. **Graceful Resolution after Dispute**: If bill was in DISPUTED status and both parties acknowledge, it resolves as GRACEFUL without admin intervention.
 
 ### List Disputed Payments
-Purpose: Admin lists disputes requiring intervention.
+Purpose: Admin lists unresolved disputes requiring intervention.
 
-Input: `organization_id`
-Output: List of DisputedPaymentItem
+Input: `organization_id`, `pagination` (optional)
+Output: List of DisputedPaymentItem, PaginationResponse
 Business Logic:
 1. Verify user is ADMIN/SUPER_ADMIN of `organization_id`.
-2. Query payments with status IN_DISPUTE.
+2. Query payments with status = DISPUTED (unresolved only).
 3. Filter out disputes involving the current admin (Admins cannot resolve their own disputes).
-4. Return list.
+4. Map to DisputedPaymentItem with dispute details in bills table.
+5. Apply pagination:
+    - If `pagination.page_size` not provided, use default (50).
+    - If `pagination.page_token` provided, continue from that position.
+    - Return `next_page_token` if more results exist.
+    - Return `total_count` of all matching disputes.
 
 ### List Resolved Disputes
-Purpose: Admin lists history of resolved disputes.
+Purpose: Admin lists history of resolved disputes with optional filtering.
 
-Input: `organization_id`
-Output: List of DisputedPaymentItem (resolved)
+Input: `organization_id`, `resolution_outcome` (optional), `pagination` (optional)
+Output: List of DisputedPaymentItem (resolved), PaginationResponse
 Business Logic:
 1. Verify user is ADMIN/SUPER_ADMIN of `organization_id`.
-2. Query payments that were disputed but are now resolved.
-3. Return list.
+2. Query payments with status in (PAID, ADMIN_RESOLVED, SYSTEM_DEFAULT_ACTION) and `disputed_at` IS NOT NULL.
+3. If `resolution_outcome` is provided, filter by exact outcome:
+    - GRACEFUL: Both parties acknowledged
+    - DEBTOR_FAULT: Admin determined debtor at fault
+    - CREDITOR_FAULT: Admin determined creditor at fault
+    - BOTH_FAULT: Admin determined both parties at fault
+4. Map to DisputedPaymentItem with resolution details.
+5. Apply pagination:
+    - If `pagination.page_size` not provided, use default (50).
+    - If `pagination.page_token` provided, continue from that position.
+    - Return `next_page_token` if more results exist.
+    - Return `total_count` of all matching resolved disputes.
+6. Sort by `resolved_at` descending (most recent first).
 
 ### Resolve Dispute
-Purpose: Admin resolves a dispute.
+Purpose: Admin resolves a dispute with either forced resolution (penalties/blocking) or non-forced resolution (parties resolved offline).
 
-Input: `payment_id`, `resolution` (DEBTOR_AT_FAULT, CREDITOR_AT_FAULT, BOTH_AT_FAULT)
+Input: `payment_id`, `resolution` (DEBTOR_AT_FAULT, CREDITOR_AT_FAULT, BOTH_AT_FAULT, GRACEFUL), `notes` (optional)
 Output: success, message
 Business Logic:
 1. Verify user is ADMIN/SUPER_ADMIN of the org of the payment.
-2. Verify admin is NOT involved in the payment.
-3. Update payment status/resolution based on input.
-    - DEBTOR_AT_FAULT: Block debtor renting.
-    - CREDITOR_AT_FAULT: Mark payment as valid (system treats as resolved/paid), optionally block creditor.
-    - BOTH_AT_FAULT: Block debtor renting, creditor lending.
-4. Record admin action in history.
-5. Notify both parties.
+2. Verify admin is either creditor nor debtor in the payment (cannot resolve own disputes).
+3. Verify bill status is DISPUTED.
+4. Set `status` = ADMIN_RESOLVED.
+5. Set `resolved_at` = NOW().
+6. Set `resolution_outcome` based on input.
+7. Set `resolution_notes` from admin's notes field (documentation of decision).
+
+8. Apply resolution consequences based on type:
+    
+    **Forced Resolutions** (with penalties/blocking):
+    - **DEBTOR_AT_FAULT**: 
+        - Update balances (enforce payment).
+        - Block debtor from renting (`renting_blocked` = true).
+        - Set `blocked_due_to_bill_id` and `blocked_reason` in users_orgs.
+    - **CREDITOR_AT_FAULT**: 
+        - Apply penalty to creditor balance (subtract amount).
+        - Block creditor from lending (`lending_blocked` = true).
+        - Set `blocked_due_to_bill_id` and `blocked_reason`.
+    - **BOTH_AT_FAULT**: 
+        - Apply penalties to both parties (subtract amount from each).
+        - Block debtor from renting AND creditor from lending.
+        - Set blocking metadata for both.
+    
+    **Non-Forced Resolution**:
+    - **GRACEFUL**: 
+        - Admin confirms parties resolved it offline (e.g., cash payment, mutual agreement).
+        - Update balances (complete payment normally).
+        - No penalties applied.
+        - No blocking applied.
+        - Resolution notes document the offline resolution.
+
+9. Create bill action: ADMIN_RESOLUTION with notes.
+10. Notify both debtor and creditor of resolution.
+11. Send email to both parties with resolution outcome and notes.
+
+**Note**: Admins can use GRACEFUL option when parties resolved offline and admin is just confirming. For unblocking users after debts are cleared, use `AdminService.AdminBlockUserAccount` with `block_renting=false` or `block_lending=false`.
 
 ## Tools
 

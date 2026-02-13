@@ -99,7 +99,7 @@ type BillSplitService interface {
 	AcknowledgePayment(ctx context.Context, userID, paymentID int32) error
 	ListDisputedPayments(ctx context.Context, adminID, orgID int32) ([]domain.Bill, error)
 	ListResolvedDisputes(ctx context.Context, adminID, orgID int32) ([]domain.Bill, error)
-	ResolveDispute(ctx context.Context, adminID, paymentID int32, resolution string) error
+	ResolveDispute(ctx context.Context, adminID, paymentID int32, resolution, notes string) error
 }
 
 type EmailService interface {

@@ -36,3 +36,23 @@ message Organization {
   string user_role = 13; // Role of the user in this organization (SUPER_ADMIN, ADMIN, MEMBER, NULL)
   repeated User admins = 14; // List of SUPER_ADMIN and ADMIN users in the organization. Populated in SearchOrganizations()
 }
+
+// Pagination request - supports both cursor-based and offset-based pagination
+message PaginationRequest {
+  // Cursor-based pagination (preferred for large datasets)
+  int32 page_size = 1;     // Number of items per page (default: 50, max: 100)
+  string page_token = 2;   // Opaque token for next page (empty for first page)
+  
+  // Offset-based pagination (alternative, for backward compatibility)
+  int32 page = 3;          // Page number (1-based, alternative to page_token)
+  int32 limit = 4;         // Limit (alternative to page_size)
+  int32 offset = 5;        // Offset (alternative to page-based pagination)
+}
+
+// Pagination response metadata
+message PaginationResponse {
+  string next_page_token = 1; // Token for next page (empty if no more pages)
+  int32 total_count = 2;      // Total number of items across all pages
+  int32 page = 3;             // Current page number (for offset-based pagination)
+  int32 page_size = 4;        // Items per page (for offset-based pagination)
+}

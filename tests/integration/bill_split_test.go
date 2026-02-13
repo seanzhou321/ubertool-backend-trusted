@@ -174,7 +174,7 @@ func TestBillSplitService_Integration(t *testing.T) {
 		assert.Equal(t, bill2.ID, disputes[0].ID)
 
 		// Resolve Dispute
-		err = billSvc.ResolveDispute(ctx, adminUser.ID, bill2.ID, string(domain.ResolutionOutcomeDebtorFault))
+		err = billSvc.ResolveDispute(ctx, adminUser.ID, bill2.ID, string(domain.ResolutionOutcomeDebtorFault), "Admin resolved: Debtor at fault")
 		assert.NoError(t, err)
 
 		updatedBill, err := billRepo.GetByID(ctx, bill2.ID)
