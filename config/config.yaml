@@ -42,3 +42,16 @@ storage:
 log:
   level: "debug"  # debug, info, warn, error
   format: "json"  # text or json
+
+billing:
+  settlement_threshold_cents: 500
+
+scheduler:
+  mark_overdue_rentals: "0 0 2 * * *"
+  send_overdue_reminders: "0 0 3 * * *"
+  send_bill_reminders: "0 0 4 * * *"
+  check_overdue_bills: "0 0 5 10 * *"
+  resolve_disputed_bills: "0 0 23 L * *"
+  take_balance_snapshots: "0 30 23 L * *"
+  perform_bill_splitting: "0 0 0 1 * *"
+  send_bill_notices: "0 0 9 * * *"

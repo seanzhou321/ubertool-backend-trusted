@@ -14,7 +14,9 @@ type Config struct {
 	SMTP     SMTPConfig     `yaml:"smtp"`
 	JWT      JWTConfig      `yaml:"jwt"`
 	Storage  StorageConfig  `yaml:"storage"`
-	Log      LogConfig      `yaml:"log"`
+	Log       LogConfig       `yaml:"log"`
+	Billing   BillingConfig   `yaml:"billing"`
+	Scheduler SchedulerConfig `yaml:"scheduler"`
 }
 
 // ServerConfig contains gRPC server settings
@@ -155,6 +157,11 @@ func (c *Config) overrideWithEnv() {
 		c.Log.Format = val
 	}
 
+	// Billing
+	if val := os.Getenv("BILLING_THRESHOLD_CENTS"); val != "" {
+		fmt.Sscanf(val, "%d", &c.Billing.SettlementThresholdCents)
+	}
+
 	// Set defaults for log if not configured
 	if c.Log.Level == "" {
 		c.Log.Level = "info"
@@ -203,6 +210,37 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("upload directory is required")
 	}
 
+	// Billing defaults
+	if c.Billing.SettlementThresholdCents == 0 {
+		c.Billing.SettlementThresholdCents = 500 // Default $5.00
+	}
+
+	// Scheduler defaults
+	if c.Scheduler.MarkOverdueRentals == "" {
+		c.Scheduler.MarkOverdueRentals = "0 0 2 * * *" // 2 AM UTC
+	}
+	if c.Scheduler.SendOverdueReminders == "" {
+		c.Scheduler.SendOverdueReminders = "0 0 3 * * *" // 3 AM UTC
+	}
+	if c.Scheduler.SendBillReminders == "" {
+		c.Scheduler.SendBillReminders = "0 0 4 * * *" // 4 AM UTC
+	}
+	if c.Scheduler.CheckOverdueBills == "" {
+		c.Scheduler.CheckOverdueBills = "0 0 5 10 * *" // 10th of month at 5 AM UTC
+	}
+	if c.Scheduler.ResolveDisputedBills == "" {
+		c.Scheduler.ResolveDisputedBills = "0 0 23 L * *" // Last day of month at 11 PM UTC
+	}
+	if c.Scheduler.TakeBalanceSnapshots == "" {
+		c.Scheduler.TakeBalanceSnapshots = "0 30 23 L * *" // Last day of month at 11:30 PM UTC
+	}
+	if c.Scheduler.PerformBillSplitting == "" {
+		c.Scheduler.PerformBillSplitting = "0 0 0 1 * *" // 1st of month at 12 AM UTC
+	}
+	if c.Scheduler.SendBillNotices == "" {
+		c.Scheduler.SendBillNotices = "0 0 9 * * *" // Daily at 9 AM UTC
+	}
+
 	return nil
 }
 
@@ -222,4 +260,21 @@ func (c *Config) GetDatabaseConnectionString() string {
 // GetServerAddress returns the gRPC server address
 func (c *Config) GetServerAddress() string {
 	return fmt.Sprintf("%s:%d", c.Server.Host, c.Server.Port)
+}
+
+// BillingConfig contains bill splitting settings
+type BillingConfig struct {
+	SettlementThresholdCents int `yaml:"settlement_threshold_cents"`
+}
+
+// SchedulerConfig contains cron schedule settings
+type SchedulerConfig struct {
+	MarkOverdueRentals   string `yaml:"mark_overdue_rentals"`
+	SendOverdueReminders string `yaml:"send_overdue_reminders"`
+	SendBillReminders    string `yaml:"send_bill_reminders"`
+	CheckOverdueBills    string `yaml:"check_overdue_bills"`
+	ResolveDisputedBills string `yaml:"resolve_disputed_bills"`
+	TakeBalanceSnapshots string `yaml:"take_balance_snapshots"`
+	PerformBillSplitting string `yaml:"perform_bill_splitting"`
+	SendBillNotices      string `yaml:"send_bill_notices"`
 }

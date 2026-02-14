@@ -41,6 +41,10 @@ run-test-debug:
 	@echo "Starting server in DEBUG mode with verbose output..."
 	set LOG_LEVEL=debug&& go run ./cmd/server -config=config/config.test.yaml
 
+run-test-cron-debug:
+	@echo "Starting cronjob in DEBUG mode with verbose output..."
+	set LOG_LEVEL=debug&& go run ./cmd/cronjob -config=config/config.test.yaml
+
 tidy:
 	go mod tidy
 

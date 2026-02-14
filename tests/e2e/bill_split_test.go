@@ -2,9 +2,13 @@ package e2e
 
 import (
 	"testing"
+	"fmt"
 	"time"
 
 	pb "ubertool-backend-trusted/api/gen/v1"
+	"ubertool-backend-trusted/internal/config"
+	"ubertool-backend-trusted/internal/jobs"
+	"ubertool-backend-trusted/internal/repository/postgres"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -601,4 +605,123 @@ func TestBillSplitService_UnauthorizedAccess(t *testing.T) {
 	} else {
 		assert.Error(t, err, "AcknowledgePayment should fail for unauthorized user")
 	}
+}
+
+func TestBillSplitAlgorithm_E2E(t *testing.T) {
+	// Setup DB
+	testDB := PrepareDB(t)
+	defer testDB.Cleanup()
+
+	// Scenario: Small church community tool sharing
+	// Scenarios from reference implementation
+	// John: 4550
+	// Mary: -3820
+	// Peter: 1275
+	// Sarah: -1560
+	// David: 320
+	// Emma: -280
+	// Luke: 2500
+	// Anna: -3015
+	// Mark: 450
+	// Ruth: -420
+
+	orgID := testDB.CreateTestOrg("E2E-Church-Community-" + t.Name())
+
+	users := []struct {
+		Name    string
+		Balance int32
+		ID      int32
+	}{
+		{"John", 4550, 0},
+		{"Mary", -3820, 0},
+		{"Peter", 1275, 0},
+		{"Sarah", -1560, 0},
+		{"David", 320, 0},
+		{"Emma", -280, 0},
+		{"Luke", 2500, 0},
+		{"Anna", -3015, 0},
+		{"Mark", 450, 0},
+		{"Ruth", -420, 0},
+	}
+
+	for i := range users {
+		email := fmt.Sprintf("e2e-test-church-%s-%d@test.com", users[i].Name, time.Now().UnixNano())
+		users[i].ID = testDB.CreateTestUser(email, users[i].Name)
+		testDB.AddUserToOrg(users[i].ID, orgID, "MEMBER", "ACTIVE", users[i].Balance)
+	}
+
+	// Setup JobRunner
+	// We need a real DB connection (testDB.DB) and a config with threshold
+	// Manually construct config since loadConfig might not be available or we want specific settings
+	cfg := &config.Config{
+		Billing: config.BillingConfig{
+			SettlementThresholdCents: 500, // $5.00
+		},
+	}
+
+	store := postgres.NewStore(testDB.DB)
+	// Services can be nil as PerformBillSplitting doesn't use them (confirmed by code analysis)
+	jobRunner := jobs.NewJobRunner(testDB.DB, store, nil, cfg)
+
+	// Trigger Bill Splitting
+	// We call the job function directly. It will discover the org and run the algorithm.
+	// Since PerformBillSplitting runs for ALL orgs, it will pick up our test org.
+	// However, we want to ensure it uses the correct "last month" logic.
+	// The implementation calculates "last month" as time.Now().AddDate(0, -1, 0).Format("2006-01").
+	// We need to verify bills for THAT month.
+	
+	jobRunner.PerformBillSplitting()
+
+	// Verification
+	// We expect 4 bills based on the unit test analysis:
+	// 1. Mary(3820) -> John
+	// 2. Anna(2500) -> Luke
+	// 3. Sarah(1275) -> Peter
+	// 4. Anna(515) -> John
+	
+	lastMonth := time.Now().AddDate(0, -1, 0).Format("2006-01")
+
+	// Helper to find user ID by name
+	getUserID := func(name string) int32 {
+		for _, u := range users {
+			if u.Name == name {
+				return u.ID
+			}
+		}
+		return 0
+	}
+
+	johnID := getUserID("John")
+	maryID := getUserID("Mary")
+	peterID := getUserID("Peter")
+	sarahID := getUserID("Sarah")
+	lukeID := getUserID("Luke")
+	annaID := getUserID("Anna")
+
+	// Check bills
+	checkBill := func(debtorID, creditorID int32, amount int32) {
+		var count int
+		err := testDB.QueryRow(`
+			SELECT COUNT(*) 
+			FROM bills 
+			WHERE org_id = $1 
+			  AND debtor_user_id = $2 
+			  AND creditor_user_id = $3 
+			  AND amount_cents = $4
+			  AND settlement_month = $5
+		`, orgID, debtorID, creditorID, amount, lastMonth).Scan(&count)
+		require.NoError(t, err)
+		assert.Equal(t, 1, count, "Expected bill from %d to %d for %d cents", debtorID, creditorID, amount)
+	}
+
+	checkBill(maryID, johnID, 3820)
+	checkBill(annaID, lukeID, 2500)
+	checkBill(sarahID, peterID, 1275)
+	checkBill(annaID, johnID, 515)
+
+	// Verify total count
+	var totalBills int
+	err := testDB.QueryRow("SELECT COUNT(*) FROM bills WHERE org_id = $1 AND settlement_month = $2", orgID, lastMonth).Scan(&totalBills)
+	require.NoError(t, err)
+	assert.Equal(t, 4, totalBills, "Expected exactly 4 bills")
 }

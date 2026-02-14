@@ -33,48 +33,56 @@ func NewScheduler(jobRunner *jobs.JobRunner) *Scheduler {
 
 // registerJobs registers all scheduled jobs with the cron scheduler
 func (s *Scheduler) registerJobs() {
-	// Nightly jobs (2 AM UTC)
+	cfg := s.jobs.Config().Scheduler
+
+	// Nightly jobs
 	// Mark overdue rentals
-	_, err := s.cron.AddFunc("0 0 2 * * *", s.jobs.MarkOverdueRentals)
+	_, err := s.cron.AddFunc(cfg.MarkOverdueRentals, s.jobs.MarkOverdueRentals)
 	if err != nil {
 		logger.Error("Failed to register MarkOverdueRentals job", "error", err)
 	}
 
-	// Send overdue reminders (3 AM UTC)
-	_, err = s.cron.AddFunc("0 0 3 * * *", s.jobs.SendOverdueReminders)
+	// Send overdue reminders
+	_, err = s.cron.AddFunc(cfg.SendOverdueReminders, s.jobs.SendOverdueReminders)
 	if err != nil {
 		logger.Error("Failed to register SendOverdueReminders job", "error", err)
 	}
 
-	// Send bill reminders (4 AM UTC)
-	_, err = s.cron.AddFunc("0 0 4 * * *", s.jobs.SendBillReminders)
+	// Send bill reminders
+	_, err = s.cron.AddFunc(cfg.SendBillReminders, s.jobs.SendBillReminders)
 	if err != nil {
 		logger.Error("Failed to register SendBillReminders job", "error", err)
 	}
 
-	// Check overdue bills daily (10th of each month at 5 AM UTC)
-	_, err = s.cron.AddFunc("0 0 5 10 * *", s.jobs.CheckOverdueBills)
+	// Check overdue bills daily
+	_, err = s.cron.AddFunc(cfg.CheckOverdueBills, s.jobs.CheckOverdueBills)
 	if err != nil {
 		logger.Error("Failed to register CheckOverdueBills job", "error", err)
 	}
 
-	// Monthly jobs - Run on last day of month
-	// Resolve disputed bills (11 PM UTC on last day of month)
-	_, err = s.cron.AddFunc("0 0 23 L * *", s.jobs.ResolveDisputedBills)
+	// Monthly jobs
+	// Resolve disputed bills
+	_, err = s.cron.AddFunc(cfg.ResolveDisputedBills, s.jobs.ResolveDisputedBills)
 	if err != nil {
 		logger.Error("Failed to register ResolveDisputedBills job", "error", err)
 	}
 
-	// Take balance snapshots (11:30 PM UTC on last day of month)
-	_, err = s.cron.AddFunc("0 30 23 L * *", s.jobs.TakeBalanceSnapshots)
+	// Take balance snapshots
+	_, err = s.cron.AddFunc(cfg.TakeBalanceSnapshots, s.jobs.TakeBalanceSnapshots)
 	if err != nil {
 		logger.Error("Failed to register TakeBalanceSnapshots job", "error", err)
 	}
 
-	// Perform bill splitting (12:00 AM UTC on 1st of month)
-	_, err = s.cron.AddFunc("0 0 0 1 * *", s.jobs.PerformBillSplitting)
+	// Perform bill splitting
+	_, err = s.cron.AddFunc(cfg.PerformBillSplitting, s.jobs.PerformBillSplitting)
 	if err != nil {
 		logger.Error("Failed to register PerformBillSplitting job", "error", err)
+	}
+
+	// Send bill splitting notices
+	_, err = s.cron.AddFunc(cfg.SendBillNotices, s.jobs.SendBillSplittingNotices)
+	if err != nil {
+		logger.Error("Failed to register SendBillSplittingNotices job", "error", err)
 	}
 
 	logger.Info("All cron jobs registered successfully")

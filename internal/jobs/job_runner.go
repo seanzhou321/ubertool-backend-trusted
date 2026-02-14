@@ -36,8 +36,13 @@ func NewJobRunner(db *sql.DB, store *postgres.Store, services *Services, cfg *co
 	}
 }
 
-// runWithRecovery wraps job execution with panic recovery
-func (jr *JobRunner) runWithRecovery(jobName string, jobFunc func()) {
+// Config returns the configuration
+func (jr *JobRunner) Config() *config.Config {
+	return jr.config
+}
+
+// runWithRecovery executes a job function with panic recovery
+func (jr *JobRunner) runWithRecovery(jobName string, fn func()) {
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error("Job panicked", "job", jobName, "panic", r)
@@ -45,7 +50,7 @@ func (jr *JobRunner) runWithRecovery(jobName string, jobFunc func()) {
 	}()
 
 	logger.Info("Starting job", "job", jobName)
-	jobFunc()
+	fn()
 	logger.Info("Job completed", "job", jobName)
 }
 

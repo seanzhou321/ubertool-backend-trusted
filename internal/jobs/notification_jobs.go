@@ -198,3 +198,124 @@ Ubertool Team`, creditorName, amountDollars, debtorName, settlementMonth, billID
 		logger.Info("Bill reminders sent", "count", count)
 	})
 }
+
+// SendBillSplittingNotices sends email notices for new bills
+func (jr *JobRunner) SendBillSplittingNotices() {
+	jr.runWithRecovery("SendBillSplittingNotices", func() {
+		ctx := context.Background()
+
+		// Find pending bills that haven't had a notice sent yet
+		query := `
+			SELECT b.id, b.debtor_user_id, b.creditor_user_id, b.amount_cents,
+			       b.settlement_month,
+			       debtor.email as debtor_email, debtor.name as debtor_name,
+			       creditor.email as creditor_email, creditor.name as creditor_name,
+			       o.name as org_name
+			FROM bills b
+			JOIN users debtor ON b.debtor_user_id = debtor.id
+			JOIN users creditor ON b.creditor_user_id = creditor.id
+			JOIN orgs o ON b.org_id = o.id
+			WHERE b.status = 'PENDING'
+			  AND b.notice_sent_at IS NULL
+		`
+
+		rows, err := jr.db.QueryContext(ctx, query)
+		if err != nil {
+			logger.Error("Failed to query new bills for notices", "error", err)
+			return
+		}
+		defer rows.Close()
+
+		count := 0
+		for rows.Next() {
+			var (
+				billID          int
+				debtorID        int
+				creditorID      int
+				amountCents     int
+				settlementMonth string
+				debtorEmail     string
+				debtorName      string
+				creditorEmail   string
+				creditorName    string
+				orgName         string
+			)
+
+			if err := rows.Scan(&billID, &debtorID, &creditorID, &amountCents, &settlementMonth,
+				&debtorEmail, &debtorName, &creditorEmail, &creditorName, &orgName); err != nil {
+				logger.Error("Failed to scan new bill", "error", err)
+				continue
+			}
+
+			// Calculate amount in dollars
+			amountDollars := float64(amountCents) / 100.0
+
+			// Send notice to debtor
+			debtorSubject := fmt.Sprintf("New Bill: Payment Due for %s", orgName)
+			debtorBody := fmt.Sprintf(`Dear %s,
+
+A new bill has been generated for the settlement period %s.
+You owe $%.2f to %s.
+
+Please arrange payment and acknowledge it in the Ubertool app.
+
+Bill ID: %d
+
+Thank you,
+Ubertool Team`, debtorName, settlementMonth, amountDollars, creditorName, billID)
+
+			err := jr.services.Email.SendAdminNotification(ctx, debtorEmail, debtorSubject, debtorBody)
+			if err != nil {
+				logger.Error("Failed to send bill notice to debtor",
+					"bill_id", billID,
+					"debtor_id", debtorID,
+					"error", err)
+				// Don't mark as sent if email failed
+				continue
+			}
+
+			// Send notice to creditor
+			creditorSubject := fmt.Sprintf("New Bill: Payment Expected from %s", debtorName)
+			creditorBody := fmt.Sprintf(`Dear %s,
+
+A new bill has been generated for the settlement period %s.
+You are owed $%.2f by %s.
+
+Please monitor the Ubertool app for payment confirmation.
+
+Bill ID: %d
+
+Thank you,
+Ubertool Team`, creditorName, settlementMonth, amountDollars, debtorName, billID)
+
+			err = jr.services.Email.SendAdminNotification(ctx, creditorEmail, creditorSubject, creditorBody)
+			if err != nil {
+				logger.Error("Failed to send bill notice to creditor",
+					"bill_id", billID,
+					"creditor_id", creditorID,
+					"error", err)
+				// Even if creditor email fails, we considered the notice "sent" as the debtor was notified?
+				// Or fail? Let's treat debtor notification as the primary "notice sent" trigger.
+			}
+
+			// Mark as sent
+			_, err = jr.db.ExecContext(ctx, "UPDATE bills SET notice_sent_at = NOW() WHERE id = $1", billID)
+			if err != nil {
+				logger.Error("Failed to update bill notice status", "bill_id", billID, "error", err)
+			}
+
+			count++
+			logger.Debug("Sent bill notices",
+				"bill_id", billID,
+				"debtor_id", debtorID,
+				"creditor_id", creditorID)
+		}
+
+		if err := rows.Err(); err != nil {
+			logger.Error("Error iterating new bills", "error", err)
+			return
+		}
+
+		logger.Info("Bill splitting notices sent", "count", count)
+	})
+}
