@@ -313,106 +313,6 @@ func (x *ListMembersRequest) GetOrganizationId() int32 {
 	return 0
 }
 
-type MemberProfile struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
-	Balance       int32                  `protobuf:"varint,4,opt,name=balance,proto3" json:"balance,omitempty"`
-	MemberSince   string                 `protobuf:"bytes,5,opt,name=member_since,json=memberSince,proto3" json:"member_since,omitempty"`
-	IsBlocked     bool                   `protobuf:"varint,6,opt,name=is_blocked,json=isBlocked,proto3" json:"is_blocked,omitempty"`
-	BlockedOn     string                 `protobuf:"bytes,7,opt,name=blocked_on,json=blockedOn,proto3" json:"blocked_on,omitempty"`
-	BlockedReason string                 `protobuf:"bytes,8,opt,name=blocked_reason,json=blockedReason,proto3" json:"blocked_reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *MemberProfile) Reset() {
-	*x = MemberProfile{}
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *MemberProfile) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MemberProfile) ProtoMessage() {}
-
-func (x *MemberProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MemberProfile.ProtoReflect.Descriptor instead.
-func (*MemberProfile) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *MemberProfile) GetUserId() int32 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
-}
-
-func (x *MemberProfile) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *MemberProfile) GetEmail() string {
-	if x != nil {
-		return x.Email
-	}
-	return ""
-}
-
-func (x *MemberProfile) GetBalance() int32 {
-	if x != nil {
-		return x.Balance
-	}
-	return 0
-}
-
-func (x *MemberProfile) GetMemberSince() string {
-	if x != nil {
-		return x.MemberSince
-	}
-	return ""
-}
-
-func (x *MemberProfile) GetIsBlocked() bool {
-	if x != nil {
-		return x.IsBlocked
-	}
-	return false
-}
-
-func (x *MemberProfile) GetBlockedOn() string {
-	if x != nil {
-		return x.BlockedOn
-	}
-	return ""
-}
-
-func (x *MemberProfile) GetBlockedReason() string {
-	if x != nil {
-		return x.BlockedReason
-	}
-	return ""
-}
-
 type ListMembersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Members       []*MemberProfile       `protobuf:"bytes,1,rep,name=members,proto3" json:"members,omitempty"`
@@ -422,7 +322,7 @@ type ListMembersResponse struct {
 
 func (x *ListMembersResponse) Reset() {
 	*x = ListMembersResponse{}
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[6]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -434,7 +334,7 @@ func (x *ListMembersResponse) String() string {
 func (*ListMembersResponse) ProtoMessage() {}
 
 func (x *ListMembersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[6]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -447,7 +347,7 @@ func (x *ListMembersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMembersResponse.ProtoReflect.Descriptor instead.
 func (*ListMembersResponse) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{6}
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListMembersResponse) GetMembers() []*MemberProfile {
@@ -467,7 +367,7 @@ type SearchUsersRequest struct {
 
 func (x *SearchUsersRequest) Reset() {
 	*x = SearchUsersRequest{}
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[7]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -479,7 +379,7 @@ func (x *SearchUsersRequest) String() string {
 func (*SearchUsersRequest) ProtoMessage() {}
 
 func (x *SearchUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[7]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -492,7 +392,7 @@ func (x *SearchUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchUsersRequest.ProtoReflect.Descriptor instead.
 func (*SearchUsersRequest) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{7}
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SearchUsersRequest) GetOrganizationId() int32 {
@@ -518,7 +418,7 @@ type SearchUsersResponse struct {
 
 func (x *SearchUsersResponse) Reset() {
 	*x = SearchUsersResponse{}
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[8]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -530,7 +430,7 @@ func (x *SearchUsersResponse) String() string {
 func (*SearchUsersResponse) ProtoMessage() {}
 
 func (x *SearchUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[8]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -543,7 +443,7 @@ func (x *SearchUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchUsersResponse.ProtoReflect.Descriptor instead.
 func (*SearchUsersResponse) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{8}
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SearchUsersResponse) GetUsers() []*MemberProfile {
@@ -562,7 +462,7 @@ type ListJoinRequestsRequest struct {
 
 func (x *ListJoinRequestsRequest) Reset() {
 	*x = ListJoinRequestsRequest{}
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[9]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -574,7 +474,7 @@ func (x *ListJoinRequestsRequest) String() string {
 func (*ListJoinRequestsRequest) ProtoMessage() {}
 
 func (x *ListJoinRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[9]
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -587,7 +487,7 @@ func (x *ListJoinRequestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListJoinRequestsRequest.ProtoReflect.Descriptor instead.
 func (*ListJoinRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{9}
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListJoinRequestsRequest) GetOrganizationId() int32 {
@@ -595,6 +495,50 @@ func (x *ListJoinRequestsRequest) GetOrganizationId() int32 {
 		return x.OrganizationId
 	}
 	return 0
+}
+
+type ListJoinRequestsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Requests      []*JoinRequestProfile  `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListJoinRequestsResponse) Reset() {
+	*x = ListJoinRequestsResponse{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListJoinRequestsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListJoinRequestsResponse) ProtoMessage() {}
+
+func (x *ListJoinRequestsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListJoinRequestsResponse.ProtoReflect.Descriptor instead.
+func (*ListJoinRequestsResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListJoinRequestsResponse) GetRequests() []*JoinRequestProfile {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
 }
 
 type JoinRequestProfile struct {
@@ -689,27 +633,29 @@ func (x *JoinRequestProfile) GetUsedOn() string {
 	return ""
 }
 
-type ListJoinRequestsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Requests      []*JoinRequestProfile  `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+type RejectRequestToJoinRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	ApplicantEmail string                 `protobuf:"bytes,2,opt,name=applicant_email,json=applicantEmail,proto3" json:"applicant_email,omitempty"`
+	Reason         string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
-func (x *ListJoinRequestsResponse) Reset() {
-	*x = ListJoinRequestsResponse{}
+func (x *RejectRequestToJoinRequest) Reset() {
+	*x = RejectRequestToJoinRequest{}
 	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListJoinRequestsResponse) String() string {
+func (x *RejectRequestToJoinRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListJoinRequestsResponse) ProtoMessage() {}
+func (*RejectRequestToJoinRequest) ProtoMessage() {}
 
-func (x *ListJoinRequestsResponse) ProtoReflect() protoreflect.Message {
+func (x *RejectRequestToJoinRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -721,16 +667,447 @@ func (x *ListJoinRequestsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListJoinRequestsResponse.ProtoReflect.Descriptor instead.
-func (*ListJoinRequestsResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use RejectRequestToJoinRequest.ProtoReflect.Descriptor instead.
+func (*RejectRequestToJoinRequest) Descriptor() ([]byte, []int) {
 	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *ListJoinRequestsResponse) GetRequests() []*JoinRequestProfile {
+func (x *RejectRequestToJoinRequest) GetOrganizationId() int32 {
 	if x != nil {
-		return x.Requests
+		return x.OrganizationId
+	}
+	return 0
+}
+
+func (x *RejectRequestToJoinRequest) GetApplicantEmail() string {
+	if x != nil {
+		return x.ApplicantEmail
+	}
+	return ""
+}
+
+func (x *RejectRequestToJoinRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type RejectRequestToJoinResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejectRequestToJoinResponse) Reset() {
+	*x = RejectRequestToJoinResponse{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejectRequestToJoinResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejectRequestToJoinResponse) ProtoMessage() {}
+
+func (x *RejectRequestToJoinResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejectRequestToJoinResponse.ProtoReflect.Descriptor instead.
+func (*RejectRequestToJoinResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RejectRequestToJoinResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *RejectRequestToJoinResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type SendInvitationRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Email          string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	Name           string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SendInvitationRequest) Reset() {
+	*x = SendInvitationRequest{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendInvitationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendInvitationRequest) ProtoMessage() {}
+
+func (x *SendInvitationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendInvitationRequest.ProtoReflect.Descriptor instead.
+func (*SendInvitationRequest) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SendInvitationRequest) GetOrganizationId() int32 {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return 0
+}
+
+func (x *SendInvitationRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *SendInvitationRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type SendInvitationResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Success        bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message        string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	InvitationCode string                 `protobuf:"bytes,3,opt,name=invitation_code,json=invitationCode,proto3" json:"invitation_code,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SendInvitationResponse) Reset() {
+	*x = SendInvitationResponse{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendInvitationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendInvitationResponse) ProtoMessage() {}
+
+func (x *SendInvitationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendInvitationResponse.ProtoReflect.Descriptor instead.
+func (*SendInvitationResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SendInvitationResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SendInvitationResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *SendInvitationResponse) GetInvitationCode() string {
+	if x != nil {
+		return x.InvitationCode
+	}
+	return ""
+}
+
+type GetMemberProfileRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	UserId         int32                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetMemberProfileRequest) Reset() {
+	*x = GetMemberProfileRequest{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMemberProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMemberProfileRequest) ProtoMessage() {}
+
+func (x *GetMemberProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMemberProfileRequest.ProtoReflect.Descriptor instead.
+func (*GetMemberProfileRequest) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetMemberProfileRequest) GetOrganizationId() int32 {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return 0
+}
+
+func (x *GetMemberProfileRequest) GetUserId() int32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+type GetMemberProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *MemberProfile         `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMemberProfileResponse) Reset() {
+	*x = GetMemberProfileResponse{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMemberProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMemberProfileResponse) ProtoMessage() {}
+
+func (x *GetMemberProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMemberProfileResponse.ProtoReflect.Descriptor instead.
+func (*GetMemberProfileResponse) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetMemberProfileResponse) GetProfile() *MemberProfile {
+	if x != nil {
+		return x.Profile
 	}
 	return nil
+}
+
+type MemberProfile struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	UserId       int32                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Name         string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Email        string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	BalanceCents int32                  `protobuf:"varint,4,opt,name=balance_cents,json=balanceCents,proto3" json:"balance_cents,omitempty"`
+	MemberSince  string                 `protobuf:"bytes,5,opt,name=member_since,json=memberSince,proto3" json:"member_since,omitempty"`
+	IsBlocked    bool                   `protobuf:"varint,6,opt,name=is_blocked,json=isBlocked,proto3" json:"is_blocked,omitempty"` // Computed: true if (renting_blocked OR lending_blocked)
+	BlockReason  string                 `protobuf:"bytes,7,opt,name=block_reason,json=blockReason,proto3" json:"block_reason,omitempty"`
+	// string about = 8; // Removed as not in DB
+	Phone          string `protobuf:"bytes,9,opt,name=phone,proto3" json:"phone,omitempty"`
+	Role           string `protobuf:"bytes,10,opt,name=role,proto3" json:"role,omitempty"` // ADMIN, MEMBER
+	AvatarUrl      string `protobuf:"bytes,11,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	RentingBlocked bool   `protobuf:"varint,12,opt,name=renting_blocked,json=rentingBlocked,proto3" json:"renting_blocked,omitempty"`
+	LendingBlocked bool   `protobuf:"varint,13,opt,name=lending_blocked,json=lendingBlocked,proto3" json:"lending_blocked,omitempty"`
+	BlockedOn      string `protobuf:"bytes,14,opt,name=blocked_on,json=blockedOn,proto3" json:"blocked_on,omitempty"`
+	Status         string `protobuf:"bytes,15,opt,name=status,proto3" json:"status,omitempty"` // ACTIVE, SUSPEND, BLOCK from users_orgs
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *MemberProfile) Reset() {
+	*x = MemberProfile{}
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MemberProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MemberProfile) ProtoMessage() {}
+
+func (x *MemberProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MemberProfile.ProtoReflect.Descriptor instead.
+func (*MemberProfile) Descriptor() ([]byte, []int) {
+	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *MemberProfile) GetUserId() int32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *MemberProfile) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetBalanceCents() int32 {
+	if x != nil {
+		return x.BalanceCents
+	}
+	return 0
+}
+
+func (x *MemberProfile) GetMemberSince() string {
+	if x != nil {
+		return x.MemberSince
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetIsBlocked() bool {
+	if x != nil {
+		return x.IsBlocked
+	}
+	return false
+}
+
+func (x *MemberProfile) GetBlockReason() string {
+	if x != nil {
+		return x.BlockReason
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetPhone() string {
+	if x != nil {
+		return x.Phone
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetRentingBlocked() bool {
+	if x != nil {
+		return x.RentingBlocked
+	}
+	return false
+}
+
+func (x *MemberProfile) GetLendingBlocked() bool {
+	if x != nil {
+		return x.LendingBlocked
+	}
+	return false
+}
+
+func (x *MemberProfile) GetBlockedOn() string {
+	if x != nil {
+		return x.BlockedOn
+	}
+	return ""
+}
+
+func (x *MemberProfile) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
 }
 
 var File_ubertool_trusted_backend_v1_admin_service_proto protoreflect.FileDescriptor
@@ -756,18 +1133,7 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"=\n" +
 	"\x12ListMembersRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"\xf4\x01\n" +
-	"\rMemberProfile\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
-	"\x05email\x18\x03 \x01(\tR\x05email\x12\x18\n" +
-	"\abalance\x18\x04 \x01(\x05R\abalance\x12!\n" +
-	"\fmember_since\x18\x05 \x01(\tR\vmemberSince\x12\x1d\n" +
-	"\n" +
-	"is_blocked\x18\x06 \x01(\bR\tisBlocked\x12\x1d\n" +
-	"\n" +
-	"blocked_on\x18\a \x01(\tR\tblockedOn\x12%\n" +
-	"\x0eblocked_reason\x18\b \x01(\tR\rblockedReason\"W\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"W\n" +
 	"\x13ListMembersResponse\x12@\n" +
 	"\amembers\x18\x01 \x03(\v2&.ubertool.trusted.api.v1.MemberProfileR\amembers\"S\n" +
 	"\x12SearchUsersRequest\x12'\n" +
@@ -776,7 +1142,9 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x13SearchUsersResponse\x12<\n" +
 	"\x05users\x18\x01 \x03(\v2&.ubertool.trusted.api.v1.MemberProfileR\x05users\"B\n" +
 	"\x17ListJoinRequestsRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"\xcc\x01\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"c\n" +
+	"\x18ListJoinRequestsResponse\x12G\n" +
+	"\brequests\x18\x01 \x03(\v2+.ubertool.trusted.api.v1.JoinRequestProfileR\brequests\"\xcc\x01\n" +
 	"\x12JoinRequestProfile\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\x12\x17\n" +
@@ -785,15 +1153,55 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x05email\x18\x04 \x01(\tR\x05email\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage\x12!\n" +
 	"\frequest_date\x18\x06 \x01(\tR\vrequestDate\x12\x17\n" +
-	"\aused_on\x18\a \x01(\tR\x06usedOn\"c\n" +
-	"\x18ListJoinRequestsResponse\x12G\n" +
-	"\brequests\x18\x01 \x03(\v2+.ubertool.trusted.api.v1.JoinRequestProfileR\brequests2\xea\x04\n" +
+	"\aused_on\x18\a \x01(\tR\x06usedOn\"\x86\x01\n" +
+	"\x1aRejectRequestToJoinRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12'\n" +
+	"\x0fapplicant_email\x18\x02 \x01(\tR\x0eapplicantEmail\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"Q\n" +
+	"\x1bRejectRequestToJoinResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"j\n" +
+	"\x15SendInvitationRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"u\n" +
+	"\x16SendInvitationResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12'\n" +
+	"\x0finvitation_code\x18\x03 \x01(\tR\x0einvitationCode\"[\n" +
+	"\x17GetMemberProfileRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\x05R\x06userId\"\\\n" +
+	"\x18GetMemberProfileResponse\x12@\n" +
+	"\aprofile\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.MemberProfileR\aprofile\"\xae\x03\n" +
+	"\rMemberProfile\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\x05R\x06userId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12#\n" +
+	"\rbalance_cents\x18\x04 \x01(\x05R\fbalanceCents\x12!\n" +
+	"\fmember_since\x18\x05 \x01(\tR\vmemberSince\x12\x1d\n" +
+	"\n" +
+	"is_blocked\x18\x06 \x01(\bR\tisBlocked\x12!\n" +
+	"\fblock_reason\x18\a \x01(\tR\vblockReason\x12\x14\n" +
+	"\x05phone\x18\t \x01(\tR\x05phone\x12\x12\n" +
+	"\x04role\x18\n" +
+	" \x01(\tR\x04role\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\v \x01(\tR\tavatarUrl\x12'\n" +
+	"\x0frenting_blocked\x18\f \x01(\bR\x0erentingBlocked\x12'\n" +
+	"\x0flending_blocked\x18\r \x01(\bR\x0elendingBlocked\x12\x1d\n" +
+	"\n" +
+	"blocked_on\x18\x0e \x01(\tR\tblockedOn\x12\x16\n" +
+	"\x06status\x18\x0f \x01(\tR\x06status2\xd9\a\n" +
 	"\fAdminService\x12\x83\x01\n" +
 	"\x14ApproveRequestToJoin\x124.ubertool.trusted.api.v1.ApproveRequestToJoinRequest\x1a5.ubertool.trusted.api.v1.ApproveRequestToJoinResponse\x12\x86\x01\n" +
 	"\x15AdminBlockUserAccount\x125.ubertool.trusted.api.v1.AdminBlockUserAccountRequest\x1a6.ubertool.trusted.api.v1.AdminBlockUserAccountResponse\x12h\n" +
 	"\vListMembers\x12+.ubertool.trusted.api.v1.ListMembersRequest\x1a,.ubertool.trusted.api.v1.ListMembersResponse\x12h\n" +
 	"\vSearchUsers\x12+.ubertool.trusted.api.v1.SearchUsersRequest\x1a,.ubertool.trusted.api.v1.SearchUsersResponse\x12w\n" +
-	"\x10ListJoinRequests\x120.ubertool.trusted.api.v1.ListJoinRequestsRequest\x1a1.ubertool.trusted.api.v1.ListJoinRequestsResponseBc\n" +
+	"\x10ListJoinRequests\x120.ubertool.trusted.api.v1.ListJoinRequestsRequest\x1a1.ubertool.trusted.api.v1.ListJoinRequestsResponse\x12\x80\x01\n" +
+	"\x13RejectRequestToJoin\x123.ubertool.trusted.api.v1.RejectRequestToJoinRequest\x1a4.ubertool.trusted.api.v1.RejectRequestToJoinResponse\x12q\n" +
+	"\x0eSendInvitation\x12..ubertool.trusted.api.v1.SendInvitationRequest\x1a/.ubertool.trusted.api.v1.SendInvitationResponse\x12w\n" +
+	"\x10GetMemberProfile\x120.ubertool.trusted.api.v1.GetMemberProfileRequest\x1a1.ubertool.trusted.api.v1.GetMemberProfileResponseBc\n" +
 	"\x1bcom.ubertool.trusted.api.v1B\x11AdminServiceProtoP\x01Z/ubertool-backend-trusted/api/gen/v1;ubertool_v1b\x06proto3"
 
 var (
@@ -808,40 +1216,53 @@ func file_ubertool_trusted_backend_v1_admin_service_proto_rawDescGZIP() []byte {
 	return file_ubertool_trusted_backend_v1_admin_service_proto_rawDescData
 }
 
-var file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_ubertool_trusted_backend_v1_admin_service_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_ubertool_trusted_backend_v1_admin_service_proto_goTypes = []any{
 	(*ApproveRequestToJoinRequest)(nil),   // 0: ubertool.trusted.api.v1.ApproveRequestToJoinRequest
 	(*ApproveRequestToJoinResponse)(nil),  // 1: ubertool.trusted.api.v1.ApproveRequestToJoinResponse
 	(*AdminBlockUserAccountRequest)(nil),  // 2: ubertool.trusted.api.v1.AdminBlockUserAccountRequest
 	(*AdminBlockUserAccountResponse)(nil), // 3: ubertool.trusted.api.v1.AdminBlockUserAccountResponse
 	(*ListMembersRequest)(nil),            // 4: ubertool.trusted.api.v1.ListMembersRequest
-	(*MemberProfile)(nil),                 // 5: ubertool.trusted.api.v1.MemberProfile
-	(*ListMembersResponse)(nil),           // 6: ubertool.trusted.api.v1.ListMembersResponse
-	(*SearchUsersRequest)(nil),            // 7: ubertool.trusted.api.v1.SearchUsersRequest
-	(*SearchUsersResponse)(nil),           // 8: ubertool.trusted.api.v1.SearchUsersResponse
-	(*ListJoinRequestsRequest)(nil),       // 9: ubertool.trusted.api.v1.ListJoinRequestsRequest
+	(*ListMembersResponse)(nil),           // 5: ubertool.trusted.api.v1.ListMembersResponse
+	(*SearchUsersRequest)(nil),            // 6: ubertool.trusted.api.v1.SearchUsersRequest
+	(*SearchUsersResponse)(nil),           // 7: ubertool.trusted.api.v1.SearchUsersResponse
+	(*ListJoinRequestsRequest)(nil),       // 8: ubertool.trusted.api.v1.ListJoinRequestsRequest
+	(*ListJoinRequestsResponse)(nil),      // 9: ubertool.trusted.api.v1.ListJoinRequestsResponse
 	(*JoinRequestProfile)(nil),            // 10: ubertool.trusted.api.v1.JoinRequestProfile
-	(*ListJoinRequestsResponse)(nil),      // 11: ubertool.trusted.api.v1.ListJoinRequestsResponse
+	(*RejectRequestToJoinRequest)(nil),    // 11: ubertool.trusted.api.v1.RejectRequestToJoinRequest
+	(*RejectRequestToJoinResponse)(nil),   // 12: ubertool.trusted.api.v1.RejectRequestToJoinResponse
+	(*SendInvitationRequest)(nil),         // 13: ubertool.trusted.api.v1.SendInvitationRequest
+	(*SendInvitationResponse)(nil),        // 14: ubertool.trusted.api.v1.SendInvitationResponse
+	(*GetMemberProfileRequest)(nil),       // 15: ubertool.trusted.api.v1.GetMemberProfileRequest
+	(*GetMemberProfileResponse)(nil),      // 16: ubertool.trusted.api.v1.GetMemberProfileResponse
+	(*MemberProfile)(nil),                 // 17: ubertool.trusted.api.v1.MemberProfile
 }
 var file_ubertool_trusted_backend_v1_admin_service_proto_depIdxs = []int32{
-	5,  // 0: ubertool.trusted.api.v1.ListMembersResponse.members:type_name -> ubertool.trusted.api.v1.MemberProfile
-	5,  // 1: ubertool.trusted.api.v1.SearchUsersResponse.users:type_name -> ubertool.trusted.api.v1.MemberProfile
+	17, // 0: ubertool.trusted.api.v1.ListMembersResponse.members:type_name -> ubertool.trusted.api.v1.MemberProfile
+	17, // 1: ubertool.trusted.api.v1.SearchUsersResponse.users:type_name -> ubertool.trusted.api.v1.MemberProfile
 	10, // 2: ubertool.trusted.api.v1.ListJoinRequestsResponse.requests:type_name -> ubertool.trusted.api.v1.JoinRequestProfile
-	0,  // 3: ubertool.trusted.api.v1.AdminService.ApproveRequestToJoin:input_type -> ubertool.trusted.api.v1.ApproveRequestToJoinRequest
-	2,  // 4: ubertool.trusted.api.v1.AdminService.AdminBlockUserAccount:input_type -> ubertool.trusted.api.v1.AdminBlockUserAccountRequest
-	4,  // 5: ubertool.trusted.api.v1.AdminService.ListMembers:input_type -> ubertool.trusted.api.v1.ListMembersRequest
-	7,  // 6: ubertool.trusted.api.v1.AdminService.SearchUsers:input_type -> ubertool.trusted.api.v1.SearchUsersRequest
-	9,  // 7: ubertool.trusted.api.v1.AdminService.ListJoinRequests:input_type -> ubertool.trusted.api.v1.ListJoinRequestsRequest
-	1,  // 8: ubertool.trusted.api.v1.AdminService.ApproveRequestToJoin:output_type -> ubertool.trusted.api.v1.ApproveRequestToJoinResponse
-	3,  // 9: ubertool.trusted.api.v1.AdminService.AdminBlockUserAccount:output_type -> ubertool.trusted.api.v1.AdminBlockUserAccountResponse
-	6,  // 10: ubertool.trusted.api.v1.AdminService.ListMembers:output_type -> ubertool.trusted.api.v1.ListMembersResponse
-	8,  // 11: ubertool.trusted.api.v1.AdminService.SearchUsers:output_type -> ubertool.trusted.api.v1.SearchUsersResponse
-	11, // 12: ubertool.trusted.api.v1.AdminService.ListJoinRequests:output_type -> ubertool.trusted.api.v1.ListJoinRequestsResponse
-	8,  // [8:13] is the sub-list for method output_type
-	3,  // [3:8] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	17, // 3: ubertool.trusted.api.v1.GetMemberProfileResponse.profile:type_name -> ubertool.trusted.api.v1.MemberProfile
+	0,  // 4: ubertool.trusted.api.v1.AdminService.ApproveRequestToJoin:input_type -> ubertool.trusted.api.v1.ApproveRequestToJoinRequest
+	2,  // 5: ubertool.trusted.api.v1.AdminService.AdminBlockUserAccount:input_type -> ubertool.trusted.api.v1.AdminBlockUserAccountRequest
+	4,  // 6: ubertool.trusted.api.v1.AdminService.ListMembers:input_type -> ubertool.trusted.api.v1.ListMembersRequest
+	6,  // 7: ubertool.trusted.api.v1.AdminService.SearchUsers:input_type -> ubertool.trusted.api.v1.SearchUsersRequest
+	8,  // 8: ubertool.trusted.api.v1.AdminService.ListJoinRequests:input_type -> ubertool.trusted.api.v1.ListJoinRequestsRequest
+	11, // 9: ubertool.trusted.api.v1.AdminService.RejectRequestToJoin:input_type -> ubertool.trusted.api.v1.RejectRequestToJoinRequest
+	13, // 10: ubertool.trusted.api.v1.AdminService.SendInvitation:input_type -> ubertool.trusted.api.v1.SendInvitationRequest
+	15, // 11: ubertool.trusted.api.v1.AdminService.GetMemberProfile:input_type -> ubertool.trusted.api.v1.GetMemberProfileRequest
+	1,  // 12: ubertool.trusted.api.v1.AdminService.ApproveRequestToJoin:output_type -> ubertool.trusted.api.v1.ApproveRequestToJoinResponse
+	3,  // 13: ubertool.trusted.api.v1.AdminService.AdminBlockUserAccount:output_type -> ubertool.trusted.api.v1.AdminBlockUserAccountResponse
+	5,  // 14: ubertool.trusted.api.v1.AdminService.ListMembers:output_type -> ubertool.trusted.api.v1.ListMembersResponse
+	7,  // 15: ubertool.trusted.api.v1.AdminService.SearchUsers:output_type -> ubertool.trusted.api.v1.SearchUsersResponse
+	9,  // 16: ubertool.trusted.api.v1.AdminService.ListJoinRequests:output_type -> ubertool.trusted.api.v1.ListJoinRequestsResponse
+	12, // 17: ubertool.trusted.api.v1.AdminService.RejectRequestToJoin:output_type -> ubertool.trusted.api.v1.RejectRequestToJoinResponse
+	14, // 18: ubertool.trusted.api.v1.AdminService.SendInvitation:output_type -> ubertool.trusted.api.v1.SendInvitationResponse
+	16, // 19: ubertool.trusted.api.v1.AdminService.GetMemberProfile:output_type -> ubertool.trusted.api.v1.GetMemberProfileResponse
+	12, // [12:20] is the sub-list for method output_type
+	4,  // [4:12] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_ubertool_trusted_backend_v1_admin_service_proto_init() }
@@ -855,7 +1276,7 @@ func file_ubertool_trusted_backend_v1_admin_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc), len(file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

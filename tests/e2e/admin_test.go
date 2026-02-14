@@ -120,6 +120,8 @@ func TestAdminService_E2E(t *testing.T) {
 		req := &pb.AdminBlockUserAccountRequest{
 			BlockedUserId:  memberID,
 			OrganizationId: orgID,
+			BlockRenting:   true,
+			BlockLending:   true,
 			Reason:         "Violated community guidelines",
 		}
 

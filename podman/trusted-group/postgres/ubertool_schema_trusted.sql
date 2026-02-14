@@ -142,6 +142,7 @@ CREATE TABLE rentals (
     rejection_reason TEXT,
     completed_by INTEGER,
     return_condition TEXT,
+    return_note TEXT,
     surcharge_or_credit_cents INTEGER, -- For late return or damage fees or credits for early return
     created_on DATE DEFAULT CURRENT_DATE,
     updated_on DATE DEFAULT CURRENT_DATE

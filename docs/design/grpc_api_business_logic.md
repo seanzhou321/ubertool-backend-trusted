@@ -125,15 +125,53 @@ Business Logic:
 4. If the user does not exist, creates an invitation record in `invitations` and send the invitation code to the new user, cc to the admin user (`user_id` parsed from this JWT token).
 5. Update `join_requests` status to 'APPROVED'.
 
-### Admin Block User Account
-Purpose: Admin suspends or blocks a member's access.
+### Reject Pending Request To Join
+Purpose: Admin rejects a pending request to join an organization.
 
-Input: `blocked_user_id`, `organization_id`, `reason`
+Input: `organization_id`, `applicant_email`, `reason`
+Output: success/failure, message
+Business Logic:
+1. Verify the caller has 'ADMIN' or 'SUPER_ADMIN' role in the given `organization_id`.
+2. Find the pending request in `join_requests` by email and org_id.
+3. Update `join_requests` status to 'REJECTED'.
+4. Send notification or email to the applicant (if implementing notification system for join requests).
+5. Return success.
+
+### Send Invitation
+Purpose: Admin sends an invitation to join the organization manually.
+
+Input: `organization_id`, `email`, `name`
+Output: success, message, invitation_code
+Business Logic:
+1. Verify the caller has 'ADMIN' or 'SUPER_ADMIN' role.
+2. Check if user is already a member. If so, return error.
+3. Create a new invitation record in `invitations` table.
+4. If the user does not exist in `users` table, send an invitation email with the code.
+5. Return the invitation code in response.
+
+### Admin Block User Account
+Purpose: Admin blocks/unblocks a member's renting and/or lending privileges.
+
+Input: `blocked_user_id`, `organization_id`, `block_renting`, `block_lending`, `reason`
 Output: success, error_message
 Business Logic:
-1. Verify caller admin rights.
-2. Update the `status` field in `users_orgs` to `BLOCK`.
-3. Set `blocked_on` and `blocked_reason`.
+1. Verify caller has 'ADMIN' or 'SUPER_ADMIN' role in the given `organization_id`.
+2. Verify the `blocked_user_id` is a member of the organization.
+3. Update the `users_orgs` record:
+   - Set `renting_blocked` = `block_renting`
+   - Set `lending_blocked` = `block_lending`
+   - If either flag is true, set `blocked_on` to current date and `blocked_reason` to the provided reason.
+   - If both flags are false (unblocking), clear `blocked_on`, `blocked_reason`.
+   - Update `status` to 'BLOCK' if either flag is true, otherwise 'ACTIVE'.
+4. Create notification for the blocked/unblocked user.
+5. Send email to the user informing them of the block/unblock action.
+6. Return success or error message.
+
+**Note**: This method can be used to:
+- Block renting only: `block_renting=true`, `block_lending=false`
+- Block lending only: `block_renting=false`, `block_lending=true`
+- Block both: `block_renting=true`, `block_lending=true`
+- Unblock user: `block_renting=false`, `block_lending=false`
 
 ### List Members
 Purpose: List all members of an organization.
@@ -141,8 +179,14 @@ Purpose: List all members of an organization.
 Input: `organization_id`
 Output: list of member profiles
 Business Logic:
-1. Verify user is either `SUPER_ADMIN` or `ADMIN`
-2. Join `users_orgs` and `users` to return member details and their current balance in that org.
+1. Verify caller has 'ADMIN' or 'SUPER_ADMIN' role in the given `organization_id`.
+2. Join `users_orgs` and `users` tables to return member details.
+3. For each member, populate `MemberProfile` with:
+   - User basic info: `user_id`, `name`, `email`, `phone`, `avatar_url`
+   - Organization-specific info: `balance_cents`, `role`, `status`, `member_since` (joined_on)
+   - Blocking info: `renting_blocked`, `lending_blocked`, `blocked_on`, `blocked_reason`
+   - Computed field `is_blocked` = `renting_blocked OR lending_blocked`
+4. Return list of member profiles.
 
 ### Search Users
 Purpose: Search for specific members within an organization.
@@ -150,7 +194,25 @@ Purpose: Search for specific members within an organization.
 Input: `organization_id`, `query`
 Output: list of matching member profiles
 Business Logic:
-1. Filter members by name or email using the `query` string in the `organization_id`.
+1. Verify caller has 'ADMIN' or 'SUPER_ADMIN' role in the given `organization_id`.
+2. Filter members by name or email using the `query` string in the `organization_id`.
+3. Return member profiles with same fields as ListMembers, including computed `is_blocked` field.
+
+### Get Member Profile
+Purpose: Get detailed profile information for a specific member.
+
+Input: `organization_id`, `user_id`
+Output: member profile
+Business Logic:
+1. Verify caller has 'ADMIN' or 'SUPER_ADMIN' role in the given `organization_id`.
+2. Query `users_orgs` joined with `users` for the specified `user_id` and `organization_id`.
+3. If member not found, return error "Member not found in this organization".
+4. Populate complete `MemberProfile` with:
+   - User basic info: `user_id`, `name`, `email`, `phone`, `avatar_url`
+   - Organization-specific info: `balance_cents`, `role`, `status`, `member_since` (joined_on)
+   - Blocking info: `renting_blocked`, `lending_blocked`, `blocked_on`, `blocked_reason`
+   - Computed field `is_blocked` = `renting_blocked OR lending_blocked`
+5. Return member profile.
 
 ### List Join Requests
 Purpose: View pending applications to join the organization.
@@ -331,15 +393,11 @@ Purpose: Admin lists unresolved disputes requiring intervention.
 Input: `organization_id`, `pagination` (optional)
 Output: List of DisputedPaymentItem, PaginationResponse
 Business Logic:
-1. Verify user is ADMIN/SUPER_ADMIN of `organization_id`.
-2. Query payments with status = DISPUTED (unresolved only).
-3. Filter out disputes involving the current admin (Admins cannot resolve their own disputes).
-4. Map to DisputedPaymentItem with dispute details in bills table.
-5. Apply pagination:
-    - If `pagination.page_size` not provided, use default (50).
-    - If `pagination.page_token` provided, continue from that position.
-    - Return `next_page_token` if more results exist.
-    - Return `total_count` of all matching disputes.
+1. Verify user is Admin/Super Admin of `organization_id`.
+2. Query `bills` where `org_id` matches and `status` is 'DISPUTED'.
+3. Join with `users` to get debtor and creditor names.
+4. Populate `DisputedPaymentItem`.
+5. Apply pagination similar to ListPayments.
 
 ### List Resolved Disputes
 Purpose: Admin lists history of resolved disputes with optional filtering.
@@ -539,14 +597,14 @@ Business Logic:
 ### Complete Rental
 Purpose: Mark tool as returned.
 
-Input: `request_id`, `return_condition`, `surcharge_or_credit_cents`
+Input: `request_id`, `return_condition`, `surcharge_or_credit_cents`, `notes`
 Output: updated rental status
 Business Logic:
 1. Either owner or renter can signal completion.
 2. Verify the rental status is 'ACTIVE', 'SCHEDULED', or 'OVERDUE'. Report error if otherwise.
 3. Calculate `total_cost_cents` based on duration from start_date to end_date and tool price. 
 4. The calculation of the cost is based on a tiered pricing structure. The owner can set the duration unit to monthly, weekly, or daily. Please refer tool-rental-pricing-instruction.md and tool-rental-pricing-algorith.md files for detail. 
-5. Update `rentals` status to 'COMPLETED' and set `completed_by` to `user_id`, `return_condition`, `surcharge_or_credit_cents`, and `total_cost_cents`.
+5. Update `rentals` status to 'COMPLETED' and set `completed_by` to `user_id`, `return_condition`, `surcharge_or_credit_cents`, `total_cost_cents`, and `notes`.
 6. Add `total_cost_cents`+`surcharge_or_credit_cents` to owner's balance in `users_orgs`.
 7. Create a `ledger_transactions` entry of type 'LENDING_CREDIT' to the owner using the org_id from the rentals.org_id and `total_cost_cents`+`surcharge_or_credit_cents` for the amount.
 8. Update owner's user_org record by adding `total_cost_cents` to the balance_cents field and set the last_balance_updated_on to today.

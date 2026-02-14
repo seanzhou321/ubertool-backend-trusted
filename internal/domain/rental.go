@@ -31,6 +31,7 @@ type Rental struct {
 	RejectionReason        string       `json:"rejection_reason"`
 	ReturnCondition        string       `json:"return_condition"`
 	SurchargeOrCreditCents int32        `json:"surcharge_or_credit_cents"`
+	Notes                  string       `json:"notes"`
 	CreatedOn              string       `json:"created_on"`
 	UpdatedOn              string       `json:"updated_on"`
 }

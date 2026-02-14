@@ -523,6 +523,7 @@ type CompleteRentalRequest struct {
 	RequestId              int32                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	ReturnCondition        string                 `protobuf:"bytes,2,opt,name=return_condition,json=returnCondition,proto3" json:"return_condition,omitempty"`                           // Optional condition note for the returned tool
 	SurchargeOrCreditCents int32                  `protobuf:"varint,3,opt,name=surcharge_or_credit_cents,json=surchargeOrCreditCents,proto3" json:"surcharge_or_credit_cents,omitempty"` // Optional fee or credit for late return, damage, or early return
+	Notes                  string                 `protobuf:"bytes,4,opt,name=notes,proto3" json:"notes,omitempty"`                                                                      // Optional notes for the rental
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -576,6 +577,13 @@ func (x *CompleteRentalRequest) GetSurchargeOrCreditCents() int32 {
 		return x.SurchargeOrCreditCents
 	}
 	return 0
+}
+
+func (x *CompleteRentalRequest) GetNotes() string {
+	if x != nil {
+		return x.Notes
+	}
+	return ""
 }
 
 // Complete rental response
@@ -1880,12 +1888,13 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x7f\n" +
 	"\x14CancelRentalResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12M\n" +
-	"\x0erental_request\x18\x02 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\x9c\x01\n" +
+	"\x0erental_request\x18\x02 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xb2\x01\n" +
 	"\x15CompleteRentalRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\x12)\n" +
 	"\x10return_condition\x18\x02 \x01(\tR\x0freturnCondition\x129\n" +
-	"\x19surcharge_or_credit_cents\x18\x03 \x01(\x05R\x16surchargeOrCreditCents\"g\n" +
+	"\x19surcharge_or_credit_cents\x18\x03 \x01(\x05R\x16surchargeOrCreditCents\x12\x14\n" +
+	"\x05notes\x18\x04 \x01(\tR\x05notes\"g\n" +
 	"\x16CompleteRentalResponse\x12M\n" +
 	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"1\n" +
 	"\x10GetRentalRequest\x12\x1d\n" +

@@ -28,12 +28,12 @@ func (r *rentalRepository) Create(ctx context.Context, rt *domain.Rental) error 
 
 func (r *rentalRepository) GetByID(ctx context.Context, id int32) (*domain.Rental, error) {
 	rt := &domain.Rental{}
-	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), created_on, updated_on FROM rentals WHERE id = $1`
+	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), COALESCE(return_note, ''), created_on, updated_on FROM rentals WHERE id = $1`
 
 	var startDate, endDate, createdOn, updatedOn time.Time
 	var lastAgreedEndDate sql.NullTime
 
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &startDate, &lastAgreedEndDate, &endDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.ReturnCondition, &rt.SurchargeOrCreditCents, &createdOn, &updatedOn)
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &startDate, &lastAgreedEndDate, &endDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.ReturnCondition, &rt.SurchargeOrCreditCents, &rt.Notes, &createdOn, &updatedOn)
 	if err != nil {
 		return nil, err
 	}
@@ -50,14 +50,14 @@ func (r *rentalRepository) GetByID(ctx context.Context, id int32) (*domain.Renta
 }
 
 func (r *rentalRepository) Update(ctx context.Context, rt *domain.Rental) error {
-	query := `UPDATE rentals SET status=$1, pickup_note=$2, start_date=$3, last_agreed_end_date=$4, end_date=$5, total_cost_cents=$6, rejection_reason=$7, completed_by=$8, return_condition=$9, surcharge_or_credit_cents=$10, updated_on=$11 WHERE id=$12`
-	_, err := r.db.ExecContext(ctx, query, rt.Status, rt.PickupNote, rt.StartDate, rt.LastAgreedEndDate, rt.EndDate, rt.TotalCostCents, rt.RejectionReason, rt.CompletedBy, rt.ReturnCondition, rt.SurchargeOrCreditCents, time.Now().Format("2006-01-02"), rt.ID)
+	query := `UPDATE rentals SET status=$1, pickup_note=$2, start_date=$3, last_agreed_end_date=$4, end_date=$5, total_cost_cents=$6, rejection_reason=$7, completed_by=$8, return_condition=$9, surcharge_or_credit_cents=$10, return_note=$11, updated_on=$12 WHERE id=$13`
+	_, err := r.db.ExecContext(ctx, query, rt.Status, rt.PickupNote, rt.StartDate, rt.LastAgreedEndDate, rt.EndDate, rt.TotalCostCents, rt.RejectionReason, rt.CompletedBy, rt.ReturnCondition, rt.SurchargeOrCreditCents, rt.Notes, time.Now().Format("2006-01-02"), rt.ID)
 	return err
 }
 
 func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
-	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), created_on, updated_on 
+	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), COALESCE(return_note, ''), created_on, updated_on 
 	        FROM rentals WHERE renter_id = $1 AND org_id = $2`
 
 	args := []interface{}{renterID, orgID}
@@ -94,7 +94,7 @@ func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int
 		var startDate, endDate, createdOn, updatedOn time.Time
 		var lastAgreedEndDate sql.NullTime
 
-		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &startDate, &lastAgreedEndDate, &endDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.ReturnCondition, &rt.SurchargeOrCreditCents, &createdOn, &updatedOn); err != nil {
+		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &startDate, &lastAgreedEndDate, &endDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.ReturnCondition, &rt.SurchargeOrCreditCents, &rt.Notes, &createdOn, &updatedOn); err != nil {
 			return nil, 0, err
 		}
 		rt.StartDate = startDate.Format("2006-01-02")
@@ -112,7 +112,7 @@ func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int
 
 func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
-	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), created_on, updated_on 
+	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), COALESCE(return_note, ''), created_on, updated_on 
 	        FROM rentals WHERE owner_id = $1 AND org_id = $2`
 
 	args := []interface{}{ownerID, orgID}
@@ -149,7 +149,7 @@ func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32
 		var startDate, endDate, createdOn, updatedOn time.Time
 		var lastAgreedEndDate sql.NullTime
 
-		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &startDate, &lastAgreedEndDate, &endDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.ReturnCondition, &rt.SurchargeOrCreditCents, &createdOn, &updatedOn); err != nil {
+		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &startDate, &lastAgreedEndDate, &endDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.ReturnCondition, &rt.SurchargeOrCreditCents, &rt.Notes, &createdOn, &updatedOn); err != nil {
 			return nil, 0, err
 		}
 		rt.StartDate = startDate.Format("2006-01-02")
@@ -167,7 +167,7 @@ func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32
 
 func (r *rentalRepository) ListByTool(ctx context.Context, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
-	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), created_on, updated_on 
+	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), COALESCE(return_note, ''), created_on, updated_on 
 	        FROM rentals WHERE tool_id = $1`
 
 	args := []interface{}{toolID}
@@ -211,7 +211,7 @@ func (r *rentalRepository) ListByTool(ctx context.Context, toolID, orgID int32, 
 		var startDate, endDate, createdOn, updatedOn time.Time
 		var lastAgreedEndDate sql.NullTime
 
-		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &startDate, &lastAgreedEndDate, &endDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.ReturnCondition, &rt.SurchargeOrCreditCents, &createdOn, &updatedOn); err != nil {
+		if err := rows.Scan(&rt.ID, &rt.OrgID, &rt.ToolID, &rt.RenterID, &rt.OwnerID, &startDate, &lastAgreedEndDate, &endDate, &rt.TotalCostCents, &rt.Status, &rt.PickupNote, &rt.RejectionReason, &rt.CompletedBy, &rt.ReturnCondition, &rt.SurchargeOrCreditCents, &rt.Notes, &createdOn, &updatedOn); err != nil {
 			return nil, 0, err
 		}
 		rt.StartDate = startDate.Format("2006-01-02")

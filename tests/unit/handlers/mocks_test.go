@@ -83,8 +83,8 @@ func (m *MockRentalService) FinalizeRentalRequest(ctx context.Context, renterID,
 	}
 	return args.Get(0).(*domain.Rental), args.Get(1).([]domain.Rental), args.Get(2).([]domain.Rental), args.Error(3)
 }
-func (m *MockRentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32) (*domain.Rental, error) {
-	args := m.Called(ctx, ownerID, rentalID, returnCondition, surchargeOrCreditCents)
+func (m *MockRentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32, notes string) (*domain.Rental, error) {
+	args := m.Called(ctx, ownerID, rentalID, returnCondition, surchargeOrCreditCents, notes)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

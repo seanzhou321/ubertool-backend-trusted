@@ -56,7 +56,7 @@ type RentalService interface {
 	RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
 	CancelRental(ctx context.Context, renterID, rentalID int32, reason string) (*domain.Rental, error)
 	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, []domain.Rental, []domain.Rental, error)
-	CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32) (*domain.Rental, error)
+	CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32, notes string) (*domain.Rental, error)
 	Update(ctx context.Context, rt *domain.Rental) error
 	ListRentals(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListLendings(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
@@ -85,10 +85,13 @@ type NotificationService interface {
 
 type AdminService interface {
 	ApproveJoinRequest(ctx context.Context, adminID, orgID int32, email, name string) (invitationCode string, err error)
-	BlockUser(ctx context.Context, adminID, userID, orgID int32, isBlock bool, reason string) error
+	BlockUser(ctx context.Context, adminID, userID, orgID int32, blockRenting, blockLending bool, reason string) error
 	ListMembers(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error)
 	SearchUsers(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error)
 	ListJoinRequests(ctx context.Context, orgID int32) ([]domain.JoinRequest, error)
+	RejectJoinRequest(ctx context.Context, adminID, orgID int32, email, reason string) error
+	SendInvitation(ctx context.Context, adminID, orgID int32, email, name string) (string, error)
+	GetMemberProfile(ctx context.Context, orgID, userID int32) (*domain.User, *domain.UserOrg, error)
 }
 
 type BillSplitService interface {

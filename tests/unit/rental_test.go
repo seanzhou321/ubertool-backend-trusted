@@ -106,7 +106,7 @@ func TestRentalService_CompleteRental(t *testing.T) {
 		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{Email: "owner@test.com"}, nil)
 		emailSvc.On("SendRentalCompletionNotification", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		res, err := svc.CompleteRental(ctx, ownerID, rentalID, "Good condition", 0)
+		res, err := svc.CompleteRental(ctx, ownerID, rentalID, "Good condition", 0, "All good")
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 

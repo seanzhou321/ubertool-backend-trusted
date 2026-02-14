@@ -24,6 +24,9 @@ const (
 	AdminService_ListMembers_FullMethodName           = "/ubertool.trusted.api.v1.AdminService/ListMembers"
 	AdminService_SearchUsers_FullMethodName           = "/ubertool.trusted.api.v1.AdminService/SearchUsers"
 	AdminService_ListJoinRequests_FullMethodName      = "/ubertool.trusted.api.v1.AdminService/ListJoinRequests"
+	AdminService_RejectRequestToJoin_FullMethodName   = "/ubertool.trusted.api.v1.AdminService/RejectRequestToJoin"
+	AdminService_SendInvitation_FullMethodName        = "/ubertool.trusted.api.v1.AdminService/SendInvitation"
+	AdminService_GetMemberProfile_FullMethodName      = "/ubertool.trusted.api.v1.AdminService/GetMemberProfile"
 )
 
 // AdminServiceClient is the client API for AdminService service.
@@ -42,6 +45,12 @@ type AdminServiceClient interface {
 	SearchUsers(ctx context.Context, in *SearchUsersRequest, opts ...grpc.CallOption) (*SearchUsersResponse, error)
 	// Admin: List pending join requests
 	ListJoinRequests(ctx context.Context, in *ListJoinRequestsRequest, opts ...grpc.CallOption) (*ListJoinRequestsResponse, error)
+	// Admin: Reject pending join request
+	RejectRequestToJoin(ctx context.Context, in *RejectRequestToJoinRequest, opts ...grpc.CallOption) (*RejectRequestToJoinResponse, error)
+	// Admin: Send invitation to join organization
+	SendInvitation(ctx context.Context, in *SendInvitationRequest, opts ...grpc.CallOption) (*SendInvitationResponse, error)
+	// Admin: Get detailed profile of a member
+	GetMemberProfile(ctx context.Context, in *GetMemberProfileRequest, opts ...grpc.CallOption) (*GetMemberProfileResponse, error)
 }
 
 type adminServiceClient struct {
@@ -102,6 +111,36 @@ func (c *adminServiceClient) ListJoinRequests(ctx context.Context, in *ListJoinR
 	return out, nil
 }
 
+func (c *adminServiceClient) RejectRequestToJoin(ctx context.Context, in *RejectRequestToJoinRequest, opts ...grpc.CallOption) (*RejectRequestToJoinResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RejectRequestToJoinResponse)
+	err := c.cc.Invoke(ctx, AdminService_RejectRequestToJoin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) SendInvitation(ctx context.Context, in *SendInvitationRequest, opts ...grpc.CallOption) (*SendInvitationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SendInvitationResponse)
+	err := c.cc.Invoke(ctx, AdminService_SendInvitation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) GetMemberProfile(ctx context.Context, in *GetMemberProfileRequest, opts ...grpc.CallOption) (*GetMemberProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMemberProfileResponse)
+	err := c.cc.Invoke(ctx, AdminService_GetMemberProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AdminServiceServer is the server API for AdminService service.
 // All implementations must embed UnimplementedAdminServiceServer
 // for forward compatibility.
@@ -118,6 +157,12 @@ type AdminServiceServer interface {
 	SearchUsers(context.Context, *SearchUsersRequest) (*SearchUsersResponse, error)
 	// Admin: List pending join requests
 	ListJoinRequests(context.Context, *ListJoinRequestsRequest) (*ListJoinRequestsResponse, error)
+	// Admin: Reject pending join request
+	RejectRequestToJoin(context.Context, *RejectRequestToJoinRequest) (*RejectRequestToJoinResponse, error)
+	// Admin: Send invitation to join organization
+	SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error)
+	// Admin: Get detailed profile of a member
+	GetMemberProfile(context.Context, *GetMemberProfileRequest) (*GetMemberProfileResponse, error)
 	mustEmbedUnimplementedAdminServiceServer()
 }
 
@@ -142,6 +187,15 @@ func (UnimplementedAdminServiceServer) SearchUsers(context.Context, *SearchUsers
 }
 func (UnimplementedAdminServiceServer) ListJoinRequests(context.Context, *ListJoinRequestsRequest) (*ListJoinRequestsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListJoinRequests not implemented")
+}
+func (UnimplementedAdminServiceServer) RejectRequestToJoin(context.Context, *RejectRequestToJoinRequest) (*RejectRequestToJoinResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RejectRequestToJoin not implemented")
+}
+func (UnimplementedAdminServiceServer) SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendInvitation not implemented")
+}
+func (UnimplementedAdminServiceServer) GetMemberProfile(context.Context, *GetMemberProfileRequest) (*GetMemberProfileResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMemberProfile not implemented")
 }
 func (UnimplementedAdminServiceServer) mustEmbedUnimplementedAdminServiceServer() {}
 func (UnimplementedAdminServiceServer) testEmbeddedByValue()                      {}
@@ -254,6 +308,60 @@ func _AdminService_ListJoinRequests_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminService_RejectRequestToJoin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RejectRequestToJoinRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).RejectRequestToJoin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_RejectRequestToJoin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).RejectRequestToJoin(ctx, req.(*RejectRequestToJoinRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_SendInvitation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendInvitationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).SendInvitation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_SendInvitation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).SendInvitation(ctx, req.(*SendInvitationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_GetMemberProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMemberProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).GetMemberProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_GetMemberProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).GetMemberProfile(ctx, req.(*GetMemberProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AdminService_ServiceDesc is the grpc.ServiceDesc for AdminService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -280,6 +388,18 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListJoinRequests",
 			Handler:    _AdminService_ListJoinRequests_Handler,
+		},
+		{
+			MethodName: "RejectRequestToJoin",
+			Handler:    _AdminService_RejectRequestToJoin_Handler,
+		},
+		{
+			MethodName: "SendInvitation",
+			Handler:    _AdminService_SendInvitation_Handler,
+		},
+		{
+			MethodName: "GetMemberProfile",
+			Handler:    _AdminService_GetMemberProfile_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

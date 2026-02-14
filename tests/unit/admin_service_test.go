@@ -32,7 +32,7 @@ func TestAdminService_BlockUser(t *testing.T) {
 		})).Return(nil).Once()
 		mockEmailSvc.On("SendAccountStatusNotification", ctx, "u1@test.com", "User 1", "Test Org", "BLOCK", "violation").Return(nil).Once()
 
-		err := svc.BlockUser(ctx, 999, 1, 1, true, "violation")
+		err := svc.BlockUser(ctx, 999, 1, 1, true, true, "violation")
 		assert.NoError(t, err)
 	})
 
@@ -47,7 +47,7 @@ func TestAdminService_BlockUser(t *testing.T) {
 		})).Return(nil).Once()
 		mockEmailSvc.On("SendAccountStatusNotification", ctx, "u1@test.com", "User 1", "Test Org", "ACTIVE", "").Return(nil).Once()
 
-		err := svc.BlockUser(ctx, 999, 1, 1, false, "")
+		err := svc.BlockUser(ctx, 999, 1, 1, false, false, "")
 		assert.NoError(t, err)
 	})
 

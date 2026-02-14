@@ -36,7 +36,7 @@ func (h *AdminHandler) AdminBlockUserAccount(ctx context.Context, req *pb.AdminB
 	if err != nil {
 		return nil, err
 	}
-	err = h.adminSvc.BlockUser(ctx, adminID, req.BlockedUserId, req.OrganizationId, true, req.Reason)
+	err = h.adminSvc.BlockUser(ctx, adminID, req.BlockedUserId, req.OrganizationId, req.BlockRenting, req.BlockLending, req.Reason)
 	if err != nil {
 		return nil, err
 	}
@@ -77,4 +77,41 @@ func (h *AdminHandler) ListJoinRequests(ctx context.Context, req *pb.ListJoinReq
 		protoReqs[i] = MapDomainJoinRequestProfileToProto(&r)
 	}
 	return &pb.ListJoinRequestsResponse{Requests: protoReqs}, nil
+}
+
+func (h *AdminHandler) RejectRequestToJoin(ctx context.Context, req *pb.RejectRequestToJoinRequest) (*pb.RejectRequestToJoinResponse, error) {
+	adminID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = h.adminSvc.RejectJoinRequest(ctx, adminID, req.OrganizationId, req.ApplicantEmail, req.Reason)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.RejectRequestToJoinResponse{Success: true}, nil
+}
+
+func (h *AdminHandler) SendInvitation(ctx context.Context, req *pb.SendInvitationRequest) (*pb.SendInvitationResponse, error) {
+	adminID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	code, err := h.adminSvc.SendInvitation(ctx, adminID, req.OrganizationId, req.Email, req.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.SendInvitationResponse{
+		Success:        true,
+		InvitationCode: code,
+	}, nil
+}
+
+func (h *AdminHandler) GetMemberProfile(ctx context.Context, req *pb.GetMemberProfileRequest) (*pb.GetMemberProfileResponse, error) {
+	user, uo, err := h.adminSvc.GetMemberProfile(ctx, req.OrganizationId, req.UserId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetMemberProfileResponse{
+		Profile: MapDomainMemberProfileToProto(*user, *uo),
+	}, nil
 }

@@ -110,6 +110,7 @@ message CompleteRentalRequest {
   int32 request_id = 1;
   string return_condition = 2; // Optional condition note for the returned tool
   int32 surcharge_or_credit_cents = 3; // Optional fee or credit for late return, damage, or early return
+  string notes = 4; // Optional notes for the rental
 }
 
 // Complete rental response

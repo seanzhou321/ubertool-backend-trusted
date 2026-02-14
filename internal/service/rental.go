@@ -738,7 +738,7 @@ func (s *rentalService) Update(ctx context.Context, rt *domain.Rental) error {
 	return s.rentalRepo.Update(ctx, rt)
 }
 
-func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32) (*domain.Rental, error) {
+func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32, notes string) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
 		return nil, err
@@ -747,9 +747,10 @@ func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID in
 		return nil, errors.New("unauthorized")
 	}
 
-	// Set return condition and surcharge/credit
+	// Set return condition, surcharge/credit, and notes
 	rt.ReturnCondition = returnCondition
 	rt.SurchargeOrCreditCents = surchargeOrCreditCents
+	rt.Notes = notes
 
 	// Calculate the full settlement amount (base rental + surcharge or - credit)
 	settlementAmount := rt.TotalCostCents + surchargeOrCreditCents

@@ -281,19 +281,23 @@ func MapDomainNotificationToProto(n *domain.Notification) *pb.Notification {
 
 func MapDomainMemberProfileToProto(u domain.User, uo domain.UserOrg) *pb.MemberProfile {
 	proto := &pb.MemberProfile{
-		UserId:      u.ID,
-		Name:        u.Name,
-		Email:       u.Email,
-		Balance:     uo.BalanceCents,
-		MemberSince: uo.JoinedOn,
-		IsBlocked:   uo.Status == domain.UserOrgStatusBlock,
-		// BlockedReason: uo.BlockedReason, // Not present in proto
+		UserId:         u.ID,
+		Name:           u.Name,
+		Email:          u.Email,
+		BalanceCents:   uo.BalanceCents,
+		MemberSince:    uo.JoinedOn,
+		IsBlocked:      uo.RentingBlocked || uo.LendingBlocked,
+		BlockReason:    uo.BlockedReason,
+		Phone:          u.PhoneNumber,
+		Role:           string(uo.Role),
+		AvatarUrl:      u.AvatarURL,
+		RentingBlocked: uo.RentingBlocked,
+		LendingBlocked: uo.LendingBlocked,
+		Status:         string(uo.Status),
 	}
-	/*
-		if uo.BlockedOn != nil {
-			proto.BlockedOn = *uo.BlockedOn // Not present in proto
-		}
-	*/
+	if uo.BlockedOn != nil {
+		proto.BlockedOn = *uo.BlockedOn
+	}
 	return proto
 }
 

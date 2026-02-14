@@ -114,7 +114,7 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 	return "", nil
 }
 
-func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int32, isBlock bool, reason string) error {
+func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int32, blockRenting, blockLending bool, reason string) error {
 	uo, err := s.userRepo.GetUserOrg(ctx, userID, orgID)
 	if err != nil {
 		return err
@@ -130,7 +130,10 @@ func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int
 		return err
 	}
 
-	if isBlock {
+	uo.RentingBlocked = blockRenting
+	uo.LendingBlocked = blockLending
+
+	if blockRenting || blockLending {
 		uo.Status = domain.UserOrgStatusBlock
 		uo.BlockedReason = reason
 		now := time.Now().Format("2006-01-02")
@@ -163,3 +166,90 @@ func (s *adminService) SearchUsers(ctx context.Context, orgID int32, query strin
 func (s *adminService) ListJoinRequests(ctx context.Context, orgID int32) ([]domain.JoinRequest, error) {
 	return s.reqRepo.ListByOrg(ctx, orgID)
 }
+
+func (s *adminService) RejectJoinRequest(ctx context.Context, adminID, orgID int32, email, reason string) error {
+	reqs, err := s.reqRepo.ListByOrg(ctx, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to list join requests: %w", err)
+	}
+
+	found := false
+	for _, req := range reqs {
+		if req.Email == email && req.Status == domain.JoinRequestStatusPending {
+			req.Status = domain.JoinRequestStatusRejected
+			if err := s.reqRepo.Update(ctx, &req); err != nil {
+				return fmt.Errorf("failed to update join request: %w", err)
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("no pending join request found for email %s", email)
+	}
+
+	// Notify applicant
+	org, err := s.orgRepo.GetByID(ctx, orgID)
+	if err != nil {
+		return fmt.Errorf("failed to get organization: %w", err)
+	}
+	_ = s.emailSvc.SendAccountStatusNotification(ctx, email, "", org.Name, "REJECTED", reason)
+
+	return nil
+}
+
+func (s *adminService) SendInvitation(ctx context.Context, adminID, orgID int32, email, name string) (string, error) {
+	// Get organization
+	org, err := s.orgRepo.GetByID(ctx, orgID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get organization: %w", err)
+	}
+
+	// Check if user already exists and is already a member
+	existingUser, _ := s.userRepo.GetByEmail(ctx, email)
+	if existingUser != nil {
+		uo, err := s.userRepo.GetUserOrg(ctx, existingUser.ID, orgID)
+		if err == nil && uo != nil {
+			return "", fmt.Errorf("user is already a member of this organization")
+		}
+	}
+
+	// Create invitation
+	inv := &domain.Invitation{
+		OrgID:     orgID,
+		Email:     email,
+		CreatedBy: adminID,
+		ExpiresOn: time.Now().Add(7 * 24 * time.Hour).Format("2006-01-02"),
+	}
+	if err := s.inviteRepo.Create(ctx, inv); err != nil {
+		return "", fmt.Errorf("failed to create invitation: %w", err)
+	}
+
+	// Get admin email for CC
+	admin, err := s.userRepo.GetByID(ctx, adminID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get admin user: %w", err)
+	}
+
+	if err := s.emailSvc.SendInvitation(ctx, email, name, inv.InvitationCode, org.Name, admin.Email); err != nil {
+		return "", fmt.Errorf("failed to send invitation email: %w", err)
+	}
+
+	return inv.InvitationCode, nil
+}
+
+func (s *adminService) GetMemberProfile(ctx context.Context, orgID, userID int32) (*domain.User, *domain.UserOrg, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	uo, err := s.userRepo.GetUserOrg(ctx, userID, orgID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get user org: %w", err)
+	}
+
+	return user, uo, nil
+}
+

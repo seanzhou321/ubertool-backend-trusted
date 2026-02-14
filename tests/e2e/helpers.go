@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -139,7 +140,7 @@ func (db *TestDB) CreateTestUser(email, name string) int32 {
 		INSERT INTO users (email, phone_number, password_hash, name)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id
-	`, email, fmt.Sprintf("555-%d", time.Now().UnixNano()), "hashed_password", name).Scan(&userID)
+	`, email, fmt.Sprintf("555-%d-%d", time.Now().UnixNano(), rand.Intn(10000)), "hashed_password", name).Scan(&userID)
 	if err != nil {
 		db.t.Fatalf("failed to create test user: %v", err)
 	}

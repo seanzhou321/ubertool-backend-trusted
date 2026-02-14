@@ -25,6 +25,16 @@ service AdminService {
 
   // Admin: List pending join requests
   rpc ListJoinRequests(ListJoinRequestsRequest) returns (ListJoinRequestsResponse);
+
+
+  // Admin: Reject pending join request
+  rpc RejectRequestToJoin(RejectRequestToJoinRequest) returns (RejectRequestToJoinResponse);
+
+  // Admin: Send invitation to join organization
+  rpc SendInvitation(SendInvitationRequest) returns (SendInvitationResponse);
+
+  // Admin: Get detailed profile of a member
+  rpc GetMemberProfile(GetMemberProfileRequest) returns (GetMemberProfileResponse);
 }
 
 message ApproveRequestToJoinRequest {
@@ -56,17 +66,6 @@ message ListMembersRequest {
   int32 organization_id = 1;
 }
 
-message MemberProfile {
-  int32 user_id = 1;
-  string name = 2;
-  string email = 3;
-  int32 balance = 4;
-  string member_since = 5;
-  bool is_blocked = 6;
-  string blocked_on = 7;
-  string blocked_reason = 8;
-}
-
 message ListMembersResponse {
   repeated MemberProfile members = 1;
 }
@@ -84,6 +83,10 @@ message ListJoinRequestsRequest {
   int32 organization_id = 1;
 }
 
+message ListJoinRequestsResponse {
+  repeated JoinRequestProfile requests = 1;
+}
+
 message JoinRequestProfile {
   int32 request_id = 1;
   int32 user_id = 2; // Added user_id
@@ -94,6 +97,52 @@ message JoinRequestProfile {
   string used_on = 7; // Date when invitation code was used (YYYY-MM-DD), empty if not used
 }
 
-message ListJoinRequestsResponse {
-  repeated JoinRequestProfile requests = 1;
+message RejectRequestToJoinRequest {
+  int32 organization_id = 1;
+  string applicant_email = 2;
+  string reason = 3;
+}
+
+message RejectRequestToJoinResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message SendInvitationRequest {
+  int32 organization_id = 1;
+  string email = 2;
+  string name = 3;
+}
+
+message SendInvitationResponse {
+  bool success = 1;
+  string message = 2;
+  string invitation_code = 3;
+}
+
+message GetMemberProfileRequest {
+  int32 organization_id = 1;
+  int32 user_id = 2;
+}
+
+message GetMemberProfileResponse {
+  MemberProfile profile = 1;
+}
+
+message MemberProfile {
+  int32 user_id = 1;
+  string name = 2;
+  string email = 3;
+  int32 balance_cents = 4;
+  string member_since = 5;
+  bool is_blocked = 6; // Computed: true if (renting_blocked OR lending_blocked)
+  string block_reason = 7;
+  // string about = 8; // Removed as not in DB
+  string phone = 9;
+  string role = 10; // ADMIN, MEMBER
+  string avatar_url = 11;
+  bool renting_blocked = 12;
+  bool lending_blocked = 13;
+  string blocked_on = 14;
+  string status = 15; // ACTIVE, SUSPEND, BLOCK from users_orgs
 }
