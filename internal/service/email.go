@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/smtp"
@@ -36,12 +37,12 @@ type EmailMessage struct {
 }
 
 // SendEmail sends an email using SMTP (internal helper)
+// SendEmail sends an email using SMTP (internal helper)
 func (s *emailService) sendEmail(msg EmailMessage) error {
 	if s.smtpHost == "" || s.smtpHost == "mock" || s.smtpHost == "localhost" {
 		log.Printf("[MOCK EMAIL] To: %v, Subject: %s", msg.To, msg.Subject)
 		return nil
 	}
-	auth := smtp.PlainAuth("", s.senderEmail, s.senderPass, s.smtpHost)
 
 	// Build email headers
 	headers := make(map[string]string)
@@ -69,9 +70,75 @@ func (s *emailService) sendEmail(msg EmailMessage) error {
 	recipients := append([]string{}, msg.To...)
 	recipients = append(recipients, msg.Cc...)
 
-	// Send email
 	addr := fmt.Sprintf("%s:%s", s.smtpHost, s.smtpPort)
-	return smtp.SendMail(addr, auth, s.senderEmail, recipients, []byte(emailBody.String()))
+	auth := smtp.PlainAuth("", s.senderEmail, s.senderPass, s.smtpHost)
+
+	// TLS Configuration
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: false,
+		ServerName:         s.smtpHost,
+	}
+
+	var client *smtp.Client
+	var err error
+
+	if s.smtpPort == "465" {
+		// Implicit TLS (SMTPS)
+		conn, err := tls.Dial("tcp", addr, tlsConfig)
+		if err != nil {
+			return fmt.Errorf("failed to dial TLS: %v", err)
+		}
+		client, err = smtp.NewClient(conn, s.smtpHost)
+		if err != nil {
+			return fmt.Errorf("failed to create SMTP client: %v", err)
+		}
+	} else {
+		// STARTTLS (usually port 587)
+		client, err = smtp.Dial(addr)
+		if err != nil {
+			return fmt.Errorf("failed to dial SMTP: %v", err)
+		}
+
+		// Perform STARTTLS if supported/needed
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err = client.StartTLS(tlsConfig); err != nil {
+				client.Close()
+				return fmt.Errorf("failed to start TLS: %v", err)
+			}
+		}
+	}
+	defer client.Quit()
+
+	// Authenticate
+	if err = client.Auth(auth); err != nil {
+		return fmt.Errorf("failed to authenticate: %v", err)
+	}
+
+	// Set sender and recipients
+	if err = client.Mail(s.senderEmail); err != nil {
+		return fmt.Errorf("failed to set sender: %v", err)
+	}
+	for _, recipient := range recipients {
+		if err = client.Rcpt(recipient); err != nil {
+			return fmt.Errorf("failed to set recipient %s: %v", recipient, err)
+		}
+	}
+
+	// Send body
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("failed to open data writer: %v", err)
+	}
+	_, err = w.Write([]byte(emailBody.String()))
+	if err != nil {
+		return fmt.Errorf("failed to write email body: %v", err)
+	}
+	err = w.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close data writer: %v", err)
+	}
+
+	return nil
 }
 
 func (s *emailService) SendInvitation(ctx context.Context, email, name, token string, orgName string, ccEmail string) error {
