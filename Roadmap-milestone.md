@@ -21,19 +21,23 @@
     - perform monthly bill splitting operation (monthly)
     - send bill splitting notice reminders to both creditors and debtors regarding to the unresolved bills (nightly)
 3. (done) Build UI screen and api to handle bill payment acknowledgements and ledger transactions
-4. Add legal statements: community bylaws and rental pricing and cost agreement confirmation
-5. enable refresh token
+4. Add legal statements: 
+    - Privacy policy
+    - Terms of service
+    - rental pricing and cost agreement confirmation
+    - community bylaws
+    - Dispute resolution policy
+5. enable refresh token and comprehensive manual testing
 6. enable 2fa
-7. comprehensive manual testing
 
 ## Milestone 3: Production - trial groups
 1. https certification
 2. Form a company
-3. deploy to cloud
+3. deploy backend to cloud and frontend to Google Play Store
 4. release to selected communities
 
 ## Milestone 4: Enhancements
-1. iOS app and release
+1. Port frontend into iOS app and release to Apple App Store
 2. image capture and display
 3. passkey
 4. push notification through FCM
@@ -43,4 +47,4 @@
 2. Production release to general public
 
 ## Milestone 6: Ad Service integration
-1. add recomendations by advertisement
+1. recomendation and personalization engine for advertisement
