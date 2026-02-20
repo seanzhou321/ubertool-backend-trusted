@@ -2,6 +2,7 @@
 -- Compatible with PostgreSQL 15+
 
 -- 0. Global Types & Enums
+-- CREATE TYPE join_request_status_enum AS ENUM ('PENDING', 'INVITED', 'JOINED', 'REJECTED');
 -- CREATE TYPE user_org_status_enum AS ENUM ('ACTIVE', 'SUSPEND', 'BLOCK');
 -- CREATE TYPE user_org_role_enum AS ENUM ('SUPER_ADMIN', 'ADMIN', 'MEMBER');
 -- CREATE TYPE tool_duration_unit_enum AS ENUM ('day', 'week', 'month');
@@ -59,6 +60,7 @@ CREATE TABLE invitations (
     invitation_code TEXT NOT NULL,
     org_id INTEGER REFERENCES orgs(id),
     email TEXT NOT NULL,
+    join_request_id INTEGER REFERENCES join_requests(id), -- Optional link to a join request
     created_by INTEGER REFERENCES users(id),
     expires_on DATE NOT NULL,
     used_on DATE, -- NULL if unused
@@ -75,6 +77,7 @@ CREATE TABLE join_requests (
     email TEXT NOT NULL,
     note TEXT,
     status TEXT DEFAULT 'PENDING',
+    reason TEXT,
     created_on DATE DEFAULT CURRENT_DATE
 );
 

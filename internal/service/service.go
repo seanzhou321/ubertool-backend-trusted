@@ -84,12 +84,12 @@ type NotificationService interface {
 }
 
 type AdminService interface {
-	ApproveJoinRequest(ctx context.Context, adminID, orgID int32, email, name string) (invitationCode string, err error)
+	ApproveJoinRequest(ctx context.Context, adminID, orgID, joinRequestID int32) (invitationCode string, err error)
 	BlockUser(ctx context.Context, adminID, userID, orgID int32, blockRenting, blockLending bool, reason string) error
 	ListMembers(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error)
 	SearchUsers(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error)
 	ListJoinRequests(ctx context.Context, orgID int32) ([]domain.JoinRequest, error)
-	RejectJoinRequest(ctx context.Context, adminID, orgID int32, email, reason string) error
+	RejectJoinRequest(ctx context.Context, adminID, orgID, joinRequestID int32, reason string) error
 	SendInvitation(ctx context.Context, adminID, orgID int32, email, name string) (string, error)
 	GetMemberProfile(ctx context.Context, orgID, userID int32) (*domain.User, *domain.UserOrg, error)
 }

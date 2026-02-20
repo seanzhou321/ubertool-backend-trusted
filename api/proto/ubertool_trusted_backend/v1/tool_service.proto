@@ -94,6 +94,7 @@ message UpdateToolRequest {
   int32 replacement_cost_cents = 8;
   ToolCondition condition = 9;
   string image_url = 10;
+  string duration = 11;
 }
 
 // Update tool response
@@ -137,19 +138,20 @@ message Tool {
   string name = 2;
   string description = 3;
   repeated string categories = 4;
+  string durationUnit = 5;
   // Prices stored as cents (e.g., 550 = $5.50)
   // int32 supports up to $21 million (more than enough for max $1000)
-  int32 price_per_day_cents = 5;
-  int32 price_per_week_cents = 6;
-  int32 price_per_month_cents = 7;
-  int32 replacement_cost_cents = 8;
-  ToolCondition condition = 9;
-  User owner = 10;
-  ToolStatus status = 11;
-  string metro = 12;
-  repeated string image_url = 13;
-  string created_on = 14; // Date string YYYY-MM-DD
-  string updated_on = 15; // Date string YYYY-MM-DD
+  int32 price_per_day_cents = 6;
+  int32 price_per_week_cents = 7;
+  int32 price_per_month_cents = 8;
+  int32 replacement_cost_cents = 9;
+  ToolCondition condition = 10;
+  User owner = 11;
+  ToolStatus status = 12;
+  string metro = 13;
+  repeated string image_url = 14;
+  string created_on = 15; // Date string YYYY-MM-DD
+  string updated_on = 16; // Date string YYYY-MM-DD
 }
 
 // Tool condition enum

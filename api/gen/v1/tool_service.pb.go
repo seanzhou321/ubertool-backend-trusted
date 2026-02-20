@@ -542,6 +542,7 @@ type UpdateToolRequest struct {
 	ReplacementCostCents int32         `protobuf:"varint,8,opt,name=replacement_cost_cents,json=replacementCostCents,proto3" json:"replacement_cost_cents,omitempty"`
 	Condition            ToolCondition `protobuf:"varint,9,opt,name=condition,proto3,enum=ubertool.trusted.api.v1.ToolCondition" json:"condition,omitempty"`
 	ImageUrl             string        `protobuf:"bytes,10,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	Duration             string        `protobuf:"bytes,11,opt,name=duration,proto3" json:"duration,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -642,6 +643,13 @@ func (x *UpdateToolRequest) GetCondition() ToolCondition {
 func (x *UpdateToolRequest) GetImageUrl() string {
 	if x != nil {
 		return x.ImageUrl
+	}
+	return ""
+}
+
+func (x *UpdateToolRequest) GetDuration() string {
+	if x != nil {
+		return x.Duration
 	}
 	return ""
 }
@@ -953,24 +961,25 @@ func (x *SearchToolsResponse) GetTotalCount() int32 {
 
 // Tool message
 type Tool struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	Id          int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Categories  []string               `protobuf:"bytes,4,rep,name=categories,proto3" json:"categories,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Id           int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name         string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Description  string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Categories   []string               `protobuf:"bytes,4,rep,name=categories,proto3" json:"categories,omitempty"`
+	DurationUnit string                 `protobuf:"bytes,5,opt,name=durationUnit,proto3" json:"durationUnit,omitempty"`
 	// Prices stored as cents (e.g., 550 = $5.50)
 	// int32 supports up to $21 million (more than enough for max $1000)
-	PricePerDayCents     int32         `protobuf:"varint,5,opt,name=price_per_day_cents,json=pricePerDayCents,proto3" json:"price_per_day_cents,omitempty"`
-	PricePerWeekCents    int32         `protobuf:"varint,6,opt,name=price_per_week_cents,json=pricePerWeekCents,proto3" json:"price_per_week_cents,omitempty"`
-	PricePerMonthCents   int32         `protobuf:"varint,7,opt,name=price_per_month_cents,json=pricePerMonthCents,proto3" json:"price_per_month_cents,omitempty"`
-	ReplacementCostCents int32         `protobuf:"varint,8,opt,name=replacement_cost_cents,json=replacementCostCents,proto3" json:"replacement_cost_cents,omitempty"`
-	Condition            ToolCondition `protobuf:"varint,9,opt,name=condition,proto3,enum=ubertool.trusted.api.v1.ToolCondition" json:"condition,omitempty"`
-	Owner                *User         `protobuf:"bytes,10,opt,name=owner,proto3" json:"owner,omitempty"`
-	Status               ToolStatus    `protobuf:"varint,11,opt,name=status,proto3,enum=ubertool.trusted.api.v1.ToolStatus" json:"status,omitempty"`
-	Metro                string        `protobuf:"bytes,12,opt,name=metro,proto3" json:"metro,omitempty"`
-	ImageUrl             []string      `protobuf:"bytes,13,rep,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
-	CreatedOn            string        `protobuf:"bytes,14,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"` // Date string YYYY-MM-DD
-	UpdatedOn            string        `protobuf:"bytes,15,opt,name=updated_on,json=updatedOn,proto3" json:"updated_on,omitempty"` // Date string YYYY-MM-DD
+	PricePerDayCents     int32         `protobuf:"varint,6,opt,name=price_per_day_cents,json=pricePerDayCents,proto3" json:"price_per_day_cents,omitempty"`
+	PricePerWeekCents    int32         `protobuf:"varint,7,opt,name=price_per_week_cents,json=pricePerWeekCents,proto3" json:"price_per_week_cents,omitempty"`
+	PricePerMonthCents   int32         `protobuf:"varint,8,opt,name=price_per_month_cents,json=pricePerMonthCents,proto3" json:"price_per_month_cents,omitempty"`
+	ReplacementCostCents int32         `protobuf:"varint,9,opt,name=replacement_cost_cents,json=replacementCostCents,proto3" json:"replacement_cost_cents,omitempty"`
+	Condition            ToolCondition `protobuf:"varint,10,opt,name=condition,proto3,enum=ubertool.trusted.api.v1.ToolCondition" json:"condition,omitempty"`
+	Owner                *User         `protobuf:"bytes,11,opt,name=owner,proto3" json:"owner,omitempty"`
+	Status               ToolStatus    `protobuf:"varint,12,opt,name=status,proto3,enum=ubertool.trusted.api.v1.ToolStatus" json:"status,omitempty"`
+	Metro                string        `protobuf:"bytes,13,opt,name=metro,proto3" json:"metro,omitempty"`
+	ImageUrl             []string      `protobuf:"bytes,14,rep,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	CreatedOn            string        `protobuf:"bytes,15,opt,name=created_on,json=createdOn,proto3" json:"created_on,omitempty"` // Date string YYYY-MM-DD
+	UpdatedOn            string        `protobuf:"bytes,16,opt,name=updated_on,json=updatedOn,proto3" json:"updated_on,omitempty"` // Date string YYYY-MM-DD
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -1031,6 +1040,13 @@ func (x *Tool) GetCategories() []string {
 		return x.Categories
 	}
 	return nil
+}
+
+func (x *Tool) GetDurationUnit() string {
+	if x != nil {
+		return x.DurationUnit
+	}
+	return ""
 }
 
 func (x *Tool) GetPricePerDayCents() int32 {
@@ -1228,7 +1244,7 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\x06status\x18\v \x01(\tR\x06status\x12\x1b\n" +
 	"\timage_url\x18\f \x03(\tR\bimageUrl\"D\n" +
 	"\x0fAddToolResponse\x121\n" +
-	"\x04tool\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.ToolR\x04tool\"\xae\x03\n" +
+	"\x04tool\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.ToolR\x04tool\"\xca\x03\n" +
 	"\x11UpdateToolRequest\x12\x17\n" +
 	"\atool_id\x18\x01 \x01(\x05R\x06toolId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1242,7 +1258,8 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\x16replacement_cost_cents\x18\b \x01(\x05R\x14replacementCostCents\x12D\n" +
 	"\tcondition\x18\t \x01(\x0e2&.ubertool.trusted.api.v1.ToolConditionR\tcondition\x12\x1b\n" +
 	"\timage_url\x18\n" +
-	" \x01(\tR\bimageUrl\"G\n" +
+	" \x01(\tR\bimageUrl\x12\x1a\n" +
+	"\bduration\x18\v \x01(\tR\bduration\"G\n" +
 	"\x12UpdateToolResponse\x121\n" +
 	"\x04tool\x18\x01 \x01(\v2\x1d.ubertool.trusted.api.v1.ToolR\x04tool\",\n" +
 	"\x11DeleteToolRequest\x12\x17\n" +
@@ -1267,28 +1284,29 @@ const file_ubertool_trusted_backend_v1_tool_service_proto_rawDesc = "" +
 	"\x13SearchToolsResponse\x123\n" +
 	"\x05tools\x18\x01 \x03(\v2\x1d.ubertool.trusted.api.v1.ToolR\x05tools\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
-	"totalCount\"\xde\x04\n" +
+	"totalCount\"\x82\x05\n" +
 	"\x04Tool\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1e\n" +
 	"\n" +
 	"categories\x18\x04 \x03(\tR\n" +
-	"categories\x12-\n" +
-	"\x13price_per_day_cents\x18\x05 \x01(\x05R\x10pricePerDayCents\x12/\n" +
-	"\x14price_per_week_cents\x18\x06 \x01(\x05R\x11pricePerWeekCents\x121\n" +
-	"\x15price_per_month_cents\x18\a \x01(\x05R\x12pricePerMonthCents\x124\n" +
-	"\x16replacement_cost_cents\x18\b \x01(\x05R\x14replacementCostCents\x12D\n" +
-	"\tcondition\x18\t \x01(\x0e2&.ubertool.trusted.api.v1.ToolConditionR\tcondition\x123\n" +
-	"\x05owner\x18\n" +
-	" \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x05owner\x12;\n" +
-	"\x06status\x18\v \x01(\x0e2#.ubertool.trusted.api.v1.ToolStatusR\x06status\x12\x14\n" +
-	"\x05metro\x18\f \x01(\tR\x05metro\x12\x1b\n" +
-	"\timage_url\x18\r \x03(\tR\bimageUrl\x12\x1d\n" +
+	"categories\x12\"\n" +
+	"\fdurationUnit\x18\x05 \x01(\tR\fdurationUnit\x12-\n" +
+	"\x13price_per_day_cents\x18\x06 \x01(\x05R\x10pricePerDayCents\x12/\n" +
+	"\x14price_per_week_cents\x18\a \x01(\x05R\x11pricePerWeekCents\x121\n" +
+	"\x15price_per_month_cents\x18\b \x01(\x05R\x12pricePerMonthCents\x124\n" +
+	"\x16replacement_cost_cents\x18\t \x01(\x05R\x14replacementCostCents\x12D\n" +
+	"\tcondition\x18\n" +
+	" \x01(\x0e2&.ubertool.trusted.api.v1.ToolConditionR\tcondition\x123\n" +
+	"\x05owner\x18\v \x01(\v2\x1d.ubertool.trusted.api.v1.UserR\x05owner\x12;\n" +
+	"\x06status\x18\f \x01(\x0e2#.ubertool.trusted.api.v1.ToolStatusR\x06status\x12\x14\n" +
+	"\x05metro\x18\r \x01(\tR\x05metro\x12\x1b\n" +
+	"\timage_url\x18\x0e \x03(\tR\bimageUrl\x12\x1d\n" +
 	"\n" +
-	"created_on\x18\x0e \x01(\tR\tcreatedOn\x12\x1d\n" +
+	"created_on\x18\x0f \x01(\tR\tcreatedOn\x12\x1d\n" +
 	"\n" +
-	"updated_on\x18\x0f \x01(\tR\tupdatedOn\"\x1b\n" +
+	"updated_on\x18\x10 \x01(\tR\tupdatedOn\"\x1b\n" +
 	"\x19ListToolCategoriesRequest\"<\n" +
 	"\x1aListToolCategoriesResponse\x12\x1e\n" +
 	"\n" +

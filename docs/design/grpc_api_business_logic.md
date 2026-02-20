@@ -66,9 +66,10 @@ Business Logic:
 4. If user already exists, return error "Email already registered. Please log in instead."
 5. Create a new user record in the `users` table with hashed password.
 6. Update the `invitations` record's `used_on` field with the current timestamp and `used_by_user_id`.
-7. Create a record in the `users_orgs` table with `user_id`, `organization_id`, and role 'MEMBER'.
-8. Initialize user's balance in the organization (balance_cents = 0).
-9. Return success and message "Your account has been created. Please log in."
+7. If the invitation has a `join_request_id`, retrieve the `join_requests` record and set its `status` to `'JOINED'`.
+8. Create a record in the `users_orgs` table with `user_id`, `organization_id`, and role 'MEMBER'.
+9. Initialize user's balance in the organization (balance_cents = 0).
+10. Return success and message "Your account has been created. Please log in."
 
 Note: User must go through normal login process after signup. Signup does NOT return authentication tokens.
 
@@ -116,25 +117,26 @@ Business Logic:
 ### Approve Request To Join
 Purpose: Admin approves a pending request to join an organization.
 
-Input: `organization_id`, `applicant_email`, `applicant_name`
-Output: success/failure, message
+Input: `organization_id`, `join_request_id`
+Output: success/failure, message, invitation_code (if new user)
 Business Logic:
 1. Verify the caller has 'ADMIN' or 'SUPER_ADMIN' role in the given `organization_id`.
-2. Find the pending request in `join_requests`.
-3. If the user already exists in `users` table (by email), add them to `users_orgs` with 'MEMBER' role.
-4. If the user does not exist, creates an invitation record in `invitations` and send the invitation code to the new user, cc to the admin user (`user_id` parsed from this JWT token).
-5. Update `join_requests` status to 'APPROVED'.
+2. Retrieve the `join_requests` record by `join_request_id` and verify it belongs to the given `organization_id`.
+3. If the user already exists in `users` table (by email from the join request), add them to `users_orgs` with 'MEMBER' role and notify them.
+4. If the user does not exist, create an invitation record in `invitations` with `join_request_id` set, and send the invitation code to the applicant (cc to the admin).
+5. Update `join_requests.status` to `'INVITED'`.
+6. Return the invitation code if one was created, empty string otherwise.
 
 ### Reject Pending Request To Join
 Purpose: Admin rejects a pending request to join an organization.
 
-Input: `organization_id`, `applicant_email`, `reason`
+Input: `organization_id`, `join_request_id`, `reason`
 Output: success/failure, message
 Business Logic:
 1. Verify the caller has 'ADMIN' or 'SUPER_ADMIN' role in the given `organization_id`.
-2. Find the pending request in `join_requests` by email and org_id.
-3. Update `join_requests` status to 'REJECTED'.
-4. Send notification or email to the applicant (if implementing notification system for join requests).
+2. Retrieve the `join_requests` record by `join_request_id` and verify it belongs to the given `organization_id`.
+3. Update `join_requests.status` to `'REJECTED'` and populate `join_requests.reason` with the provided reason.
+4. Send a rejection email to the applicant.
 5. Return success.
 
 ### Send Invitation
@@ -487,21 +489,25 @@ Business Logic:
 ### Add Tool
 Purpose: List a new tool to rent.
 
-Input: `name`, `description`, `categories`, prices, `condition`, `image_url`
-Output: the created tool object
+Input: `name`, `description`, `categories`, prices, `duration`, `condition`, `image_url`
+Output: the created tool object (includes `durationUnit` reflecting the persisted value)
 Business Logic:
-1. Insert into `tools` table.
+1. Insert into `tools` table, persisting `duration` from the request as `duration_unit` in the database.
 2. The `owner_id` is the `user_id` from JWT token.
-2. Insert `image_url` into `tool_images`.
+3. Insert `image_url` into `tool_images`.
+
+Note: `duration` in the request represents the rental period unit (`day`, `week`, or `month`). It is stored as `duration_unit` in the database and returned as `durationUnit` in the `Tool` response message.
 
 ### Update Tool
 Purpose: Update the content of a tool.
 
-Input: `tool_id`, and all updated fields, except id, owner_id, created_on, deleted_on fields.
-Output: the updated tool object
+Input: `tool_id`, and all updated fields including `duration`, except id, owner_id, created_on, deleted_on fields.
+Output: the updated tool object (includes `durationUnit` reflecting the persisted value)
 Business Logic:
 1. Verify the current user is the owner of the tool.
-2. Update `tools` and `tool_images`.
+2. Update `tools` (including `duration_unit`) and `tool_images`.
+
+Note: `duration` in the request represents the rental period unit (`day`, `week`, or `month`). It is stored as `duration_unit` in the database and returned as `durationUnit` in the `Tool` response message.
 
 ### Delete Tool
 Purpose: Remove a tool listing.

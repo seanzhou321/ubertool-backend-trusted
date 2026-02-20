@@ -31,6 +31,7 @@ func (h *ToolHandler) AddTool(ctx context.Context, req *pb.AddToolRequest) (*pb.
 		PricePerWeekCents:   req.PricePerWeekCents,
 		PricePerMonthCents:  req.PricePerMonthCents,
 		ReplacementCostCents: req.ReplacementCostCents,
+		DurationUnit:         domain.ToolDurationUnit(req.Duration),
 		Condition:            MapProtoToolConditionToDomain(req.Condition),
 		Metro:                req.Metro,
 		Status:               domain.ToolStatusAvailable,
@@ -66,6 +67,7 @@ func (h *ToolHandler) UpdateTool(ctx context.Context, req *pb.UpdateToolRequest)
 		PricePerWeekCents:   req.PricePerWeekCents,
 		PricePerMonthCents:  req.PricePerMonthCents,
 		ReplacementCostCents: req.ReplacementCostCents,
+		DurationUnit:         domain.ToolDurationUnit(req.Duration),
 		Condition:            MapProtoToolConditionToDomain(req.Condition),
 	}
 	err := h.toolSvc.UpdateTool(ctx, tool)

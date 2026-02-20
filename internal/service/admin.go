@@ -36,8 +36,17 @@ func NewAdminService(
 	}
 }
 
-func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID int32, email, name string) (string, error) {
-	// 1. Get Organization
+func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID, joinRequestID int32) (string, error) {
+	// 1. Fetch the join request by ID
+	joinReq, err := s.reqRepo.GetByID(ctx, joinRequestID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get join request: %w", err)
+	}
+	if joinReq.OrgID != orgID {
+		return "", fmt.Errorf("join request does not belong to the given organization")
+	}
+
+	// 2. Get Organization
 	org, err := s.orgRepo.GetByID(ctx, orgID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get organization: %w", err)
@@ -45,8 +54,8 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 
 	var invitationCode string
 
-	// 2. Check if user already exists
-	user, err := s.userRepo.GetByEmail(ctx, email)
+	// 3. Check if user already exists
+	user, err := s.userRepo.GetByEmail(ctx, joinReq.Email)
 	if err == nil && user != nil {
 		// User exists, add to org
 		userOrg := &domain.UserOrg{
@@ -62,15 +71,16 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 		}
 
 		// Notify user
-		_ = s.emailSvc.SendAccountStatusNotification(ctx, email, name, org.Name, "APPROVED", "Your join request has been approved.")
+		_ = s.emailSvc.SendAccountStatusNotification(ctx, joinReq.Email, joinReq.Name, org.Name, "APPROVED", "Your join request has been approved.")
 
 	} else {
-		// User does not exist, Invite
+		// User does not exist — create an invitation linked to the join request
 		inv := &domain.Invitation{
-			OrgID:     orgID,
-			Email:     email,
-			CreatedBy: adminID,
-			ExpiresOn: time.Now().Add(7 * 24 * time.Hour).Format("2006-01-02"),
+			OrgID:         orgID,
+			Email:         joinReq.Email,
+			JoinRequestID: &joinReq.ID,
+			CreatedBy:     adminID,
+			ExpiresOn:     time.Now().Add(7 * 24 * time.Hour).Format("2006-01-02"),
 		}
 		if err := s.inviteRepo.Create(ctx, inv); err != nil {
 			return "", fmt.Errorf("failed to create invitation: %w", err)
@@ -82,32 +92,19 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID in
 			return "", fmt.Errorf("failed to get admin user: %w", err)
 		}
 
-		if err := s.emailSvc.SendInvitation(ctx, email, name, inv.InvitationCode, org.Name, admin.Email); err != nil {
+		if err := s.emailSvc.SendInvitation(ctx, joinReq.Email, joinReq.Name, inv.InvitationCode, org.Name, admin.Email); err != nil {
 			return "", fmt.Errorf("failed to send invitation email: %w", err)
 		}
 
-		// Store the invitation code to return to admin
 		invitationCode = inv.InvitationCode
 	}
 
-	// 3. Update Join Request Status (if we can find it by email/org or passed ID? Interface passes email/name/orgID)
-	// The interface `ApproveJoinRequest` doesn't take RequestID.
-	// But `JoinRequestRepository` likely has `GetByOrg` or we might need to search pending requests.
-	// `ListByOrg` exists.
-	// Optimization: Ideally `reqID` should be passed. But sticking to interface for now.
-	// We will search for pending requests for this email/org and update them.
-
-	reqs, err := s.reqRepo.ListByOrg(ctx, orgID)
-	if err == nil {
-		for _, req := range reqs {
-			if req.Email == email && req.Status == domain.JoinRequestStatusPending {
-				req.Status = domain.JoinRequestStatusApproved
-				_ = s.reqRepo.Update(ctx, &req)
-			}
-		}
+	// 4. Mark the join request as INVITED
+	joinReq.Status = domain.JoinRequestStatusInvited
+	if err := s.reqRepo.Update(ctx, joinReq); err != nil {
+		return "", fmt.Errorf("failed to update join request status: %w", err)
 	}
 
-	// Return invitation code if one was created, empty string otherwise
 	if invitationCode != "" {
 		return invitationCode, nil
 	}
@@ -167,34 +164,29 @@ func (s *adminService) ListJoinRequests(ctx context.Context, orgID int32) ([]dom
 	return s.reqRepo.ListByOrg(ctx, orgID)
 }
 
-func (s *adminService) RejectJoinRequest(ctx context.Context, adminID, orgID int32, email, reason string) error {
-	reqs, err := s.reqRepo.ListByOrg(ctx, orgID)
+func (s *adminService) RejectJoinRequest(ctx context.Context, adminID, orgID, joinRequestID int32, reason string) error {
+	// 1. Fetch the join request by ID
+	joinReq, err := s.reqRepo.GetByID(ctx, joinRequestID)
 	if err != nil {
-		return fmt.Errorf("failed to list join requests: %w", err)
+		return fmt.Errorf("failed to get join request: %w", err)
+	}
+	if joinReq.OrgID != orgID {
+		return fmt.Errorf("join request does not belong to the given organization")
 	}
 
-	found := false
-	for _, req := range reqs {
-		if req.Email == email && req.Status == domain.JoinRequestStatusPending {
-			req.Status = domain.JoinRequestStatusRejected
-			if err := s.reqRepo.Update(ctx, &req); err != nil {
-				return fmt.Errorf("failed to update join request: %w", err)
-			}
-			found = true
-			break
-		}
+	// 2. Update status to REJECTED and set reason
+	joinReq.Status = domain.JoinRequestStatusRejected
+	joinReq.Reason = reason
+	if err := s.reqRepo.Update(ctx, joinReq); err != nil {
+		return fmt.Errorf("failed to update join request: %w", err)
 	}
 
-	if !found {
-		return fmt.Errorf("no pending join request found for email %s", email)
-	}
-
-	// Notify applicant
+	// 3. Notify applicant
 	org, err := s.orgRepo.GetByID(ctx, orgID)
 	if err != nil {
 		return fmt.Errorf("failed to get organization: %w", err)
 	}
-	_ = s.emailSvc.SendAccountStatusNotification(ctx, email, "", org.Name, "REJECTED", reason)
+	_ = s.emailSvc.SendAccountStatusNotification(ctx, joinReq.Email, joinReq.Name, org.Name, "REJECTED", reason)
 
 	return nil
 }
@@ -252,4 +244,3 @@ func (s *adminService) GetMemberProfile(ctx context.Context, orgID, userID int32
 
 	return user, uo, nil
 }
-

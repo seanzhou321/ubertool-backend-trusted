@@ -25,10 +25,12 @@ build-cronjob:
 	go build -o bin/cronjob.exe ./cmd/cronjob
 
 run-dev:
-	go run ./cmd/server -config=config/config.dev.yaml
+	@echo "Starting server in DEBUG mode for testing..."
+	set LOG_LEVEL=debug && go run ./cmd/server -config=config/config.dev.yaml
 
 run-cronjob-dev:
-	go run ./cmd/cronjob -config=config/config.dev.yaml
+	@echo "Starting cronjob in DEBUG mode for testing..."
+	set LOG_LEVEL=debug && go run ./cmd/cronjob -config=config/config.dev.yaml
 
 run-cronjob-once:
 	@if "$(JOB)"=="" (echo Error: Please specify JOB variable, e.g., make run-cronjob-once JOB=mark-overdue-rentals) else (go run ./cmd/cronjob -config=config/config.dev.yaml -run-once=$(JOB))

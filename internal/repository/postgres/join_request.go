@@ -39,19 +39,26 @@ func (r *joinRequestRepository) Create(ctx context.Context, req *domain.JoinRequ
 
 func (r *joinRequestRepository) GetByID(ctx context.Context, id int32) (*domain.JoinRequest, error) {
 	req := &domain.JoinRequest{}
-	query := `SELECT id, org_id, user_id, name, email, note, status, created_on FROM join_requests WHERE id = $1`
+	query := `SELECT id, org_id, user_id, name, email, note, reason, status, created_on FROM join_requests WHERE id = $1`
 	var createdOn time.Time
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &createdOn)
+	var note, reason sql.NullString
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &note, &reason, &req.Status, &createdOn)
 	if err != nil {
 		return nil, err
 	}
 	req.CreatedOn = createdOn.Format("2006-01-02")
+	if note.Valid {
+		req.Note = note.String
+	}
+	if reason.Valid {
+		req.Reason = reason.String
+	}
 	return req, nil
 }
 
 func (r *joinRequestRepository) Update(ctx context.Context, req *domain.JoinRequest) error {
-	query := `UPDATE join_requests SET status = $1 WHERE id = $2`
-	_, err := r.db.ExecContext(ctx, query, req.Status, req.ID)
+	query := `UPDATE join_requests SET status = $1, reason = $2 WHERE id = $3`
+	_, err := r.db.ExecContext(ctx, query, req.Status, req.Reason, req.ID)
 	return err
 }
 

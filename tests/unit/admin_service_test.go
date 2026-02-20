@@ -76,7 +76,6 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	mockOrgRepo := new(MockOrganizationRepo)
 	mockInviteRepo := new(MockInviteRepo)
 	mockEmailSvc := new(MockEmailService)
-	// Add other missing repos: reqRepo, ledgerRepo
 	mockJoinRepo := new(MockJoinRequestRepo)
 	mockLedgerRepo := new(MockLedgerRepo)
 
@@ -85,17 +84,28 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 
 	adminID := int32(1)
 	orgID := int32(10)
+	joinRequestID := int32(42)
 	email := "applicant@test.com"
 	name := "Applicant"
+
+	// Mock fetching the join request by ID
+	mockJoinRepo.On("GetByID", ctx, joinRequestID).Return(&domain.JoinRequest{
+		ID:     joinRequestID,
+		OrgID:  orgID,
+		Name:   name,
+		Email:  email,
+		Status: domain.JoinRequestStatusPending,
+	}, nil)
 
 	mockOrgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Test Org"}, nil)
 	// Mock admin user for CC
 	mockUserRepo.On("GetByID", ctx, adminID).Return(&domain.User{ID: adminID, Name: "Admin", Email: "admin@test.com"}, nil)
-	// Mock Check if user exists (false for this test case)
+	// Mock: user does not exist yet (new user path)
 	mockUserRepo.On("GetByEmail", ctx, email).Return(nil, nil)
 
 	mockInviteRepo.On("Create", ctx, mock.MatchedBy(func(inv *domain.Invitation) bool {
-		return inv.OrgID == orgID && inv.Email == email && inv.CreatedBy == adminID
+		return inv.OrgID == orgID && inv.Email == email && inv.CreatedBy == adminID &&
+			inv.JoinRequestID != nil && *inv.JoinRequestID == joinRequestID
 	})).Run(func(args mock.Arguments) {
 		inv := args.Get(1).(*domain.Invitation)
 		inv.ID = 1
@@ -103,14 +113,17 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	}).Return(nil)
 	mockEmailSvc.On("SendInvitation", ctx, email, name, "ABC12345", "Test Org", "admin@test.com").Return(nil)
 
-	// Mock ListJoinRequests lookup update
-	mockJoinRepo.On("ListByOrg", ctx, orgID).Return([]domain.JoinRequest{}, nil)
+	// Mock updating join request status to INVITED
+	mockJoinRepo.On("Update", ctx, mock.MatchedBy(func(jr *domain.JoinRequest) bool {
+		return jr.ID == joinRequestID && jr.Status == domain.JoinRequestStatusInvited
+	})).Return(nil)
 
-	invitationCode, err := svc.ApproveJoinRequest(ctx, adminID, orgID, email, name)
+	invitationCode, err := svc.ApproveJoinRequest(ctx, adminID, orgID, joinRequestID)
 	assert.NoError(t, err)
 	assert.Equal(t, "ABC12345", invitationCode, "Should return the invitation code for new users")
 
 	mockOrgRepo.AssertExpectations(t)
+	mockJoinRepo.AssertExpectations(t)
 	mockInviteRepo.AssertExpectations(t)
 	mockEmailSvc.AssertExpectations(t)
 }

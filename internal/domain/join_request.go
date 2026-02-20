@@ -4,7 +4,8 @@ type JoinRequestStatus string
 
 const (
 	JoinRequestStatusPending  JoinRequestStatus = "PENDING"
-	JoinRequestStatusApproved JoinRequestStatus = "APPROVED"
+	JoinRequestStatusInvited  JoinRequestStatus = "INVITED"
+	JoinRequestStatusJoined   JoinRequestStatus = "JOINED"
 	JoinRequestStatusRejected JoinRequestStatus = "REJECTED"
 )
 
@@ -15,6 +16,7 @@ type JoinRequest struct {
 	Name      string            `json:"name"`
 	Email     string            `json:"email"`
 	Note      string            `json:"note"`
+	Reason    string            `json:"reason,omitempty"` // Populated on rejection
 	Status    JoinRequestStatus `json:"status"`
 	CreatedOn string            `json:"created_on"`
 	UsedOn    *string           `json:"used_on,omitempty"` // Date when invitation code was used

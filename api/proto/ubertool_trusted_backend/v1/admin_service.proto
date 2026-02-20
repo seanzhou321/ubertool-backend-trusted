@@ -39,8 +39,7 @@ service AdminService {
 
 message ApproveRequestToJoinRequest {
   int32 organization_id = 1;
-  string applicant_email = 2;
-  string applicant_name = 3;
+  int32 join_request_id = 2; // Added request_id to link to the specific join request
 }
 
 message ApproveRequestToJoinResponse {
@@ -99,7 +98,7 @@ message JoinRequestProfile {
 
 message RejectRequestToJoinRequest {
   int32 organization_id = 1;
-  string applicant_email = 2;
+  int32 join_request_id = 2;
   string reason = 3;
 }
 

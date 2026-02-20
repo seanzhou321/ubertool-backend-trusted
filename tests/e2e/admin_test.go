@@ -29,10 +29,12 @@ func TestAdminService_E2E(t *testing.T) {
 		db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
 
 		// Create join request
-		_, err := db.Exec(`
+		var joinRequestID int32
+		err := db.QueryRow(`
 			INSERT INTO join_requests (org_id, user_id, name, email, note, status)
 			VALUES ($1, $2, 'Existing User', 'e2e-test-existing@test.com', 'Please let me join', 'PENDING')
-		`, orgID, existingUserID)
+			RETURNING id
+		`, orgID, existingUserID).Scan(&joinRequestID)
 		require.NoError(t, err)
 
 		// Test: Admin approves join request
@@ -41,8 +43,7 @@ func TestAdminService_E2E(t *testing.T) {
 
 		req := &pb.ApproveRequestToJoinRequest{
 			OrganizationId: orgID,
-			ApplicantEmail: "e2e-test-existing@test.com",
-			ApplicantName:  "Existing User",
+			JoinRequestId:  joinRequestID,
 		}
 
 		resp, err := adminClient.ApproveRequestToJoin(ctx, req)
@@ -59,7 +60,7 @@ func TestAdminService_E2E(t *testing.T) {
 		var status string
 		err = db.QueryRow("SELECT status FROM join_requests WHERE email = $1 AND org_id = $2", "e2e-test-existing@test.com", orgID).Scan(&status)
 		assert.NoError(t, err)
-		assert.Equal(t, "APPROVED", status)
+		assert.Equal(t, "INVITED", status)
 	})
 
 	t.Run("ApproveJoinRequest for New User (Send Invitation)", func(t *testing.T) {
@@ -71,10 +72,12 @@ func TestAdminService_E2E(t *testing.T) {
 		newUserEmail := "e2e-test-newuser-invite@test.com"
 
 		// Create join request for non-existent user
-		_, err := db.Exec(`
+		var joinRequestID int32
+		err := db.QueryRow(`
 			INSERT INTO join_requests (org_id, user_id, name, email, note, status)
 			VALUES ($1, NULL, 'New User', $2, 'I want to join', 'PENDING')
-		`, orgID, newUserEmail)
+			RETURNING id
+		`, orgID, newUserEmail).Scan(&joinRequestID)
 		require.NoError(t, err)
 
 		// Test: Admin approves join request
@@ -83,8 +86,7 @@ func TestAdminService_E2E(t *testing.T) {
 
 		req := &pb.ApproveRequestToJoinRequest{
 			OrganizationId: orgID,
-			ApplicantEmail: newUserEmail,
-			ApplicantName:  "New User",
+			JoinRequestId:  joinRequestID,
 		}
 
 		resp, err := adminClient.ApproveRequestToJoin(ctx, req)
@@ -101,7 +103,7 @@ func TestAdminService_E2E(t *testing.T) {
 		var status string
 		err = db.QueryRow("SELECT status FROM join_requests WHERE email = $1 AND org_id = $2", newUserEmail, orgID).Scan(&status)
 		assert.NoError(t, err)
-		assert.Equal(t, "APPROVED", status)
+		assert.Equal(t, "INVITED", status)
 	})
 
 	t.Run("BlockUser", func(t *testing.T) {

@@ -37,6 +37,7 @@ func TestToolService_E2E(t *testing.T) {
 			PricePerDayCents:   1000,
 			PricePerWeekCents:  5000,
 			PricePerMonthCents: 15000,
+			Duration:           "day",
 			Condition:          pb.ToolCondition_TOOL_CONDITION_EXCELLENT,
 			Metro:              "San Jose",
 		}
@@ -47,6 +48,7 @@ func TestToolService_E2E(t *testing.T) {
 		assert.Greater(t, resp.Tool.Id, int32(0))
 		// Owner field is not populated for AddTool (user is adding their own tool)
 		assert.Equal(t, pb.ToolStatus_TOOL_STATUS_AVAILABLE, resp.Tool.Status)
+		assert.Equal(t, "day", resp.Tool.DurationUnit)
 
 		// Verify: Tool exists in database
 		var toolName string
@@ -133,6 +135,7 @@ func TestToolService_E2E(t *testing.T) {
 			PricePerDayCents:   1200,
 			PricePerWeekCents:  6000,
 			PricePerMonthCents: 18000,
+			Duration:           "week",
 			Condition:          pb.ToolCondition_TOOL_CONDITION_GOOD,
 		}
 
@@ -140,6 +143,7 @@ func TestToolService_E2E(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "Updated Tool Name", resp.Tool.Name)
 		assert.Equal(t, int32(1200), resp.Tool.PricePerDayCents)
+		assert.Equal(t, "week", resp.Tool.DurationUnit)
 
 		// Verify: Database was updated
 		var toolName string

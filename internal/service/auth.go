@@ -247,6 +247,15 @@ func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phon
 		return err
 	}
 
+	// 6a. If invitation is linked to a join request, mark it as JOINED
+	if inv.JoinRequestID != nil {
+		joinReq, err := s.reqRepo.GetByID(ctx, *inv.JoinRequestID)
+		if err == nil && joinReq != nil {
+			joinReq.Status = domain.JoinRequestStatusJoined
+			_ = s.reqRepo.Update(ctx, joinReq)
+		}
+	}
+
 	// 7. Link user to org
 	userOrg := &domain.UserOrg{
 		UserID:       user.ID,

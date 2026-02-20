@@ -24,8 +24,7 @@ const (
 type ApproveRequestToJoinRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	ApplicantEmail string                 `protobuf:"bytes,2,opt,name=applicant_email,json=applicantEmail,proto3" json:"applicant_email,omitempty"`
-	ApplicantName  string                 `protobuf:"bytes,3,opt,name=applicant_name,json=applicantName,proto3" json:"applicant_name,omitempty"`
+	JoinRequestId  int32                  `protobuf:"varint,2,opt,name=join_request_id,json=joinRequestId,proto3" json:"join_request_id,omitempty"` // Added request_id to link to the specific join request
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -67,18 +66,11 @@ func (x *ApproveRequestToJoinRequest) GetOrganizationId() int32 {
 	return 0
 }
 
-func (x *ApproveRequestToJoinRequest) GetApplicantEmail() string {
+func (x *ApproveRequestToJoinRequest) GetJoinRequestId() int32 {
 	if x != nil {
-		return x.ApplicantEmail
+		return x.JoinRequestId
 	}
-	return ""
-}
-
-func (x *ApproveRequestToJoinRequest) GetApplicantName() string {
-	if x != nil {
-		return x.ApplicantName
-	}
-	return ""
+	return 0
 }
 
 type ApproveRequestToJoinResponse struct {
@@ -636,7 +628,7 @@ func (x *JoinRequestProfile) GetUsedOn() string {
 type RejectRequestToJoinRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OrganizationId int32                  `protobuf:"varint,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	ApplicantEmail string                 `protobuf:"bytes,2,opt,name=applicant_email,json=applicantEmail,proto3" json:"applicant_email,omitempty"`
+	JoinRequestId  int32                  `protobuf:"varint,2,opt,name=join_request_id,json=joinRequestId,proto3" json:"join_request_id,omitempty"`
 	Reason         string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -679,11 +671,11 @@ func (x *RejectRequestToJoinRequest) GetOrganizationId() int32 {
 	return 0
 }
 
-func (x *RejectRequestToJoinRequest) GetApplicantEmail() string {
+func (x *RejectRequestToJoinRequest) GetJoinRequestId() int32 {
 	if x != nil {
-		return x.ApplicantEmail
+		return x.JoinRequestId
 	}
-	return ""
+	return 0
 }
 
 func (x *RejectRequestToJoinRequest) GetReason() string {
@@ -1114,11 +1106,10 @@ var File_ubertool_trusted_backend_v1_admin_service_proto protoreflect.FileDescri
 
 const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\n" +
-	"/ubertool_trusted_backend/v1/admin_service.proto\x12\x17ubertool.trusted.api.v1\"\x96\x01\n" +
+	"/ubertool_trusted_backend/v1/admin_service.proto\x12\x17ubertool.trusted.api.v1\"n\n" +
 	"\x1bApproveRequestToJoinRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12'\n" +
-	"\x0fapplicant_email\x18\x02 \x01(\tR\x0eapplicantEmail\x12%\n" +
-	"\x0eapplicant_name\x18\x03 \x01(\tR\rapplicantName\"{\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12&\n" +
+	"\x0fjoin_request_id\x18\x02 \x01(\x05R\rjoinRequestId\"{\n" +
 	"\x1cApproveRequestToJoinResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12'\n" +
@@ -1153,10 +1144,10 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x05email\x18\x04 \x01(\tR\x05email\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage\x12!\n" +
 	"\frequest_date\x18\x06 \x01(\tR\vrequestDate\x12\x17\n" +
-	"\aused_on\x18\a \x01(\tR\x06usedOn\"\x86\x01\n" +
+	"\aused_on\x18\a \x01(\tR\x06usedOn\"\x85\x01\n" +
 	"\x1aRejectRequestToJoinRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12'\n" +
-	"\x0fapplicant_email\x18\x02 \x01(\tR\x0eapplicantEmail\x12\x16\n" +
+	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12&\n" +
+	"\x0fjoin_request_id\x18\x02 \x01(\x05R\rjoinRequestId\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\"Q\n" +
 	"\x1bRejectRequestToJoinResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +

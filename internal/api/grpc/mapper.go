@@ -74,6 +74,7 @@ func MapDomainToolToProto(t *domain.Tool) *pb.Tool {
 		Name:                 t.Name,
 		Description:          t.Description,
 		Categories:           t.Categories,
+		DurationUnit:         string(t.DurationUnit),
 		PricePerDayCents:     t.PricePerDayCents,
 		PricePerWeekCents:    t.PricePerWeekCents,
 		PricePerMonthCents:   t.PricePerMonthCents,

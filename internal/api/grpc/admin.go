@@ -21,7 +21,7 @@ func (h *AdminHandler) ApproveRequestToJoin(ctx context.Context, req *pb.Approve
 	if err != nil {
 		return nil, err
 	}
-	invitationCode, err := h.adminSvc.ApproveJoinRequest(ctx, adminID, req.OrganizationId, req.ApplicantEmail, req.ApplicantName)
+	invitationCode, err := h.adminSvc.ApproveJoinRequest(ctx, adminID, req.OrganizationId, req.JoinRequestId)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (h *AdminHandler) RejectRequestToJoin(ctx context.Context, req *pb.RejectRe
 	if err != nil {
 		return nil, err
 	}
-	err = h.adminSvc.RejectJoinRequest(ctx, adminID, req.OrganizationId, req.ApplicantEmail, req.Reason)
+	err = h.adminSvc.RejectJoinRequest(ctx, adminID, req.OrganizationId, req.JoinRequestId, req.Reason)
 	if err != nil {
 		return nil, err
 	}
