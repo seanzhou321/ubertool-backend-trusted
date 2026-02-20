@@ -547,10 +547,18 @@ Input: `tool_id`, `start_date`, `end_date`, `organization_id`
 Output: rental request details
 Business Logic:
 1. Verify the tool is either available or its rental schedule is free for the specified start_date and end_date.
-2. Calculate `total_cost_cents` based on duration from start_date to end_date and tool price.
-3. Insert into `rentals` with status 'PENDING'.
-4. Create a notification to the owner with attributes set to {topic:rental_request; rental:rental_id; purpose:"request for approval"}
-5. Send an email to the tool owner to notify the rental request, cc to the renter (user_id parsed from the JWT token).
+2. Validate that `end_date` is strictly after `start_date`. If `end_date <= start_date`, return error: "end date must be after start date (minimum 1 day rental)".
+3. Calculate `total_cost_cents` using the tiered pricing algorithm. Duration is computed as `end_date - start_date` (end date is **exclusive**; minimum effective duration is 1 day). See `tool-rental-pricing-algorithm.md` for details.
+4. Copy the tool's current price fields into the rental record as an immutable price snapshot:
+   - `duration_unit` ← tool's `duration_unit`
+   - `daily_price_cents` ← tool's `price_per_day_cents`
+   - `weekly_price_cents` ← tool's `price_per_week_cents`
+   - `monthly_price_cents` ← tool's `price_per_month_cents`
+   - `replacement_cost_cents` ← tool's `replacement_cost_cents`
+   All subsequent cost calculations for this rental use these snapshot values, so future tool price changes do not affect already-created rentals.
+5. Insert into `rentals` with status 'PENDING', storing the snapshot fields and computed `total_cost_cents`.
+6. Create a notification to the owner with attributes set to {topic:rental_request; rental:rental_id; purpose:"request for approval"}
+7. Send an email to the tool owner to notify the rental request, cc to the renter (user_id parsed from the JWT token).
 
 ### Approve Rental Request
 Purpose: Owner approves the lending.
@@ -608,8 +616,8 @@ Output: updated rental status
 Business Logic:
 1. Either owner or renter can signal completion.
 2. Verify the rental status is 'ACTIVE', 'SCHEDULED', or 'OVERDUE'. Report error if otherwise.
-3. Calculate `total_cost_cents` based on duration from start_date to end_date and tool price. 
-4. The calculation of the cost is based on a tiered pricing structure. The owner can set the duration unit to monthly, weekly, or daily. Please refer tool-rental-pricing-instruction.md and tool-rental-pricing-algorith.md files for detail. 
+3. Calculate `total_cost_cents` based on duration from start_date to end_date using the rental's price snapshot (captured at creation time). Duration is computed as `end_date - start_date` (end date is exclusive). See `tool-rental-pricing-algorithm.md` for the tiered pricing algorithm.
+4. The calculation uses `duration_unit`, `daily_price_cents`, `weekly_price_cents`, and `monthly_price_cents` stored on the rental record, not the tool's current prices.
 5. Update `rentals` status to 'COMPLETED' and set `completed_by` to `user_id`, `return_condition`, `surcharge_or_credit_cents`, `total_cost_cents`, and `notes`.
 6. Add `total_cost_cents`+`surcharge_or_credit_cents` to owner's balance in `users_orgs`.
 7. Create a `ledger_transactions` entry of type 'LENDING_CREDIT' to the owner using the org_id from the rentals.org_id and `total_cost_cents`+`surcharge_or_credit_cents` for the amount.
@@ -678,7 +686,8 @@ Business Logic:
 
 **Case 1: Renter changes dates in PENDING, APPROVED, or SCHEDULED status**
    - Verify `user_id` is the renter.
-   - Calculate new `total_cost_cents` based on duration from new start_date to new end_date and tool pricing.
+   - Validate that `new_end_date` is strictly after `new_start_date` (minimum 1 day).
+   - Calculate new `total_cost_cents` using the rental's price snapshot (`duration_unit`, `daily_price_cents`, `weekly_price_cents`, `monthly_price_cents`) stored on the rental record. Duration is `new_end_date - new_start_date` (end exclusive).
    - Update `rentals` with new start_date, end_date, and total_cost_cents.
    - Set status to 'PENDING' (requires owner re-approval).
    - Create a notification to the owner with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"renter changed dates, requires re-approval"}.
@@ -686,7 +695,8 @@ Business Logic:
 
 **Case 2: Owner changes dates in PENDING, APPROVED, or SCHEDULED status**
    - Verify `user_id` is the tool owner.
-   - Calculate new `total_cost_cents` based on duration from new start_date to new end_date and tool pricing.
+   - Validate that `new_end_date` is strictly after `new_start_date` (minimum 1 day).
+   - Calculate new `total_cost_cents` using the rental's price snapshot. Duration is `new_end_date - new_start_date` (end exclusive).
    - Update `rentals` with new start_date, end_date, and total_cost_cents.
    - Set status to 'APPROVED' (requires renter confirmation).
    - Create a notification to the renter with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"owner changed dates, requires confirmation"}.
@@ -695,7 +705,8 @@ Business Logic:
 **Case 3: Renter extends return date in ACTIVE or OVERDUE status**
    - Verify `user_id` is the renter.
    - Verify only `new_end_date` is changed (start date cannot change for active rentals).
-   - Calculate new `total_cost_cents` based on duration from start_date to new end_date and tool pricing.
+   - Validate that `new_end_date` is strictly after `start_date` (minimum 1 day).
+   - Calculate new `total_cost_cents` using the rental's price snapshot. Duration is `new_end_date - start_date` (end exclusive).
    - Update `rentals` with new end_date and total_cost_cents.
    - Set status to 'RETURN_DATE_CHANGED'.
    - Create a notification to the owner with attributes set to {topic:return_date_change_request; rental:rental_id; old_date:old_end_date; new_date:new_end_date; purpose:"renter requests return date extension"}.
@@ -733,7 +744,7 @@ Business Logic:
 4. Update `rentals` status to 'RETURN_DATE_CHANGE_REJECTED'.
 5. Store rejection `reason` in the `rejection_reason` field of the rental record.
 6. Update `rentals.end_date` with the `new_end_date` set by owner.
-7. Recalculate `total_cost_cents` based on duration from start_date to new_end_date and tool pricing, then update the record.
+7. Recalculate `total_cost_cents` using the rental's price snapshot (`duration_unit`, `daily_price_cents`, `weekly_price_cents`, `monthly_price_cents`) stored on the rental record. Duration is `new_end_date - start_date` (end exclusive), then update the record.
 8. Create a notification to the renter with attributes set to {topic:return_date_change_rejected; rental:rental_id; rejection_reason:reason; new_end_date:new_end_date; old_end_date:old_end_date; purpose:"owner rejected return date extension and set new return date"}.
 9. Send email to renter about rejected return date extension with:
    - The rejection reason
@@ -752,7 +763,7 @@ Business Logic:
 1. Verify the rental exists and status is 'RETURN_DATE_CHANGE_REJECTED'.
 2. Verify `user_id` is the renter.
 3. Copy `last_agreed_end_date` back to `end_date` (rollback to the last agreed date).
-4. Recalculate `total_cost_cents` based on duration from start_date to end_date (now restored) and tool pricing.
+4. Recalculate `total_cost_cents` using the rental's price snapshot (`duration_unit`, `daily_price_cents`, `weekly_price_cents`, `monthly_price_cents`) stored on the rental record. Duration is `end_date - start_date` (end exclusive, after rollback).
 5. Clear rejection_reason field.
 6. Determine appropriate status based on current date vs end_date:
    - If current_date <= end_date: Set status to 'ACTIVE'
@@ -769,7 +780,7 @@ Business Logic:
 1. Verify the rental exists and status is 'RETURN_DATE_CHANGED'.
 2. Verify `user_id` is the renter.
 3. Copy `last_agreed_end_date` back to `end_date` (rollback to the last agreed date).
-4. Recalculate `total_cost_cents` based on duration from start_date to end_date (now restored) and tool pricing.
+4. Recalculate `total_cost_cents` using the rental's price snapshot (`duration_unit`, `daily_price_cents`, `weekly_price_cents`, `monthly_price_cents`) stored on the rental record. Duration is `end_date - start_date` (end exclusive, after rollback).
 5. Determine appropriate status based on current date vs end_date:
    - If current_date <= end_date: Set status to 'ACTIVE'
    - If current_date > end_date: Set status to 'OVERDUE'
