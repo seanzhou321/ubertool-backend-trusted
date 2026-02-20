@@ -279,6 +279,22 @@ func TestCalculateRentalCost_MonthUnit(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, int32(13500), cost) // 1 month minimum * $135
 	})
+
+	t.Run("4 months + 1 day rounds up to 5 months", func(t *testing.T) {
+		// Tool: duration=month, daily=0, weekly=1000, monthly=1000
+		// Rental: 2025-10-09 to 2026-02-10 = 4 months + 1 day → rounds up to 5 months
+		monthlyPrices := RentalPriceSnapshot{
+			PricePerDayCents:   0,
+			PricePerWeekCents:  1000,
+			PricePerMonthCents: 1000,
+			DurationUnit:       domain.ToolDurationUnitMonth,
+		}
+		start, _ := time.Parse("2006-01-02", "2025-10-09")
+		end, _ := time.Parse("2006-01-02", "2026-02-10")
+		cost, err := CalculateRentalCost(start, end, monthlyPrices)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(5000), cost) // 5 months * 1000
+	})
 }
 
 func TestCalculateRentalCostWithBreakdown_DayUnit(t *testing.T) {
