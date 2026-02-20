@@ -78,6 +78,7 @@ CREATE TABLE join_requests (
     note TEXT,
     status TEXT DEFAULT 'PENDING',
     reason TEXT,
+    rejected_by_user_id INTEGER REFERENCES users(id), -- Admin who rejected the request
     created_on DATE DEFAULT CURRENT_DATE
 );
 

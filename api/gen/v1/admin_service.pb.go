@@ -541,7 +541,10 @@ type JoinRequestProfile struct {
 	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
 	Message       string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
 	RequestDate   string                 `protobuf:"bytes,6,opt,name=request_date,json=requestDate,proto3" json:"request_date,omitempty"`
-	UsedOn        string                 `protobuf:"bytes,7,opt,name=used_on,json=usedOn,proto3" json:"used_on,omitempty"` // Date when invitation code was used (YYYY-MM-DD), empty if not used
+	UsedOn        string                 `protobuf:"bytes,7,opt,name=used_on,json=usedOn,proto3" json:"used_on,omitempty"`              // Date when invitation code was used (YYYY-MM-DD), empty if not used
+	Status        string                 `protobuf:"bytes,8,opt,name=status,proto3" json:"status,omitempty"`                            // PENDING, INVITED, JOINED, REJECTED
+	Reason        string                 `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`                            // Rejection reason (populated when status=REJECTED)
+	RejectedBy    string                 `protobuf:"bytes,10,opt,name=rejected_by,json=rejectedBy,proto3" json:"rejected_by,omitempty"` // Name/email of admin who rejected (populated when status=REJECTED)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -621,6 +624,27 @@ func (x *JoinRequestProfile) GetRequestDate() string {
 func (x *JoinRequestProfile) GetUsedOn() string {
 	if x != nil {
 		return x.UsedOn
+	}
+	return ""
+}
+
+func (x *JoinRequestProfile) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *JoinRequestProfile) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *JoinRequestProfile) GetRejectedBy() string {
+	if x != nil {
+		return x.RejectedBy
 	}
 	return ""
 }
@@ -1135,7 +1159,7 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x17ListJoinRequestsRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\"c\n" +
 	"\x18ListJoinRequestsResponse\x12G\n" +
-	"\brequests\x18\x01 \x03(\v2+.ubertool.trusted.api.v1.JoinRequestProfileR\brequests\"\xcc\x01\n" +
+	"\brequests\x18\x01 \x03(\v2+.ubertool.trusted.api.v1.JoinRequestProfileR\brequests\"\x9d\x02\n" +
 	"\x12JoinRequestProfile\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\x12\x17\n" +
@@ -1144,7 +1168,12 @@ const file_ubertool_trusted_backend_v1_admin_service_proto_rawDesc = "" +
 	"\x05email\x18\x04 \x01(\tR\x05email\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage\x12!\n" +
 	"\frequest_date\x18\x06 \x01(\tR\vrequestDate\x12\x17\n" +
-	"\aused_on\x18\a \x01(\tR\x06usedOn\"\x85\x01\n" +
+	"\aused_on\x18\a \x01(\tR\x06usedOn\x12\x16\n" +
+	"\x06status\x18\b \x01(\tR\x06status\x12\x16\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\x12\x1f\n" +
+	"\vrejected_by\x18\n" +
+	" \x01(\tR\n" +
+	"rejectedBy\"\x85\x01\n" +
 	"\x1aRejectRequestToJoinRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\x05R\x0eorganizationId\x12&\n" +
 	"\x0fjoin_request_id\x18\x02 \x01(\x05R\rjoinRequestId\x12\x16\n" +

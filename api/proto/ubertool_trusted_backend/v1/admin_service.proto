@@ -94,6 +94,9 @@ message JoinRequestProfile {
   string message = 5;
   string request_date = 6;
   string used_on = 7; // Date when invitation code was used (YYYY-MM-DD), empty if not used
+  string status = 8; // PENDING, INVITED, JOINED, REJECTED
+  string reason = 9; // Rejection reason (populated when status=REJECTED)
+  string rejected_by = 10; // Name/email of admin who rejected (populated when status=REJECTED)
 }
 
 message RejectRequestToJoinRequest {

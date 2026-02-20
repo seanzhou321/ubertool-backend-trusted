@@ -174,9 +174,10 @@ func (s *adminService) RejectJoinRequest(ctx context.Context, adminID, orgID, jo
 		return fmt.Errorf("join request does not belong to the given organization")
 	}
 
-	// 2. Update status to REJECTED and set reason
+	// 2. Update status to REJECTED, set reason and rejected_by_user_id
 	joinReq.Status = domain.JoinRequestStatusRejected
 	joinReq.Reason = reason
+	joinReq.RejectedByUserID = &adminID
 	if err := s.reqRepo.Update(ctx, joinReq); err != nil {
 		return fmt.Errorf("failed to update join request: %w", err)
 	}

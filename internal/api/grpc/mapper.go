@@ -312,6 +312,9 @@ func MapDomainJoinRequestProfileToProto(jr *domain.JoinRequest) *pb.JoinRequestP
 		Email:       jr.Email,
 		Message:     jr.Note,
 		RequestDate: jr.CreatedOn,
+		Status:      string(jr.Status),
+		Reason:      jr.Reason,
+		RejectedBy:  jr.RejectedBy,
 	}
 	if jr.UserID != nil {
 		proto.UserId = *jr.UserID

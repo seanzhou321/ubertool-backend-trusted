@@ -57,14 +57,15 @@ func (r *joinRequestRepository) GetByID(ctx context.Context, id int32) (*domain.
 }
 
 func (r *joinRequestRepository) Update(ctx context.Context, req *domain.JoinRequest) error {
-	query := `UPDATE join_requests SET status = $1, reason = $2 WHERE id = $3`
-	_, err := r.db.ExecContext(ctx, query, req.Status, req.Reason, req.ID)
+	query := `UPDATE join_requests SET status = $1, reason = $2, rejected_by_user_id = $3 WHERE id = $4`
+	_, err := r.db.ExecContext(ctx, query, req.Status, req.Reason, req.RejectedByUserID, req.ID)
 	return err
 }
 
 func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]domain.JoinRequest, error) {
 	query := `
-		SELECT jr.id, jr.org_id, jr.user_id, jr.name, jr.email, jr.note, jr.status, jr.created_on, i.used_on
+		SELECT jr.id, jr.org_id, jr.user_id, jr.name, jr.email, jr.note, jr.reason, jr.status, jr.created_on,
+		       i.used_on, rb.name AS rejected_by_name
 		FROM join_requests jr
 		LEFT JOIN LATERAL (
 			SELECT used_on
@@ -80,7 +81,9 @@ func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]d
 			  invitations.used_on DESC
 			LIMIT 1
 		) i ON true
+		LEFT JOIN users rb ON rb.id = jr.rejected_by_user_id
 		WHERE jr.org_id = $1
+		  AND jr.created_on >= NOW() - INTERVAL '2 months'
 	`
 	rows, err := r.db.QueryContext(ctx, query, orgID)
 	if err != nil {
@@ -92,14 +95,24 @@ func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]d
 	for rows.Next() {
 		var req domain.JoinRequest
 		var createdOn time.Time
+		var note, reason, rejectedByName sql.NullString
 		var usedOn sql.NullTime
-		if err := rows.Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &req.Note, &req.Status, &createdOn, &usedOn); err != nil {
+		if err := rows.Scan(&req.ID, &req.OrgID, &req.UserID, &req.Name, &req.Email, &note, &reason, &req.Status, &createdOn, &usedOn, &rejectedByName); err != nil {
 			return nil, err
 		}
 		req.CreatedOn = createdOn.Format("2006-01-02")
+		if note.Valid {
+			req.Note = note.String
+		}
+		if reason.Valid {
+			req.Reason = reason.String
+		}
 		if usedOn.Valid {
 			dateStr := usedOn.Time.Format("2006-01-02")
 			req.UsedOn = &dateStr
+		}
+		if rejectedByName.Valid {
+			req.RejectedBy = rejectedByName.String
 		}
 		reqs = append(reqs, req)
 	}
