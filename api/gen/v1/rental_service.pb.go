@@ -1703,6 +1703,11 @@ type RentalRequest struct {
 	UpdatedOn              string                 `protobuf:"bytes,15,opt,name=updated_on,json=updatedOn,proto3" json:"updated_on,omitempty"`                                             // Date string YYYY-MM-DD
 	ReturnCondition        string                 `protobuf:"bytes,16,opt,name=return_condition,json=returnCondition,proto3" json:"return_condition,omitempty"`                           // Condition note when tool was returned
 	SurchargeOrCreditCents int32                  `protobuf:"varint,17,opt,name=surcharge_or_credit_cents,json=surchargeOrCreditCents,proto3" json:"surcharge_or_credit_cents,omitempty"` // Surcharge or credit applied at completion
+	DurationUnit           string                 `protobuf:"bytes,18,opt,name=durationUnit,proto3" json:"durationUnit,omitempty"`                                                        // Unit of rental duration (e.g. "day", "week")
+	DailyPriceCents        int32                  `protobuf:"varint,19,opt,name=daily_price_cents,json=dailyPriceCents,proto3" json:"daily_price_cents,omitempty"`                        // Daily rental rate in cents
+	WeeklyPriceCents       int32                  `protobuf:"varint,20,opt,name=weekly_price_cents,json=weeklyPriceCents,proto3" json:"weekly_price_cents,omitempty"`                     // Weekly rental rate in cents
+	MonthlyPriceCents      int32                  `protobuf:"varint,21,opt,name=monthly_price_cents,json=monthlyPriceCents,proto3" json:"monthly_price_cents,omitempty"`                  // Monthly rental rate in cents
+	ReplacementCostCents   int32                  `protobuf:"varint,22,opt,name=replacement_cost_cents,json=replacementCostCents,proto3" json:"replacement_cost_cents,omitempty"`         // Replacement cost for the tool in cents
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -1856,6 +1861,41 @@ func (x *RentalRequest) GetSurchargeOrCreditCents() int32 {
 	return 0
 }
 
+func (x *RentalRequest) GetDurationUnit() string {
+	if x != nil {
+		return x.DurationUnit
+	}
+	return ""
+}
+
+func (x *RentalRequest) GetDailyPriceCents() int32 {
+	if x != nil {
+		return x.DailyPriceCents
+	}
+	return 0
+}
+
+func (x *RentalRequest) GetWeeklyPriceCents() int32 {
+	if x != nil {
+		return x.WeeklyPriceCents
+	}
+	return 0
+}
+
+func (x *RentalRequest) GetMonthlyPriceCents() int32 {
+	if x != nil {
+		return x.MonthlyPriceCents
+	}
+	return 0
+}
+
+func (x *RentalRequest) GetReplacementCostCents() int32 {
+	if x != nil {
+		return x.ReplacementCostCents
+	}
+	return 0
+}
+
 var File_ubertool_trusted_backend_v1_rental_service_proto protoreflect.FileDescriptor
 
 const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
@@ -1968,7 +2008,7 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\"o\n" +
 	"\x1eCancelReturnDateChangeResponse\x12M\n" +
-	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xee\x04\n" +
+	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xd2\x06\n" +
 	"\rRentalRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x17\n" +
 	"\atool_id\x18\x02 \x01(\x05R\x06toolId\x12\x1b\n" +
@@ -1992,7 +2032,12 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\n" +
 	"updated_on\x18\x0f \x01(\tR\tupdatedOn\x12)\n" +
 	"\x10return_condition\x18\x10 \x01(\tR\x0freturnCondition\x129\n" +
-	"\x19surcharge_or_credit_cents\x18\x11 \x01(\x05R\x16surchargeOrCreditCents*\xe2\x02\n" +
+	"\x19surcharge_or_credit_cents\x18\x11 \x01(\x05R\x16surchargeOrCreditCents\x12\"\n" +
+	"\fdurationUnit\x18\x12 \x01(\tR\fdurationUnit\x12*\n" +
+	"\x11daily_price_cents\x18\x13 \x01(\x05R\x0fdailyPriceCents\x12,\n" +
+	"\x12weekly_price_cents\x18\x14 \x01(\x05R\x10weeklyPriceCents\x12.\n" +
+	"\x13monthly_price_cents\x18\x15 \x01(\x05R\x11monthlyPriceCents\x124\n" +
+	"\x16replacement_cost_cents\x18\x16 \x01(\x05R\x14replacementCostCents*\xe2\x02\n" +
 	"\fRentalStatus\x12\x1d\n" +
 	"\x19RENTAL_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15RENTAL_STATUS_PENDING\x10\x01\x12\x1a\n" +

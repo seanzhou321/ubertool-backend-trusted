@@ -28,7 +28,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 	toolID := int32(2)
 	orgID := int32(3)
 	startDate := time.Now().Add(24 * time.Hour).Format("2006-01-02")
-	endDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
+	endDate := time.Now().Add(72 * time.Hour).Format("2006-01-02") // 2-day rental (end-exclusive)
 
 	tool := &domain.Tool{
 		ID:                 toolID,
@@ -56,7 +56,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		assert.NotNil(t, res)
 		assert.Equal(t, toolID, res.ToolID)
 		assert.Equal(t, renterID, res.RenterID)
-		assert.Equal(t, int32(2000), res.TotalCostCents) // 2 days inclusive (24h to 48h) * 1000
+		assert.Equal(t, int32(2000), res.TotalCostCents) // 2 days (end-exclusive: +24h to +72h) * 1000
 	})
 
 	// Balance check is disabled for now
@@ -250,7 +250,11 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
 		Status:    domain.RentalStatusActive,
 		StartDate: time.Now().Format("2006-01-02"), EndDate: time.Now().Add(24 * time.Hour).Format("2006-01-02"),
-		TotalCostCents: 1000,
+		TotalCostCents:    1000,
+		DurationUnit:      string(domain.ToolDurationUnitDay),
+		DailyPriceCents:   1000,
+		WeeklyPriceCents:  6000,
+		MonthlyPriceCents: 20000,
 	}
 	tool := &domain.Tool{
 		ID:                 toolID,
@@ -271,7 +275,7 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		// Expect update with temp status and new cost
 		rentalRepo.On("Update", ctx, mock.MatchedBy(func(u *domain.Rental) bool {
 			return u.Status == domain.RentalStatusReturnDateChanged &&
-				u.TotalCostCents == 3000 // 3 days inclusive (today to +48h) * 1000
+				u.TotalCostCents == 2000 // 2 days end-exclusive (today to +48h) * 1000
 		})).Return(nil)
 
 		// Notifications
@@ -302,6 +306,10 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 			LastAgreedEndDate: &lastAgreedEndDate,
 			EndDate:           requestedEndDate, // Already has a pending request
 			TotalCostCents:    2000,
+			DurationUnit:      string(domain.ToolDurationUnitDay),
+			DailyPriceCents:   1000,
+			WeeklyPriceCents:  6000,
+			MonthlyPriceCents: 20000,
 		}
 
 		// Renter wants to update their request to a different date
@@ -313,7 +321,7 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		// Expect update with new end date and cost
 		rentalRepo.On("Update", ctx, mock.MatchedBy(func(u *domain.Rental) bool {
 			return u.Status == domain.RentalStatusReturnDateChanged &&
-				u.TotalCostCents == 4000 // 4 days inclusive * 1000
+				u.TotalCostCents == 3000 // 3 days end-exclusive (today to +72h) * 1000
 		})).Return(nil)
 
 		// Notifications
@@ -326,7 +334,7 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, domain.RentalStatusReturnDateChanged, result.Status)
-		assert.Equal(t, int32(4000), result.TotalCostCents)
+		assert.Equal(t, int32(3000), result.TotalCostCents)
 		assert.NotNil(t, result.EndDate)
 	})
 }
@@ -369,6 +377,10 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			LastAgreedEndDate: &lastAgreedEndDate,
 			EndDate:           requestedEndDate,
 			TotalCostCents:    3000,
+			DurationUnit:      string(domain.ToolDurationUnitDay),
+			DailyPriceCents:   1000,
+			WeeklyPriceCents:  6000,
+			MonthlyPriceCents: 20000,
 		}
 		counterProposalDate := time.Now().Add(48 * time.Hour).Format("2006-01-02") // 2 days
 		reason := "I need the tool back sooner"
@@ -381,7 +393,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			return u.Status == domain.RentalStatusReturnDateChangeRejected &&
 				u.RejectionReason == reason &&
 				u.EndDate == counterProposalDate &&
-				u.TotalCostCents == 3000 // Recalculated based on 3 days inclusive (today to +48h)
+				u.TotalCostCents == 2000 // 2 days end-exclusive (today to +48h) * 1000
 		})).Return(nil)
 
 		// Expect notification to renter
@@ -394,14 +406,14 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		})).Return(nil)
 
 		// Expect email notification
-		emailSvc.On("SendReturnDateRejectionNotification", ctx, renter.Email, tool.Name, counterProposalDate, reason, int32(3000)).Return(nil)
+		emailSvc.On("SendReturnDateRejectionNotification", ctx, renter.Email, tool.Name, counterProposalDate, reason, int32(2000)).Return(nil)
 
 		result, err := svc.RejectReturnDateChange(ctx, ownerID, rentalID, reason, counterProposalDate)
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, domain.RentalStatusReturnDateChangeRejected, result.Status)
 		assert.Equal(t, reason, result.RejectionReason)
-		assert.Equal(t, int32(3000), result.TotalCostCents)
+		assert.Equal(t, int32(2000), result.TotalCostCents)
 	})
 
 	t.Run("Error - Unauthorized (not owner)", func(t *testing.T) {
@@ -576,6 +588,10 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 			LastAgreedEndDate: &lastAgreedEndDate,
 			EndDate:           requestedEndDate,
 			TotalCostCents:    3000,
+			DurationUnit:      string(domain.ToolDurationUnitDay),
+			DailyPriceCents:   1000,
+			WeeklyPriceCents:  6000,
+			MonthlyPriceCents: 20000,
 		}
 		counterProposalDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
 		reason := "Tool needed urgently"
@@ -588,7 +604,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
 
 		// Email fails but operation should still succeed
-		emailSvc.On("SendReturnDateRejectionNotification", ctx, renter.Email, tool.Name, counterProposalDate, reason, int32(3000)).Return(fmt.Errorf("email error"))
+		emailSvc.On("SendReturnDateRejectionNotification", ctx, renter.Email, tool.Name, counterProposalDate, reason, int32(2000)).Return(fmt.Errorf("email error"))
 
 		result, err := svc.RejectReturnDateChange(ctx, ownerID, rentalID, reason, counterProposalDate)
 		assert.NoError(t, err) // Email error is ignored

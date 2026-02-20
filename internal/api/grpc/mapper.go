@@ -157,6 +157,11 @@ func MapDomainRentalToProtoWithNames(r *domain.Rental, renterName, ownerName, to
 		SurchargeOrCreditCents: r.SurchargeOrCreditCents,
 		CreatedOn:              r.CreatedOn,
 		UpdatedOn:              r.UpdatedOn,
+		DurationUnit:           r.DurationUnit,
+		DailyPriceCents:        r.DailyPriceCents,
+		WeeklyPriceCents:       r.WeeklyPriceCents,
+		MonthlyPriceCents:      r.MonthlyPriceCents,
+		ReplacementCostCents:   r.ReplacementCostCents,
 	}
 	return proto
 }

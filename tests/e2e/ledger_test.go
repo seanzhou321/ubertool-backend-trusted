@@ -81,10 +81,10 @@ func TestLedgerService_E2E(t *testing.T) {
 
 		// Create rental records with different statuses
 		_, err := db.Exec(`
-			INSERT INTO rentals (org_id, tool_id, renter_id, owner_id, start_date, end_date, total_cost_cents, status)
-			VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE + 1, 1000, 'COMPLETED'),
-			       ($1, $2, $3, $4, CURRENT_DATE + 2, CURRENT_DATE + 3, 1000, 'SCHEDULED'),
-			       ($1, $2, $3, $4, CURRENT_DATE + 4, CURRENT_DATE + 5, 1000, 'PENDING')
+			INSERT INTO rentals (org_id, tool_id, renter_id, owner_id, start_date, end_date, duration_unit, daily_price_cents, weekly_price_cents, monthly_price_cents, replacement_cost_cents, total_cost_cents, status)
+			VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE + 1, 'day', 1000, 6000, 20000, 50000, 1000, 'COMPLETED'),
+			       ($1, $2, $3, $4, CURRENT_DATE + 2, CURRENT_DATE + 3, 'day', 1000, 6000, 20000, 50000, 1000, 'SCHEDULED'),
+			       ($1, $2, $3, $4, CURRENT_DATE + 4, CURRENT_DATE + 5, 'day', 1000, 6000, 20000, 50000, 1000, 'PENDING')
 		`, orgID, toolID, userID, ownerID)
 		require.NoError(t, err)
 
@@ -190,8 +190,8 @@ func TestLedgerService_E2E(t *testing.T) {
 
 		balanceResp2, err := ledgerClient.GetBalance(ctx5b, balanceReq)
 		require.NoError(t, err)
-		// Should be 10000 - 4000 (2 days * 2000/day) = 6000
-		assert.Equal(t, int32(6000), balanceResp2.Balance)
+		// Should be 10000 - 2000 (1 day end-exclusive * 2000/day) = 8000
+		assert.Equal(t, int32(8000), balanceResp2.Balance)
 
 		// Check owner's balance after completion
 		ctx6, cancel6 := ContextWithUserIDAndTimeout(ownerID, 5*time.Second)
@@ -202,7 +202,7 @@ func TestLedgerService_E2E(t *testing.T) {
 		}
 		ownerBalanceResp, err := ledgerClient.GetBalance(ctx6, ownerBalanceReq)
 		require.NoError(t, err)
-		// Owner should receive 4000
-		assert.Equal(t, int32(4000), ownerBalanceResp.Balance)
+		// Owner should receive 2000 (1 day end-exclusive * 2000/day)
+		assert.Equal(t, int32(2000), ownerBalanceResp.Balance)
 	})
 }

@@ -226,7 +226,13 @@ func TestRentalDateChange_Integration(t *testing.T) {
 		rental := &domain.Rental{
 			OrgID: orgID, ToolID: tool.ID, RenterID: renter.ID, OwnerID: owner.ID,
 			StartDate: startDate, EndDate: endDate,
-			TotalCostCents: 1000, Status: domain.RentalStatusScheduled,
+			TotalCostCents:       1000,
+			Status:               domain.RentalStatusScheduled,
+			DurationUnit:         string(tool.DurationUnit),
+			DailyPriceCents:      tool.PricePerDayCents,
+			WeeklyPriceCents:     tool.PricePerWeekCents,
+			MonthlyPriceCents:    tool.PricePerMonthCents,
+			ReplacementCostCents: tool.ReplacementCostCents,
 		}
 		err = rentalRepo.Create(ctx, rental)
 		assert.NoError(t, err)
@@ -264,8 +270,8 @@ func TestRentalDateChange_Integration(t *testing.T) {
 		t.Logf("ChangeRental Result: Status=%s, Cost=%d, EndDate=%v, LastAgreedEndDate=%v",
 			chgRental.Status, chgRental.TotalCostCents, chgRental.EndDate, chgRental.LastAgreedEndDate)
 		assert.Equal(t, domain.RentalStatusReturnDateChanged, chgRental.Status)
-		// Cost should be 3 days (2025-01-01 to 2025-01-03 inclusive) * 1000 = 3000
-		assert.Equal(t, int32(3000), chgRental.TotalCostCents)
+		// Cost should be 2 days (2025-01-01 to 2025-01-03 end-exclusive) * 1000 = 2000
+		assert.Equal(t, int32(2000), chgRental.TotalCostCents)
 
 		// 3. Approve Extension
 		appRental, err := svc.ApproveReturnDateChange(ctx, owner.ID, rental.ID)

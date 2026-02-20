@@ -24,6 +24,13 @@ type Rental struct {
 	StartDate              string       `json:"start_date"`
 	EndDate                string       `json:"end_date"`
 	LastAgreedEndDate      *string      `json:"last_agreed_end_date,omitempty"`
+	// Price snapshot fields — captured from the tool at rental creation time.
+	// All cost calculations use these snapshots, not live tool prices.
+	DurationUnit         string `json:"duration_unit"`
+	DailyPriceCents      int32  `json:"daily_price_cents"`
+	WeeklyPriceCents     int32  `json:"weekly_price_cents"`
+	MonthlyPriceCents    int32  `json:"monthly_price_cents"`
+	ReplacementCostCents int32  `json:"replacement_cost_cents"`
 	TotalCostCents         int32        `json:"total_cost_cents"`
 	Status                 RentalStatus `json:"status"`
 	CompletedBy            *int32       `json:"completed_by,omitempty"`

@@ -124,13 +124,13 @@ func TestRentalService_E2E(t *testing.T) {
 		// Verify: Renter's balance was debited at completion
 		err = db.QueryRow("SELECT balance_cents FROM users_orgs WHERE user_id = $1 AND org_id = $2", renterID, orgID).Scan(&renterBalance)
 		assert.NoError(t, err)
-		assert.Equal(t, int32(2000), renterBalance) // 5000 - 3000 = 2000
+		assert.Equal(t, int32(3000), renterBalance) // 5000 - 2000 = 3000
 
 		// Verify: Owner's balance was credited
 		var ownerBalance int32
 		err = db.QueryRow("SELECT balance_cents FROM users_orgs WHERE user_id = $1 AND org_id = $2", ownerID, orgID).Scan(&ownerBalance)
 		assert.NoError(t, err)
-		assert.Equal(t, int32(3000), ownerBalance) // Owner receives the rental cost
+		assert.Equal(t, int32(2000), ownerBalance) // Owner receives the rental cost (2 days * $10)
 
 		// Verify: Ledger transactions created (2 paired transactions: owner credit + renter debit)
 		var renterDebitCount int
@@ -291,8 +291,8 @@ func TestRentalService_E2E(t *testing.T) {
 		firstEndDateStr := firstEndDate.Format("2006-01-02")
 		expectedFirstDate := firstExtensionDate.Format("2006-01-02")
 		assert.Equal(t, expectedFirstDate, firstEndDateStr, "First extension date should match requested date")
-		// First extension: 3 days inclusive = 3000 cents
-		assert.Equal(t, int32(3000), firstTotalCost, "Cost should be calculated for 3 days")
+		// First extension: startDate to firstExtensionDate = 2 days = 2000 cents
+		assert.Equal(t, int32(2000), firstTotalCost, "Cost should be calculated for 2 days")
 
 		t.Logf("✓ Initial extension request submitted successfully. Status: RETURN_DATE_CHANGED, EndDate: %s, Cost: %d cents", 
 			firstEndDateStr, firstTotalCost)
@@ -327,9 +327,9 @@ func TestRentalService_E2E(t *testing.T) {
 		assert.Equal(t, expectedSecondDate, updatedEndDateStr, 
 			"CRITICAL: EndDate should be UPDATED to the new requested date, not remain the old date")
 		
-		// Updated extension: 4 days inclusive = 4000 cents
-		assert.Equal(t, int32(4000), updatedTotalCost, 
-			"Cost should be recalculated for 4 days")
+		// Updated extension: startDate to secondExtensionDate = 3 days = 3000 cents
+		assert.Equal(t, int32(3000), updatedTotalCost,
+			"Cost should be recalculated for 3 days")
 
 		// Verify it's NOT the old date
 		assert.NotEqual(t, firstEndDateStr, updatedEndDateStr, 

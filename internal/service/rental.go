@@ -56,7 +56,19 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 	}
 
 	// Calculate cost using tiered pricing algorithm
-	totalCost, err := utils.CalculateRentalCost(start, end, tool)
+	if !end.After(start) {
+		return nil, errors.New("end date must be after start date (minimum 1 day rental)")
+	}
+
+	// Build price snapshot from tool at the time of rental creation
+	snapshot := utils.RentalPriceSnapshot{
+		DurationUnit:       tool.DurationUnit,
+		PricePerDayCents:   tool.PricePerDayCents,
+		PricePerWeekCents:  tool.PricePerWeekCents,
+		PricePerMonthCents: tool.PricePerMonthCents,
+	}
+
+	totalCost, err := utils.CalculateRentalCost(start, end, snapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -72,14 +84,19 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 	// }
 
 	rental := &domain.Rental{
-		OrgID:          orgID,
-		ToolID:         toolID,
-		RenterID:       renterID,
-		OwnerID:        tool.OwnerID,
-		StartDate:      start.Format("2006-01-02"),
-		EndDate:        end.Format("2006-01-02"),
-		TotalCostCents: totalCost,
-		Status:         domain.RentalStatusPending,
+		OrgID:                orgID,
+		ToolID:               toolID,
+		RenterID:             renterID,
+		OwnerID:              tool.OwnerID,
+		StartDate:            start.Format("2006-01-02"),
+		EndDate:              end.Format("2006-01-02"),
+		DurationUnit:         string(tool.DurationUnit),
+		DailyPriceCents:      tool.PricePerDayCents,
+		WeeklyPriceCents:     tool.PricePerWeekCents,
+		MonthlyPriceCents:    tool.PricePerMonthCents,
+		ReplacementCostCents: tool.ReplacementCostCents,
+		TotalCostCents:       totalCost,
+		Status:               domain.RentalStatusPending,
 	}
 
 	if err := s.rentalRepo.Create(ctx, rental); err != nil {
@@ -391,8 +408,18 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 	}
 	// Verify old dates match (optimistic locking check) - skipping for simplicity as per requirement focus
 
-	// Calculate new cost using tiered pricing algorithm
-	newCost, err := utils.CalculateRentalCost(nStart, nEnd, tool)
+	if !nEnd.After(nStart) {
+		return nil, errors.New("end date must be after start date (minimum 1 day rental)")
+	}
+
+	// Calculate new cost using tiered pricing algorithm using the rental's price snapshot
+	rtSnapshot := utils.RentalPriceSnapshot{
+		DurationUnit:       domain.ToolDurationUnit(rt.DurationUnit),
+		PricePerDayCents:   rt.DailyPriceCents,
+		PricePerWeekCents:  rt.WeeklyPriceCents,
+		PricePerMonthCents: rt.MonthlyPriceCents,
+	}
+	newCost, err := utils.CalculateRentalCost(nStart, nEnd, rtSnapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -576,7 +603,13 @@ func (s *rentalService) RejectReturnDateChange(ctx context.Context, ownerID, ren
 
 	// Recalculate total_cost_cents based on new end date using tiered pricing
 	startDate, _ := time.Parse("2006-01-02", rt.StartDate)
-	newCost, err := utils.CalculateRentalCost(startDate, newEndDate, tool)
+	rtSnapshot := utils.RentalPriceSnapshot{
+		DurationUnit:       domain.ToolDurationUnit(rt.DurationUnit),
+		PricePerDayCents:   rt.DailyPriceCents,
+		PricePerWeekCents:  rt.WeeklyPriceCents,
+		PricePerMonthCents: rt.MonthlyPriceCents,
+	}
+	newCost, err := utils.CalculateRentalCost(startDate, newEndDate, rtSnapshot)
 	if err != nil {
 		return nil, err
 	}
@@ -621,19 +654,19 @@ func (s *rentalService) AcknowledgeReturnDateRejection(ctx context.Context, rent
 		return nil, errors.New("invalid status")
 	}
 
-	// Get tool for cost recalculation
-	tool, err := s.toolRepo.GetByID(ctx, rt.ToolID)
-	if err != nil {
-		return nil, err
-	}
-
 	// Rollback: Copy LastAgreedEndDate back to EndDate
 	if rt.LastAgreedEndDate != nil {
 		rt.EndDate = *rt.LastAgreedEndDate
-		// Recalculate cost using the last agreed end date
+		// Recalculate cost using the last agreed end date and the rental's price snapshot
 		startDate, _ := time.Parse("2006-01-02", rt.StartDate)
 		endDate, _ := time.Parse("2006-01-02", rt.EndDate)
-		originalCost, err := utils.CalculateRentalCost(startDate, endDate, tool)
+		rtSnapshot := utils.RentalPriceSnapshot{
+			DurationUnit:       domain.ToolDurationUnit(rt.DurationUnit),
+			PricePerDayCents:   rt.DailyPriceCents,
+			PricePerWeekCents:  rt.WeeklyPriceCents,
+			PricePerMonthCents: rt.MonthlyPriceCents,
+		}
+		originalCost, err := utils.CalculateRentalCost(startDate, endDate, rtSnapshot)
 		if err != nil {
 			return nil, err
 		}
@@ -678,19 +711,19 @@ func (s *rentalService) CancelReturnDateChange(ctx context.Context, renterID, re
 		return nil, errors.New("invalid status")
 	}
 
-	// Get tool for cost recalculation
-	tool, err := s.toolRepo.GetByID(ctx, rt.ToolID)
-	if err != nil {
-		return nil, err
-	}
-
 	// Rollback: Copy LastAgreedEndDate back to EndDate
 	if rt.LastAgreedEndDate != nil {
 		rt.EndDate = *rt.LastAgreedEndDate
-		// Recalculate cost using the last agreed end date
+		// Recalculate cost using the last agreed end date and the rental's price snapshot
 		startDate, _ := time.Parse("2006-01-02", rt.StartDate)
 		endDate, _ := time.Parse("2006-01-02", rt.EndDate)
-		originalCost, err := utils.CalculateRentalCost(startDate, endDate, tool)
+		rtSnapshot := utils.RentalPriceSnapshot{
+			DurationUnit:       domain.ToolDurationUnit(rt.DurationUnit),
+			PricePerDayCents:   rt.DailyPriceCents,
+			PricePerWeekCents:  rt.WeeklyPriceCents,
+			PricePerMonthCents: rt.MonthlyPriceCents,
+		}
+		originalCost, err := utils.CalculateRentalCost(startDate, endDate, rtSnapshot)
 		if err != nil {
 			return nil, err
 		}

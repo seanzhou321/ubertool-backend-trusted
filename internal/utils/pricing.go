@@ -22,6 +22,16 @@ type DateDifference struct {
 	Days   int
 }
 
+// RentalPriceSnapshot holds price data captured from a tool at the time a rental is created.
+// All cost calculations use this snapshot so that subsequent tool price changes do not affect
+// already-created rentals.
+type RentalPriceSnapshot struct {
+	DurationUnit       domain.ToolDurationUnit
+	PricePerDayCents   int32
+	PricePerWeekCents  int32
+	PricePerMonthCents int32
+}
+
 // RentalCostBreakdown provides detailed cost breakdown
 type RentalCostBreakdown struct {
 	Months     int
@@ -94,10 +104,15 @@ func CalculateDateDifference(startDate, endDate Date) (DateDifference, error) {
 		return DateDifference{}, fmt.Errorf("end date must be >= start date")
 	}
 
+	// Same-day: treat as minimum 1-day duration
+	if startDate == endDate {
+		return DateDifference{Months: 0, Days: 1}, nil
+	}
+
 	// Initial difference calculation
 	years := endDate.Year - startDate.Year
 	months := endDate.Month - startDate.Month
-	days := endDate.Day - startDate.Day + 1 // +1 to include both ends
+	days := endDate.Day - startDate.Day // end is exclusive; duration = endDate - startDate
 
 	// If days < 0, borrow from months
 	if days < 0 {
@@ -125,9 +140,11 @@ func CalculateDateDifference(startDate, endDate Date) (DateDifference, error) {
 	return DateDifference{Months: months, Days: days}, nil
 }
 
-// CalculateRentalCost calculates the total rental cost based on the tool's pricing
-// and duration unit, following the tiered pricing algorithm from tool-rental-pricing-algorithm.md
-func CalculateRentalCost(startDate, endDate time.Time, tool *domain.Tool) (int32, error) {
+// CalculateRentalCost calculates the total rental cost based on price snapshot data
+// and the tiered pricing algorithm from tool-rental-pricing-algorithm.md.
+// Duration is computed as endDate - startDate (end is exclusive; minimum 1 day should be
+// enforced by callers before calling this function).
+func CalculateRentalCost(startDate, endDate time.Time, prices RentalPriceSnapshot) (int32, error) {
 	// Convert time.Time to yyyy-mm-dd format strings
 	startDateStr := startDate.Format("2006-01-02")
 	endDateStr := endDate.Format("2006-01-02")
@@ -150,22 +167,22 @@ func CalculateRentalCost(startDate, endDate time.Time, tool *domain.Tool) (int32
 	}
 
 	// Calculate cost based on duration unit
-	switch tool.DurationUnit {
+	switch prices.DurationUnit {
 	case domain.ToolDurationUnitMonth:
-		return calculateMonthUnitCost(tool, diff), nil
+		return calculateMonthUnitCost(prices, diff), nil
 	case domain.ToolDurationUnitWeek:
-		return calculateWeekUnitCost(tool, diff), nil
+		return calculateWeekUnitCost(prices, diff), nil
 	case domain.ToolDurationUnitDay:
-		return calculateDayUnitCost(tool, diff), nil
+		return calculateDayUnitCost(prices, diff), nil
 	default:
 		// Default to day unit if not specified
-		return calculateDayUnitCost(tool, diff), nil
+		return calculateDayUnitCost(prices, diff), nil
 	}
 }
 
 // calculateMonthUnitCost calculates cost for month-based duration
 // If diff.Days == 0, charges exact months; otherwise rounds up to next month
-func calculateMonthUnitCost(tool *domain.Tool, diff DateDifference) int32 {
+func calculateMonthUnitCost(prices RentalPriceSnapshot, diff DateDifference) int32 {
 	var months int32
 	if diff.Days == 0 {
 		months = int32(diff.Months)
@@ -177,12 +194,12 @@ func calculateMonthUnitCost(tool *domain.Tool, diff DateDifference) int32 {
 		months = 1
 	}
 
-	return months * tool.PricePerMonthCents
+	return months * prices.PricePerMonthCents
 }
 
 // calculateWeekUnitCost calculates cost for week-based duration
 // Rounds up to nearest full week
-func calculateWeekUnitCost(tool *domain.Tool, diff DateDifference) int32 {
+func calculateWeekUnitCost(prices RentalPriceSnapshot, diff DateDifference) int32 {
 	const daysPerWeek = 7
 
 	// Calculate total weeks, rounding up
@@ -192,14 +209,14 @@ func calculateWeekUnitCost(tool *domain.Tool, diff DateDifference) int32 {
 	}
 
 	// Add cost for full months (converted to weeks)
-	monthsCost := int32(diff.Months) * tool.PricePerMonthCents
-	weeksCost := min(weeks*tool.PricePerWeekCents, tool.PricePerMonthCents) // Cap week cost at month cost
+	monthsCost := int32(diff.Months) * prices.PricePerMonthCents
+	weeksCost := min(weeks*prices.PricePerWeekCents, prices.PricePerMonthCents) // Cap week cost at month cost
 
 	return monthsCost + weeksCost
 }
 
 // calculateDayUnitCost calculates cost using tiered pricing (months + weeks + days)
-func calculateDayUnitCost(tool *domain.Tool, diff DateDifference) int32 {
+func calculateDayUnitCost(prices RentalPriceSnapshot, diff DateDifference) int32 {
 	const daysPerWeek = 7
 
 	// Break down remaining days into weeks and days
@@ -207,15 +224,15 @@ func calculateDayUnitCost(tool *domain.Tool, diff DateDifference) int32 {
 	days := int32(diff.Days % daysPerWeek)
 
 	// Calculate costs
-	monthsCost := int32(diff.Months) * tool.PricePerMonthCents
-	weeksCost := min(weeks*tool.PricePerWeekCents, tool.PricePerMonthCents) // Cap week cost at month cost
-	daysCost := min(days*tool.PricePerDayCents, tool.PricePerWeekCents)     // Cap day cost at week cost
+	monthsCost := int32(diff.Months) * prices.PricePerMonthCents
+	weeksCost := min(weeks*prices.PricePerWeekCents, prices.PricePerMonthCents) // Cap week cost at month cost
+	daysCost := min(days*prices.PricePerDayCents, prices.PricePerWeekCents)     // Cap day cost at week cost
 
 	return monthsCost + weeksCost + daysCost
 }
 
 // CalculateRentalCostWithBreakdown provides detailed breakdown of rental cost
-func CalculateRentalCostWithBreakdown(startDate, endDate time.Time, tool *domain.Tool) (RentalCostBreakdown, error) {
+func CalculateRentalCostWithBreakdown(startDate, endDate time.Time, prices RentalPriceSnapshot) (RentalCostBreakdown, error) {
 	// Convert time.Time to yyyy-mm-dd format strings
 	startDateStr := startDate.Format("2006-01-02")
 	endDateStr := endDate.Format("2006-01-02")
@@ -238,7 +255,7 @@ func CalculateRentalCostWithBreakdown(startDate, endDate time.Time, tool *domain
 	}
 
 	// Calculate breakdown based on duration unit
-	switch tool.DurationUnit {
+	switch prices.DurationUnit {
 	case domain.ToolDurationUnitMonth:
 		var months int
 		if diff.Days == 0 {
@@ -249,7 +266,7 @@ func CalculateRentalCostWithBreakdown(startDate, endDate time.Time, tool *domain
 		if months < 1 {
 			months = 1
 		}
-		totalCost := int32(months) * tool.PricePerMonthCents
+		totalCost := int32(months) * prices.PricePerMonthCents
 		return RentalCostBreakdown{
 			Months:     months,
 			Weeks:      0,
@@ -266,8 +283,8 @@ func CalculateRentalCostWithBreakdown(startDate, endDate time.Time, tool *domain
 		if diff.Days%daysPerWeek > 0 {
 			weeks += 1
 		}
-		monthsCost := int32(diff.Months) * tool.PricePerMonthCents
-		weeksCost := int32(weeks) * tool.PricePerWeekCents
+		monthsCost := int32(diff.Months) * prices.PricePerMonthCents
+		weeksCost := int32(weeks) * prices.PricePerWeekCents
 		return RentalCostBreakdown{
 			Months:     diff.Months,
 			Weeks:      weeks,
@@ -282,9 +299,9 @@ func CalculateRentalCostWithBreakdown(startDate, endDate time.Time, tool *domain
 		const daysPerWeek = 7
 		weeks := diff.Days / daysPerWeek
 		days := diff.Days % daysPerWeek
-		monthsCost := int32(diff.Months) * tool.PricePerMonthCents
-		weeksCost := int32(weeks) * tool.PricePerWeekCents
-		daysCost := int32(days) * tool.PricePerDayCents
+		monthsCost := int32(diff.Months) * prices.PricePerMonthCents
+		weeksCost := int32(weeks) * prices.PricePerWeekCents
+		daysCost := int32(days) * prices.PricePerDayCents
 		return RentalCostBreakdown{
 			Months:     diff.Months,
 			Weeks:      weeks,
@@ -300,9 +317,9 @@ func CalculateRentalCostWithBreakdown(startDate, endDate time.Time, tool *domain
 		const daysPerWeek = 7
 		weeks := diff.Days / daysPerWeek
 		days := diff.Days % daysPerWeek
-		monthsCost := int32(diff.Months) * tool.PricePerMonthCents
-		weeksCost := int32(weeks) * tool.PricePerWeekCents
-		daysCost := int32(days) * tool.PricePerDayCents
+		monthsCost := int32(diff.Months) * prices.PricePerMonthCents
+		weeksCost := int32(weeks) * prices.PricePerWeekCents
+		daysCost := int32(days) * prices.PricePerDayCents
 		return RentalCostBreakdown{
 			Months:     diff.Months,
 			Weeks:      weeks,

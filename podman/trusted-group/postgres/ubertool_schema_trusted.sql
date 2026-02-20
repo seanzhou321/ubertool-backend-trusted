@@ -55,6 +55,19 @@ CREATE TABLE users_orgs (
 CREATE INDEX idx_users_orgs_renting_blocked ON users_orgs(user_id, org_id) WHERE renting_blocked = TRUE;
 CREATE INDEX idx_users_orgs_lending_blocked ON users_orgs(user_id, org_id) WHERE lending_blocked = TRUE;
 
+CREATE TABLE join_requests (
+    id SERIAL PRIMARY KEY,
+    org_id INTEGER REFERENCES orgs(id),
+    user_id INTEGER REFERENCES users(id),
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    note TEXT,
+    status TEXT DEFAULT 'PENDING',
+    reason TEXT,
+    rejected_by_user_id INTEGER REFERENCES users(id), -- Admin who rejected the request
+    created_on DATE DEFAULT CURRENT_DATE
+);
+
 CREATE TABLE invitations (
     id SERIAL PRIMARY KEY,
     invitation_code TEXT NOT NULL,
@@ -69,19 +82,6 @@ CREATE TABLE invitations (
     UNIQUE(invitation_code, email) -- Ensure uniqueness of invitation tuple
 );
 
-CREATE TABLE join_requests (
-    id SERIAL PRIMARY KEY,
-    org_id INTEGER REFERENCES orgs(id),
-    user_id INTEGER REFERENCES users(id),
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    note TEXT,
-    status TEXT DEFAULT 'PENDING',
-    reason TEXT,
-    rejected_by_user_id INTEGER REFERENCES users(id), -- Admin who rejected the request
-    created_on DATE DEFAULT CURRENT_DATE
-);
-
 -- 3. Tools
 CREATE TABLE tools (
     id SERIAL PRIMARY KEY,
@@ -92,7 +92,7 @@ CREATE TABLE tools (
     price_per_day_cents INTEGER NOT NULL DEFAULT 0,
     price_per_week_cents INTEGER NOT NULL DEFAULT 0,
     price_per_month_cents INTEGER NOT NULL DEFAULT 0,
-    replacement_cost_cents INTEGER,
+    replacement_cost_cents INTEGER NOT NULL DEFAULT 0,
     duration_unit TEXT NOT NULL DEFAULT 'day',
     condition TEXT NOT NULL DEFAULT 'GOOD',
     metro TEXT, -- Optional location indicator
@@ -140,6 +140,11 @@ CREATE TABLE rentals (
     start_date DATE NOT NULL,
     last_agreed_end_date DATE, -- Last agreed return date (agreed by both renter and owner,can be updated with return date change flow)
     end_date DATE NOT NULL, -- Actual return date
+    duration_unit TEXT NOT NULL DEFAULT 'day',
+    daily_price_cents INTEGER NOT NULL,
+    weekly_price_cents INTEGER NOT NULL,
+    monthly_price_cents INTEGER NOT NULL,
+    replacement_cost_cents INTEGER NOT NULL,
     total_cost_cents INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'PENDING',
     pickup_note TEXT,

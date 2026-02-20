@@ -250,6 +250,11 @@ message RentalRequest {
   string updated_on = 15; // Date string YYYY-MM-DD
   string return_condition = 16; // Condition note when tool was returned
   int32 surcharge_or_credit_cents = 17; // Surcharge or credit applied at completion
+  string durationUnit = 18; // Unit of rental duration (e.g. "day", "week")
+  int32 daily_price_cents = 19; // Daily rental rate in cents
+  int32 weekly_price_cents = 20; // Weekly rental rate in cents
+  int32 monthly_price_cents = 21; // Monthly rental rate in cents
+  int32 replacement_cost_cents = 22; // Replacement cost for the tool in cents
 }
 
 // Rental status enum
