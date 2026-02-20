@@ -100,6 +100,32 @@ func (r *invitationRepository) GetByInvitationCodeAndEmail(ctx context.Context, 
 	return inv, nil
 }
 
+func (r *invitationRepository) GetByJoinRequestID(ctx context.Context, joinRequestID int32) (*domain.Invitation, error) {
+	inv := &domain.Invitation{}
+	query := `SELECT id, invitation_code, org_id, email, join_request_id, created_by, expires_on, used_on, used_by_user_id, created_on
+	          FROM invitations
+	          WHERE join_request_id = $1
+	          ORDER BY created_on DESC
+	          LIMIT 1`
+	var expiresOn, createdOn time.Time
+	var usedOn sql.NullTime
+
+	err := r.db.QueryRowContext(ctx, query, joinRequestID).Scan(
+		&inv.ID, &inv.InvitationCode, &inv.OrgID, &inv.Email, &inv.JoinRequestID,
+		&inv.CreatedBy, &expiresOn, &usedOn, &inv.UsedByUserID, &createdOn,
+	)
+	if err != nil {
+		return nil, err
+	}
+	inv.ExpiresOn = expiresOn.Format("2006-01-02")
+	inv.CreatedOn = createdOn.Format("2006-01-02")
+	if usedOn.Valid {
+		dateStr := usedOn.Time.Format("2006-01-02")
+		inv.UsedOn = &dateStr
+	}
+	return inv, nil
+}
+
 func (r *invitationRepository) Update(ctx context.Context, inv *domain.Invitation) error {
 	query := `UPDATE invitations SET used_on = $1, used_by_user_id = $2 WHERE id = $3`
 	_, err := r.db.ExecContext(ctx, query, inv.UsedOn, inv.UsedByUserID, inv.ID)

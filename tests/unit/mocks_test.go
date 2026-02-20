@@ -126,6 +126,14 @@ func (m *MockInviteRepo) Update(ctx context.Context, invite *domain.Invitation) 
 	return args.Error(0)
 }
 
+func (m *MockInviteRepo) GetByJoinRequestID(ctx context.Context, joinRequestID int32) (*domain.Invitation, error) {
+	args := m.Called(ctx, joinRequestID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Invitation), args.Error(1)
+}
+
 // Type alias for compatibility
 type MockInvitationRepo = MockInviteRepo
 

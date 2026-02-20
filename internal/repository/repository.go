@@ -76,6 +76,7 @@ type InvitationRepository interface {
 	Create(ctx context.Context, invite *domain.Invitation) error
 	GetByInvitationCode(ctx context.Context, invitationCode string) (*domain.Invitation, error)
 	GetByInvitationCodeAndEmail(ctx context.Context, invitationCode, email string) (*domain.Invitation, error)
+	GetByJoinRequestID(ctx context.Context, joinRequestID int32) (*domain.Invitation, error)
 	Update(ctx context.Context, invite *domain.Invitation) error
 }
 
