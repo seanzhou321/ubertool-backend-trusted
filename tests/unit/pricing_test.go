@@ -1,17 +1,18 @@
-package utils
+package unit
 
 import (
 	"testing"
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/utils"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestParseDate(t *testing.T) {
 	t.Run("Valid date", func(t *testing.T) {
-		date, err := ParseDate("2024-01-15")
+		date, err := utils.ParseDate("2024-01-15")
 		assert.NoError(t, err)
 		assert.Equal(t, 2024, date.Year)
 		assert.Equal(t, 1, date.Month)
@@ -19,19 +20,19 @@ func TestParseDate(t *testing.T) {
 	})
 
 	t.Run("Invalid format", func(t *testing.T) {
-		_, err := ParseDate("2024/01/15")
+		_, err := utils.ParseDate("2024/01/15")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid date format")
 	})
 
 	t.Run("Invalid month", func(t *testing.T) {
-		_, err := ParseDate("2024-13-15")
+		_, err := utils.ParseDate("2024-13-15")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "month must be between 1 and 12")
 	})
 
 	t.Run("Invalid day", func(t *testing.T) {
-		_, err := ParseDate("2024-01-32")
+		_, err := utils.ParseDate("2024-01-32")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "day must be between 1 and 31")
 	})
@@ -57,7 +58,7 @@ func TestDaysInMonth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
-			days := DaysInMonth(tt.year, tt.month)
+			days := utils.DaysInMonth(tt.year, tt.month)
 			assert.Equal(t, tt.expected, days)
 		})
 	}
@@ -65,36 +66,36 @@ func TestDaysInMonth(t *testing.T) {
 
 func TestCalculateDateDifference(t *testing.T) {
 	t.Run("Same day", func(t *testing.T) {
-		start := Date{Year: 2024, Month: 1, Day: 15}
-		end := Date{Year: 2024, Month: 1, Day: 15}
-		diff, err := CalculateDateDifference(start, end)
+		start := utils.Date{Year: 2024, Month: 1, Day: 15}
+		end := utils.Date{Year: 2024, Month: 1, Day: 15}
+		diff, err := utils.CalculateDateDifference(start, end)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, diff.Months)
 		assert.Equal(t, 1, diff.Days) // same-day = minimum 1-day duration
 	})
 
 	t.Run("Same month", func(t *testing.T) {
-		start := Date{Year: 2024, Month: 1, Day: 15}
-		end := Date{Year: 2024, Month: 1, Day: 20}
-		diff, err := CalculateDateDifference(start, end)
+		start := utils.Date{Year: 2024, Month: 1, Day: 15}
+		end := utils.Date{Year: 2024, Month: 1, Day: 20}
+		diff, err := utils.CalculateDateDifference(start, end)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, diff.Months)
 		assert.Equal(t, 5, diff.Days) // 20 - 15 = 5
 	})
 
 	t.Run("Cross month boundary", func(t *testing.T) {
-		start := Date{Year: 2024, Month: 1, Day: 25}
-		end := Date{Year: 2024, Month: 2, Day: 5}
-		diff, err := CalculateDateDifference(start, end)
+		start := utils.Date{Year: 2024, Month: 1, Day: 25}
+		end := utils.Date{Year: 2024, Month: 2, Day: 5}
+		diff, err := utils.CalculateDateDifference(start, end)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, diff.Months)
 		assert.Equal(t, 11, diff.Days) // Feb 5 - Jan 25 = 11 (exclusive end)
 	})
 
 	t.Run("Multiple months", func(t *testing.T) {
-		start := Date{Year: 2024, Month: 1, Day: 15}
-		end := Date{Year: 2024, Month: 4, Day: 20}
-		diff, err := CalculateDateDifference(start, end)
+		start := utils.Date{Year: 2024, Month: 1, Day: 15}
+		end := utils.Date{Year: 2024, Month: 4, Day: 20}
+		diff, err := utils.CalculateDateDifference(start, end)
 		assert.NoError(t, err)
 		assert.Equal(t, 3, diff.Months)
 		assert.Equal(t, 5, diff.Days) // 20 - 15 = 5
@@ -102,34 +103,34 @@ func TestCalculateDateDifference(t *testing.T) {
 
 	t.Run("Exact months", func(t *testing.T) {
 		// Jan 15 to Mar 15 is exactly 2 months (exclusive end)
-		start := Date{Year: 2024, Month: 1, Day: 15}
-		end := Date{Year: 2024, Month: 3, Day: 15}
-		diff, err := CalculateDateDifference(start, end)
+		start := utils.Date{Year: 2024, Month: 1, Day: 15}
+		end := utils.Date{Year: 2024, Month: 3, Day: 15}
+		diff, err := utils.CalculateDateDifference(start, end)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, diff.Months)
 		assert.Equal(t, 0, diff.Days)
 	})
 
 	t.Run("Cross year boundary", func(t *testing.T) {
-		start := Date{Year: 2023, Month: 11, Day: 15}
-		end := Date{Year: 2024, Month: 2, Day: 10}
-		diff, err := CalculateDateDifference(start, end)
+		start := utils.Date{Year: 2023, Month: 11, Day: 15}
+		end := utils.Date{Year: 2024, Month: 2, Day: 10}
+		diff, err := utils.CalculateDateDifference(start, end)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, diff.Months)
 		assert.Equal(t, 26, diff.Days)
 	})
 
 	t.Run("End before start", func(t *testing.T) {
-		start := Date{Year: 2024, Month: 1, Day: 20}
-		end := Date{Year: 2024, Month: 1, Day: 15}
-		_, err := CalculateDateDifference(start, end)
+		start := utils.Date{Year: 2024, Month: 1, Day: 20}
+		end := utils.Date{Year: 2024, Month: 1, Day: 15}
+		_, err := utils.CalculateDateDifference(start, end)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "end date must be >= start date")
 	})
 }
 
 func TestCalculateRentalCost_DayUnit(t *testing.T) {
-	prices := RentalPriceSnapshot{
+	prices := utils.RentalPriceSnapshot{
 		PricePerDayCents:   1000,  // $10.00
 		PricePerWeekCents:  4500,  // $45.00
 		PricePerMonthCents: 13500, // $135.00
@@ -140,7 +141,7 @@ func TestCalculateRentalCost_DayUnit(t *testing.T) {
 		// Jan 15 to Jan 16 = 1 day (end exclusive)
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-16")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(1000), cost) // 1 day * $10
 	})
@@ -149,7 +150,7 @@ func TestCalculateRentalCost_DayUnit(t *testing.T) {
 		// Jan 15 to Jan 20 = 5 days
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-20")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(4500), cost) // 5 days * $10 = $50, capped at week price $45
 	})
@@ -158,7 +159,7 @@ func TestCalculateRentalCost_DayUnit(t *testing.T) {
 		// Jan 15 to Jan 22 = 7 days
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-22")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(4500), cost) // 1 week * $45
 	})
@@ -167,7 +168,7 @@ func TestCalculateRentalCost_DayUnit(t *testing.T) {
 		// Jan 15 to Jan 26 = 11 days = 1 week + 4 days
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-26")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 11 days = 1 week (7 days) + 4 days
 		assert.Equal(t, int32(8500), cost) // $45 + $40 = $85
@@ -177,7 +178,7 @@ func TestCalculateRentalCost_DayUnit(t *testing.T) {
 		// Dec 15, 2023 to Mar 10, 2024 = 2 months + 24 days (exclusive end)
 		start, _ := time.Parse("2006-01-02", "2023-12-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-10")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 2 months + 24 days = 2 months + 3 weeks (21 days) + 3 days
 		// $270 + $135 + $30 = $435
@@ -188,7 +189,7 @@ func TestCalculateRentalCost_DayUnit(t *testing.T) {
 		// Dec 15, 2023 to Mar 20, 2024 = 3 months + 5 days
 		start, _ := time.Parse("2006-01-02", "2023-12-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-20")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 3 months + 5 days = 3 months + 0 weeks + 5 days
 		// $405 + $0 + min($50,$45) = $405 + $45 = $450
@@ -197,7 +198,7 @@ func TestCalculateRentalCost_DayUnit(t *testing.T) {
 }
 
 func TestCalculateRentalCost_WeekUnit(t *testing.T) {
-	prices := RentalPriceSnapshot{
+	prices := utils.RentalPriceSnapshot{
 		PricePerDayCents:   1000,  // $10.00
 		PricePerWeekCents:  4500,  // $45.00
 		PricePerMonthCents: 13500, // $135.00
@@ -208,7 +209,7 @@ func TestCalculateRentalCost_WeekUnit(t *testing.T) {
 		// Jan 15 to Jan 29 = 14 days = exactly 2 weeks
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-29")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 14 days = 2 weeks
 		assert.Equal(t, int32(9000), cost) // 2 weeks * $45
@@ -218,7 +219,7 @@ func TestCalculateRentalCost_WeekUnit(t *testing.T) {
 		// Jan 15 to Jan 25 = 10 days (10/7=1 rem 3 → rounds up to 2 weeks)
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-25")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 10 days rounds up to 2 weeks
 		assert.Equal(t, int32(9000), cost) // 2 weeks * $45
@@ -228,7 +229,7 @@ func TestCalculateRentalCost_WeekUnit(t *testing.T) {
 		// Jan 15 to Mar 25 = 2 months + 10 days (10/7 rounds up to 2 weeks)
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-25")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 2 months + 10 days = 2 months + 2 weeks (rounded up)
 		// $270 + $90 = $360
@@ -237,7 +238,7 @@ func TestCalculateRentalCost_WeekUnit(t *testing.T) {
 }
 
 func TestCalculateRentalCost_MonthUnit(t *testing.T) {
-	prices := RentalPriceSnapshot{
+	prices := utils.RentalPriceSnapshot{
 		PricePerDayCents:   1000,  // $10.00
 		PricePerWeekCents:  4500,  // $45.00
 		PricePerMonthCents: 13500, // $135.00
@@ -248,7 +249,7 @@ func TestCalculateRentalCost_MonthUnit(t *testing.T) {
 		// Jan 15 to Mar 15 = exactly 2 months (exclusive end)
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-15")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(27000), cost) // 2 months * $135
 	})
@@ -256,7 +257,7 @@ func TestCalculateRentalCost_MonthUnit(t *testing.T) {
 	t.Run("2 months + 5 days rounds up", func(t *testing.T) {
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-20")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 2 months + 5 days rounds up to 3 months
 		assert.Equal(t, int32(40500), cost) // 3 months * $135
@@ -265,7 +266,7 @@ func TestCalculateRentalCost_MonthUnit(t *testing.T) {
 	t.Run("3 months + 5 days rounds up", func(t *testing.T) {
 		start, _ := time.Parse("2006-01-02", "2023-12-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-20")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 3 months + 5 days rounds up to 4 months
 		assert.Equal(t, int32(54000), cost) // 4 months * $135
@@ -275,7 +276,7 @@ func TestCalculateRentalCost_MonthUnit(t *testing.T) {
 		// Jan 15 to Jan 16 = 1 day. For month-unit, <1 month → charged as 1 month.
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-16")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(13500), cost) // 1 month minimum * $135
 	})
@@ -283,7 +284,7 @@ func TestCalculateRentalCost_MonthUnit(t *testing.T) {
 	t.Run("4 months + 1 day rounds up to 5 months", func(t *testing.T) {
 		// Tool: duration=month, daily=0, weekly=1000, monthly=1000
 		// Rental: 2025-10-09 to 2026-02-10 = 4 months + 1 day → rounds up to 5 months
-		monthlyPrices := RentalPriceSnapshot{
+		monthlyPrices := utils.RentalPriceSnapshot{
 			PricePerDayCents:   0,
 			PricePerWeekCents:  1000,
 			PricePerMonthCents: 1000,
@@ -291,14 +292,14 @@ func TestCalculateRentalCost_MonthUnit(t *testing.T) {
 		}
 		start, _ := time.Parse("2006-01-02", "2025-10-09")
 		end, _ := time.Parse("2006-01-02", "2026-02-10")
-		cost, err := CalculateRentalCost(start, end, monthlyPrices)
+		cost, err := utils.CalculateRentalCost(start, end, monthlyPrices)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(5000), cost) // 5 months * 1000
 	})
 }
 
 func TestCalculateRentalCostWithBreakdown_DayUnit(t *testing.T) {
-	prices := RentalPriceSnapshot{
+	prices := utils.RentalPriceSnapshot{
 		PricePerDayCents:   1000,  // $10.00
 		PricePerWeekCents:  4500,  // $45.00
 		PricePerMonthCents: 13500, // $135.00
@@ -309,7 +310,7 @@ func TestCalculateRentalCostWithBreakdown_DayUnit(t *testing.T) {
 		// Dec 15, 2023 to Mar 10, 2024 = 2 months + 24 days
 		start, _ := time.Parse("2006-01-02", "2023-12-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-10")
-		breakdown, err := CalculateRentalCostWithBreakdown(start, end, prices)
+		breakdown, err := utils.CalculateRentalCostWithBreakdown(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, breakdown.Months)
 		assert.Equal(t, 3, breakdown.Weeks)
@@ -324,7 +325,7 @@ func TestCalculateRentalCostWithBreakdown_DayUnit(t *testing.T) {
 		// Jan 15 to Jan 26 = 11 days = 1 week + 4 days
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-26")
-		breakdown, err := CalculateRentalCostWithBreakdown(start, end, prices)
+		breakdown, err := utils.CalculateRentalCostWithBreakdown(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, breakdown.Months)
 		assert.Equal(t, 1, breakdown.Weeks)
@@ -337,7 +338,7 @@ func TestCalculateRentalCostWithBreakdown_DayUnit(t *testing.T) {
 }
 
 func TestCalculateRentalCostWithBreakdown_MonthUnit(t *testing.T) {
-	prices := RentalPriceSnapshot{
+	prices := utils.RentalPriceSnapshot{
 		PricePerDayCents:   1000,  // $10.00
 		PricePerWeekCents:  4500,  // $45.00
 		PricePerMonthCents: 13500, // $135.00
@@ -348,7 +349,7 @@ func TestCalculateRentalCostWithBreakdown_MonthUnit(t *testing.T) {
 		// Jan 15 to Mar 15 = exactly 2 months
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-15")
-		breakdown, err := CalculateRentalCostWithBreakdown(start, end, prices)
+		breakdown, err := utils.CalculateRentalCostWithBreakdown(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, breakdown.Months)
 		assert.Equal(t, 0, breakdown.Weeks)
@@ -359,7 +360,7 @@ func TestCalculateRentalCostWithBreakdown_MonthUnit(t *testing.T) {
 	t.Run("2 months + 5 days", func(t *testing.T) {
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-20")
-		breakdown, err := CalculateRentalCostWithBreakdown(start, end, prices)
+		breakdown, err := utils.CalculateRentalCostWithBreakdown(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, 3, breakdown.Months) // Rounded up
 		assert.Equal(t, 0, breakdown.Weeks)
@@ -369,7 +370,7 @@ func TestCalculateRentalCostWithBreakdown_MonthUnit(t *testing.T) {
 }
 
 func TestCalculateRentalCostWithBreakdown_WeekUnit(t *testing.T) {
-	prices := RentalPriceSnapshot{
+	prices := utils.RentalPriceSnapshot{
 		PricePerDayCents:   1000,  // $10.00
 		PricePerWeekCents:  4500,  // $45.00
 		PricePerMonthCents: 13500, // $135.00
@@ -380,7 +381,7 @@ func TestCalculateRentalCostWithBreakdown_WeekUnit(t *testing.T) {
 		// Jan 15 to Jan 29 = 14 days = exactly 2 weeks
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-29")
-		breakdown, err := CalculateRentalCostWithBreakdown(start, end, prices)
+		breakdown, err := utils.CalculateRentalCostWithBreakdown(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, breakdown.Months)
 		assert.Equal(t, 2, breakdown.Weeks)
@@ -392,7 +393,7 @@ func TestCalculateRentalCostWithBreakdown_WeekUnit(t *testing.T) {
 		// Jan 15 to Mar 25, 2024 = 2 months + 10 days (10/7 rounds up to 2 weeks)
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-25")
-		breakdown, err := CalculateRentalCostWithBreakdown(start, end, prices)
+		breakdown, err := utils.CalculateRentalCostWithBreakdown(start, end, prices)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, breakdown.Months)
 		assert.Equal(t, 2, breakdown.Weeks) // 10 days rounds up to 2 weeks
@@ -402,7 +403,7 @@ func TestCalculateRentalCostWithBreakdown_WeekUnit(t *testing.T) {
 }
 
 func TestCalculateRentalCost_EdgeCases(t *testing.T) {
-	prices := RentalPriceSnapshot{
+	prices := utils.RentalPriceSnapshot{
 		PricePerDayCents:   1000,
 		PricePerWeekCents:  4500,
 		PricePerMonthCents: 13500,
@@ -412,7 +413,7 @@ func TestCalculateRentalCost_EdgeCases(t *testing.T) {
 	t.Run("Leap year - February 29", func(t *testing.T) {
 		start, _ := time.Parse("2006-01-02", "2024-02-15")
 		end, _ := time.Parse("2006-01-02", "2024-03-14")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		assert.NotZero(t, cost)
 	})
@@ -421,7 +422,7 @@ func TestCalculateRentalCost_EdgeCases(t *testing.T) {
 		// Dec 25, 2023 to Jan 10, 2024 = 16 days = 2 weeks + 2 days
 		start, _ := time.Parse("2006-01-02", "2023-12-25")
 		end, _ := time.Parse("2006-01-02", "2024-01-10")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 16 days = 2 weeks (14) + 2 days
 		assert.Equal(t, int32(11000), cost) // (2 * $45) + (2 * $10)
@@ -431,7 +432,7 @@ func TestCalculateRentalCost_EdgeCases(t *testing.T) {
 		// Jan 15, 2023 to Jan 15, 2025 = exactly 24 months
 		start, _ := time.Parse("2006-01-02", "2023-01-15")
 		end, _ := time.Parse("2006-01-02", "2025-01-15")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// Exactly 24 months
 		assert.Equal(t, int32(324000), cost) // 24 * $135
@@ -440,7 +441,7 @@ func TestCalculateRentalCost_EdgeCases(t *testing.T) {
 
 func TestCalculateRentalCost_DefaultUnit(t *testing.T) {
 	t.Run("Empty duration unit defaults to day", func(t *testing.T) {
-		prices := RentalPriceSnapshot{
+		prices := utils.RentalPriceSnapshot{
 			PricePerDayCents:   1000,
 			PricePerWeekCents:  4500,
 			PricePerMonthCents: 13500,
@@ -450,7 +451,7 @@ func TestCalculateRentalCost_DefaultUnit(t *testing.T) {
 		// Jan 15 to Jan 22 = 7 days = 1 week in day unit
 		start, _ := time.Parse("2006-01-02", "2024-01-15")
 		end, _ := time.Parse("2006-01-02", "2024-01-22")
-		cost, err := CalculateRentalCost(start, end, prices)
+		cost, err := utils.CalculateRentalCost(start, end, prices)
 		assert.NoError(t, err)
 		// 7 days = 1 week in day unit
 		assert.Equal(t, int32(4500), cost) // 1 week * $45
