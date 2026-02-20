@@ -134,6 +134,11 @@ func (m *MockInviteRepo) GetByJoinRequestID(ctx context.Context, joinRequestID i
 	return args.Get(0).(*domain.Invitation), args.Error(1)
 }
 
+func (m *MockInviteRepo) ExpireInvitation(ctx context.Context, id int32, expiresOn string) error {
+	args := m.Called(ctx, id, expiresOn)
+	return args.Error(0)
+}
+
 // Type alias for compatibility
 type MockInvitationRepo = MockInviteRepo
 

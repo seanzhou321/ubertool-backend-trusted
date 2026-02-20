@@ -182,12 +182,10 @@ func (s *adminService) RejectJoinRequest(ctx context.Context, adminID, orgID, jo
 		return fmt.Errorf("failed to update join request: %w", err)
 	}
 
-	// 3. Stamp any linked invitation as used (voided by admin rejection), only if not already stamped
+	// 3. Expire any linked invitation immediately (set expires_on to yesterday)
 	if inv, err := s.inviteRepo.GetByJoinRequestID(ctx, joinRequestID); err == nil && inv != nil && inv.UsedOn == nil && inv.UsedByUserID == nil {
-		nowStr := time.Now().Format("2006-01-02")
-		inv.UsedOn = &nowStr
-		inv.UsedByUserID = &adminID
-		_ = s.inviteRepo.Update(ctx, inv)
+		yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+		_ = s.inviteRepo.ExpireInvitation(ctx, inv.ID, yesterday)
 	}
 
 	// 4. Notify applicant

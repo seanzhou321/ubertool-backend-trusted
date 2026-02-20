@@ -127,8 +127,14 @@ func (r *invitationRepository) GetByJoinRequestID(ctx context.Context, joinReque
 }
 
 func (r *invitationRepository) Update(ctx context.Context, inv *domain.Invitation) error {
-	query := `UPDATE invitations SET used_on = $1, used_by_user_id = $2 WHERE id = $3`
-	_, err := r.db.ExecContext(ctx, query, inv.UsedOn, inv.UsedByUserID, inv.ID)
+	query := `UPDATE invitations SET used_on = $1, used_by_user_id = $2, expires_on = $3 WHERE id = $4`
+	_, err := r.db.ExecContext(ctx, query, inv.UsedOn, inv.UsedByUserID, inv.ExpiresOn, inv.ID)
+	return err
+}
+
+func (r *invitationRepository) ExpireInvitation(ctx context.Context, id int32, expiresOn string) error {
+	query := `UPDATE invitations SET expires_on = $1 WHERE id = $2`
+	_, err := r.db.ExecContext(ctx, query, expiresOn, id)
 	return err
 }
 

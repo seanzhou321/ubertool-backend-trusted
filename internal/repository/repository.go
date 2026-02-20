@@ -78,6 +78,7 @@ type InvitationRepository interface {
 	GetByInvitationCodeAndEmail(ctx context.Context, invitationCode, email string) (*domain.Invitation, error)
 	GetByJoinRequestID(ctx context.Context, joinRequestID int32) (*domain.Invitation, error)
 	Update(ctx context.Context, invite *domain.Invitation) error
+	ExpireInvitation(ctx context.Context, id int32, expiresOn string) error
 }
 
 type JoinRequestRepository interface {
