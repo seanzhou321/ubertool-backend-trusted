@@ -1710,6 +1710,8 @@ type RentalRequest struct {
 	ReplacementCostCents   int32                  `protobuf:"varint,22,opt,name=replacement_cost_cents,json=replacementCostCents,proto3" json:"replacement_cost_cents,omitempty"`         // Replacement cost for the tool in cents
 	OrganizationName       string                 `protobuf:"bytes,23,opt,name=organization_name,json=organizationName,proto3" json:"organization_name,omitempty"`                        // Name of the organization context for this rental
 	ToolCondition          string                 `protobuf:"bytes,24,opt,name=tool_condition,json=toolCondition,proto3" json:"tool_condition,omitempty"`                                 // Tool condition string e.g. "EXCELLENT", "GOOD", "ACCEPTABLE", "DAMAGED__NEEDS_REPAIR"
+	RenterPhone            string                 `protobuf:"bytes,25,opt,name=renter_phone,json=renterPhone,proto3" json:"renter_phone,omitempty"`                                       // Phone number of the renter (visible to owner)
+	OwnerPhone             string                 `protobuf:"bytes,26,opt,name=owner_phone,json=ownerPhone,proto3" json:"owner_phone,omitempty"`                                          // Phone number of the owner (visible to renter)
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -1912,6 +1914,20 @@ func (x *RentalRequest) GetToolCondition() string {
 	return ""
 }
 
+func (x *RentalRequest) GetRenterPhone() string {
+	if x != nil {
+		return x.RenterPhone
+	}
+	return ""
+}
+
+func (x *RentalRequest) GetOwnerPhone() string {
+	if x != nil {
+		return x.OwnerPhone
+	}
+	return ""
+}
+
 var File_ubertool_trusted_backend_v1_rental_service_proto protoreflect.FileDescriptor
 
 const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
@@ -2024,7 +2040,7 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\"o\n" +
 	"\x1eCancelReturnDateChangeResponse\x12M\n" +
-	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xa6\a\n" +
+	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xea\a\n" +
 	"\rRentalRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x17\n" +
 	"\atool_id\x18\x02 \x01(\x05R\x06toolId\x12\x1b\n" +
@@ -2055,7 +2071,10 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\x13monthly_price_cents\x18\x15 \x01(\x05R\x11monthlyPriceCents\x124\n" +
 	"\x16replacement_cost_cents\x18\x16 \x01(\x05R\x14replacementCostCents\x12+\n" +
 	"\x11organization_name\x18\x17 \x01(\tR\x10organizationName\x12%\n" +
-	"\x0etool_condition\x18\x18 \x01(\tR\rtoolCondition*\xe2\x02\n" +
+	"\x0etool_condition\x18\x18 \x01(\tR\rtoolCondition\x12!\n" +
+	"\frenter_phone\x18\x19 \x01(\tR\vrenterPhone\x12\x1f\n" +
+	"\vowner_phone\x18\x1a \x01(\tR\n" +
+	"ownerPhone*\xe2\x02\n" +
 	"\fRentalStatus\x12\x1d\n" +
 	"\x19RENTAL_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15RENTAL_STATUS_PENDING\x10\x01\x12\x1a\n" +

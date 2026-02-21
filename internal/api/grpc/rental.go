@@ -191,16 +191,18 @@ func (h *RentalHandler) CancelRental(ctx context.Context, req *pb.CancelRentalRe
 
 // populateRentalNames fetches user, tool, and org names to populate the proto RentalRequest
 func (h *RentalHandler) populateRentalNames(ctx context.Context, rental *domain.Rental) *pb.RentalRequest {
-	var renterName, ownerName, toolName, toolCondition, orgName string
+	var renterName, renterPhone, ownerName, ownerPhone, toolName, toolCondition, orgName string
 
-	// Fetch renter name
+	// Fetch renter name and phone
 	if renter, _, _, err := h.userSvc.GetUserProfile(ctx, rental.RenterID); err == nil && renter != nil {
 		renterName = renter.Name
+		renterPhone = renter.PhoneNumber
 	}
 
-	// Fetch owner name
+	// Fetch owner name and phone
 	if owner, _, _, err := h.userSvc.GetUserProfile(ctx, rental.OwnerID); err == nil && owner != nil {
 		ownerName = owner.Name
+		ownerPhone = owner.PhoneNumber
 	}
 
 	// Fetch tool name and condition
@@ -214,7 +216,7 @@ func (h *RentalHandler) populateRentalNames(ctx context.Context, rental *domain.
 		orgName = org.Name
 	}
 
-	return MapDomainRentalToProtoWithNames(rental, renterName, ownerName, toolName, orgName, toolCondition)
+	return MapDomainRentalToProtoWithNames(rental, renterName, ownerName, toolName, orgName, toolCondition, renterPhone, ownerPhone)
 }
 
 func (h *RentalHandler) ActivateRental(ctx context.Context, req *pb.ActivateRentalRequest) (*pb.ActivateRentalResponse, error) {

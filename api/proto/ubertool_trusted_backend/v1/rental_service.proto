@@ -257,6 +257,8 @@ message RentalRequest {
   int32 replacement_cost_cents = 22; // Replacement cost for the tool in cents
   string organization_name = 23; // Name of the organization context for this rental
   string tool_condition = 24; // Tool condition string e.g. "EXCELLENT", "GOOD", "ACCEPTABLE", "DAMAGED__NEEDS_REPAIR"
+  string renter_phone = 25; // Phone number of the renter (visible to owner)
+  string owner_phone = 26; // Phone number of the owner (visible to renter)
 }
 
 // Rental status enum
