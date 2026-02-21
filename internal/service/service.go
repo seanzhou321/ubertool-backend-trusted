@@ -22,7 +22,7 @@ type UserService interface {
 
 type OrganizationService interface {
 	ListOrganizations(ctx context.Context) ([]domain.Organization, error)
-	GetOrganization(ctx context.Context, id int32) (*domain.Organization, error)
+	GetOrganization(ctx context.Context, id int32, callingUserID int32) (*domain.Organization, *domain.UserOrg, error)
 	CreateOrganization(ctx context.Context, userID int32, org *domain.Organization) error
 	SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error)
 	UpdateOrganization(ctx context.Context, org *domain.Organization) error

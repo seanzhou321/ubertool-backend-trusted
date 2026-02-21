@@ -37,7 +37,7 @@ func TestOrganizationService_MemberCount(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get the org using the newly created ID
-		org, err := orgSvc.GetOrganization(ctx, newOrg.ID)
+		org, _, err := orgSvc.GetOrganization(ctx, newOrg.ID, 0)
 		require.NoError(t, err)
 		require.NotNil(t, org)
 

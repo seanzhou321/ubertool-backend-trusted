@@ -48,11 +48,19 @@ func (h *OrganizationHandler) ListMyOrganizations(ctx context.Context, req *pb.L
 }
 
 func (h *OrganizationHandler) GetOrganization(ctx context.Context, req *pb.GetOrganizationRequest) (*pb.GetOrganizationResponse, error) {
-	org, err := h.orgSvc.GetOrganization(ctx, req.OrganizationId)
+	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetOrganizationResponse{Organization: MapDomainOrgToProto(org, "")}, nil
+	org, userOrg, err := h.orgSvc.GetOrganization(ctx, req.OrganizationId, userID)
+	if err != nil {
+		return nil, err
+	}
+	var userRole string
+	if userOrg != nil {
+		userRole = string(userOrg.Role)
+	}
+	return &pb.GetOrganizationResponse{Organization: MapDomainOrgToProto(org, userRole)}, nil
 }
 
 func (h *OrganizationHandler) SearchOrganizations(ctx context.Context, req *pb.SearchOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {

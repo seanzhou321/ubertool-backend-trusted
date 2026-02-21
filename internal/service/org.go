@@ -31,10 +31,10 @@ func (s *organizationService) ListOrganizations(ctx context.Context) ([]domain.O
 	return s.orgRepo.List(ctx)
 }
 
-func (s *organizationService) GetOrganization(ctx context.Context, id int32) (*domain.Organization, error) {
+func (s *organizationService) GetOrganization(ctx context.Context, id int32, callingUserID int32) (*domain.Organization, *domain.UserOrg, error) {
 	org, err := s.orgRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Get member count (non-blocked users)
@@ -45,7 +45,17 @@ func (s *organizationService) GetOrganization(ctx context.Context, id int32) (*d
 		org.MemberCount = memberCount
 	}
 
-	return org, nil
+	// Get calling user's role in this org
+	var userOrg *domain.UserOrg
+	if callingUserID > 0 {
+		userOrg, err = s.userRepo.GetUserOrg(ctx, callingUserID, id)
+		if err != nil {
+			logger.Warn("Failed to fetch user org role", "userID", callingUserID, "orgID", id, "error", err)
+			userOrg = nil
+		}
+	}
+
+	return org, userOrg, nil
 }
 
 func (s *organizationService) SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error) {

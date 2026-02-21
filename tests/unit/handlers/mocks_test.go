@@ -162,12 +162,17 @@ func (m *MockOrganizationService) ListOrganizations(ctx context.Context) ([]doma
 	args := m.Called(ctx)
 	return args.Get(0).([]domain.Organization), args.Error(1)
 }
-func (m *MockOrganizationService) GetOrganization(ctx context.Context, id int32) (*domain.Organization, error) {
-	args := m.Called(ctx, id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (m *MockOrganizationService) GetOrganization(ctx context.Context, id int32, callingUserID int32) (*domain.Organization, *domain.UserOrg, error) {
+	args := m.Called(ctx, id, callingUserID)
+	var org *domain.Organization
+	if args.Get(0) != nil {
+		org = args.Get(0).(*domain.Organization)
 	}
-	return args.Get(0).(*domain.Organization), args.Error(1)
+	var uo *domain.UserOrg
+	if args.Get(1) != nil {
+		uo = args.Get(1).(*domain.UserOrg)
+	}
+	return org, uo, args.Error(2)
 }
 func (m *MockOrganizationService) CreateOrganization(ctx context.Context, userID int32, org *domain.Organization) error {
 	args := m.Called(ctx, userID, org)

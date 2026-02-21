@@ -38,7 +38,7 @@ func TestRentalHandler_CreateRentalRequest(t *testing.T) {
 		userSvc.On("GetUserProfile", ctx, int32(1)).Return(&domain.User{ID: 1, Name: "Renter"}, []domain.Organization{}, []domain.UserOrg{}, nil)
 		userSvc.On("GetUserProfile", ctx, int32(0)).Return(&domain.User{ID: 0, Name: "Owner"}, []domain.Organization{}, []domain.UserOrg{}, nil)
 		toolSvc.On("GetTool", ctx, int32(2), int32(1)).Return(&domain.Tool{ID: 2, Name: "TestTool"}, []domain.ToolImage{}, nil)
-		orgSvc.On("GetOrganization", ctx, int32(3)).Return(&domain.Organization{ID: 3, Name: "TestOrg"}, nil)
+		orgSvc.On("GetOrganization", ctx, int32(3), int32(0)).Return(&domain.Organization{ID: 3, Name: "TestOrg"}, (*domain.UserOrg)(nil), nil)
 
 		res, err := handler.CreateRentalRequest(ctx, req)
 		assert.NoError(t, err)
@@ -70,7 +70,7 @@ func TestRentalHandler_ApproveRentalRequest(t *testing.T) {
 		userSvc.On("GetUserProfile", ctx, int32(2)).Return(&domain.User{ID: 2, Name: "Renter"}, []domain.Organization{}, []domain.UserOrg{}, nil)
 		userSvc.On("GetUserProfile", ctx, int32(3)).Return(&domain.User{ID: 3, Name: "Owner"}, []domain.Organization{}, []domain.UserOrg{}, nil)
 		toolSvc.On("GetTool", ctx, int32(4), int32(2)).Return(&domain.Tool{ID: 4, Name: "TestTool"}, []domain.ToolImage{}, nil)
-		orgSvc.On("GetOrganization", ctx, int32(0)).Return(&domain.Organization{ID: 0, Name: ""}, nil)
+		orgSvc.On("GetOrganization", ctx, int32(0), int32(0)).Return(&domain.Organization{ID: 0, Name: ""}, (*domain.UserOrg)(nil), nil)
 
 		res, err := handler.ApproveRentalRequest(ctx, req)
 		assert.NoError(t, err)

@@ -212,7 +212,7 @@ func (h *RentalHandler) populateRentalNames(ctx context.Context, rental *domain.
 	}
 
 	// Fetch organization name
-	if org, err := h.orgSvc.GetOrganization(ctx, rental.OrgID); err == nil && org != nil {
+	if org, _, err := h.orgSvc.GetOrganization(ctx, rental.OrgID, 0); err == nil && org != nil {
 		orgName = org.Name
 	}
 

@@ -188,4 +188,52 @@ func TestOrganizationService_E2E(t *testing.T) {
 
 		t.Logf("Summary: %d orgs with admins, %d orgs without admins", orgsWithAdmins, orgsWithoutAdmins)
 	})
+
+	t.Run("GetOrganization - UserRole Populated for Calling User", func(t *testing.T) {
+		orgID := db.CreateTestOrg("E2E-Test-GetOrg-UserRole")
+
+		memberID := db.CreateTestUser("e2e-test-getorg-member@test.com", "Member User")
+		adminID := db.CreateTestUser("e2e-test-getorg-admin@test.com", "Admin User")
+		superAdminID := db.CreateTestUser("e2e-test-getorg-superadmin@test.com", "Super Admin User")
+		outsiderID := db.CreateTestUser("e2e-test-getorg-outsider@test.com", "Outsider User")
+
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+		db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
+		db.AddUserToOrg(superAdminID, orgID, "SUPER_ADMIN", "ACTIVE", 0)
+		// outsider is intentionally not added to the org
+
+		cases := []struct {
+			name           string
+			callerID       int32
+			expectedRole   string
+			expectNonEmpty bool
+		}{
+			{"MEMBER sees own role", memberID, "MEMBER", true},
+			{"ADMIN sees own role", adminID, "ADMIN", true},
+			{"SUPER_ADMIN sees own role", superAdminID, "SUPER_ADMIN", true},
+			{"Non-member gets empty role", outsiderID, "", false},
+		}
+
+		for _, tc := range cases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				ctx, cancel := ContextWithUserIDAndTimeout(tc.callerID, 5*time.Second)
+				defer cancel()
+
+				resp, err := orgClient.GetOrganization(ctx, &pb.GetOrganizationRequest{OrganizationId: orgID})
+				require.NoError(t, err)
+				require.NotNil(t, resp.Organization)
+
+				t.Logf("org_id=%d caller_id=%d user_role=%q", orgID, tc.callerID, resp.Organization.UserRole)
+
+				if tc.expectNonEmpty {
+					assert.Equal(t, tc.expectedRole, resp.Organization.UserRole,
+						"user_role should reflect the calling user's role in users_orgs")
+				} else {
+					assert.Empty(t, resp.Organization.UserRole,
+						"user_role should be empty for a caller who is not a member")
+				}
+			})
+		}
+	})
 }
