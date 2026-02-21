@@ -13,13 +13,15 @@ type RentalHandler struct {
 	rentalSvc service.RentalService
 	userSvc   service.UserService
 	toolSvc   service.ToolService
+	orgSvc    service.OrganizationService
 }
 
-func NewRentalHandler(rentalSvc service.RentalService, userSvc service.UserService, toolSvc service.ToolService) *RentalHandler {
+func NewRentalHandler(rentalSvc service.RentalService, userSvc service.UserService, toolSvc service.ToolService, orgSvc service.OrganizationService) *RentalHandler {
 	return &RentalHandler{
 		rentalSvc: rentalSvc,
 		userSvc:   userSvc,
 		toolSvc:   toolSvc,
+		orgSvc:    orgSvc,
 	}
 }
 
@@ -187,9 +189,9 @@ func (h *RentalHandler) CancelRental(ctx context.Context, req *pb.CancelRentalRe
 	}, nil
 }
 
-// populateRentalNames fetches user and tool names to populate the proto RentalRequest
+// populateRentalNames fetches user, tool, and org names to populate the proto RentalRequest
 func (h *RentalHandler) populateRentalNames(ctx context.Context, rental *domain.Rental) *pb.RentalRequest {
-	var renterName, ownerName, toolName string
+	var renterName, ownerName, toolName, toolCondition, orgName string
 
 	// Fetch renter name
 	if renter, _, _, err := h.userSvc.GetUserProfile(ctx, rental.RenterID); err == nil && renter != nil {
@@ -201,74 +203,112 @@ func (h *RentalHandler) populateRentalNames(ctx context.Context, rental *domain.
 		ownerName = owner.Name
 	}
 
-	// Fetch tool name
+	// Fetch tool name and condition
 	if tool, _, err := h.toolSvc.GetTool(ctx, rental.ToolID, rental.RenterID); err == nil && tool != nil {
 		toolName = tool.Name
+		toolCondition = string(tool.Condition)
 	}
 
-	return MapDomainRentalToProtoWithNames(rental, renterName, ownerName, toolName)
+	// Fetch organization name
+	if org, err := h.orgSvc.GetOrganization(ctx, rental.OrgID); err == nil && org != nil {
+		orgName = org.Name
+	}
+
+	return MapDomainRentalToProtoWithNames(rental, renterName, ownerName, toolName, orgName, toolCondition)
 }
 
 func (h *RentalHandler) ActivateRental(ctx context.Context, req *pb.ActivateRentalRequest) (*pb.ActivateRentalResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	rt, err := h.rentalSvc.ActivateRental(ctx, userID, req.RequestId)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &pb.ActivateRentalResponse{RentalRequest: h.populateRentalNames(ctx, rt)}, nil
 }
 
 func (h *RentalHandler) ChangeRentalDates(ctx context.Context, req *pb.ChangeRentalDatesRequest) (*pb.ChangeRentalDatesResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	rt, err := h.rentalSvc.ChangeRentalDates(ctx, userID, req.RequestId, req.NewStartDate, req.NewEndDate, req.OldStartDate, req.OldEndDate)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &pb.ChangeRentalDatesResponse{RentalRequest: h.populateRentalNames(ctx, rt)}, nil
 }
 
 func (h *RentalHandler) ApproveReturnDateChange(ctx context.Context, req *pb.ApproveReturnDateChangeRequest) (*pb.ApproveReturnDateChangeResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	rt, err := h.rentalSvc.ApproveReturnDateChange(ctx, userID, req.RequestId)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &pb.ApproveReturnDateChangeResponse{RentalRequest: h.populateRentalNames(ctx, rt)}, nil
 }
 
 func (h *RentalHandler) RejectReturnDateChange(ctx context.Context, req *pb.RejectReturnDateChangeRequest) (*pb.RejectReturnDateChangeResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	rt, err := h.rentalSvc.RejectReturnDateChange(ctx, userID, req.RequestId, req.Reason, req.NewEndDate)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &pb.RejectReturnDateChangeResponse{RentalRequest: h.populateRentalNames(ctx, rt)}, nil
 }
 
 func (h *RentalHandler) AcknowledgeReturnDateRejection(ctx context.Context, req *pb.AcknowledgeReturnDateRejectionRequest) (*pb.AcknowledgeReturnDateRejectionResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	rt, err := h.rentalSvc.AcknowledgeReturnDateRejection(ctx, userID, req.RequestId)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &pb.AcknowledgeReturnDateRejectionResponse{RentalRequest: h.populateRentalNames(ctx, rt)}, nil
 }
 
 func (h *RentalHandler) CancelReturnDateChange(ctx context.Context, req *pb.CancelReturnDateChangeRequest) (*pb.CancelReturnDateChangeResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	rt, err := h.rentalSvc.CancelReturnDateChange(ctx, userID, req.RequestId)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &pb.CancelReturnDateChangeResponse{RentalRequest: h.populateRentalNames(ctx, rt)}, nil
 }
 
 func (h *RentalHandler) ListToolRentals(ctx context.Context, req *pb.ListToolRentalsRequest) (*pb.ListRentalsResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	statuses := MapProtoRentalStatusesToDomain(req.Status)
 	page := req.Page
-	if page <= 0 { page = 1 }
+	if page <= 0 {
+		page = 1
+	}
 	pageSize := req.PageSize
-	if pageSize <= 0 { pageSize = 10 }
-	
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+
 	rentals, count, err := h.rentalSvc.ListToolRentals(ctx, userID, req.ToolId, req.OrganizationId, statuses, page, pageSize)
-	if err != nil { return nil, err }
-	
+	if err != nil {
+		return nil, err
+	}
+
 	protoRentals := make([]*pb.RentalRequest, len(rentals))
 	for i, r := range rentals {
 		protoRentals[i] = h.populateRentalNames(ctx, &r)

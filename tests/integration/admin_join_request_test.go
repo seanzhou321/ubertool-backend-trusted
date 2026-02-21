@@ -40,8 +40,8 @@ func TestAdminService_ListJoinRequests_UsedOnField(t *testing.T) {
 
 		// Create test organization
 		var orgID int32
-		err := db.QueryRow(`INSERT INTO orgs (name, metro, admin_email, admin_phone_number) 
-			VALUES ($1, 'San Jose', 'admin@test.com', '555-0000') RETURNING id`,
+		err := db.QueryRow(`INSERT INTO orgs (name, metro, admin_email, admin_phone_number, address) 
+			VALUES ($1, 'San Jose', 'admin@test.com', '555-0000', '123 Test St') RETURNING id`,
 			fmt.Sprintf("Test-Join-Req-Org-%d", time.Now().UnixNano())).Scan(&orgID)
 		require.NoError(t, err)
 		t.Logf("Created test org_id=%d", orgID)

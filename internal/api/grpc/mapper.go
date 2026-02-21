@@ -132,10 +132,10 @@ func MapDomainToolStatusToProto(s domain.ToolStatus) pb.ToolStatus {
 }
 
 func MapDomainRentalToProto(r *domain.Rental) *pb.RentalRequest {
-	return MapDomainRentalToProtoWithNames(r, "", "", "")
+	return MapDomainRentalToProtoWithNames(r, "", "", "", "", "")
 }
 
-func MapDomainRentalToProtoWithNames(r *domain.Rental, renterName, ownerName, toolName string) *pb.RentalRequest {
+func MapDomainRentalToProtoWithNames(r *domain.Rental, renterName, ownerName, toolName, orgName, toolCondition string) *pb.RentalRequest {
 	if r == nil {
 		return nil
 	}
@@ -162,6 +162,8 @@ func MapDomainRentalToProtoWithNames(r *domain.Rental, renterName, ownerName, to
 		WeeklyPriceCents:       r.WeeklyPriceCents,
 		MonthlyPriceCents:      r.MonthlyPriceCents,
 		ReplacementCostCents:   r.ReplacementCostCents,
+		OrganizationName:       orgName,
+		ToolCondition:          toolCondition,
 	}
 	return proto
 }

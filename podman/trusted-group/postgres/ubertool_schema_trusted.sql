@@ -16,10 +16,13 @@ CREATE TABLE orgs (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    address TEXT,
-    metro TEXT,
-    admin_phone_number TEXT,
-    admin_email TEXT,
+    address TEXT NOT NULL,
+    metro TEXT NOT NULL, -- Required metro for location-based features
+    admin_phone_number TEXT NOT NULL,
+    admin_email TEXT NOT NULL,
+    max_replacement_cost_cents INTEGER NOT NULL DEFAULT 30000, -- Max allowed replacement cost for tools in this org
+    max_rental_cost_cents INTEGER NOT NULL DEFAULT 1000, -- Max allowed rental cost for single rental request in this org
+    max_bill_split_threshold_cents INTEGER NOT NULL DEFAULT 500, -- Max allowed amount for bill splitting; above this requires manual review
     created_on DATE DEFAULT CURRENT_DATE
 );
 

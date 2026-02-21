@@ -1708,6 +1708,8 @@ type RentalRequest struct {
 	WeeklyPriceCents       int32                  `protobuf:"varint,20,opt,name=weekly_price_cents,json=weeklyPriceCents,proto3" json:"weekly_price_cents,omitempty"`                     // Weekly rental rate in cents
 	MonthlyPriceCents      int32                  `protobuf:"varint,21,opt,name=monthly_price_cents,json=monthlyPriceCents,proto3" json:"monthly_price_cents,omitempty"`                  // Monthly rental rate in cents
 	ReplacementCostCents   int32                  `protobuf:"varint,22,opt,name=replacement_cost_cents,json=replacementCostCents,proto3" json:"replacement_cost_cents,omitempty"`         // Replacement cost for the tool in cents
+	OrganizationName       string                 `protobuf:"bytes,23,opt,name=organization_name,json=organizationName,proto3" json:"organization_name,omitempty"`                        // Name of the organization context for this rental
+	ToolCondition          string                 `protobuf:"bytes,24,opt,name=tool_condition,json=toolCondition,proto3" json:"tool_condition,omitempty"`                                 // Tool condition string e.g. "EXCELLENT", "GOOD", "ACCEPTABLE", "DAMAGED__NEEDS_REPAIR"
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -1896,6 +1898,20 @@ func (x *RentalRequest) GetReplacementCostCents() int32 {
 	return 0
 }
 
+func (x *RentalRequest) GetOrganizationName() string {
+	if x != nil {
+		return x.OrganizationName
+	}
+	return ""
+}
+
+func (x *RentalRequest) GetToolCondition() string {
+	if x != nil {
+		return x.ToolCondition
+	}
+	return ""
+}
+
 var File_ubertool_trusted_backend_v1_rental_service_proto protoreflect.FileDescriptor
 
 const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
@@ -2008,7 +2024,7 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x01 \x01(\x05R\trequestId\"o\n" +
 	"\x1eCancelReturnDateChangeResponse\x12M\n" +
-	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xd2\x06\n" +
+	"\x0erental_request\x18\x01 \x01(\v2&.ubertool.trusted.api.v1.RentalRequestR\rrentalRequest\"\xa6\a\n" +
 	"\rRentalRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x17\n" +
 	"\atool_id\x18\x02 \x01(\x05R\x06toolId\x12\x1b\n" +
@@ -2037,7 +2053,9 @@ const file_ubertool_trusted_backend_v1_rental_service_proto_rawDesc = "" +
 	"\x11daily_price_cents\x18\x13 \x01(\x05R\x0fdailyPriceCents\x12,\n" +
 	"\x12weekly_price_cents\x18\x14 \x01(\x05R\x10weeklyPriceCents\x12.\n" +
 	"\x13monthly_price_cents\x18\x15 \x01(\x05R\x11monthlyPriceCents\x124\n" +
-	"\x16replacement_cost_cents\x18\x16 \x01(\x05R\x14replacementCostCents*\xe2\x02\n" +
+	"\x16replacement_cost_cents\x18\x16 \x01(\x05R\x14replacementCostCents\x12+\n" +
+	"\x11organization_name\x18\x17 \x01(\tR\x10organizationName\x12%\n" +
+	"\x0etool_condition\x18\x18 \x01(\tR\rtoolCondition*\xe2\x02\n" +
 	"\fRentalStatus\x12\x1d\n" +
 	"\x19RENTAL_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15RENTAL_STATUS_PENDING\x10\x01\x12\x1a\n" +

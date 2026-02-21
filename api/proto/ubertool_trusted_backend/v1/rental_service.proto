@@ -255,6 +255,8 @@ message RentalRequest {
   int32 weekly_price_cents = 20; // Weekly rental rate in cents
   int32 monthly_price_cents = 21; // Monthly rental rate in cents
   int32 replacement_cost_cents = 22; // Replacement cost for the tool in cents
+  string organization_name = 23; // Name of the organization context for this rental
+  string tool_condition = 24; // Tool condition string e.g. "EXCELLENT", "GOOD", "ACCEPTABLE", "DAMAGED__NEEDS_REPAIR"
 }
 
 // Rental status enum

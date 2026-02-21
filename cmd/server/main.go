@@ -143,7 +143,7 @@ func main() {
 	userHandler := api.NewUserHandler(userSvc)
 	orgHandler := api.NewOrganizationHandler(orgSvc)
 	toolHandler := api.NewToolHandler(toolSvc)
-	rentalHandler := api.NewRentalHandler(rentalSvc, userSvc, toolSvc)
+	rentalHandler := api.NewRentalHandler(rentalSvc, userSvc, toolSvc, orgSvc)
 	ledgerHandler := api.NewLedgerHandler(ledgerSvc)
 	notificationHandler := api.NewNotificationHandler(noteSvc)
 	adminHandler := api.NewAdminHandler(adminSvc)

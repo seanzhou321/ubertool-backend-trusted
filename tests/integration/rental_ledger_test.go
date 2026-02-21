@@ -97,7 +97,7 @@ func TestRentalAndLedger_Integration(t *testing.T) {
 
 	// 1. Setup Data
 	orgName := fmt.Sprintf("Org-%d", time.Now().UnixNano())
-	db.Exec("INSERT INTO orgs (name, metro) VALUES ($1, 'San Jose')", orgName)
+	db.Exec("INSERT INTO orgs (name, metro, address, admin_email, admin_phone_number) VALUES ($1, 'San Jose', '123 Test St', 'admin@test.com', '555-0000')", orgName)
 	var orgID int32
 	db.QueryRow("SELECT id FROM orgs WHERE name = $1", orgName).Scan(&orgID)
 
@@ -181,7 +181,7 @@ func TestRentalDateChange_Integration(t *testing.T) {
 
 	// 2. Setup Data
 	orgName := fmt.Sprintf("Org-Date-%d", time.Now().UnixNano())
-	_, err := db.Exec("INSERT INTO orgs (name, metro) VALUES ($1, 'San Jose')", orgName)
+	_, err := db.Exec("INSERT INTO orgs (name, metro, address, admin_email, admin_phone_number) VALUES ($1, 'San Jose', '123 Test St', 'admin@test.com', '555-0000')", orgName)
 	require.NoError(t, err)
 	var orgID int32
 	err = db.QueryRow("SELECT id FROM orgs WHERE name = $1", orgName).Scan(&orgID)

@@ -153,6 +153,46 @@ func (m *MockRentalService) Update(ctx context.Context, rental *domain.Rental) e
 	return args.Error(0)
 }
 
+// MockOrganizationService
+type MockOrganizationService struct {
+	mock.Mock
+}
+
+func (m *MockOrganizationService) ListOrganizations(ctx context.Context) ([]domain.Organization, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]domain.Organization), args.Error(1)
+}
+func (m *MockOrganizationService) GetOrganization(ctx context.Context, id int32) (*domain.Organization, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Organization), args.Error(1)
+}
+func (m *MockOrganizationService) CreateOrganization(ctx context.Context, userID int32, org *domain.Organization) error {
+	args := m.Called(ctx, userID, org)
+	return args.Error(0)
+}
+func (m *MockOrganizationService) SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error) {
+	args := m.Called(ctx, name, metro)
+	return args.Get(0).([]domain.Organization), args.Error(1)
+}
+func (m *MockOrganizationService) UpdateOrganization(ctx context.Context, org *domain.Organization) error {
+	args := m.Called(ctx, org)
+	return args.Error(0)
+}
+func (m *MockOrganizationService) ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, []domain.UserOrg, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).([]domain.Organization), args.Get(1).([]domain.UserOrg), args.Error(2)
+}
+func (m *MockOrganizationService) JoinOrganizationWithInvite(ctx context.Context, userID int32, inviteCode string) (*domain.Organization, *domain.User, error) {
+	args := m.Called(ctx, userID, inviteCode)
+	if args.Get(0) == nil {
+		return nil, nil, args.Error(2)
+	}
+	return args.Get(0).(*domain.Organization), args.Get(1).(*domain.User), args.Error(2)
+}
+
 // MockUserService
 type MockUserService struct {
 	mock.Mock
