@@ -166,6 +166,8 @@ func MapDomainRentalToProtoWithNames(r *domain.Rental, renterName, ownerName, to
 		ToolCondition:          toolCondition,
 		RenterPhone:            renterPhone,
 		OwnerPhone:             ownerPhone,
+		ReturnNote:             r.Notes,
+		RejectionReason:        r.RejectionReason,
 	}
 	return proto
 }

@@ -55,4 +55,4 @@ logs/
 client/
 
 # generated api code
-api/gen/
+api/gen/*

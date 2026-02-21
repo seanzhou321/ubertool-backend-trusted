@@ -259,6 +259,8 @@ message RentalRequest {
   string tool_condition = 24; // Tool condition string e.g. "EXCELLENT", "GOOD", "ACCEPTABLE", "DAMAGED__NEEDS_REPAIR"
   string renter_phone = 25; // Phone number of the renter (visible to owner)
   string owner_phone = 26; // Phone number of the owner (visible to renter)
+  string return_note = 27; // Notes provided by owner when marking as returned
+  string rejection_reason = 28; // Reason provided by owner when rejecting a rental request
 }
 
 // Rental status enum
