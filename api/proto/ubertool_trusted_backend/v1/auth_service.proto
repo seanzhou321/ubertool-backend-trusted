@@ -2,9 +2,10 @@ syntax = "proto3";
 
 package ubertool.trusted.api.v1;
 
-option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
-
+import "google/protobuf/timestamp.proto";
 import "ubertool_trusted_backend/v1/ubertool_schema.proto";
+
+option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
 option java_multiple_files = true;
 option java_package = "com.ubertool.trusted.api.v1";
@@ -64,7 +65,7 @@ message LoginRequest {
 message LoginResponse {
   bool success = 1;
   string two_fa_token = 2;
-  int64 expires_at = 3;
+  google.protobuf.Timestamp expires_at = 3;
   string message = 4;
 }
 
@@ -79,7 +80,8 @@ message Verify2FAResponse {
   bool success = 1;
   string access_token = 2;
   string refresh_token = 3;
-  User user = 4;
+  google.protobuf.Timestamp expires_at = 4;
+  User user = 5;
 }
 
 // Signup request

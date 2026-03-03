@@ -7,6 +7,7 @@ import (
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func MapDomainUserToProto(u *domain.User) *pb.User {
@@ -275,6 +276,14 @@ func MapDomainTransactionTypeToProto(t domain.TransactionType) pb.TransactionTyp
 	}
 }
 
+// timeToProto converts a nullable *time.Time to a protobuf Timestamp (nil-safe).
+func timeToProto(t *time.Time) *timestamppb.Timestamp {
+	if t == nil {
+		return nil
+	}
+	return timestamppb.New(*t)
+}
+
 func MapDomainNotificationToProto(n *domain.Notification) *pb.Notification {
 	if n == nil {
 		return nil
@@ -285,9 +294,11 @@ func MapDomainNotificationToProto(n *domain.Notification) *pb.Notification {
 		OrganizationId: n.OrgID,
 		Title:          n.Title,
 		Message:        n.Message,
-		Read:           n.IsRead,
 		Attributes:     n.Attributes,
-		CreatedOn:      n.CreatedOn,
+		DeliveredAt:    timeToProto(n.DeliveredAt),
+		ClickedAt:      timeToProto(n.ClickedAt),
+		ReadAt:         timeToProto(n.ReadAt),
+		CreatedAt:      timeToProto(n.CreatedAt),
 	}
 }
 
@@ -351,12 +362,9 @@ func MapDomainToolImageToProto(t *domain.ToolImage) *pb.ToolImage {
 		return nil
 	}
 
-	var createdOn, confirmedOn string
-	if !t.CreatedOn.IsZero() {
-		createdOn = t.CreatedOn.Format("2006-01-02T15:04:05Z")
-	}
+	var confirmedAt *timestamppb.Timestamp
 	if t.ConfirmedOn != nil && !t.ConfirmedOn.IsZero() {
-		confirmedOn = t.ConfirmedOn.Format("2006-01-02T15:04:05Z")
+		confirmedAt = timestamppb.New(*t.ConfirmedOn)
 	}
 
 	return &pb.ToolImage{
@@ -369,8 +377,8 @@ func MapDomainToolImageToProto(t *domain.ToolImage) *pb.ToolImage {
 		IsPrimary:     t.IsPrimary,
 		DisplayOrder:  t.DisplayOrder,
 		Status:        t.Status,
-		CreatedOn:     createdOn,
-		ConfirmedOn:   confirmedOn,
+		CreatedAt:     timestamppb.New(t.CreatedOn),
+		ConfirmedAt:   confirmedAt,
 	}
 }
 
@@ -415,23 +423,23 @@ func MapDomainBillToPaymentItem(ctx context.Context, bill *domain.Bill, userID i
 		DisputeReason:     bill.DisputeReason,
 		ResolutionOutcome: bill.ResolutionOutcome,
 		ResolutionNotes:   bill.ResolutionNotes,
-		CreatedAt:         timeToEpochMillis(bill.CreatedAt),
+		CreatedAt:         timestamppb.New(bill.CreatedAt),
 	}
 
 	if bill.NoticeSentAt != nil {
-		payment.NoticeSentAt = timeToEpochMillis(*bill.NoticeSentAt)
+		payment.NoticeSentAt = timestamppb.New(*bill.NoticeSentAt)
 	}
 	if bill.DebtorAcknowledgedAt != nil {
-		payment.DebtorAcknowledgedAt = timeToEpochMillis(*bill.DebtorAcknowledgedAt)
+		payment.DebtorAcknowledgedAt = timestamppb.New(*bill.DebtorAcknowledgedAt)
 	}
 	if bill.CreditorAcknowledgedAt != nil {
-		payment.CreditorAcknowledgedAt = timeToEpochMillis(*bill.CreditorAcknowledgedAt)
+		payment.CreditorAcknowledgedAt = timestamppb.New(*bill.CreditorAcknowledgedAt)
 	}
 	if bill.DisputedAt != nil {
-		payment.DisputedAt = timeToEpochMillis(*bill.DisputedAt)
+		payment.DisputedAt = timestamppb.New(*bill.DisputedAt)
 	}
 	if bill.ResolvedAt != nil {
-		payment.ResolvedAt = timeToEpochMillis(*bill.ResolvedAt)
+		payment.ResolvedAt = timestamppb.New(*bill.ResolvedAt)
 	}
 
 	return payment, nil
@@ -461,7 +469,7 @@ func MapDomainBillActionToProto(ctx context.Context, action *domain.BillAction, 
 		ActionType:        string(action.ActionType),
 		Notes:             action.Notes,
 		ActionDetailsJson: action.ActionDetails,
-		CreatedAt:         timeToEpochMillis(action.CreatedAt),
+		CreatedAt:         timestamppb.New(action.CreatedAt),
 	}, nil
 }
 
@@ -497,15 +505,14 @@ func MapDomainBillToDisputedPaymentItem(ctx context.Context, bill *domain.Bill, 
 		CreditorName: creditorName,
 		AmountCents:  bill.AmountCents,
 		Reason:       bill.DisputeReason,
-		IsResolved:   bill.ResolvedAt != nil,
 		Resolution:   bill.ResolutionOutcome,
 	}
 
 	if bill.DisputedAt != nil {
-		item.DisputedAt = timeToEpochMillis(*bill.DisputedAt)
+		item.DisputedAt = timestamppb.New(*bill.DisputedAt)
 	}
 	if bill.ResolvedAt != nil {
-		item.ResolvedAt = timeToEpochMillis(*bill.ResolvedAt)
+		item.ResolvedAt = timestamppb.New(*bill.ResolvedAt)
 	}
 
 	return item, nil

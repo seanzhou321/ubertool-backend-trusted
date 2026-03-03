@@ -329,7 +329,7 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		})).Return(nil).Once()
 
 		// Notifications
-		mockNotifRepo.On("Create", ctx, mock.Anything).Return(nil).Times(2)
+		mockNotifRepo.On("Dispatch", ctx, mock.Anything).Return(nil).Times(2)
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "DEBTOR_FAULT", "Admin resolved: Debtor blocked from renting due to fault", "Test Org").Return(nil).Once()
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "creditor@test.com", "Creditor", int32(1000), "DEBTOR_FAULT", "Admin resolved: Debtor blocked from renting due to fault", "Test Org").Return(nil).Once()
 
@@ -377,7 +377,7 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 			return uo.UserID == 3 && uo.BalanceCents == -1500 && uo.LendingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
 		})).Return(nil).Once()
 
-		mockNotifRepo.On("Create", ctx, mock.Anything).Return(nil).Times(2)
+		mockNotifRepo.On("Dispatch", ctx, mock.Anything).Return(nil).Times(2)
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "CREDITOR_FAULT", "Admin resolved: Creditor at fault, payment marked valid", "Test Org").Return(nil).Once()
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "creditor@test.com", "Creditor", int32(1000), "CREDITOR_FAULT", "Admin resolved: Creditor at fault, payment marked valid", "Test Org").Return(nil).Once()
 
@@ -433,7 +433,7 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 			return uo.UserID == 3 && uo.BalanceCents == -1500 && uo.LendingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
 		})).Return(nil).Once()
 
-		mockNotifRepo.On("Create", ctx, mock.Anything).Return(nil).Times(2)
+		mockNotifRepo.On("Dispatch", ctx, mock.Anything).Return(nil).Times(2)
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "BOTH_FAULT", "Admin resolved: Both parties blocked from renting/lending", "Test Org").Return(nil).Once()
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "creditor@test.com", "Creditor", int32(1000), "BOTH_FAULT", "Admin resolved: Both parties blocked from renting/lending", "Test Org").Return(nil).Once()
 

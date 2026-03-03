@@ -22,6 +22,19 @@ The business logic should be implemented in the service layer.
 
 **Implementation**: All service layer code must use `domain.BillStatus*` constants, never hardcoded strings. 
 
+## Architectural Note: Push Notification Pattern
+
+For every event that creates an in-app `notifications` record AND sends an email, a push notification is also sent to the same recipient(s) — **except** events during sign-on, user identification, user provisioning, and invitations (2FA codes, invitation emails, signup flows, join request submissions).
+
+**Pattern per event**:
+1. Insert a row into `notifications` to get a `notification_id` (`BIGSERIAL`).
+2. Send email (existing behavior).
+3. Look up all `fcm_tokens` rows for the target `user_id` where `status = 'ACTIVE'`.
+4. For each active token, call `messaging.Send()` asynchronously (goroutine with a detached context and timeout):
+   - Include the `notification_id` in the FCM data payload (key: `"notification_id"`) so the client can call `ReportMessageEvent`.
+   - On `messaging.IsUnregistered(err)` response, set `fcm_tokens.status = 'OBSOLETE'` for that token.
+5. The client app reports delivery/click events back via `ReportMessageEvent`.
+
 ## Authentication
 
 ### Validate Invite
@@ -51,8 +64,9 @@ Business Logic:
 4. The `user_id` in `join_requests` may be assigned from the user found by the email, or should be null if the user is not found.
 5. Find the admin users in `organization_id`. 
 6. Send emails to the admin users with the new user email, name, and the message.
-7. Create a list of notifications to each admin users that the email was sent.
-8. Return success/failure and message, "Your request to join the organization has been submitted."
+7. Create a notification for each admin user (insert into `notifications`).
+8. Send push notification to each admin user (see Push Notification Pattern).
+9. Return success/failure and message, "Your request to join the organization has been submitted."
 
 ### User Signup
 Purpose: Register a new user account.
@@ -165,9 +179,10 @@ Business Logic:
    - If either flag is true, set `blocked_on` to current date and `blocked_reason` to the provided reason.
    - If both flags are false (unblocking), clear `blocked_on`, `blocked_reason`.
    - Update `status` to 'BLOCK' if either flag is true, otherwise 'ACTIVE'.
-4. Create notification for the blocked/unblocked user.
+4. Create notification for the blocked/unblocked user (insert into `notifications`).
 5. Send email to the user informing them of the block/unblock action.
-6. Return success or error message.
+6. Send push notification to the user (see Push Notification Pattern).
+7. Return success or error message.
 
 **Note**: This method can be used to:
 - Block renting only: `block_renting=true`, `block_lending=false`
@@ -374,7 +389,8 @@ Business Logic:
     - Check debtor has not already acknowledged.
     - Set `debtor_acknowledged_at` = NOW().
     - Create bill action: DEBTOR_ACKNOWLEDGED.
-    - Notify Creditor.
+    - Create a notification for the creditor (insert into `notifications`).
+    - Send push notification to the creditor (see Push Notification Pattern).
     - Note: Status remains PENDING or DISPUTED until creditor also acknowledges.
 4. If Creditor:
     - Check bill status is PENDING or DISPUTED.
@@ -386,7 +402,8 @@ Business Logic:
     - Set `resolution_outcome` = GRACEFUL (both parties acknowledged).
     - Create bill action: CREDITOR_ACKNOWLEDGED.
     - Update balances in users_orgs table for both parties.
-    - Notify Debtor.
+    - Create a notification for the debtor (insert into `notifications`).
+    - Send push notification to the debtor (see Push Notification Pattern).
 5. **Graceful Resolution after Dispute**: If bill was in DISPUTED status and both parties acknowledge, it resolves as GRACEFUL without admin intervention.
 
 ### List Disputed Payments
@@ -461,8 +478,9 @@ Business Logic:
         - Resolution notes document the offline resolution.
 
 9. Create bill action: ADMIN_RESOLUTION with notes.
-10. Notify both debtor and creditor of resolution.
-11. Send email to both parties with resolution outcome and notes.
+10. Create a notification for both debtor and creditor (insert into `notifications`).
+11. Send push notification to both debtor and creditor (see Push Notification Pattern).
+12. Send email to both parties with resolution outcome and notes.
 
 **Note**: Admins can use GRACEFUL option when parties resolved offline and admin is just confirming. For unblocking users after debts are cleared, use `AdminService.AdminBlockUserAccount` with `block_renting=false` or `block_lending=false`.
 
@@ -557,8 +575,9 @@ Business Logic:
    - `replacement_cost_cents` ← tool's `replacement_cost_cents`
    All subsequent cost calculations for this rental use these snapshot values, so future tool price changes do not affect already-created rentals.
 5. Insert into `rentals` with status 'PENDING', storing the snapshot fields and computed `total_cost_cents`.
-6. Create a notification to the owner with attributes set to {topic:rental_request; rental:rental_id; purpose:"request for approval"}
+6. Create a notification to the owner with attributes set to {topic:rental_request; rental:rental_id; purpose:"request for approval"} (insert into `notifications`).
 7. Send an email to the tool owner to notify the rental request, cc to the renter (user_id parsed from the JWT token).
+8. Send push notification to the owner (see Push Notification Pattern).
 
 ### Approve Rental Request
 Purpose: Owner approves the lending.
@@ -568,8 +587,9 @@ Output: updated rental request object
 Business Logic:
 1. Verify `user_id` is the tool owner.
 2. Update `rentals` status to 'APPROVED'.
-3. Create a notification to the renter with attributes set to {topic:rental_request; rental:rental_id, purpose:"rental request approved"}
+3. Create a notification to the renter with attributes set to {topic:rental_request; rental:rental_id, purpose:"rental request approved"} (insert into `notifications`).
 4. Send an email to the renter to notify the rental approval with `pickup_instruction`, cc to the owner.
+5. Send push notification to the renter (see Push Notification Pattern).
 
 ### Reject Rental Request
 Purpose: Owner declines the lending.
@@ -579,8 +599,9 @@ Output: success, updated rental request object
 Business Logic:
 1. Verify `user_id` is the tool owner.
 2. Update `rentals` status to 'REJECTED'.
-3. Create a notification to the renter with attributes set to {topic:rental_request; rental:rental_id; purpose:"rental request rejected"}
-4. Send an email to the renter to notify the rental rejection with `reason`, cc to the owner (user_id parsed from the JWT token). 
+3. Create a notification to the renter with attributes set to {topic:rental_request; rental:rental_id; purpose:"rental request rejected"} (insert into `notifications`).
+4. Send an email to the renter to notify the rental rejection with `reason`, cc to the owner (user_id parsed from the JWT token).
+5. Send push notification to the renter (see Push Notification Pattern).
 
 ### Finalize Rental Request
 Purpose: Renter confirms and pays for the rental.
@@ -592,10 +613,11 @@ Business Logic:
 2. Copy `end_date` to `last_agreed_end_date` (save the agreed-upon date for potential rollback).
 3. Update `rentals` status to 'SCHEDULED'.
 4. Update the tool status to 'RENTED'.
-5. Create a notification to the owner with attributes set to {topic: rental_request; rental:rental_id; purpose:"rental request confirmed"}
-5. Send an email to the owner to notify the rental confirmation, cc to the renter (user_id parsed from the JWT token).
-6. Search approved rental requests of the renter for the same kind of tool.
-7. Search pending rental requests of the renter for the same kind of tool. 
+5. Create a notification to the owner with attributes set to {topic: rental_request; rental:rental_id; purpose:"rental request confirmed"} (insert into `notifications`).
+6. Send an email to the owner to notify the rental confirmation, cc to the renter (user_id parsed from the JWT token).
+7. Send push notification to the owner (see Push Notification Pattern).
+8. Search approved rental requests of the renter for the same kind of tool.
+9. Search pending rental requests of the renter for the same kind of tool.
 
 ### Cancel Rental Request
 Purpose: Renter cancels the rental request.
@@ -605,8 +627,9 @@ Output: success, updated rental request object
 Business Logic:
 1. Verify `user_id` is the tool renter.
 2. Update `rentals` status to 'CANCELED'.
-3. Create a notification to the owner with attributes set to {topic: rental_request; rental:rental_id; purpose:"rental request canceled"}
-4. Send an email to the owner to notify the cancelation of the rental request with `reason`, cc to the renter (user_id parsed from the JWT token). 
+3. Create a notification to the owner with attributes set to {topic: rental_request; rental:rental_id; purpose:"rental request canceled"} (insert into `notifications`).
+4. Send an email to the owner to notify the cancelation of the rental request with `reason`, cc to the renter (user_id parsed from the JWT token).
+5. Send push notification to the owner (see Push Notification Pattern).
 
 ### Complete Rental
 Purpose: Mark tool as returned.
@@ -622,17 +645,21 @@ Business Logic:
 6. Add `total_cost_cents`+`surcharge_or_credit_cents` to owner's balance in `users_orgs`.
 7. Create a `ledger_transactions` entry of type 'LENDING_CREDIT' to the owner using the org_id from the rentals.org_id and `total_cost_cents`+`surcharge_or_credit_cents` for the amount.
 8. Update owner's user_org record by adding `total_cost_cents` to the balance_cents field and set the last_balance_updated_on to today.
-9. Create a notification to the owner with attributes set to {topic:rental_credit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id}
+9. Create a notification to the owner with attributes set to {topic:rental_credit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id} (insert into `notifications`).
 10. Send email to owner to inform the credit update from the rental.
-11. Create a `ledger_transactions` record of type 'LENDING_DEBIT' to the renter using the org_id from the rentals.org_id
-12. Update renter's user_org record by adding `total_cost_cents`+`surcharge_or_credit_cents` to the balance_cents field and set the last_balance_updated_on to today.
-13. Create a notification to the renter with attributes set to {topic:rental_debit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id}
-14. Send email to renter to inform the debit update from the rental.
-15. Set `tools.status` back to 'AVAILABLE' if the tool has no more 'ACTIVE' or 'SCHEDULED' rental requests. Otherwise, set to 'RENTED'
-16. Create a notification to owner to inform the completion of the rental and the tool status change with attributes set to {topic:rental_completion; rental:rental_id}.
-17. Send email to owner to inform the completion of the rental and the tool status change.
-18. Create a notification to the renter to inform the completion of the rental with attributes set to {topic:rental_completion; rental:rental_id}.
-19. Send email to renter to inform the completion of the rental and the tool status change.
+11. Send push notification to the owner (see Push Notification Pattern).
+12. Create a `ledger_transactions` record of type 'LENDING_DEBIT' to the renter using the org_id from the rentals.org_id
+13. Update renter's user_org record by adding `total_cost_cents`+`surcharge_or_credit_cents` to the balance_cents field and set the last_balance_updated_on to today.
+14. Create a notification to the renter with attributes set to {topic:rental_debit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id} (insert into `notifications`).
+15. Send email to renter to inform the debit update from the rental.
+16. Send push notification to the renter (see Push Notification Pattern).
+17. Set `tools.status` back to 'AVAILABLE' if the tool has no more 'ACTIVE' or 'SCHEDULED' rental requests. Otherwise, set to 'RENTED'
+18. Create a notification to owner to inform the completion of the rental and the tool status change with attributes set to {topic:rental_completion; rental:rental_id} (insert into `notifications`).
+19. Send email to owner to inform the completion of the rental and the tool status change.
+20. Send push notification to the owner (see Push Notification Pattern).
+21. Create a notification to the renter to inform the completion of the rental with attributes set to {topic:rental_completion; rental:rental_id} (insert into `notifications`).
+22. Send email to renter to inform the completion of the rental and the tool status change.
+23. Send push notification to the renter (see Push Notification Pattern).
 
 ### Get Rental
 Purpose: View rental details.
@@ -669,9 +696,10 @@ Business Logic:
 1. Verify the rental exists and status is 'SCHEDULED'.
 2. Verify `user_id` is either the renter or the owner (both can initiate pickup).
 3. Update `rentals` status to 'ACTIVE'.
-4. Create a notification to the other party (if renter initiated, notify owner; if owner initiated, notify renter) with attributes set to {topic:rental_pickup; rental:rental_id; tool_name:tool_name; start_date:start_date; end_date:end_date; purpose:"rental has been picked up"}.
+4. Create a notification to the other party (if renter initiated, notify owner; if owner initiated, notify renter) with attributes set to {topic:rental_pickup; rental:rental_id; tool_name:tool_name; start_date:start_date; end_date:end_date; purpose:"rental has been picked up"} (insert into `notifications`).
 5. Send an email to the other party to notify the tool pickup confirmation.
-6. Return the updated rental request object.
+6. Send push notification to the other party (see Push Notification Pattern).
+7. Return the updated rental request object.
 
 ### Change Rental Dates
 Purpose: Allow either renter or owner to modify rental dates with appropriate approval workflow.
@@ -690,8 +718,9 @@ Business Logic:
    - Calculate new `total_cost_cents` using the rental's price snapshot (`duration_unit`, `daily_price_cents`, `weekly_price_cents`, `monthly_price_cents`) stored on the rental record. Duration is `new_end_date - new_start_date` (end exclusive).
    - Update `rentals` with new start_date, end_date, and total_cost_cents.
    - Set status to 'PENDING' (requires owner re-approval).
-   - Create a notification to the owner with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"renter changed dates, requires re-approval"}.
+   - Create a notification to the owner with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"renter changed dates, requires re-approval"} (insert into `notifications`).
    - Send email to owner about date change requiring re-approval.
+   - Send push notification to the owner (see Push Notification Pattern).
 
 **Case 2: Owner changes dates in PENDING, APPROVED, or SCHEDULED status**
    - Verify `user_id` is the tool owner.
@@ -699,8 +728,9 @@ Business Logic:
    - Calculate new `total_cost_cents` using the rental's price snapshot. Duration is `new_end_date - new_start_date` (end exclusive).
    - Update `rentals` with new start_date, end_date, and total_cost_cents.
    - Set status to 'APPROVED' (requires renter confirmation).
-   - Create a notification to the renter with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"owner changed dates, requires confirmation"}.
+   - Create a notification to the renter with attributes set to {topic:rental_date_change; rental:rental_id; tool_name:tool_name; start_date:new_start_date; end_date:new_end_date; old_start_date:old_start_date; old_end_date:old_end_date; purpose:"owner changed dates, requires confirmation"} (insert into `notifications`).
    - Send email to renter about date change requiring confirmation.
+   - Send push notification to the renter (see Push Notification Pattern).
 
 **Case 3: Renter extends return date in ACTIVE or OVERDUE status**
    - Verify `user_id` is the renter.
@@ -709,8 +739,9 @@ Business Logic:
    - Calculate new `total_cost_cents` using the rental's price snapshot. Duration is `new_end_date - start_date` (end exclusive).
    - Update `rentals` with new end_date and total_cost_cents.
    - Set status to 'RETURN_DATE_CHANGED'.
-   - Create a notification to the owner with attributes set to {topic:return_date_change_request; rental:rental_id; old_date:old_end_date; new_date:new_end_date; purpose:"renter requests return date extension"}.
+   - Create a notification to the owner with attributes set to {topic:return_date_change_request; rental:rental_id; old_date:old_end_date; new_date:new_end_date; purpose:"renter requests return date extension"} (insert into `notifications`).
    - Send email to owner about return date extension request.
+   - Send push notification to the owner (see Push Notification Pattern).
 
 5. Return the updated rental request object.
 
@@ -724,9 +755,10 @@ Business Logic:
 2. Verify `user_id` is the tool owner.
 3. Copy `end_date` to `last_agreed_end_date` (save the newly approved date for potential future rollback).
 4. Update `rentals` status to 'ACTIVE' (or 'OVERDUE' if new end_date has passed).
-5. Create a notification to the renter with attributes set to {topic:return_date_change_approved; rental:rental_id; tool_name:tool_name; purpose:"owner approved return date change."}.
+5. Create a notification to the renter with attributes set to {topic:return_date_change_approved; rental:rental_id; tool_name:tool_name; purpose:"owner approved return date change."} (insert into `notifications`).
 6. Send email to renter about approved return date extension.
-7. Return the updated rental request object.
+7. Send push notification to the renter (see Push Notification Pattern).
+8. Return the updated rental request object.
 
 ### Reject Return Date Change
 Purpose: Owner rejects a renter's request to extend the return date and sets a new return date.
@@ -745,12 +777,13 @@ Business Logic:
 5. Store rejection `reason` in the `rejection_reason` field of the rental record.
 6. Update `rentals.end_date` with the `new_end_date` set by owner.
 7. Recalculate `total_cost_cents` using the rental's price snapshot (`duration_unit`, `daily_price_cents`, `weekly_price_cents`, `monthly_price_cents`) stored on the rental record. Duration is `new_end_date - start_date` (end exclusive), then update the record.
-8. Create a notification to the renter with attributes set to {topic:return_date_change_rejected; rental:rental_id; rejection_reason:reason; new_end_date:new_end_date; old_end_date:old_end_date; purpose:"owner rejected return date extension and set new return date"}.
+8. Create a notification to the renter with attributes set to {topic:return_date_change_rejected; rental:rental_id; rejection_reason:reason; new_end_date:new_end_date; old_end_date:old_end_date; purpose:"owner rejected return date extension and set new return date"} (insert into `notifications`).
 9. Send email to renter about rejected return date extension with:
    - The rejection reason
    - The new return date set by the owner
    - The updated rental cost
-10. Return the updated rental request object.
+10. Send push notification to the renter (see Push Notification Pattern).
+11. Return the updated rental request object.
 
 Note: The owner is required to set a counter-proposal return date when rejecting. This ensures the renter knows the actual expected return date.
 
@@ -784,9 +817,10 @@ Business Logic:
 5. Determine appropriate status based on current date vs end_date:
    - If current_date <= end_date: Set status to 'ACTIVE'
    - If current_date > end_date: Set status to 'OVERDUE'
-6. Create a notification to the owner with attributes set to {topic:return_date_change_cancelled; rental:rental_id; purpose:"renter cancelled return date change request"}.
+6. Create a notification to the owner with attributes set to {topic:return_date_change_cancelled; rental:rental_id; purpose:"renter cancelled return date change request"} (insert into `notifications`).
 7. Send email to owner about cancelled return date change request.
-8. Return the updated rental request object.
+8. Send push notification to the owner (see Push Notification Pattern).
+9. Return the updated rental request object.
 
 ### List Tool Rentals
 Purpose: View complete rental history for a specific tool (for tool owners).
@@ -854,8 +888,34 @@ Purpose: Clear an alert.
 Input: `notification_id`
 Output: success flag
 Business Logic:
-1. Validate the notification is for `user_id`.
-2. Update `is_read = TRUE` for the given notification ID.
+1. Validate the notification belongs to `user_id`.
+2. Update `read_at = NOW()` only if `read_at` is currently NULL (first-write-wins): `UPDATE notifications SET read_at = COALESCE(read_at, NOW()) WHERE id = $notification_id AND user_id = $user_id`.
+
+### Sync Device Token
+Purpose: Register or refresh an FCM push notification token for the user's device. Called by the mobile app on startup and whenever the FCM token is refreshed by the Android system.
+
+Input: `fcm_token`, `android_device_id`, `device_name`
+Output: empty
+Business Logic:
+1. Extract `user_id` from the JWT token.
+2. Upsert into `fcm_tokens` matching on `fcm_token`:
+   - If the token already exists: update `user_id`, `device_info` (from `device_name`), `status = 'ACTIVE'`, `updated_at = NOW()`. Reassigning `user_id` handles the case where a user re-logs in on the same device.
+   - If the token does not exist: insert a new record with `status = 'ACTIVE'`.
+3. Return empty response.
+
+### Report Message Event
+Purpose: Client reports a push notification lifecycle event. Called from the mobile app's FCM handlers: `onMessageReceived()` for delivery, `NotificationOpened` callback for click.
+
+Input: `notification_id`, `event_type` ("DELIVERED" or "CLICKED"), `event_time`
+Output: empty
+Business Logic:
+1. Extract `user_id` from the JWT token.
+2. Validate `event_type` is one of: `DELIVERED`, `CLICKED`.
+3. Verify `notification_id` exists in `notifications` and belongs to `user_id`.
+4. Update the corresponding timestamp using first-write-wins (no override if already set):
+   - `DELIVERED`: `UPDATE notifications SET delivered_at = COALESCE(delivered_at, $event_time) WHERE id = $notification_id AND user_id = $user_id`
+   - `CLICKED`: `UPDATE notifications SET clicked_at = COALESCE(clicked_at, $event_time) WHERE id = $notification_id AND user_id = $user_id`
+5. Return empty response.
 
 ## Image Storage
 

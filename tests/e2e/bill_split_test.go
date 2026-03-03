@@ -158,7 +158,7 @@ func TestBillSplitService_DebtorDisputesPayment(t *testing.T) {
 	require.NoError(t, err, "ListDisputedPayments should succeed")
 	assert.Len(t, disputesResp.Disputes, 1, "Should have 1 disputed payment")
 	assert.Equal(t, billID, disputesResp.Disputes[0].PaymentId, "Disputed payment ID should match")
-	assert.False(t, disputesResp.Disputes[0].IsResolved, "Dispute should not be resolved yet")
+	assert.Nil(t, disputesResp.Disputes[0].ResolvedAt, "Dispute should not be resolved yet")
 }
 
 // TestBillSplitService_AdminResolvesDisputeDebtorFault tests admin resolving dispute with debtor at fault.
@@ -552,7 +552,7 @@ func TestBillSplitService_ListResolvedDisputes(t *testing.T) {
 	require.NoError(t, err, "ListResolvedDisputes should succeed")
 	assert.Len(t, resolvedResp.Disputes, 1, "Should have 1 resolved dispute")
 	assert.Equal(t, billID, resolvedResp.Disputes[0].PaymentId, "Resolved dispute ID should match")
-	assert.True(t, resolvedResp.Disputes[0].IsResolved, "Dispute should be marked as resolved")
+	assert.NotNil(t, resolvedResp.Disputes[0].ResolvedAt, "Dispute should be marked as resolved")
 	assert.Equal(t, "DEBTOR_FAULT", resolvedResp.Disputes[0].Resolution, "Resolution should be DEBTOR_FAULT")
 }
 

@@ -240,11 +240,11 @@ func TestImageStorageService_E2E(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, resp.Success)
 
-		// Verify: Image is soft deleted (deleted_on is set)
-		var deletedOn *time.Time
-		err = db.QueryRow("SELECT deleted_on FROM tool_images WHERE id = $1", imageID).Scan(&deletedOn)
+		// Verify: Image is soft deleted (deleted_at is set)
+		var deletedAt *time.Time
+		err = db.QueryRow("SELECT deleted_at FROM tool_images WHERE id = $1", imageID).Scan(&deletedAt)
 		assert.NoError(t, err)
-		assert.NotNil(t, deletedOn)
+		assert.NotNil(t, deletedAt)
 	})
 
 	t.Run("Download Thumbnail", func(t *testing.T) {

@@ -28,14 +28,14 @@ func (r *notificationRepository) Create(ctx context.Context, n *domain.Notificat
 		logger.ExitMethodWithError("notificationRepository.Create", err, "reason", "failed to marshal attributes")
 		return err
 	}
-	logger.Debug("Notification attributes marshaled", "attributesJSON", string(attrs))
 
-	query := `INSERT INTO notifications (user_id, org_id, title, message, is_read, attributes, created_on) 
-	          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	query := `INSERT INTO notifications (user_id, org_id, title, message, attributes)
+	          VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`
 	logger.DatabaseCall("INSERT", "notifications", "userID", n.UserID, "orgID", n.OrgID)
 
-	now := time.Now().Format("2006-01-02")
-	err = r.db.QueryRowContext(ctx, query, n.UserID, n.OrgID, n.Title, n.Message, n.IsRead, attrs, now).Scan(&n.ID)
+	var createdAt time.Time
+	err = r.db.QueryRowContext(ctx, query, n.UserID, n.OrgID, n.Title, n.Message, attrs).Scan(&n.ID, &createdAt)
+	n.CreatedAt = &createdAt
 	logger.DatabaseResult("INSERT", 1, err, "notificationID", n.ID)
 
 	if err != nil {
@@ -47,8 +47,8 @@ func (r *notificationRepository) Create(ctx context.Context, n *domain.Notificat
 }
 
 func (r *notificationRepository) List(ctx context.Context, userID int32, limit, offset int32) ([]domain.Notification, int32, error) {
-	query := `SELECT id, user_id, org_id, title, message, is_read, attributes, created_on 
-	          FROM notifications WHERE user_id = $1 ORDER BY created_on DESC LIMIT $2 OFFSET $3`
+	query := `SELECT id, user_id, org_id, title, message, delivered_at, clicked_at, read_at, attributes, created_at
+	          FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
 	if err != nil {
 		return nil, 0, err
@@ -56,9 +56,8 @@ func (r *notificationRepository) List(ctx context.Context, userID int32, limit, 
 	defer rows.Close()
 
 	var count int32
-	countQuery := `SELECT count(*) FROM notifications WHERE user_id = $1`
-	err = r.db.QueryRowContext(ctx, countQuery, userID).Scan(&count)
-	if err != nil {
+	countQuery := `SELECT COUNT(*) FROM notifications WHERE user_id = $1`
+	if err := r.db.QueryRowContext(ctx, countQuery, userID).Scan(&count); err != nil {
 		return nil, 0, err
 	}
 
@@ -66,11 +65,23 @@ func (r *notificationRepository) List(ctx context.Context, userID int32, limit, 
 	for rows.Next() {
 		var n domain.Notification
 		var attrs []byte
-		var createdOn time.Time
-		if err := rows.Scan(&n.ID, &n.UserID, &n.OrgID, &n.Title, &n.Message, &n.IsRead, &attrs, &createdOn); err != nil {
+		var deliveredAt, clickedAt, readAt, createdAt sql.NullTime
+		if err := rows.Scan(&n.ID, &n.UserID, &n.OrgID, &n.Title, &n.Message,
+			&deliveredAt, &clickedAt, &readAt, &attrs, &createdAt); err != nil {
 			return nil, 0, err
 		}
-		n.CreatedOn = createdOn.Format("2006-01-02")
+		if deliveredAt.Valid {
+			n.DeliveredAt = &deliveredAt.Time
+		}
+		if clickedAt.Valid {
+			n.ClickedAt = &clickedAt.Time
+		}
+		if readAt.Valid {
+			n.ReadAt = &readAt.Time
+		}
+		if createdAt.Valid {
+			n.CreatedAt = &createdAt.Time
+		}
 		if len(attrs) > 0 {
 			if err := json.Unmarshal(attrs, &n.Attributes); err != nil {
 				return nil, 0, err
@@ -81,8 +92,8 @@ func (r *notificationRepository) List(ctx context.Context, userID int32, limit, 
 	return notes, count, nil
 }
 
-func (r *notificationRepository) MarkAsRead(ctx context.Context, id, userID int32) error {
-	query := `UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2`
+func (r *notificationRepository) MarkAsRead(ctx context.Context, id int64, userID int32) error {
+	query := `UPDATE notifications SET read_at = COALESCE(read_at, NOW()) WHERE id = $1 AND user_id = $2`
 	result, err := r.db.ExecContext(ctx, query, id, userID)
 	if err != nil {
 		return err
@@ -95,4 +106,16 @@ func (r *notificationRepository) MarkAsRead(ctx context.Context, id, userID int3
 		return fmt.Errorf("notification not found or access denied")
 	}
 	return nil
+}
+
+func (r *notificationRepository) MarkDelivered(ctx context.Context, id int64, userID int32, t time.Time) error {
+	query := `UPDATE notifications SET delivered_at = COALESCE(delivered_at, $3) WHERE id = $1 AND user_id = $2`
+	_, err := r.db.ExecContext(ctx, query, id, userID, t)
+	return err
+}
+
+func (r *notificationRepository) MarkClicked(ctx context.Context, id int64, userID int32, t time.Time) error {
+	query := `UPDATE notifications SET clicked_at = COALESCE(clicked_at, $3) WHERE id = $1 AND user_id = $2`
+	_, err := r.db.ExecContext(ctx, query, id, userID, t)
+	return err
 }

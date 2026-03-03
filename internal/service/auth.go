@@ -28,18 +28,18 @@ type authService struct {
 	inviteRepo repository.InvitationRepository
 	reqRepo    repository.JoinRequestRepository
 	orgRepo    repository.OrganizationRepository
-	noteRepo   repository.NotificationRepository
+	noteSvc    NotificationService
 	emailSvc   EmailService
 	tm         security.TokenManager
 }
 
-func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteRepo repository.NotificationRepository, emailSvc EmailService, secret string) AuthService {
+func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string) AuthService {
 	return &authService{
 		userRepo:   userRepo,
 		inviteRepo: inviteRepo,
 		reqRepo:    reqRepo,
 		orgRepo:    orgRepo,
-		noteRepo:   noteRepo,
+		noteSvc:    noteSvc,
 		emailSvc:   emailSvc,
 		tm:         security.NewTokenManager(secret),
 	}
@@ -175,17 +175,15 @@ func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, emai
 		OrgID:   orgID,
 		Title:   "New Join Request",
 		Message: fmt.Sprintf("%s requested to join %s", name, org.Name),
-		IsRead:  false,
 		Attributes: map[string]string{
 			"type":      "JOIN_REQUEST",
 			"reference": fmt.Sprintf("join_request:%d", req.ID),
 		},
-		CreatedOn: time.Now().Format("2006-01-02"),
 	}
 
 	logger.Debug("Creating notification for admin", "adminID", adminUser.ID, "notifTitle", notif.Title)
 	logger.DatabaseCall("INSERT", "notifications (user_id, org_id, title, message, is_read, attributes)")
-	notifErr := s.noteRepo.Create(ctx, notif)
+	notifErr := s.noteSvc.Dispatch(ctx, notif)
 	logger.DatabaseResult("INSERT", 1, notifErr, "adminID", adminUser.ID)
 
 	if notifErr != nil {

@@ -2,9 +2,11 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/service"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type NotificationHandler struct {
@@ -53,4 +55,32 @@ func (h *NotificationHandler) MarkNotificationRead(ctx context.Context, req *pb.
 		return nil, err
 	}
 	return &pb.MarkNotificationReadResponse{Success: true}, nil
+}
+
+func (h *NotificationHandler) SyncDeviceToken(ctx context.Context, req *pb.SyncTokenRequest) (*emptypb.Empty, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.noteSvc.SyncDeviceToken(ctx, userID, req.FcmToken, req.AndroidDeviceId, req.DeviceName); err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (h *NotificationHandler) ReportMessageEvent(ctx context.Context, req *pb.ReportEventRequest) (*emptypb.Empty, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var eventTime time.Time
+	if req.EventTime != nil {
+		eventTime = req.EventTime.AsTime()
+	} else {
+		eventTime = time.Now()
+	}
+	if err := h.noteSvc.ReportMessageEvent(ctx, userID, req.NotificationId, req.EventType, eventTime); err != nil {
+		return nil, err
+	}
+	return &emptypb.Empty{}, nil
 }

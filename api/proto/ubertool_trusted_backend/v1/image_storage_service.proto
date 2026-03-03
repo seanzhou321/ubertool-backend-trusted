@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package ubertool.trusted.api.v1;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
 
@@ -42,7 +44,7 @@ message GetUploadUrlResponse {
   string upload_url = 1;      // Presigned PUT URL for uploading
   int32 image_id = 2;         // Unique ID to reference this image
   string download_url = 3;    // URL to download/display the image
-  int64 expires_at = 4;       // Unix timestamp when URLs expire
+  google.protobuf.Timestamp expires_at = 4;       // Unix timestamp when URLs expire
 }
 
 message ConfirmImageUploadRequest {
@@ -65,7 +67,7 @@ message GetDownloadUrlRequest {
 
 message GetDownloadUrlResponse {
   string download_url = 1;
-  int64 expires_at = 2;
+  google.protobuf.Timestamp expires_at = 2;
 }
 
 // Get uploaded tool image
@@ -107,7 +109,8 @@ message ToolImage {
   bool is_primary = 7;
   int32 display_order = 8;
   string status = 9;
-  string created_on = 10;
-  string confirmed_on = 11;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp confirmed_at = 11;
+  google.protobuf.Timestamp deleted_at = 12;
 }
 

@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"time"
+
 	"ubertool-backend-trusted/internal/domain"
 )
 
@@ -69,7 +71,15 @@ type LedgerRepository interface {
 type NotificationRepository interface {
 	Create(ctx context.Context, note *domain.Notification) error
 	List(ctx context.Context, userID int32, limit, offset int32) ([]domain.Notification, int32, error)
-	MarkAsRead(ctx context.Context, id, userID int32) error
+	MarkAsRead(ctx context.Context, id int64, userID int32) error
+	MarkDelivered(ctx context.Context, id int64, userID int32, t time.Time) error
+	MarkClicked(ctx context.Context, id int64, userID int32, t time.Time) error
+}
+
+type FcmTokenRepository interface {
+	Upsert(ctx context.Context, token *domain.FcmToken) error
+	GetActiveByUserID(ctx context.Context, userID int32) ([]domain.FcmToken, error)
+	MarkObsolete(ctx context.Context, token string) error
 }
 
 type InvitationRepository interface {

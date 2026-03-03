@@ -63,6 +63,16 @@ func main() {
 	// Initialize Repositories
 	store := postgres.NewStore(db)
 
+	// Initialize Notification + Push services (created first so other services can depend on noteSvc)
+	fcmClient, fcmErr := config.InitFirebase()
+	if fcmErr != nil {
+		logger.Warn("FCM client unavailable — push notifications disabled", "error", fcmErr)
+		fcmClient = nil
+	}
+	noteSvc := service.NewNotificationService(store.NotificationRepository, store.FcmTokenRepository)
+	pushSvc := service.NewPushNotificationService(fcmClient, store.FcmTokenRepository)
+	noteSvc.SetPushService(pushSvc)
+
 	// Initialize Security
 	tokenManager := security.NewTokenManager(cfg.JWT.Secret)
 	authInterceptor := interceptor.NewAuthInterceptor(tokenManager)
@@ -105,22 +115,21 @@ func main() {
 		store.InvitationRepository,
 		store.JoinRequestRepository,
 		store.OrganizationRepository,
-		store.NotificationRepository,
+		noteSvc,
 		emailSvc,
 		cfg.JWT.Secret,
 	)
 	userSvc := service.NewUserService(store.UserRepository, store.OrganizationRepository)
-	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository, store.InvitationRepository, store.NotificationRepository)
+	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository, store.InvitationRepository, noteSvc)
 	toolSvc := service.NewToolService(store.ToolRepository, store.UserRepository, store.OrganizationRepository)
 	ledgerSvc := service.NewLedgerService(store.LedgerRepository)
-	noteSvc := service.NewNotificationService(store.NotificationRepository)
 	rentalSvc := service.NewRentalService(
 		store.RentalRepository,
 		store.ToolRepository,
 		store.LedgerRepository,
 		store.UserRepository,
 		emailSvc,
-		store.NotificationRepository,
+		noteSvc,
 	)
 	adminSvc := service.NewAdminService(
 		store.JoinRequestRepository,
@@ -134,7 +143,7 @@ func main() {
 		store.BillRepository,
 		store.UserRepository,
 		store.OrganizationRepository,
-		store.NotificationRepository,
+		noteSvc,
 		emailSvc,
 	)
 

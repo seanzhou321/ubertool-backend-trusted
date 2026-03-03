@@ -2,9 +2,11 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/service"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type ImageStorageHandler struct {
@@ -39,7 +41,7 @@ func (h *ImageStorageHandler) GetUploadUrl(ctx context.Context, req *pb.GetUploa
 		UploadUrl:   uploadURL,
 		ImageId:     image.ID,
 		DownloadUrl: downloadURL,
-		ExpiresAt:   expiresAt,
+		ExpiresAt:   timestamppb.New(time.Unix(expiresAt, 0)),
 	}, nil
 }
 
@@ -76,7 +78,7 @@ func (h *ImageStorageHandler) GetDownloadUrl(ctx context.Context, req *pb.GetDow
 
 	return &pb.GetDownloadUrlResponse{
 		DownloadUrl: downloadURL,
-		ExpiresAt:   expiresAt,
+		ExpiresAt:   timestamppb.New(time.Unix(expiresAt, 0)),
 	}, nil
 }
 

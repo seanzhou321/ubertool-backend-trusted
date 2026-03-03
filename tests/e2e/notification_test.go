@@ -29,11 +29,11 @@ func TestNotificationService_E2E(t *testing.T) {
 
 		// Create test notifications
 		_, err := db.Exec(`
-			INSERT INTO notifications (user_id, org_id, title, message, is_read, attributes)
+			INSERT INTO notifications (user_id, org_id, title, message, attributes)
 			VALUES 
-				($1, $2, 'Test Notification 1', 'This is a test notification', false, '{"type": "rental_request"}'::jsonb),
-				($1, $2, 'Test Notification 2', 'Another test notification', false, '{"type": "admin_alert"}'::jsonb),
-				($1, $2, 'Old Notification', 'This one is read', true, '{}'::jsonb)
+				($1, $2, 'Test Notification 1', 'This is a test notification', '{"type": "rental_request"}'::jsonb),
+				($1, $2, 'Test Notification 2', 'Another test notification', '{"type": "admin_alert"}'::jsonb),
+				($1, $2, 'Old Notification', 'This one is read', '{}'::jsonb)
 		`, userID, orgID)
 		require.NoError(t, err)
 
@@ -55,7 +55,7 @@ func TestNotificationService_E2E(t *testing.T) {
 		// Verify: Notifications contain expected data
 		unreadCount := 0
 		for _, notif := range resp.Notifications {
-			if !notif.Read {
+			if notif.ReadAt == nil {
 				unreadCount++
 			}
 			assert.NotEmpty(t, notif.Title)
@@ -70,10 +70,10 @@ func TestNotificationService_E2E(t *testing.T) {
 		orgID := db.CreateTestOrg("")
 		db.AddUserToOrg(userID, orgID, "MEMBER", "ACTIVE", 0)
 
-		var notifID int32
+		var notifID int64
 		err := db.QueryRow(`
-			INSERT INTO notifications (user_id, org_id, title, message, is_read)
-			VALUES ($1, $2, 'Unread Notification', 'Please read this', false)
+			INSERT INTO notifications (user_id, org_id, title, message)
+			VALUES ($1, $2, 'Unread Notification', 'Please read this')
 			RETURNING id
 		`, userID, orgID).Scan(&notifID)
 		require.NoError(t, err)
@@ -91,10 +91,10 @@ func TestNotificationService_E2E(t *testing.T) {
 		assert.True(t, resp.Success)
 
 		// Verify: Notification is marked as read in database
-		var isRead bool
-		err = db.QueryRow("SELECT is_read FROM notifications WHERE id = $1", notifID).Scan(&isRead)
+		var readAt *time.Time
+		err = db.QueryRow("SELECT read_at FROM notifications WHERE id = $1", notifID).Scan(&readAt)
 		assert.NoError(t, err)
-		assert.True(t, isRead)
+		assert.NotNil(t, readAt)
 	})
 
 	t.Run("GetNotifications with Pagination", func(t *testing.T) {
@@ -106,8 +106,8 @@ func TestNotificationService_E2E(t *testing.T) {
 		// Create 15 notifications
 		for i := 0; i < 15; i++ {
 			_, err := db.Exec(`
-				INSERT INTO notifications (user_id, org_id, title, message, is_read)
-				VALUES ($1, $2, $3, $4, false)
+				INSERT INTO notifications (user_id, org_id, title, message)
+				VALUES ($1, $2, $3, $4)
 			`, userID, orgID, fmt.Sprintf("Notification %d", i), fmt.Sprintf("Message %d", i))
 			require.NoError(t, err)
 		}
@@ -148,10 +148,10 @@ func TestNotificationService_E2E(t *testing.T) {
 		db.AddUserToOrg(user1ID, orgID, "MEMBER", "ACTIVE", 0)
 		db.AddUserToOrg(user2ID, orgID, "MEMBER", "ACTIVE", 0)
 
-		var notifID int32
+		var notifID int64
 		err := db.QueryRow(`
-			INSERT INTO notifications (user_id, org_id, title, message, is_read)
-			VALUES ($1, $2, 'User 1 Notification', 'For user 1 only', false)
+			INSERT INTO notifications (user_id, org_id, title, message)
+			VALUES ($1, $2, 'User 1 Notification', 'For user 1 only')
 			RETURNING id
 		`, user1ID, orgID).Scan(&notifID)
 		require.NoError(t, err)

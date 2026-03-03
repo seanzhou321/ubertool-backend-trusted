@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package ubertool.trusted.api.v1;
 
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
 option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
 
@@ -16,6 +19,17 @@ service NotificationService {
 
   // Mark notification as read
   rpc MarkNotificationRead(MarkNotificationReadRequest) returns (MarkNotificationReadResponse);
+
+  // Client calls this on app start and token refresh
+  rpc SyncDeviceToken(SyncTokenRequest) returns (google.protobuf.Empty);
+
+  // Client calls this to report message lifecycle events
+  // ReportEventRequest.event_type='DELIVERED' when called from onMessageReceived() on phone app
+  // backend should should stamp notifications.delivered_at field when receiving this event to track delivery
+  //
+  // ReportEventRequest.event_type='CLICKED' when called from NotificationOpened on the phone app when notification is clicked and app is opened 
+  // backend should stamp notifications.clicked_at field when receiving this event to track notification engagement
+  rpc ReportMessageEvent(ReportEventRequest) returns (google.protobuf.Empty);
 }
 
 // Get notifications request
@@ -32,7 +46,7 @@ message GetNotificationsResponse {
 
 // Mark notification read request
 message MarkNotificationReadRequest {
-  int32 notification_id = 1;
+  int64 notification_id = 1;
 }
 
 // Mark notification read response
@@ -42,13 +56,26 @@ message MarkNotificationReadResponse {
 
 // Notification message
 message Notification {
-  int32 id = 1;
+  int64 id = 1;
   int32 user_id = 2;
   int32 organization_id = 3;
   string title = 4;
   string message = 5;
-  bool read = 6;
-  string created_on = 7; // Date string YYYY-MM-DD
-  map<string, string> attributes = 8; // Additional key-value attributes for notification metadata
+  google.protobuf.Timestamp delivered_at = 6;
+  google.protobuf.Timestamp clicked_at = 7;
+  google.protobuf.Timestamp read_at = 8;
+  google.protobuf.Timestamp created_at = 9; // Date string YYYY-MM-DD
+  map<string, string> attributes = 10; // Additional key-value attributes for notification metadata
 }
 
+message SyncTokenRequest {
+  string fcm_token = 1;
+  string android_device_id = 2; // identifier for the device (e.g., UUID from client)
+  string device_name = 3;
+}
+
+message ReportEventRequest {
+  int64 notification_id = 1; // each push notification message should carry ID of the notification for tracking
+  string event_type = 2; // "DELIVERED", "CLICKED"
+  google.protobuf.Timestamp event_time = 3;
+}

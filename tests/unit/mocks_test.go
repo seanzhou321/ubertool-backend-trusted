@@ -2,8 +2,10 @@ package unit
 
 import (
 	"context"
+	"time"
 
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/service"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -444,22 +446,30 @@ func (m *MockBillRepo) ListActionsByBill(ctx context.Context, billID int32) ([]d
 	return args.Get(0).([]domain.BillAction), args.Error(1)
 }
 
-// MockNotificationRepo
+// MockNotificationRepo implements service.NotificationService (no-op for tests)
 type MockNotificationRepo struct {
 	mock.Mock
 }
 
-func (m *MockNotificationRepo) Create(ctx context.Context, note *domain.Notification) error {
-	args := m.Called(ctx, note)
-	return args.Error(0)
+func (m *MockNotificationRepo) GetNotifications(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Notification, int32, error) {
+	return nil, 0, nil
 }
-
-func (m *MockNotificationRepo) List(ctx context.Context, userID, limit, offset int32) ([]domain.Notification, int32, error) {
-	args := m.Called(ctx, userID, limit, offset)
-	return args.Get(0).([]domain.Notification), args.Get(1).(int32), args.Error(2)
+func (m *MockNotificationRepo) MarkAsRead(ctx context.Context, userID int32, notificationID int64) error {
+	return nil
 }
-
-func (m *MockNotificationRepo) MarkAsRead(ctx context.Context, id, userID int32) error {
-	args := m.Called(ctx, id, userID)
-	return args.Error(0)
+func (m *MockNotificationRepo) Dispatch(ctx context.Context, n *domain.Notification) error {
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "Dispatch" {
+			args := m.Called(ctx, n)
+			return args.Error(0)
+		}
+	}
+	return nil
 }
+func (m *MockNotificationRepo) SyncDeviceToken(ctx context.Context, userID int32, fcmToken, androidDeviceID, deviceName string) error {
+	return nil
+}
+func (m *MockNotificationRepo) ReportMessageEvent(ctx context.Context, userID int32, notificationID int64, eventType string, eventTime time.Time) error {
+	return nil
+}
+func (m *MockNotificationRepo) SetPushService(pushSvc service.PushNotificationService) {}

@@ -11,26 +11,26 @@ import (
 )
 
 type billSplitService struct {
-	billRepo         repository.BillRepository
-	userRepo         repository.UserRepository
-	orgRepo          repository.OrganizationRepository
-	notificationRepo repository.NotificationRepository
-	emailSvc         EmailService
+	billRepo repository.BillRepository
+	userRepo repository.UserRepository
+	orgRepo  repository.OrganizationRepository
+	noteSvc  NotificationService
+	emailSvc EmailService
 }
 
 func NewBillSplitService(
 	billRepo repository.BillRepository,
 	userRepo repository.UserRepository,
 	orgRepo repository.OrganizationRepository,
-	notificationRepo repository.NotificationRepository,
+	noteSvc NotificationService,
 	emailSvc EmailService,
 ) BillSplitService {
 	return &billSplitService{
-		billRepo:         billRepo,
-		userRepo:         userRepo,
-		orgRepo:          orgRepo,
-		notificationRepo: notificationRepo,
-		emailSvc:         emailSvc,
+		billRepo: billRepo,
+		userRepo: userRepo,
+		orgRepo:  orgRepo,
+		noteSvc:  noteSvc,
+		emailSvc: emailSvc,
 	}
 }
 
@@ -280,7 +280,7 @@ func (s *billSplitService) AcknowledgePayment(ctx context.Context, userID, payme
 					"amount_cents": fmt.Sprintf("%d", bill.AmountCents),
 				},
 			}
-			_ = s.notificationRepo.Create(ctx, notification)
+			_ = s.noteSvc.Dispatch(ctx, notification)
 
 			// Send email to creditor
 			_ = s.emailSvc.SendBillPaymentAcknowledgment(ctx, creditor.Email, creditor.Name, user.Name, bill.AmountCents, bill.SettlementMonth, orgName)
@@ -346,7 +346,7 @@ func (s *billSplitService) AcknowledgePayment(ctx context.Context, userID, payme
 					"amount_cents": fmt.Sprintf("%d", bill.AmountCents),
 				},
 			}
-			_ = s.notificationRepo.Create(ctx, notification)
+			_ = s.noteSvc.Dispatch(ctx, notification)
 
 			// Send email to debtor
 			_ = s.emailSvc.SendBillReceiptConfirmation(ctx, debtor.Email, debtor.Name, user.Name, bill.AmountCents, bill.SettlementMonth, orgName)
@@ -575,7 +575,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 				"resolution": resolution,
 			},
 		}
-		_ = s.notificationRepo.Create(ctx, notification)
+		_ = s.noteSvc.Dispatch(ctx, notification)
 		_ = s.emailSvc.SendBillDisputeResolutionNotification(ctx, debtor.Email, debtor.Name, bill.AmountCents, resolution, bill.ResolutionNotes, orgName)
 	}
 
@@ -591,7 +591,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 				"resolution": resolution,
 			},
 		}
-		_ = s.notificationRepo.Create(ctx, notification)
+		_ = s.noteSvc.Dispatch(ctx, notification)
 		_ = s.emailSvc.SendBillDisputeResolutionNotification(ctx, creditor.Email, creditor.Name, bill.AmountCents, resolution, bill.ResolutionNotes, orgName)
 	}
 

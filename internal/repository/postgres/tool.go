@@ -206,7 +206,7 @@ func (r *toolRepository) Search(ctx context.Context, userID int32, metro, queryT
 // CreateImage creates a new image record (can be pending or confirmed)
 func (r *toolRepository) CreateImage(ctx context.Context, img *domain.ToolImage) error {
 	query := `INSERT INTO tool_images (tool_id, user_id, file_name, file_path, thumbnail_path, 
-	          file_size, mime_type, is_primary, display_order, status, expires_at, created_on) 
+	          file_size, mime_type, is_primary, display_order, status, expires_at, created_at) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`
 	return r.db.QueryRowContext(ctx, query, img.ToolID, img.UserID, img.FileName,
 		img.FilePath, img.ThumbnailPath, img.FileSize, img.MimeType,
@@ -216,7 +216,7 @@ func (r *toolRepository) CreateImage(ctx context.Context, img *domain.ToolImage)
 // GetImageByID retrieves a single image by ID
 func (r *toolRepository) GetImageByID(ctx context.Context, imageID int32) (*domain.ToolImage, error) {
 	query := `SELECT id, tool_id, user_id, file_name, file_path, thumbnail_path, file_size, 
-	          mime_type, is_primary, display_order, status, expires_at, created_on, confirmed_on, deleted_on
+	          mime_type, is_primary, display_order, status, expires_at, created_at, confirmed_at, deleted_at
 	          FROM tool_images WHERE id = $1`
 
 	img := &domain.ToolImage{}
@@ -235,10 +235,10 @@ func (r *toolRepository) GetImageByID(ctx context.Context, imageID int32) (*doma
 // GetImages retrieves all confirmed images for a tool
 func (r *toolRepository) GetImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error) {
 	query := `SELECT id, tool_id, user_id, file_name, file_path, thumbnail_path, file_size, 
-	          mime_type, is_primary, display_order, status, created_on, confirmed_on
+	          mime_type, is_primary, display_order, status, created_at, confirmed_at
 	          FROM tool_images 
-	          WHERE tool_id = $1 AND status = 'CONFIRMED' AND deleted_on IS NULL 
-	          ORDER BY is_primary DESC, display_order ASC, created_on ASC`
+	          WHERE tool_id = $1 AND status = 'CONFIRMED' AND deleted_at IS NULL 
+	          ORDER BY is_primary DESC, display_order ASC, created_at ASC`
 
 	rows, err := r.db.QueryContext(ctx, query, toolID)
 	if err != nil {
@@ -262,10 +262,10 @@ func (r *toolRepository) GetImages(ctx context.Context, toolID int32) ([]domain.
 // GetPendingImagesByUser retrieves pending images for a user
 func (r *toolRepository) GetPendingImagesByUser(ctx context.Context, userID int32) ([]domain.ToolImage, error) {
 	query := `SELECT id, tool_id, user_id, file_name, file_path, thumbnail_path, file_size, 
-	          mime_type, is_primary, display_order, status, expires_at, created_on
+	          mime_type, is_primary, display_order, status, expires_at, created_at
 	          FROM tool_images 
-	          WHERE user_id = $1 AND status = 'PENDING' AND deleted_on IS NULL
-	          ORDER BY created_on DESC`
+	          WHERE user_id = $1 AND status = 'PENDING' AND deleted_at IS NULL
+	          ORDER BY created_at DESC`
 
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
@@ -290,7 +290,7 @@ func (r *toolRepository) GetPendingImagesByUser(ctx context.Context, userID int3
 func (r *toolRepository) UpdateImage(ctx context.Context, img *domain.ToolImage) error {
 	query := `UPDATE tool_images 
 	          SET tool_id = $2, file_path = $3, thumbnail_path = $4, file_size = $5, 
-	              is_primary = $6, display_order = $7, status = $8, confirmed_on = $9
+	              is_primary = $6, display_order = $7, status = $8, confirmed_at = $9
 	          WHERE id = $1`
 
 	_, err := r.db.ExecContext(ctx, query, img.ID, img.ToolID, img.FilePath, img.ThumbnailPath,
@@ -301,7 +301,7 @@ func (r *toolRepository) UpdateImage(ctx context.Context, img *domain.ToolImage)
 // ConfirmImage transitions a pending image to confirmed status
 func (r *toolRepository) ConfirmImage(ctx context.Context, imageID int32, toolID int32) error {
 	query := `UPDATE tool_images 
-	          SET status = 'CONFIRMED', tool_id = $2, confirmed_on = $3 
+	          SET status = 'CONFIRMED', tool_id = $2, confirmed_at = $3 
 	          WHERE id = $1 AND status = 'PENDING'`
 
 	result, err := r.db.ExecContext(ctx, query, imageID, toolID, time.Now())
@@ -322,7 +322,7 @@ func (r *toolRepository) ConfirmImage(ctx context.Context, imageID int32, toolID
 
 // DeleteImage soft deletes an image
 func (r *toolRepository) DeleteImage(ctx context.Context, imageID int32) error {
-	query := `UPDATE tool_images SET status = 'DELETED', deleted_on = $1 WHERE id = $2`
+	query := `UPDATE tool_images SET status = 'DELETED', deleted_at = $1 WHERE id = $2`
 	_, err := r.db.ExecContext(ctx, query, time.Now(), imageID)
 	return err
 }
@@ -361,7 +361,7 @@ func (r *toolRepository) SetPrimaryImage(ctx context.Context, toolID int32, imag
 // DeleteExpiredPendingImages removes expired pending images
 func (r *toolRepository) DeleteExpiredPendingImages(ctx context.Context) error {
 	query := `UPDATE tool_images 
-	          SET status = 'DELETED', deleted_on = $1 
+	          SET status = 'DELETED', deleted_at = $1 
 	          WHERE status = 'PENDING' AND expires_at < $1`
 	_, err := r.db.ExecContext(ctx, query, time.Now())
 	return err

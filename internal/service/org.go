@@ -15,15 +15,15 @@ type organizationService struct {
 	orgRepo    repository.OrganizationRepository
 	userRepo   repository.UserRepository
 	inviteRepo repository.InvitationRepository
-	noteRepo   repository.NotificationRepository
+	noteSvc    NotificationService
 }
 
-func NewOrganizationService(orgRepo repository.OrganizationRepository, userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, noteRepo repository.NotificationRepository) OrganizationService {
+func NewOrganizationService(orgRepo repository.OrganizationRepository, userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, noteSvc NotificationService) OrganizationService {
 	return &organizationService{
 		orgRepo:    orgRepo,
 		userRepo:   userRepo,
 		inviteRepo: inviteRepo,
-		noteRepo:   noteRepo,
+		noteSvc:    noteSvc,
 	}
 }
 
@@ -218,15 +218,14 @@ func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, us
 					OrgID:   inv.OrgID,
 					Title:   "New Member Joined",
 					Message: fmt.Sprintf("%s joined %s", user.Name, org.Name),
-					IsRead:  false,
+
 					Attributes: map[string]string{
 						"type":      "MEMBER_JOINED",
 						"reference": fmt.Sprintf("user:%d", userID),
 					},
-					CreatedOn: time.Now().Format("2006-01-02"),
 				}
 
-				notifErr := s.noteRepo.Create(ctx, notif)
+				notifErr := s.noteSvc.Dispatch(ctx, notif)
 				if notifErr != nil {
 					logger.Error("CRITICAL: Failed to create member joined notification", "adminID", u.ID, "error", notifErr)
 					notificationsFailed++

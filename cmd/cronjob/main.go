@@ -54,6 +54,9 @@ func main() {
 	// Initialize Repositories
 	store := postgres.NewStore(db)
 
+	// Initialize Notification service (no FCM in cronjob — push is disabled)
+	noteSvc := service.NewNotificationService(store.NotificationRepository, store.FcmTokenRepository)
+
 	// Initialize Services
 	emailService := service.NewEmailService(
 		cfg.SMTP.Host,
@@ -69,7 +72,7 @@ func main() {
 		store.LedgerRepository,
 		store.UserRepository,
 		emailService,
-		store.NotificationRepository,
+		noteSvc,
 	)
 
 	ledgerService := service.NewLedgerService(
@@ -80,7 +83,7 @@ func main() {
 		store.OrganizationRepository,
 		store.UserRepository,
 		store.InvitationRepository,
-		store.NotificationRepository,
+		noteSvc,
 	)
 
 	userService := service.NewUserService(

@@ -75,15 +75,22 @@ type MockNotificationRepo struct {
 	mock.Mock
 }
 
-func (m *MockNotificationRepo) Create(ctx context.Context, n *domain.Notification) error {
-	return nil
-}
-func (m *MockNotificationRepo) List(ctx context.Context, userID int32, limit, offset int32) ([]domain.Notification, int32, error) {
+func (m *MockNotificationRepo) GetNotifications(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Notification, int32, error) {
 	return nil, 0, nil
 }
-func (m *MockNotificationRepo) MarkAsRead(ctx context.Context, id, userID int32) error {
+func (m *MockNotificationRepo) MarkAsRead(ctx context.Context, userID int32, notificationID int64) error {
 	return nil
 }
+func (m *MockNotificationRepo) Dispatch(ctx context.Context, n *domain.Notification) error {
+	return nil
+}
+func (m *MockNotificationRepo) SyncDeviceToken(ctx context.Context, userID int32, fcmToken, androidDeviceID, deviceName string) error {
+	return nil
+}
+func (m *MockNotificationRepo) ReportMessageEvent(ctx context.Context, userID int32, notificationID int64, eventType string, eventTime time.Time) error {
+	return nil
+}
+func (m *MockNotificationRepo) SetPushService(pushSvc service.PushNotificationService) {}
 
 func TestRentalAndLedger_Integration(t *testing.T) {
 	db := prepareDB(t)

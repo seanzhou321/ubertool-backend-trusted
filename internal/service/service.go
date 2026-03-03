@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"time"
+
 	"ubertool-backend-trusted/internal/domain"
 )
 
@@ -80,7 +82,18 @@ type LedgerService interface {
 
 type NotificationService interface {
 	GetNotifications(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Notification, int32, error)
-	MarkAsRead(ctx context.Context, userID, notificationID int32) error
+	MarkAsRead(ctx context.Context, userID int32, notificationID int64) error
+	SyncDeviceToken(ctx context.Context, userID int32, fcmToken, androidDeviceID, deviceName string) error
+	ReportMessageEvent(ctx context.Context, userID int32, notificationID int64, eventType string, eventTime time.Time) error
+	// Dispatch creates the notification row in DB and fires a push notification if a push service is configured.
+	Dispatch(ctx context.Context, n *domain.Notification) error
+	// SetPushService wires the FCM push service after construction (allows nil-safe late binding).
+	SetPushService(pushSvc PushNotificationService)
+}
+
+// PushNotificationService sends FCM push notifications to a user's registered devices.
+type PushNotificationService interface {
+	SendToUser(ctx context.Context, userID int32, title, body string, notificationID int64, data map[string]string) error
 }
 
 type AdminService interface {

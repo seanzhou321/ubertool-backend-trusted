@@ -10,6 +10,7 @@
 -- CREATE TYPE tool_condition_enum AS ENUM ('EXCELLENT', 'GOOD', 'ACCEPTABLE', 'DAMAGED/NEEDS_REPAIR');
 -- CREATE TYPE ledger_transaction_type_enum AS ENUM ('RENTAL_DEBIT', 'LENDING_CREDIT', 'REFUND', 'ADJUSTMENT');
 -- CREATE TYPE rental_status_enum AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'OVERDUE', 'RETURN_DATE_CHANGED', 'RETURN_DATE_CHANGE_REJECTED');
+-- CREATE TYPE rental_dispute_status_enum AS ENUM ('INITIALIZED', 'RESOLVED', 'ADMIN_RESOLVED');
 
 -- 1. Organizations (Community/Church Groups)
 CREATE TABLE orgs (
@@ -117,10 +118,10 @@ CREATE TABLE tool_images (
     is_primary BOOLEAN NOT NULL DEFAULT FALSE,
     display_order INTEGER DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, CONFIRMED, DELETED
-    expires_at TIMESTAMP,                 -- For pending images
-    created_on TIMESTAMP DEFAULT NOW(),
-    confirmed_on TIMESTAMP,
-    deleted_on TIMESTAMP
+    expires_at TIMESTAMPTZ,                 -- For pending images
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ,
+    deleted_at TIMESTAMPTZ
 );
 
 -- Unique constraint: only one primary image per confirmed tool
@@ -160,6 +161,24 @@ CREATE TABLE rentals (
     updated_on DATE DEFAULT CURRENT_DATE
 );
 
+CREATE TABLE rental_disputes (
+    id SERIAL PRIMARY KEY,
+    rental_id INTEGER REFERENCES rentals(id) ON DELETE CASCADE,
+    raised_by_user_id INTEGER REFERENCES users(id),  -- either renter or owner can raise dispute
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'INITIALIZED',
+    resolution TEXT,
+    admin_comment TEXT,
+    disputed_amount_cents INTEGER, -- For cases where dispute involves disagreement on additional fees (e.g., late fee, damage fee)
+    resolved_amount_cents INTEGER, -- Final amount after dispute resolution (can be same as disputed_amount_cents if no change)
+    renter_acknowledged BOOLEAN DEFAULT FALSE,
+    owner_acknowledged BOOLEAN DEFAULT FALSE,
+    admin_resolved_user_id INTEGER REFERENCES users(id), -- Admin who resolved the dispute
+    resolved_on DATE,
+    created_on DATE DEFAULT CURRENT_DATE,
+    updated_on DATE DEFAULT CURRENT_DATE
+);
+
 -- 5. Ledger
 CREATE TABLE ledger_transactions (
     id SERIAL PRIMARY KEY,
@@ -175,15 +194,36 @@ CREATE TABLE ledger_transactions (
 
 -- 6. Notifications
 CREATE TABLE notifications (
-    id SERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     org_id INTEGER REFERENCES orgs(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     message TEXT NOT NULL,
-    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    devices_sent JSONB, -- For storing which devices the push notification was sent to
+    delivered_at TIMESTAMPTZ, -- for device receives push notifications
+    clicked_at TIMESTAMPTZ, -- for user tapped push notifications and opens the app
+    read_at TIMESTAMPTZ, -- for in-app notifications
     attributes JSONB, -- For metadata map
-    created_on DATE DEFAULT CURRENT_DATE
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Implementation note: when processing ReportEventRequest from client, update the corresponding timestamp based on event_type
+-- Use below SQL as reference for the update query (example for DELIVERED event):
+-- UPDATE notifications SET delivered_at = COALESCE(delivered_at, NOW()) WHERE id = $1
+
+CREATE TABLE fcm_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    fcm_token TEXT NOT NULL, -- FCM registration token from the device
+    android_device_id TEXT NOT NULL, -- identifier for the device (e.g., UUID from client)
+    device_info JSONB, -- For storing device metadata
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, OBSOLETE
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(fcm_token) -- fcm_token is a global unique identifier for the device registration with FCM
+);
+
+CREATE INDEX idx_fcm_tokens_user_id ON fcm_tokens(user_id) WHERE status = 'ACTIVE';
 
 -- Function to update balance on insert
 CREATE OR REPLACE FUNCTION update_user_balance() RETURNS TRIGGER AS $$
@@ -207,8 +247,8 @@ CREATE TABLE balance_snapshots (
     org_id INTEGER NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
     balance_cents INTEGER NOT NULL,
     settlement_month TEXT NOT NULL, -- Format: 'YYYY-MM' (e.g., '2026-01')
-    snapshot_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    created_on TIMESTAMP DEFAULT NOW(),
+    snapshot_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(user_id, org_id, settlement_month)
 );
 
@@ -229,19 +269,19 @@ CREATE TABLE bills (
     status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, PAID, DISPUTED, ADMIN_RESOLVED, SYSTEM_DEFAULT_ACTION
     
     -- Timestamps for tracking state transitions (denormalized for quick queries)
-    notice_sent_at TIMESTAMP,
-    debtor_acknowledged_at TIMESTAMP,
-    creditor_acknowledged_at TIMESTAMP,
-    disputed_at TIMESTAMP,
-    resolved_at TIMESTAMP,
+    notice_sent_at TIMESTAMPTZ,
+    debtor_acknowledged_at TIMESTAMPTZ,
+    creditor_acknowledged_at TIMESTAMPTZ,
+    disputed_at TIMESTAMPTZ,
+    resolved_at TIMESTAMPTZ,
     
     -- Dispute tracking
     dispute_reason TEXT, -- DEBTOR_NO_ACK, CREDITOR_NO_ACK
     resolution_outcome TEXT, -- GRACEFUL, DEBTOR_FAULT, CREDITOR_FAULT, BOTH_FAULT
     resolution_notes TEXT,
     
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     
     CHECK (debtor_user_id != creditor_user_id),
     UNIQUE(org_id, debtor_user_id, creditor_user_id, settlement_month)
@@ -270,7 +310,7 @@ CREATE TABLE bill_actions (
                                 -- DISPUTE_OPENED, ADMIN_COMMENT, ADMIN_RESOLUTION, SYSTEM_AUTO_RESOLVE
     action_details JSONB, -- Flexible storage for action metadata
     notes TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_bill_actions_bill ON bill_actions(bill_id);

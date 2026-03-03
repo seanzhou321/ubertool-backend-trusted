@@ -15,6 +15,7 @@ type Store struct {
 	repository.RentalRepository
 	repository.LedgerRepository
 	repository.NotificationRepository
+	repository.FcmTokenRepository
 	repository.InvitationRepository
 	repository.JoinRequestRepository
 	repository.BillRepository
@@ -29,6 +30,7 @@ func NewStore(db *sql.DB) *Store {
 		RentalRepository:       NewRentalRepository(db),
 		LedgerRepository:       NewLedgerRepository(db),
 		NotificationRepository: NewNotificationRepository(db),
+		FcmTokenRepository:     NewFcmTokenRepository(db),
 		InvitationRepository:   NewInvitationRepository(db),
 		JoinRequestRepository:  NewJoinRequestRepository(db),
 		BillRepository:         NewBillRepository(db),

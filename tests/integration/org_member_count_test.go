@@ -20,10 +20,10 @@ func TestOrganizationService_MemberCount(t *testing.T) {
 	orgRepo := postgres.NewOrganizationRepository(db)
 	userRepo := postgres.NewUserRepository(db)
 	inviteRepo := postgres.NewInvitationRepository(db)
-	notifRepo := postgres.NewNotificationRepository(db)
+	notifSvc := &MockNotificationRepo{}
 
 	// Create organization service
-	orgSvc := service.NewOrganizationService(orgRepo, userRepo, inviteRepo, notifRepo)
+	orgSvc := service.NewOrganizationService(orgRepo, userRepo, inviteRepo, notifSvc)
 
 	ctx := context.Background()
 
