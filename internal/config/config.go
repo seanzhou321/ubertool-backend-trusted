@@ -9,13 +9,12 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	SMTP     SMTPConfig     `yaml:"smtp"`
-	JWT      JWTConfig      `yaml:"jwt"`
-	Storage  StorageConfig  `yaml:"storage"`
+	Server    ServerConfig    `yaml:"server"`
+	Database  DatabaseConfig  `yaml:"database"`
+	SMTP      SMTPConfig      `yaml:"smtp"`
+	JWT       JWTConfig       `yaml:"jwt"`
+	Storage   StorageConfig   `yaml:"storage"`
 	Log       LogConfig       `yaml:"log"`
-	Billing   BillingConfig   `yaml:"billing"`
 	Scheduler SchedulerConfig `yaml:"scheduler"`
 }
 
@@ -157,11 +156,6 @@ func (c *Config) overrideWithEnv() {
 		c.Log.Format = val
 	}
 
-	// Billing
-	if val := os.Getenv("BILLING_THRESHOLD_CENTS"); val != "" {
-		fmt.Sscanf(val, "%d", &c.Billing.SettlementThresholdCents)
-	}
-
 	// Set defaults for log if not configured
 	if c.Log.Level == "" {
 		c.Log.Level = "info"
@@ -210,11 +204,6 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("upload directory is required")
 	}
 
-	// Billing defaults
-	if c.Billing.SettlementThresholdCents == 0 {
-		c.Billing.SettlementThresholdCents = 500 // Default $5.00
-	}
-
 	// Scheduler defaults
 	if c.Scheduler.MarkOverdueRentals == "" {
 		c.Scheduler.MarkOverdueRentals = "0 0 2 * * *" // 2 AM UTC
@@ -260,11 +249,6 @@ func (c *Config) GetDatabaseConnectionString() string {
 // GetServerAddress returns the gRPC server address
 func (c *Config) GetServerAddress() string {
 	return fmt.Sprintf("%s:%d", c.Server.Host, c.Server.Port)
-}
-
-// BillingConfig contains bill splitting settings
-type BillingConfig struct {
-	SettlementThresholdCents int `yaml:"settlement_threshold_cents"`
 }
 
 // SchedulerConfig contains cron schedule settings

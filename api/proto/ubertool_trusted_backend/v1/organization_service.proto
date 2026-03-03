@@ -80,6 +80,8 @@ message UpdateOrganizationRequest {
   string metro = 5;
   string admin_email = 6;
   string admin_phone = 7;
+  int32 billsplit_settlement_threshold_cents = 8; // Max amount allowed to carry over after bill splitting
+  int32 max_billsplit_rental_cost_cents = 9;       // Max rental cost settled by bill splitting
 }
 
 message UpdateOrganizationResponse {

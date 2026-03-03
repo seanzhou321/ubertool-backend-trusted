@@ -26,9 +26,9 @@ func (r *organizationRepository) Create(ctx context.Context, o *domain.Organizat
 
 func (r *organizationRepository) GetByID(ctx context.Context, id int32) (*domain.Organization, error) {
 	o := &domain.Organization{}
-	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on FROM orgs WHERE id = $1`
+	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on, billsplit_settlement_threshold_cents, max_billsplit_rental_cost_cents FROM orgs WHERE id = $1`
 	var createdOn time.Time
-	err := r.db.QueryRowContext(ctx, query, id).Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &createdOn)
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &createdOn, &o.SettlementThresholdCents, &o.MaxBillsplitRentalCostCents)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (r *organizationRepository) GetByID(ctx context.Context, id int32) (*domain
 }
 
 func (r *organizationRepository) List(ctx context.Context) ([]domain.Organization, error) {
-	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on FROM orgs`
+	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on, billsplit_settlement_threshold_cents, max_billsplit_rental_cost_cents FROM orgs`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (r *organizationRepository) List(ctx context.Context) ([]domain.Organizatio
 	for rows.Next() {
 		var o domain.Organization
 		var createdOn time.Time
-		if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &createdOn); err != nil {
+		if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &createdOn, &o.SettlementThresholdCents, &o.MaxBillsplitRentalCostCents); err != nil {
 			return nil, err
 		}
 		o.CreatedOn = createdOn.Format("2006-01-02")
@@ -58,7 +58,7 @@ func (r *organizationRepository) List(ctx context.Context) ([]domain.Organizatio
 }
 
 func (r *organizationRepository) Search(ctx context.Context, name, metro string) ([]domain.Organization, error) {
-	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on FROM orgs 
+	query := `SELECT id, name, COALESCE(description, ''), COALESCE(address, ''), metro, COALESCE(admin_phone_number, ''), COALESCE(admin_email, ''), created_on, billsplit_settlement_threshold_cents, max_billsplit_rental_cost_cents FROM orgs 
 	          WHERE name ILIKE $1 AND metro ILIKE $2`
 	rows, err := r.db.QueryContext(ctx, query, "%"+name+"%", "%"+metro+"%")
 	if err != nil {
@@ -70,7 +70,7 @@ func (r *organizationRepository) Search(ctx context.Context, name, metro string)
 	for rows.Next() {
 		var o domain.Organization
 		var createdOn time.Time
-		if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &createdOn); err != nil {
+		if err := rows.Scan(&o.ID, &o.Name, &o.Description, &o.Address, &o.Metro, &o.AdminPhoneNumber, &o.AdminEmail, &createdOn, &o.SettlementThresholdCents, &o.MaxBillsplitRentalCostCents); err != nil {
 			return nil, err
 		}
 		o.CreatedOn = createdOn.Format("2006-01-02")
@@ -79,7 +79,7 @@ func (r *organizationRepository) Search(ctx context.Context, name, metro string)
 	return orgs, nil
 }
 func (r *organizationRepository) Update(ctx context.Context, o *domain.Organization) error {
-	query := `UPDATE orgs SET name = $1, description = $2, address = $3, metro = $4, admin_phone_number = $5, admin_email = $6 WHERE id = $7`
-	_, err := r.db.ExecContext(ctx, query, o.Name, o.Description, o.Address, o.Metro, o.AdminPhoneNumber, o.AdminEmail, o.ID)
+	query := `UPDATE orgs SET name = $1, description = $2, address = $3, metro = $4, admin_phone_number = $5, admin_email = $6, billsplit_settlement_threshold_cents = $7, max_billsplit_rental_cost_cents = $8 WHERE id = $9`
+	_, err := r.db.ExecContext(ctx, query, o.Name, o.Description, o.Address, o.Metro, o.AdminPhoneNumber, o.AdminEmail, o.SettlementThresholdCents, o.MaxBillsplitRentalCostCents, o.ID)
 	return err
 }

@@ -651,17 +651,10 @@ func TestBillSplitAlgorithm_E2E(t *testing.T) {
 	}
 
 	// Setup JobRunner
-	// We need a real DB connection (testDB.DB) and a config with threshold
-	// Manually construct config since loadConfig might not be available or we want specific settings
-	cfg := &config.Config{
-		Billing: config.BillingConfig{
-			SettlementThresholdCents: 500, // $5.00
-		},
-	}
-
+	// We need a real DB connection (testDB.DB)
 	store := postgres.NewStore(testDB.DB)
 	// Services can be nil as PerformBillSplitting doesn't use them (confirmed by code analysis)
-	jobRunner := jobs.NewJobRunner(testDB.DB, store, nil, cfg)
+	jobRunner := jobs.NewJobRunner(testDB.DB, store, nil, &config.Config{})
 
 	// Trigger Bill Splitting
 	// We call the job function directly. It will discover the org and run the algorithm.

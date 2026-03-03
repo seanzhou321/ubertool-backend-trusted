@@ -52,17 +52,19 @@ func MapDomainOrgToProto(o *domain.Organization, userRole string) *pb.Organizati
 	}
 
 	return &pb.Organization{
-		Id:          o.ID,
-		Name:        o.Name,
-		Description: o.Description,
-		Address:     o.Address,
-		Metro:       o.Metro,
-		MemberCount: o.MemberCount,
-		AdminEmail:  o.AdminEmail,
-		AdminPhone:  o.AdminPhoneNumber,
-		CreatedOn:   o.CreatedOn,
-		UserRole:    userRole,
-		Admins:      protoAdmins,
+		Id:                              o.ID,
+		Name:                            o.Name,
+		Description:                     o.Description,
+		Address:                         o.Address,
+		Metro:                           o.Metro,
+		MemberCount:                     o.MemberCount,
+		AdminEmail:                      o.AdminEmail,
+		AdminPhone:                      o.AdminPhoneNumber,
+		CreatedOn:                       o.CreatedOn,
+		UserRole:                        userRole,
+		Admins:                          protoAdmins,
+		MaxBillsplitRentalCostCents:     o.MaxBillsplitRentalCostCents,
+		BillsplitSettlementThresholdCents: o.SettlementThresholdCents,
 	}
 }
 

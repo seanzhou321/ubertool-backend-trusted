@@ -22,15 +22,17 @@ func TestOrganizationRepository_Update(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		org := &domain.Organization{
-			ID:               1,
-			Name:             "Updated Org",
-			Description:      "New Desc",
-			AdminEmail:       "admin@test.com",
-			AdminPhoneNumber: "123",
+			ID:                          1,
+			Name:                        "Updated Org",
+			Description:                 "New Desc",
+			AdminEmail:                  "admin@test.com",
+			AdminPhoneNumber:            "123",
+			SettlementThresholdCents:    500,
+			MaxBillsplitRentalCostCents: 1000,
 		}
 
 		mock.ExpectExec("UPDATE orgs SET").
-			WithArgs(org.Name, org.Description, org.Address, org.Metro, org.AdminPhoneNumber, org.AdminEmail, org.ID).
+			WithArgs(org.Name, org.Description, org.Address, org.Metro, org.AdminPhoneNumber, org.AdminEmail, org.SettlementThresholdCents, org.MaxBillsplitRentalCostCents, org.ID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
 		err := repo.Update(ctx, org)

@@ -35,6 +35,8 @@ message Organization {
   string admin_phone = 12;
   string user_role = 13; // Role of the user in this organization (SUPER_ADMIN, ADMIN, MEMBER, NULL)
   repeated User admins = 14; // List of SUPER_ADMIN and ADMIN users in the organization. Populated in SearchOrganizations()
+  int32 max_billsplit_rental_cost_cents = 15; // Max rental cost allowed to be settled by bill splitting.
+  int32 billsplit_settlement_threshold_cents = 16; // Max amount allowed to carry over to next billing cycle after bill splitting.
 }
 
 // Pagination request - supports both cursor-based and offset-based pagination

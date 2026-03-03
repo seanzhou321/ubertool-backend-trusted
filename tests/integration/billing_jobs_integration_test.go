@@ -20,16 +20,9 @@ func TestPerformBillSplittingForOrg(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Setup Config
-	cfg := &config.Config{
-		Billing: config.BillingConfig{
-			SettlementThresholdCents: 500, // $5.00
-		},
-	}
-
 	// Setup JobRunner
 	// We only need DB and Config for this function
-	jr := jobs.NewJobRunner(db, &postgres.Store{}, nil, cfg)
+	jr := jobs.NewJobRunner(db, &postgres.Store{}, nil, &config.Config{})
 
 	// Test Data
 	orgID := int32(101)
@@ -64,7 +57,7 @@ func TestPerformBillSplittingForOrg(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	count, err := jr.PerformBillSplittingForOrg(ctx, orgID, orgName, settlementMonth)
+	count, err := jr.PerformBillSplittingForOrg(ctx, orgID, orgName, settlementMonth, 500)
 
 	// Assertions
 	assert.NoError(t, err)
@@ -84,12 +77,7 @@ func TestPerformBillSplittingForOrg_BelowThreshold(t *testing.T) {
 	}
 	defer db.Close()
 
-	cfg := &config.Config{
-		Billing: config.BillingConfig{
-			SettlementThresholdCents: 500, // $5.00
-		},
-	}
-	jr := jobs.NewJobRunner(db, &postgres.Store{}, nil, cfg)
+	jr := jobs.NewJobRunner(db, &postgres.Store{}, nil, &config.Config{})
 
 	orgID := int32(102)
 	orgName := "Small Org"
@@ -106,7 +94,7 @@ func TestPerformBillSplittingForOrg_BelowThreshold(t *testing.T) {
 
 	// Expect NO insert statements because balances are below threshold
 	
-	count, err := jr.PerformBillSplittingForOrg(context.Background(), orgID, orgName, settlementMonth)
+	count, err := jr.PerformBillSplittingForOrg(context.Background(), orgID, orgName, settlementMonth, 500)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)

@@ -119,7 +119,7 @@ func (jr *JobRunner) PerformBillSplitting() {
 
 		totalBills := 0
 		for _, org := range orgs {
-			billCount, err := jr.PerformBillSplittingForOrg(ctx, org.ID, org.Name, lastMonth)
+			billCount, err := jr.PerformBillSplittingForOrg(ctx, org.ID, org.Name, lastMonth, int(org.SettlementThresholdCents))
 			if err != nil {
 				logger.Error("Failed to perform bill splitting for org",
 					"org_id", org.ID,
@@ -137,7 +137,7 @@ func (jr *JobRunner) PerformBillSplitting() {
 }
 
 // PerformBillSplittingForOrg performs bill splitting for a single organization
-func (jr *JobRunner) PerformBillSplittingForOrg(ctx context.Context, orgID int32, orgName, settlementMonth string) (int, error) {
+func (jr *JobRunner) PerformBillSplittingForOrg(ctx context.Context, orgID int32, orgName, settlementMonth string, thresholdCents int) (int, error) {
 	// Get all users in the organization with their balances
 	query := `
 		SELECT user_id, balance_cents
@@ -176,7 +176,6 @@ func (jr *JobRunner) PerformBillSplittingForOrg(ctx context.Context, orgID int32
 	}
 
 	// Calculate transactions using the heap-based greedy algorithm
-	thresholdCents := jr.config.Billing.SettlementThresholdCents
 	transactions := CalculateTransactions(creditors, debtors, thresholdCents)
 
 	// Save transactions to DB

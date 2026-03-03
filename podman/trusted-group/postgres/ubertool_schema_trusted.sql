@@ -22,8 +22,8 @@ CREATE TABLE orgs (
     admin_phone_number TEXT NOT NULL,
     admin_email TEXT NOT NULL,
     max_replacement_cost_cents INTEGER NOT NULL DEFAULT 30000, -- Max allowed replacement cost for tools in this org
-    max_rental_cost_cents INTEGER NOT NULL DEFAULT 1000, -- Max allowed rental cost for single rental request in this org
-    max_bill_split_threshold_cents INTEGER NOT NULL DEFAULT 500, -- Max allowed amount for bill splitting; above this requires manual review
+    max_billsplit_rental_cost_cents INTEGER NOT NULL DEFAULT 1000, -- Max rental cost allowed to be settled by bill splitting. 
+    billsplit_settlement_threshold_cents INTEGER NOT NULL DEFAULT 500, -- Max amount allowed to carry over to next billing cycle after bill splitting.
     created_on DATE DEFAULT CURRENT_DATE
 );
 

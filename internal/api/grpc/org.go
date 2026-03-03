@@ -77,13 +77,15 @@ func (h *OrganizationHandler) SearchOrganizations(ctx context.Context, req *pb.S
 }
 func (h *OrganizationHandler) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {
 	org := &domain.Organization{
-		ID:               req.OrganizationId,
-		Name:             req.Name,
-		Description:      req.Description,
-		Address:          req.Address,
-		Metro:            req.Metro,
-		AdminEmail:       req.AdminEmail,
-		AdminPhoneNumber: req.AdminPhone,
+		ID:                          req.OrganizationId,
+		Name:                        req.Name,
+		Description:                 req.Description,
+		Address:                     req.Address,
+		Metro:                       req.Metro,
+		AdminEmail:                  req.AdminEmail,
+		AdminPhoneNumber:            req.AdminPhone,
+		SettlementThresholdCents:    req.BillsplitSettlementThresholdCents,
+		MaxBillsplitRentalCostCents: req.MaxBillsplitRentalCostCents,
 	}
 	err := h.orgSvc.UpdateOrganization(ctx, org)
 	if err != nil {
