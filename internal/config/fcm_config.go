@@ -10,7 +10,7 @@ import (
 )
 
 func initFirebase() (*messaging.Client, error) {
-	opt := option.WithCredentialsFile("config/fcmServiceAccountKey.json")
+	opt := option.WithCredentialsFile("config/firebase-admin-key.json")
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
 		return nil, err

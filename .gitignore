@@ -56,3 +56,4 @@ client/
 
 # generated api code
 api/gen/
+config/firebase-admin-key.json
