@@ -95,6 +95,7 @@ func PrepareDB(t *testing.T) *TestDB {
 // Cleanup performs test cleanup
 func (db *TestDB) Cleanup() {
 	db.Exec("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
+	db.Exec("DELETE FROM fcm_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
 	db.Exec("DELETE FROM ledger_transactions WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%')")
 	// Delete bill_actions first (foreign key to bills)
 	db.Exec("DELETE FROM bill_actions WHERE bill_id IN (SELECT id FROM bills WHERE debtor_user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%') OR creditor_user_id IN (SELECT id FROM users WHERE email LIKE 'e2e-test-%'))")
@@ -461,4 +462,34 @@ func (db *TestDB) GetLatestBillAction(billID int32) map[string]interface{} {
 	}
 
 	return result
+}
+
+// CreateFcmToken seeds an active FCM token for a user directly in the database,
+// simulating what the Android client would send via SyncDeviceToken on startup.
+func (db *TestDB) CreateFcmToken(userID int32, fcmToken, androidDeviceID string) {
+	_, err := db.Exec(`
+		INSERT INTO fcm_tokens (user_id, fcm_token, android_device_id, device_info, status)
+		VALUES ($1, $2, $3, '{}', 'ACTIVE')
+		ON CONFLICT (fcm_token) DO UPDATE SET user_id = EXCLUDED.user_id, status = 'ACTIVE'
+	`, userID, fcmToken, androidDeviceID)
+	if err != nil {
+		db.t.Fatalf("failed to create fcm token for user %d: %v", userID, err)
+	}
+}
+
+// GetFcmTokenStatus returns the status of an FCM token, or "" if not found.
+func (db *TestDB) GetFcmTokenStatus(fcmToken string) string {
+	var status string
+	err := db.QueryRow("SELECT status FROM fcm_tokens WHERE fcm_token = $1", fcmToken).Scan(&status)
+	if err != nil {
+		return ""
+	}
+	return status
+}
+
+// CountActiveTokensForUser returns the number of ACTIVE FCM tokens for a user.
+func (db *TestDB) CountActiveTokensForUser(userID int32) int {
+	var count int
+	_ = db.QueryRow("SELECT COUNT(*) FROM fcm_tokens WHERE user_id = $1 AND status = 'ACTIVE'", userID).Scan(&count)
+	return count
 }

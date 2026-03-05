@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository"
 )
 
@@ -39,7 +40,10 @@ func (s *notificationService) Dispatch(ctx context.Context, n *domain.Notificati
 		return err
 	}
 	if s.pushSvc != nil && n.ID > 0 {
+		logger.Debug("Dispatching push notification", "userID", n.UserID, "notificationID", n.ID, "title", n.Title)
 		s.pushSvc.SendToUser(ctx, n.UserID, n.Title, n.Message, n.ID, n.Attributes) //nolint:errcheck
+	} else if s.pushSvc == nil {
+		logger.Debug("Push service not configured, skipping push for notification", "notificationID", n.ID)
 	}
 	return nil
 }

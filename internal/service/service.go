@@ -14,7 +14,7 @@ type AuthService interface {
 	Login(ctx context.Context, email, password string) (string, string, string, bool, error) // access, refresh, session, requires2FA
 	Verify2FA(ctx context.Context, userID int32, code string) (string, string, *domain.User, error)
 	RefreshToken(ctx context.Context, refresh string) (string, string, error)
-	Logout(ctx context.Context, refresh string) error
+	Logout(ctx context.Context, userID int32, refresh, androidDeviceID string) error
 }
 
 type UserService interface {
@@ -94,6 +94,9 @@ type NotificationService interface {
 // PushNotificationService sends FCM push notifications to a user's registered devices.
 type PushNotificationService interface {
 	SendToUser(ctx context.Context, userID int32, title, body string, notificationID int64, data map[string]string) error
+	// Shutdown drains all in-flight send goroutines. Call during graceful server
+	// shutdown before exiting. Returns ctx.Err() if the deadline is exceeded.
+	Shutdown(ctx context.Context) error
 }
 
 type AdminService interface {

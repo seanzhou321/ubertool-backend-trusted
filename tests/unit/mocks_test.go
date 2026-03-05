@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	fcmmessaging "firebase.google.com/go/v4/messaging"
+
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
 
@@ -473,3 +475,41 @@ func (m *MockNotificationRepo) ReportMessageEvent(ctx context.Context, userID in
 	return nil
 }
 func (m *MockNotificationRepo) SetPushService(pushSvc service.PushNotificationService) {}
+
+// MockFCMSender mocks the service.FCMSender interface.
+type MockFCMSender struct {
+	mock.Mock
+}
+
+func (m *MockFCMSender) Send(ctx context.Context, msg *fcmmessaging.Message) (string, error) {
+	args := m.Called(ctx, msg)
+	return args.String(0), args.Error(1)
+}
+
+// MockFcmTokenRepo mocks repository.FcmTokenRepository.
+type MockFcmTokenRepo struct {
+	mock.Mock
+}
+
+func (m *MockFcmTokenRepo) Upsert(ctx context.Context, token *domain.FcmToken) error {
+	args := m.Called(ctx, token)
+	return args.Error(0)
+}
+
+func (m *MockFcmTokenRepo) GetActiveByUserID(ctx context.Context, userID int32) ([]domain.FcmToken, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.FcmToken), args.Error(1)
+}
+
+func (m *MockFcmTokenRepo) MarkObsolete(ctx context.Context, token string) error {
+	args := m.Called(ctx, token)
+	return args.Error(0)
+}
+
+func (m *MockFcmTokenRepo) MarkObsoleteByDevice(ctx context.Context, userID int32, androidDeviceID string) error {
+	args := m.Called(ctx, userID, androidDeviceID)
+	return args.Error(0)
+}

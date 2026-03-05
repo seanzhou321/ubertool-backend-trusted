@@ -115,8 +115,9 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 			Title:   "New Rental Request",
 			Message: fmt.Sprintf("%s requested to rent %s", renter.Name, tool.Name),
 			Attributes: map[string]string{
-				"type":      "RENTAL_REQUEST",
-				"rental_id": fmt.Sprintf("%d", rental.ID),
+				"type":       "RENTAL_REQUEST",
+				"rental_id":  fmt.Sprintf("%d", rental.ID),
+				"channel_id": string(domain.ChannelRentalRequest),
 			},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
@@ -157,8 +158,9 @@ func (s *rentalService) ApproveRentalRequest(ctx context.Context, ownerID, renta
 			Title:   "Rental Approved",
 			Message: fmt.Sprintf("Your rental request for %s by %s was approved", tool.Name, owner.Name),
 			Attributes: map[string]string{
-				"type":      "RENTAL_APPROVED",
-				"rental_id": fmt.Sprintf("%d", rt.ID),
+				"type":       "RENTAL_APPROVED",
+				"rental_id":  fmt.Sprintf("%d", rt.ID),
+				"channel_id": string(domain.ChannelRentalRequest),
 			},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
@@ -195,8 +197,9 @@ func (s *rentalService) RejectRentalRequest(ctx context.Context, ownerID, rental
 			Title:   "Rental Rejected",
 			Message: fmt.Sprintf("Your rental request for %s by %s was rejected", tool.Name, owner.Name),
 			Attributes: map[string]string{
-				"type":      "RENTAL_REJECTED",
-				"rental_id": fmt.Sprintf("%d", rt.ID),
+				"type":       "RENTAL_REJECTED",
+				"rental_id":  fmt.Sprintf("%d", rt.ID),
+				"channel_id": string(domain.ChannelRentalRequest),
 			},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
@@ -233,8 +236,9 @@ func (s *rentalService) CancelRental(ctx context.Context, renterID, rentalID int
 			Title:   "Rental Cancelled",
 			Message: fmt.Sprintf("%s cancelled rental request for %s", renter.Name, tool.Name),
 			Attributes: map[string]string{
-				"type":      "RENTAL_CANCELLED",
-				"rental_id": fmt.Sprintf("%d", rt.ID),
+				"type":       "RENTAL_CANCELLED",
+				"rental_id":  fmt.Sprintf("%d", rt.ID),
+				"channel_id": string(domain.ChannelRentalRequest),
 			},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
@@ -285,8 +289,9 @@ func (s *rentalService) FinalizeRentalRequest(ctx context.Context, renterID, ren
 			Title:   "Rental Confirmed",
 			Message: fmt.Sprintf("%s confirmed rental for %s", renter.Name, tool.Name),
 			Attributes: map[string]string{
-				"type":      "RENTAL_CONFIRMED",
-				"rental_id": fmt.Sprintf("%d", rt.ID),
+				"type":       "RENTAL_CONFIRMED",
+				"rental_id":  fmt.Sprintf("%d", rt.ID),
+				"channel_id": string(domain.ChannelRentalRequest),
 			},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
@@ -362,8 +367,9 @@ func (s *rentalService) ActivateRental(ctx context.Context, userID, rentalID int
 			Title:   "Rental Picked Up",
 			Message: fmt.Sprintf("Rental for %s has been picked up by %s", toolName, myName),
 			Attributes: map[string]string{
-				"type":      "RENTAL_PICKUP",
-				"rental_id": fmt.Sprintf("%d", rt.ID),
+				"type":       "RENTAL_PICKUP",
+				"rental_id":  fmt.Sprintf("%d", rt.ID),
+				"channel_id": string(domain.ChannelRentalRequest),
 			},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
@@ -443,7 +449,7 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 					OrgID:      rt.OrgID,
 					Title:      "Rental Dates Changed",
 					Message:    fmt.Sprintf("Renter changed dates for %s. Please re-approve.", tool.Name),
-					Attributes: map[string]string{"type": "RENTAL_DATE_CHANGE", "rental_id": fmt.Sprintf("%d", rt.ID)},
+					Attributes: map[string]string{"type": "RENTAL_DATE_CHANGE", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
 				}
 				_ = s.noteSvc.Dispatch(ctx, notif)
 			}
@@ -458,7 +464,7 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 					OrgID:      rt.OrgID,
 					Title:      "Rental Dates Updated",
 					Message:    fmt.Sprintf("Owner updated dates for %s. Please confirm.", tool.Name),
-					Attributes: map[string]string{"type": "RENTAL_DATE_CHANGE", "rental_id": fmt.Sprintf("%d", rt.ID)},
+					Attributes: map[string]string{"type": "RENTAL_DATE_CHANGE", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
 				}
 				_ = s.noteSvc.Dispatch(ctx, notif)
 			}
@@ -483,7 +489,7 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 				OrgID:      rt.OrgID,
 				Title:      "Return Date Extension Request",
 				Message:    fmt.Sprintf("Renter requests to extend return date for %s to %s.", tool.Name, nEnd.Format("2006-01-02")),
-				Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_REQUEST", "rental_id": fmt.Sprintf("%d", rt.ID)},
+				Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_REQUEST", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
 			}
 			_ = s.noteSvc.Dispatch(ctx, notif)
 		}
@@ -506,7 +512,7 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 				OrgID:      rt.OrgID,
 				Title:      "Extension Request Updated",
 				Message:    fmt.Sprintf("Renter updated their extension request for %s to %s.", tool.Name, nEnd.Format("2006-01-02")),
-				Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_REQUEST_UPDATED", "rental_id": fmt.Sprintf("%d", rt.ID)},
+				Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_REQUEST_UPDATED", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
 			}
 			_ = s.noteSvc.Dispatch(ctx, notif)
 		}
@@ -551,9 +557,11 @@ func (s *rentalService) ApproveReturnDateChange(ctx context.Context, ownerID, re
 	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
 	if renter != nil && tool != nil {
 		notif := &domain.Notification{
-			UserID: renter.ID, OrgID: rt.OrgID, Title: "Extension Approved",
+			UserID:     renter.ID,
+			OrgID:      rt.OrgID,
+			Title:      "Extension Approved",
 			Message:    fmt.Sprintf("Extension for %s approved.", tool.Name),
-			Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_APPROVED", "rental_id": fmt.Sprintf("%d", rt.ID)},
+			Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_APPROVED", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
 	}
@@ -623,8 +631,9 @@ func (s *rentalService) RejectReturnDateChange(ctx context.Context, ownerID, ren
 	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
 	if renter != nil && tool != nil {
 		notif := &domain.Notification{
-			UserID: renter.ID, OrgID: rt.OrgID,
-			Title: "Extension Rejected - Counter-Proposal",
+			UserID: renter.ID,
+			OrgID:  rt.OrgID,
+			Title:  "Extension Rejected - Counter-Proposal",
 			Message: fmt.Sprintf("Extension for %s rejected. Owner set new return date: %s. Reason: %s. Updated cost: $%.2f",
 				tool.Name, newEndDate.Format("2006-01-02"), reason, float64(rt.TotalCostCents)/100),
 			Attributes: map[string]string{
@@ -632,6 +641,7 @@ func (s *rentalService) RejectReturnDateChange(ctx context.Context, ownerID, ren
 				"rental_id":        fmt.Sprintf("%d", rt.ID),
 				"new_end_date":     newEndDate.Format("2006-01-02"),
 				"total_cost_cents": fmt.Sprintf("%d", rt.TotalCostCents),
+				"channel_id":       string(domain.ChannelRentalRequest),
 			},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
@@ -690,9 +700,11 @@ func (s *rentalService) AcknowledgeReturnDateRejection(ctx context.Context, rent
 	owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
 	if owner != nil {
 		notif := &domain.Notification{
-			UserID: owner.ID, OrgID: rt.OrgID, Title: "Rejection Acknowledged",
+			UserID:     owner.ID,
+			OrgID:      rt.OrgID,
+			Title:      "Rejection Acknowledged",
 			Message:    "Renter acknowledged extension rejection.",
-			Attributes: map[string]string{"type": "RETURN_DATE_REJECTION_ACKNOWLEDGED", "rental_id": fmt.Sprintf("%d", rt.ID)},
+			Attributes: map[string]string{"type": "RETURN_DATE_REJECTION_ACKNOWLEDGED", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
 	}
@@ -745,9 +757,11 @@ func (s *rentalService) CancelReturnDateChange(ctx context.Context, renterID, re
 	owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
 	if owner != nil {
 		notif := &domain.Notification{
-			UserID: owner.ID, OrgID: rt.OrgID, Title: "Extension Request Cancelled",
+			UserID:     owner.ID,
+			OrgID:      rt.OrgID,
+			Title:      "Extension Request Cancelled",
 			Message:    "Renter cancelled extension request.",
-			Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_CANCELLED", "rental_id": fmt.Sprintf("%d", rt.ID)},
+			Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_CANCELLED", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notif)
 	}

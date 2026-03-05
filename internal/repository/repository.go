@@ -80,6 +80,7 @@ type FcmTokenRepository interface {
 	Upsert(ctx context.Context, token *domain.FcmToken) error
 	GetActiveByUserID(ctx context.Context, userID int32) ([]domain.FcmToken, error)
 	MarkObsolete(ctx context.Context, token string) error
+	MarkObsoleteByDevice(ctx context.Context, userID int32, androidDeviceID string) error
 }
 
 type InvitationRepository interface {

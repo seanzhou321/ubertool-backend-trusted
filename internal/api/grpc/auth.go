@@ -149,6 +149,20 @@ func (h *AuthHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequ
 }
 
 func (h *AuthHandler) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
-	_, _ = GetUserIDFromContext(ctx) // Extract but maybe not needed for simple logout
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "missing or invalid access token")
+	}
+
+	var refreshToken string
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if tokens := md.Get("refresh-token"); len(tokens) > 0 {
+			refreshToken = tokens[0]
+		}
+	}
+
+	if err := h.authSvc.Logout(ctx, int32(userID), refreshToken, req.AndroidDeviceId); err != nil {
+		return nil, err
+	}
 	return &pb.LogoutResponse{Success: true}, nil
 }

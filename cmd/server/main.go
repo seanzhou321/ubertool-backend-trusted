@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -118,6 +123,7 @@ func main() {
 		noteSvc,
 		emailSvc,
 		cfg.JWT.Secret,
+		store.FcmTokenRepository,
 	)
 	userSvc := service.NewUserService(store.UserRepository, store.OrganizationRepository)
 	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository, store.InvitationRepository, noteSvc)
@@ -203,8 +209,37 @@ func main() {
 	}
 
 	logger.Info("gRPC server listening", "address", cfg.GetServerAddress())
-	if err := s.Serve(lis); err != nil {
-		logger.Error("Failed to serve gRPC", "error", err)
-		log.Fatalf("Failed to serve: %v", err)
+
+	// Run gRPC server in background; block until OS signal.
+	serveErr := make(chan error, 1)
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			serveErr <- err
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+
+	select {
+	case err := <-serveErr:
+		logger.Error("gRPC server exited unexpectedly", "error", err)
+		log.Fatalf("gRPC server error: %v", err)
+	case sig := <-quit:
+		logger.Info("Shutdown signal received", "signal", sig)
+	}
+
+	// Stop accepting new RPCs; wait for in-flight handlers to complete.
+	s.GracefulStop()
+	logger.Info("gRPC server stopped")
+
+	// Drain any in-flight FCM send goroutines (including sleeping retries).
+	// Allow up to 15 seconds before giving up so critical pushes are delivered.
+	drainCtx, drainCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer drainCancel()
+	if err := pushSvc.Shutdown(drainCtx); err != nil {
+		logger.Warn("FCM drain timed out; some in-flight pushes may be lost", "error", err)
+	} else {
+		logger.Info("FCM goroutines drained")
 	}
 }

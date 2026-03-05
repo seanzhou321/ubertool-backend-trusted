@@ -278,6 +278,7 @@ func (s *billSplitService) AcknowledgePayment(ctx context.Context, userID, payme
 					"bill_id":      fmt.Sprintf("%d", bill.ID),
 					"debtor_id":    fmt.Sprintf("%d", bill.DebtorUserID),
 					"amount_cents": fmt.Sprintf("%d", bill.AmountCents),
+					"channel_id":   string(domain.ChannelBillSplitting),
 				},
 			}
 			_ = s.noteSvc.Dispatch(ctx, notification)
@@ -344,6 +345,7 @@ func (s *billSplitService) AcknowledgePayment(ctx context.Context, userID, payme
 					"bill_id":      fmt.Sprintf("%d", bill.ID),
 					"creditor_id":  fmt.Sprintf("%d", bill.CreditorUserID),
 					"amount_cents": fmt.Sprintf("%d", bill.AmountCents),
+					"channel_id":   string(domain.ChannelBillSplitting),
 				},
 			}
 			_ = s.noteSvc.Dispatch(ctx, notification)
@@ -573,6 +575,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 				"topic":      "bill_dispute_resolved",
 				"bill_id":    fmt.Sprintf("%d", bill.ID),
 				"resolution": resolution,
+				"channel_id": string(domain.ChannelDispute),
 			},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notification)
@@ -589,6 +592,7 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 				"topic":      "bill_dispute_resolved",
 				"bill_id":    fmt.Sprintf("%d", bill.ID),
 				"resolution": resolution,
+				"channel_id": string(domain.ChannelDispute),
 			},
 		}
 		_ = s.noteSvc.Dispatch(ctx, notification)

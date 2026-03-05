@@ -112,6 +112,10 @@ message RefreshTokenResponse {
 
 // Logout request
 message LogoutRequest {
+  // Android device unique identifier (Settings.Secure.ANDROID_ID).
+  // Backend uses this to mark the device's FCM token as OBSOLETE so
+  // push notifications are no longer routed to a logged-out device.
+  string android_device_id = 1;
 }
 
 // Logout response

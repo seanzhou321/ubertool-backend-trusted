@@ -119,12 +119,16 @@ Business Logic:
 3. if fail, output a warning security log.
 
 ### Logout
-Purpose: Invalidate the current session.
+Purpose: Invalidate the current session and stop push notifications to the device.
 
-Input: none
+Input: `android_device_id`
 Output: success flag
 Business Logic:
-1. Invalidate/blacklist the current JWT tokens (access and refresh tokens).
+1. Extract `user_id` from the JWT token.
+2. Invalidate/blacklist the current JWT tokens (access and refresh tokens).
+3. Mark the FCM token(s) for this device as OBSOLETE:
+   `UPDATE fcm_tokens SET status = 'OBSOLETE', updated_at = NOW() WHERE user_id = $user_id AND android_device_id = $android_device_id AND status = 'ACTIVE'`
+   This prevents the backend from routing future push notifications to a logged-out device.
 
 ## Administration
 

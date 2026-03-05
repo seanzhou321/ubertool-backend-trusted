@@ -73,3 +73,12 @@ func (r *fcmTokenRepository) MarkObsolete(ctx context.Context, token string) err
 	_, err := r.db.ExecContext(ctx, query, token)
 	return err
 }
+
+// MarkObsoleteByDevice marks all ACTIVE FCM tokens for a given user+device as OBSOLETE.
+// Called on user logout so the device no longer receives push notifications.
+func (r *fcmTokenRepository) MarkObsoleteByDevice(ctx context.Context, userID int32, androidDeviceID string) error {
+	query := `UPDATE fcm_tokens SET status = 'OBSOLETE', updated_at = NOW()
+	          WHERE user_id = $1 AND android_device_id = $2 AND status = 'ACTIVE'`
+	_, err := r.db.ExecContext(ctx, query, userID, androidDeviceID)
+	return err
+}

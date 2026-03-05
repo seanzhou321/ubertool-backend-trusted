@@ -31,9 +31,10 @@ type authService struct {
 	noteSvc    NotificationService
 	emailSvc   EmailService
 	tm         security.TokenManager
+	fcmRepo    repository.FcmTokenRepository
 }
 
-func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string) AuthService {
+func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string, fcmRepo repository.FcmTokenRepository) AuthService {
 	return &authService{
 		userRepo:   userRepo,
 		inviteRepo: inviteRepo,
@@ -42,6 +43,7 @@ func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.In
 		noteSvc:    noteSvc,
 		emailSvc:   emailSvc,
 		tm:         security.NewTokenManager(secret),
+		fcmRepo:    fcmRepo,
 	}
 }
 
@@ -176,8 +178,9 @@ func (s *authService) RequestToJoin(ctx context.Context, orgID int32, name, emai
 		Title:   "New Join Request",
 		Message: fmt.Sprintf("%s requested to join %s", name, org.Name),
 		Attributes: map[string]string{
-			"type":      "JOIN_REQUEST",
-			"reference": fmt.Sprintf("join_request:%d", req.ID),
+			"type":       "JOIN_REQUEST",
+			"reference":  fmt.Sprintf("join_request:%d", req.ID),
+			"channel_id": string(domain.ChannelAdmin),
 		},
 	}
 
@@ -389,7 +392,14 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 	return access, refresh, nil
 }
 
-func (s *authService) Logout(ctx context.Context, refresh string) error {
-	// In a real app, we might blacklist the refresh token
+func (s *authService) Logout(ctx context.Context, userID int32, refresh, androidDeviceID string) error {
+	// Mark the device's FCM tokens as OBSOLETE so push notifications are no longer
+	// routed to a logged-out device.
+	if s.fcmRepo != nil && androidDeviceID != "" {
+		if err := s.fcmRepo.MarkObsoleteByDevice(ctx, userID, androidDeviceID); err != nil {
+			logger.Error("Logout: failed to mark FCM tokens obsolete", "userID", userID, "androidDeviceID", androidDeviceID, "error", err)
+			// Non-fatal: continue with logout even if FCM token update fails
+		}
+	}
 	return nil
 }
