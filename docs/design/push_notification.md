@@ -12,11 +12,12 @@ Tracks active FCM registration tokens per user.
 
 ### `notification_logs`
 Tracks the lifecycle of every sent message.
-- `internal_msg_id` (UUID, PK): Our internal tracking ID.
+- `notification_id` (bigserial, PK): Stable numeric ID embedded in the FCM `data` map.
 - `fcm_message_id` (TEXT): The ID returned by Firebase after a successful `Send()`.
 - `user_id` (UUID): Target user.
-- `status` (ENUM): 'SENT', 'DELIVERED', 'CLICKED', 'APP_OPENED'.
-- `updated_at` (TIMESTAMP): Time of last status transition.
+- `status` (ENUM): `SENT`, `DELIVERED`, `CLICKED`.
+- `delivered_at`, `clicked_at` (TIMESTAMPTZ): First-write-only — never overwritten once set.
+- `updated_at` (TIMESTAMPTZ): Time of last status transition.
 
 ## 2. gRPC Service Definition
 ```proto
@@ -29,13 +30,14 @@ service PushTrackingService {
 }
 
 message SyncTokenRequest {
-  string fcm_token = 1;
-  string device_name = 2;
+  string fcm_token    = 1;
+  string device_id    = 2; // FirebaseInstallations.getId() — stable per app install
+  string device_name  = 3; // e.g. "Google Pixel 8"
 }
 
 message ReportEventRequest {
-  string internal_msg_id = 1;
-  string event_type = 2; // "DELIVERED", "CLICKED"
+  int64  notification_id = 1; // bigserial from the notifications table
+  string event_type      = 2; // "DELIVERED" or "CLICKED"
 }
 ```
 
@@ -43,32 +45,31 @@ message ReportEventRequest {
 
 ### Sending Notifications
 
+> ⚠️ **Data-only messages are mandatory.** The `Notification` field in the FCM message
+> **MUST be omitted**. See [Why data-only?](#why-data-only) below.
+
 1. Generate ID: Create a new `notification_id` (bigserial from the `notifications` table).
-2. Payload: Construct an FCM **notification+data** message using the Firebase Admin Go SDK.
-   - Set the `notification` field with `title` and `body` so the Android OS can render the
-     notification automatically when the app is in the background or killed.
-   - Set the `data` map with `notification_id` (as a string) and `channel_id` so the client
-     routes to the correct notification channel and can report lifecycle events.
-   - Set `AndroidConfig.Priority` based on the channel: `"high"` for channels 1–3 (wakes the
-     device in Doze), `"normal"` for channels 4–5 (delivered when the device is active).
+2. Payload: Construct a **data-only** FCM message using the Firebase Admin Go SDK.
+   - Omit the `Notification` field entirely — `title` and `body` go in the `data` map.
+   - Set the `data` map with `notification_id`, `channel_id`, `title`, and `body`.
+   - Set `AndroidConfig.Priority` based on the channel: `"high"` for `rental_request_messages`
+     (wakes the device in Doze), `"normal"` for all other channels (delivered when the device is active).
    - Go SDK example:
      ```go
      // Determine FCM priority from channel.
      fcmPriority := "normal"
-     if channel == "rental_request_messages" ||
-         channel == "billsplitting_messages" ||
-         channel == "dispute_messages" {
+     if channel == "rental_request_messages" {
          fcmPriority = "high"
      }
 
      message := &messaging.Message{
-         Notification: &messaging.Notification{
-             Title: title,
-             Body:  body,
-         },
+         // DO NOT set Notification field — data-only so onMessageReceived is
+         // always called regardless of app state (foreground / background / killed).
          Data: map[string]string{
              "notification_id": strconv.FormatInt(notificationID, 10),
              "channel_id":      channel, // routes to the correct Android channel
+             "title":           title,
+             "body":            body,
          },
          Token: fcmToken,
          Android: &messaging.AndroidConfig{
@@ -76,6 +77,25 @@ message ReportEventRequest {
          },
      }
      ```
+
+#### Why data-only?
+
+FCM has three message types:
+
+| Type | `Notification` field | `onMessageReceived` called when app is killed? | Sound/UI control |
+|---|---|---|---|
+| Notification message | Present | ❌ OS renders directly | OS-controlled |
+| **Data-only message** | **Absent** | ✅ **Always called** | **App-controlled** |
+| Notification + data | Both present | ❌ OS renders directly | OS-controlled |
+
+When a `Notification` field is included and the app is **killed (swiped away)**:
+- `onMessageReceived` is never called
+- The OS renders the notification silently (no sound, no heads-up banner, dot only)
+- The app cannot track `notification_id`, report `DELIVERED`, or trigger a data reload
+
+When data-only is used:
+- `onMessageReceived` fires for **all app states** — the app builds the notification itself
+- Sound, vibration, heads-up banner, `BigTextStyle`, and lifecycle tracking all work correctly
 
 ### Notification Channels
 
@@ -85,8 +105,8 @@ channels at startup; users may adjust them in Settings → App notifications.
 | `channel_id` | Label | Priority | Behavior |
 |---|---|---|---|
 | `rental_request_messages` | Rental Request Messages | HIGH | Heads-up; wakes device from sleep (Doze bypass) |
-| `billsplitting_messages` | Billsplitting events notifications | HIGH | Heads-up; wakes device from sleep |
-| `dispute_messages` | Rental dispute notifications | HIGH | Heads-up; wakes device from sleep |
+| `billsplitting_messages` | Billsplitting events notifications | DEFAULT | Appears in notification shade; no heads-up or wake |
+| `dispute_messages` | Rental dispute notifications | DEFAULT | Appears in notification shade; no heads-up or wake |
 | `admin_messages` | Administrative event messages | DEFAULT | Appears in notification shade; no heads-up or wake |
 | `app_messages` | General App events | DEFAULT | Appears in notification shade; no heads-up or wake |
 
@@ -115,25 +135,27 @@ If `channel_id` is omitted or unrecognised, the client defaults to `app_messages
 | `dispute_messages` | Dispute Resolved | Debtor | Admin resolves a disputed bill |
 | `dispute_messages` | Dispute Resolved | Creditor | Admin resolves a disputed bill |
 | `admin_messages` | New Join Request | Org admin | User submits a request to join an organisation |
+
 3. DB Entry: Insert a record into `notifications` with status `SENT`.
 4. Execute: Call `messaging.Send(ctx, message)`.
 5. Use a goroutine or a worker queue to send the message without blocking other processes.
-6. Embed the `notifications.id` value in the `data` map as `notification_id`. When the app
-   reports back, this becomes `ReportEventRequest.notification_id` in `notification_service.proto`.
 
 ### Android Client Lifecycle Behavior
 
-The use of notification+data messages means the delivery path differs depending on app state:
+With data-only messages, `onMessageReceived` is **always called** regardless of app state.
+The split-path behaviour of notification+data messages no longer applies.
 
 | App state | Who renders the notification | DELIVERED / CLICKED reported by |
 |---|---|---|
-| **Foreground** | `onMessageReceived()` calls `showNotification()` → `NotificationOpenedReceiver` handles tap | `UberToolFirebaseMessagingService` (DELIVERED) + `NotificationOpenedReceiver` (CLICKED) |
-| **Background / killed** | Android OS renders automatically from the `notification` field; `onMessageReceived()` is **not** called | `MainActivity.handleFcmNotificationTapIfPresent()` reports both DELIVERED and CLICKED on tap |
+| **Foreground** | `onMessageReceived()` → `showNotification()` | `UberToolFirebaseMessagingService` (DELIVERED) + `MainActivity.handleFcmNotificationTapIfPresent()` (CLICKED) |
+| **Background** | `onMessageReceived()` → `showNotification()` | Same as foreground |
+| **Killed (swiped away)** | `onMessageReceived()` → `showNotification()` | Same as foreground — CLICKED reported by `MainActivity.handleFcmNotificationTapIfPresent()` on tap |
 
-When the OS renders a background notification and the user taps it, FCM delivers the `data` map
-keys as String extras on the `MainActivity` launch intent. `handleFcmNotificationTapIfPresent()`
-reads `notification_id` from those extras and enqueues DELIVERED + CLICKED via WorkManager.
+When the user taps the notification, FCM delivers the `data` map keys as Long/String extras
+on the `MainActivity` launch intent. `handleFcmNotificationTapIfPresent()` reads
+`notification_id` from those extras and enqueues DELIVERED + CLICKED via WorkManager.
 `onNewIntent()` covers the case where the activity is already running and brought to front.
+In all tap cases `AppRefreshState.triggerRefresh()` is also called so the UI reloads.
 
 ### Token Maintenance
 

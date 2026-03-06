@@ -73,9 +73,9 @@ type pushNotificationService struct {
 	isUnregisteredFn func(error) bool
 
 	// jobs is the bounded work queue; nil in test mode (runs synchronously).
-	jobs       chan fcmJob
-	jobsMu     sync.Mutex         // guards jobsClosed + close(jobs)
-	jobsClosed bool
+	jobs         chan fcmJob
+	jobsMu       sync.Mutex // guards jobsClosed + close(jobs)
+	jobsClosed   bool
 	workerCtx    context.Context    // cancelled on Shutdown to interrupt sleeping retries
 	workerCancel context.CancelFunc // nil in test mode
 	wg           sync.WaitGroup     // tracks worker goroutines
@@ -324,22 +324,13 @@ func (s *pushNotificationService) SendToUser(ctx context.Context, userID int32, 
 
 	fcmPriority := fcmPriorityForChannel(data["channel_id"])
 	for _, t := range tokens {
-		payload := buildPayload(data, notificationID)
+		payload := buildPayload(data, notificationID, title, body)
 		msg := &messaging.Message{
 			Token: t.Token,
-			Notification: &messaging.Notification{
-				Title: title,
-				Body:  body,
-			},
-			Data: payload,
+			Data:  payload,
 			Android: &messaging.AndroidConfig{
 				// "high" wakes the device from Doze mode for time-sensitive events.
 				Priority: fcmPriority,
-				// ChannelID is required on Android 8.0+ (API 26+); without it the OS
-				// silently drops the notification even when FCM returns a success ID.
-				Notification: &messaging.AndroidNotification{
-					ChannelID: data["channel_id"],
-				},
 			},
 		}
 		job := fcmJob{token: t, msg: msg, attempt: 0}
@@ -443,27 +434,29 @@ func (s *pushNotificationService) sendOne(ctx context.Context, job fcmJob) {
 
 // fcmPriorityForChannel returns the FCM Android delivery priority for a channel.
 //
-// "high"   – wakes the device immediately from Doze mode.
+// "high"   – wakes the device immediately from Doze mode (Doze bypass).
 // "normal" – delivered when the device is next active; does not wake from Doze.
 //
-// Only rental requests are time-sensitive enough to warrant waking the device.
-// Bill-splitting and dispute messages use "normal" so they do not unnecessarily
-// drain battery while still being delivered promptly when the device is active.
+// rental_request_messages, billsplitting_messages, and dispute_messages are all
+// time-sensitive and require "high" to produce heads-up banners and wake the device.
+// admin_messages and app_messages use "normal" to avoid unnecessary battery drain.
 func fcmPriorityForChannel(channelID string) string {
 	switch domain.NotificationChannel(channelID) {
-	case domain.ChannelRentalRequest:
+	case domain.ChannelRentalRequest, domain.ChannelBillSplitting, domain.ChannelDispute:
 		return "high"
 	default:
 		return "normal"
 	}
 }
 
-func buildPayload(extra map[string]string, notificationID int64) map[string]string {
-	payload := make(map[string]string, len(extra)+1)
+func buildPayload(extra map[string]string, notificationID int64, title, message string) map[string]string {
+	payload := make(map[string]string, len(extra)+3)
 	for k, v := range extra {
 		payload[k] = v
 	}
 	payload["notification_id"] = fmt.Sprintf("%d", notificationID)
+	payload["title"] = title
+	payload["body"] = message
 	return payload
 }
 
