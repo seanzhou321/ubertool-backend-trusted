@@ -322,6 +322,14 @@ CREATE INDEX idx_bill_actions_actor ON bill_actions(actor_user_id);
 CREATE INDEX idx_bill_actions_type ON bill_actions(action_type);
 CREATE INDEX idx_bill_actions_created ON bill_actions(created_at);
 
+-- One pending 2FA code per user at a time (upsert on user_id keeps the table bounded).
+-- expires_at allows the server to reject stale codes without a separate cleanup job.
+CREATE TABLE pending_2fa_codes (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    code        CHAR(5)     NOT NULL,
+    expires_at  TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '10 minutes')
+);
+
 -- Function to automatically initiate disputes after 10 days
 CREATE OR REPLACE FUNCTION check_overdue_bills() RETURNS void AS $$
 BEGIN

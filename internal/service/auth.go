@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"sync"
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
@@ -24,14 +26,15 @@ var (
 )
 
 type authService struct {
-	userRepo   repository.UserRepository
-	inviteRepo repository.InvitationRepository
-	reqRepo    repository.JoinRequestRepository
-	orgRepo    repository.OrganizationRepository
-	noteSvc    NotificationService
-	emailSvc   EmailService
-	tm         security.TokenManager
-	fcmRepo    repository.FcmTokenRepository
+	userRepo        repository.UserRepository
+	inviteRepo      repository.InvitationRepository
+	reqRepo         repository.JoinRequestRepository
+	orgRepo         repository.OrganizationRepository
+	noteSvc         NotificationService
+	emailSvc        EmailService
+	tm              security.TokenManager
+	fcmRepo         repository.FcmTokenRepository
+	pending2FACodes sync.Map // key: userID (int32), value: string (5-digit code)
 }
 
 func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string, fcmRepo repository.FcmTokenRepository) AuthService {
@@ -301,13 +304,10 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		}
 		logger.Debug("2FA token generated", "userID", user.ID, "tokenPrefix", sessionToken[:20])
 
-		// Send 2FA code via email
-		// For prototype, we might hardcode or log it.
-		// "123456" is hardcoded in Verify2FA currently.
-		// Real implementation should generate random code and store it in Redis/Session.
-		// For now, we can send the hardcoded code via email to demonstrate flow.
-		code := "123456"
-		logger.Info("2FA code for testing (HARDCODED)", "userID", user.ID, "code", code)
+		// Generate a random 5-digit 2FA code and store it for verification.
+		code := fmt.Sprintf("%05d", rand.Intn(100000))
+		s.pending2FACodes.Store(user.ID, code)
+		logger.Info("2FA code generated", "userID", user.ID)
 		subject := "Your 2FA Code"
 		message := fmt.Sprintf("Your login code is: %s", code)
 		_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message)
@@ -332,13 +332,21 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) (string, string, *domain.User, error) {
 	logger.EnterMethod("authService.Verify2FA", "userID", userID, "codeProvided", code)
 
-	// Mock 2FA verification
-	logger.Debug("Validating 2FA code", "userID", userID, "providedCode", code, "expectedCode", "123456")
-	if code != "123456" {
-		logger.Warn("2FA code validation FAILED", "userID", userID, "providedCode", code, "expectedCode", "123456")
+	// Retrieve and validate the stored 2FA code for this user.
+	expected, ok := s.pending2FACodes.Load(userID)
+	if !ok {
+		logger.Warn("No pending 2FA code found", "userID", userID)
 		logger.ExitMethodWithError("authService.Verify2FA", ErrInvalid2FACode, "userID", userID)
 		return "", "", nil, ErrInvalid2FACode
 	}
+	logger.Debug("Validating 2FA code", "userID", userID)
+	if code != expected.(string) {
+		logger.Warn("2FA code validation FAILED", "userID", userID)
+		logger.ExitMethodWithError("authService.Verify2FA", ErrInvalid2FACode, "userID", userID)
+		return "", "", nil, ErrInvalid2FACode
+	}
+	// Delete after successful validation to prevent code reuse.
+	s.pending2FACodes.Delete(userID)
 	logger.Info("2FA code validated successfully", "userID", userID)
 
 	// Verify user still exists

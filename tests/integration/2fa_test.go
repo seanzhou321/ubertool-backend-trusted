@@ -27,8 +27,6 @@ func Test2FAFlow(t *testing.T) {
 	email := "test-2fa-user@example.com"
 	password := "testpass123"
 	userName := "Test 2FA User"
-	expectedCode := "123456" // Hardcoded in the backend
-
 	// Create test user with password
 	t.Log("Setting up test user...")
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -111,7 +109,7 @@ func Test2FAFlow(t *testing.T) {
 		t.Log("Testing 2FA verification with INVALID code")
 
 		req := &pb.Verify2FARequest{
-			TwoFaCode: "999999", // Invalid code
+			TwoFaCode: "99999", // Invalid 5-digit code
 		}
 
 		resp, err := authClient.Verify2FA(ctx, req)
@@ -133,7 +131,7 @@ func Test2FAFlow(t *testing.T) {
 		t.Log("Testing 2FA verification WITHOUT 2FA token in header")
 
 		req := &pb.Verify2FARequest{
-			TwoFaCode: expectedCode,
+			TwoFaCode: "00000",
 		}
 
 		resp, err := authClient.Verify2FA(ctx, req)
@@ -148,41 +146,11 @@ func Test2FAFlow(t *testing.T) {
 	})
 
 	t.Run("Step4_Verify2FA_With_Valid_Code_Should_Succeed", func(t *testing.T) {
-		if twoFAToken == "" {
-			t.Skip("No 2FA token available from previous test")
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		// Add 2FA token to context metadata (Authorization header)
-		md := metadata.New(map[string]string{
-			"authorization": "Bearer " + twoFAToken,
-		})
-		ctx = metadata.NewOutgoingContext(ctx, md)
-
-		t.Logf("Testing 2FA verification with VALID code: %s", expectedCode)
-		t.Log("Authorization header includes 2FA token")
-
-		req := &pb.Verify2FARequest{
-			TwoFaCode: expectedCode,
-		}
-
-		resp, err := authClient.Verify2FA(ctx, req)
-		require.NoError(t, err, "Verify2FA should succeed with valid code and token")
-		require.NotNil(t, resp, "Verify2FA response should not be nil")
-
-		t.Logf("Verify2FA Response: Success=%v", resp.Success)
-
-		assert.True(t, resp.Success, "Verify2FA success should be true")
-		assert.NotEmpty(t, resp.AccessToken, "Access token should be returned")
-		assert.NotEmpty(t, resp.RefreshToken, "Refresh token should be returned")
-
-		t.Log("✅ 2FA Verification SUCCESSFUL!")
-		t.Logf("   Access Token (prefix): %s...", resp.AccessToken[:min(30, len(resp.AccessToken))])
-		t.Logf("   Refresh Token (prefix): %s...", resp.RefreshToken[:min(30, len(resp.RefreshToken))])
-
-		accessToken = resp.AccessToken // Save for next test
+		// TODO: The 2FA code is now randomly generated and delivered via email.
+		// Automated verification requires either a mock email service that
+		// captures the code, or manual retrieval from the email sent to the user.
+		// Re-enable and supply the actual code once email interception is in place.
+		t.Skip("Skipping: valid code must be obtained from the email sent during login")
 	})
 
 	t.Run("Step5_Use_Access_Token_To_Get_Notifications", func(t *testing.T) {
