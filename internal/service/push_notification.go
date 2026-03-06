@@ -55,22 +55,51 @@ type FCMBatchSender interface {
 	SendEach(ctx context.Context, msgs []*messaging.Message) (*messaging.BatchResponse, error)
 }
 
+// FCMDryRunSender abstracts single-message dry-run sends (Firebase validates but does not deliver).
+// Used in test mode (sendOne) for tokens with status='TESTING'.
+// *messaging.Client satisfies this interface.
+type FCMDryRunSender interface {
+	SendDryRun(ctx context.Context, msg *messaging.Message) (string, error)
+}
+
+// FCMBatchDryRunSender abstracts batch dry-run sends.
+// Used by the production worker pool for tokens with status='TESTING'.
+// *messaging.Client satisfies this interface.
+type FCMBatchDryRunSender interface {
+	SendEachDryRun(ctx context.Context, msgs []*messaging.Message) (*messaging.BatchResponse, error)
+}
+
+// FCMMulticastSender abstracts Firebase's SendEachForMulticast, used when the
+// same message is delivered to many tokens at once (broadcast). *messaging.Client satisfies this.
+type FCMMulticastSender interface {
+	SendEachForMulticast(ctx context.Context, msg *messaging.MulticastMessage) (*messaging.BatchResponse, error)
+}
+
 // fcmJob is a single unit of work queued for delivery.
 type fcmJob struct {
 	token   domain.FcmToken
 	msg     *messaging.Message
-	attempt int // 0 = first attempt; incremented on each transient-retry enqueue
+	attempt int  // 0 = first attempt; incremented on each transient-retry enqueue
+	dryRun  bool // true when token status = 'TESTING'; sends via Firebase validate-only mode
 }
 
 type pushNotificationService struct {
 	// fcmClient is the single-message sender used in test mode.
 	fcmClient FCMSender
+	// fcmDryRunClient is the single-message dry-run sender used in test mode for TESTING tokens.
+	fcmDryRunClient FCMDryRunSender
 	// fcmBatchClient is used by the production worker pool's SendEach path.
 	// nil in test mode.
-	fcmBatchClient   FCMBatchSender
-	fcmRepo          repository.FcmTokenRepository
-	retryDelays      []time.Duration
-	isUnregisteredFn func(error) bool
+	fcmBatchClient FCMBatchSender
+	// fcmBatchDryRunClient is used by the production worker pool for TESTING tokens.
+	// nil in test mode.
+	fcmBatchDryRunClient FCMBatchDryRunSender
+	// fcmMulticastClient is used by SendMulticastToUsers (SendEachForMulticast).
+	// nil when FCM is not configured.
+	fcmMulticastClient FCMMulticastSender
+	fcmRepo            repository.FcmTokenRepository
+	retryDelays        []time.Duration
+	isUnregisteredFn   func(error) bool
 
 	// jobs is the bounded work queue; nil in test mode (runs synchronously).
 	jobs         chan fcmJob
@@ -89,12 +118,21 @@ func NewPushNotificationService(fcmClient *messaging.Client, fcmRepo repository.
 	// interface is != nil and would bypass the nil-guard inside SendToUser.
 	var sender FCMSender
 	var batchSender FCMBatchSender
+	var dryRunSender FCMDryRunSender
+	var batchDryRunSender FCMBatchDryRunSender
+	var multicastSender FCMMulticastSender
 	if fcmClient != nil {
 		sender = fcmClient
 		batchSender = fcmClient
+		dryRunSender = fcmClient
+		batchDryRunSender = fcmClient
+		multicastSender = fcmClient
 	}
 	svc := newPushSvc(sender, fcmRepo, fcmRetryDelays)
 	svc.fcmBatchClient = batchSender
+	svc.fcmDryRunClient = dryRunSender
+	svc.fcmBatchDryRunClient = batchDryRunSender
+	svc.fcmMulticastClient = multicastSender
 
 	ctx, cancel := context.WithCancel(context.Background())
 	svc.workerCtx = ctx
@@ -176,22 +214,52 @@ func (s *pushNotificationService) collectBatch() []fcmJob {
 	return batch
 }
 
-// sendBatch calls SendEach for all messages in the batch and dispatches each
-// per-message result: logs successes, marks obsolete tokens, and schedules
-// back-off retries for transient failures.
+// sendBatch dispatches FCM messages for a collected batch. Jobs with dryRun=true
+// (token status='TESTING') are routed to SendEachDryRun; real jobs go to SendEach.
 func (s *pushNotificationService) sendBatch(ctx context.Context, batch []fcmJob) {
+	var realJobs, dryRunJobs []fcmJob
+	for _, job := range batch {
+		if job.dryRun {
+			dryRunJobs = append(dryRunJobs, job)
+		} else {
+			realJobs = append(realJobs, job)
+		}
+	}
+	if len(realJobs) > 0 {
+		s.sendBatchGroup(ctx, realJobs, false)
+	}
+	if len(dryRunJobs) > 0 {
+		if s.fcmBatchDryRunClient == nil {
+			logger.Warn("FCM batch dry-run client not configured, skipping TESTING token batch",
+				"count", len(dryRunJobs))
+			return
+		}
+		s.sendBatchGroup(ctx, dryRunJobs, true)
+	}
+}
+
+// sendBatchGroup calls SendEach or SendEachDryRun for a homogeneous sub-batch and
+// processes per-message results: logs successes, marks obsolete tokens, and schedules
+// back-off retries for transient failures.
+func (s *pushNotificationService) sendBatchGroup(ctx context.Context, batch []fcmJob, dryRun bool) {
 	msgs := make([]*messaging.Message, len(batch))
 	for i, job := range batch {
 		msgs[i] = job.msg
 	}
 
 	sendCtx, cancel := context.WithTimeout(context.Background(), fcmSendTimeout)
-	resp, err := s.fcmBatchClient.SendEach(sendCtx, msgs)
+	var resp *messaging.BatchResponse
+	var err error
+	if dryRun {
+		resp, err = s.fcmBatchDryRunClient.SendEachDryRun(sendCtx, msgs)
+	} else {
+		resp, err = s.fcmBatchClient.SendEach(sendCtx, msgs)
+	}
 	cancel()
 
 	if err != nil {
 		// Whole-batch failure (network / auth error); treat all as transient.
-		logger.Warn("FCM SendEach failed entirely", "batchSize", len(batch), "error", err)
+		logger.Warn("FCM SendEach failed entirely", "dryRun", dryRun, "batchSize", len(batch), "error", err)
 		for _, job := range batch {
 			s.scheduleRetry(ctx, job, err)
 		}
@@ -199,6 +267,7 @@ func (s *pushNotificationService) sendBatch(ctx context.Context, batch []fcmJob)
 	}
 
 	logger.Debug("FCM SendEach complete",
+		"dryRun", dryRun,
 		"batchSize", len(batch),
 		"successCount", resp.SuccessCount,
 		"failureCount", resp.FailureCount)
@@ -208,12 +277,22 @@ func (s *pushNotificationService) sendBatch(ctx context.Context, batch []fcmJob)
 		if sr.Success {
 			logger.Info("FCM push sent successfully",
 				"userID", job.token.UserID,
+				"dryRun", dryRun,
 				"attempt", job.attempt+1,
 				"tokenPrefix", tokenPrefix(job.token.Token),
 				"messageID", sr.MessageID)
 			continue
 		}
 		sendErr := sr.Error
+
+		// For TESTING tokens Firebase may return INVALID_ARGUMENT because the token
+		// is fake. In dry-run mode we only care that the message structure is valid;
+		// do not mark the token obsolete — it exists purely for testing.
+		if dryRun {
+			logger.Debug("FCM dry-run validation failed (expected for fake TESTING tokens)",
+				"tokenPrefix", tokenPrefix(job.token.Token), "error", sendErr)
+			continue
+		}
 
 		// Permanent: unregistered token.
 		if s.isUnregisteredFn(sendErr) {
@@ -253,7 +332,7 @@ func (s *pushNotificationService) scheduleRetry(ctx context.Context, job fcmJob,
 	logger.Warn("FCM send attempt failed, scheduling retry",
 		"userID", job.token.UserID, "attempt", job.attempt+1, "nextDelay", delay, "error", lastErr)
 
-	retryJob := fcmJob{token: job.token, msg: job.msg, attempt: job.attempt + 1}
+	retryJob := fcmJob{token: job.token, msg: job.msg, attempt: job.attempt + 1, dryRun: job.dryRun}
 	go func() {
 		select {
 		case <-time.After(delay):
@@ -325,6 +404,11 @@ func (s *pushNotificationService) SendToUser(ctx context.Context, userID int32, 
 	fcmPriority := fcmPriorityForChannel(data["channel_id"])
 	for _, t := range tokens {
 		payload := buildPayload(data, notificationID, title, body)
+		dryRun := t.Status == "TESTING"
+		if dryRun {
+			logger.Debug("FCM dry-run mode for TESTING token (validate-only, not delivered)",
+				"userID", userID, "tokenPrefix", tokenPrefix(t.Token), "notificationID", notificationID)
+		}
 		msg := &messaging.Message{
 			Token: t.Token,
 			Data:  payload,
@@ -333,7 +417,7 @@ func (s *pushNotificationService) SendToUser(ctx context.Context, userID int32, 
 				Priority: fcmPriority,
 			},
 		}
-		job := fcmJob{token: t, msg: msg, attempt: 0}
+		job := fcmJob{token: t, msg: msg, attempt: 0, dryRun: dryRun}
 		if s.jobs != nil {
 			if !s.tryEnqueue(job) {
 				logger.Warn("FCM job dropped: queue closed or full",
@@ -344,6 +428,85 @@ func (s *pushNotificationService) SendToUser(ctx context.Context, userID int32, 
 			s.sendOne(s.workerCtx, job)
 		}
 	}
+	return nil
+}
+
+// SendMulticastToUsers sends an identical FCM push to all active devices of the given
+// users via SendEachForMulticast (one shared payload, many tokens). The call is non-blocking:
+// token lookup and batch sends happen in a background goroutine. Unregistered tokens are
+// marked OBSOLETE automatically. A no-op when FCM is not configured.
+func (s *pushNotificationService) SendMulticastToUsers(ctx context.Context, userIDs []int32, title, body string, data map[string]string) error {
+	if s.fcmMulticastClient == nil {
+		logger.Debug("FCM multicast client not configured, skipping broadcast", "userCount", len(userIDs))
+		return nil
+	}
+	if len(userIDs) == 0 {
+		return nil
+	}
+
+	payload := buildMulticastPayload(data, title, body)
+	priority := fcmPriorityForChannel(data["channel_id"])
+
+	go func() {
+		tokens, err := s.fcmRepo.GetActiveByUserIDs(context.Background(), userIDs)
+		if err != nil {
+			logger.Error("SendMulticastToUsers: failed to fetch FCM tokens", "error", err, "userCount", len(userIDs))
+			return
+		}
+		if len(tokens) == 0 {
+			logger.Debug("SendMulticastToUsers: no active FCM tokens found", "userCount", len(userIDs))
+			return
+		}
+
+		tokenStrings := make([]string, len(tokens))
+		for i, t := range tokens {
+			tokenStrings[i] = t.Token
+		}
+
+		// Batch into groups of at most fcmBatchSize (Firebase multicast limit = 500).
+		for start := 0; start < len(tokenStrings); start += fcmBatchSize {
+			end := start + fcmBatchSize
+			if end > len(tokenStrings) {
+				end = len(tokenStrings)
+			}
+			batchTokenStrings := tokenStrings[start:end]
+			batchMeta := tokens[start:end]
+
+			msg := &messaging.MulticastMessage{
+				Tokens: batchTokenStrings,
+				Data:   payload,
+				Android: &messaging.AndroidConfig{
+					Priority: priority,
+				},
+			}
+
+			sendCtx, cancel := context.WithTimeout(context.Background(), fcmSendTimeout)
+			resp, err := s.fcmMulticastClient.SendEachForMulticast(sendCtx, msg)
+			cancel()
+
+			if err != nil {
+				logger.Warn("FCM SendEachForMulticast batch failed",
+					"batchStart", start, "batchSize", len(batchTokenStrings), "error", err)
+				continue
+			}
+
+			logger.Debug("FCM SendEachForMulticast complete",
+				"batchSize", len(batchTokenStrings),
+				"successCount", resp.SuccessCount,
+				"failureCount", resp.FailureCount)
+
+			for i, sr := range resp.Responses {
+				if sr.Success {
+					continue
+				}
+				if messaging.IsUnregistered(sr.Error) {
+					if obsErr := s.fcmRepo.MarkObsolete(context.Background(), batchMeta[i].Token); obsErr != nil {
+						logger.Error("Failed to mark FCM token obsolete", "error", obsErr)
+					}
+				}
+			}
+		}
+	}()
 	return nil
 }
 
@@ -394,13 +557,31 @@ func (s *pushNotificationService) sendOne(ctx context.Context, job fcmJob) {
 
 		sendCtx, cancel := context.WithTimeout(context.Background(), fcmSendTimeout)
 		var msgID string
-		msgID, lastErr = s.fcmClient.Send(sendCtx, msg)
+		if job.dryRun {
+			if s.fcmDryRunClient == nil {
+				logger.Debug("FCM dry-run client not configured, skipping TESTING token in test mode",
+					"userID", t.UserID)
+				cancel()
+				return
+			}
+			msgID, lastErr = s.fcmDryRunClient.SendDryRun(sendCtx, msg)
+		} else {
+			msgID, lastErr = s.fcmClient.Send(sendCtx, msg)
+		}
 		cancel()
 
 		if lastErr == nil {
 			logger.Info("FCM push sent successfully",
-				"userID", t.UserID, "attempt", attempt+1,
+				"userID", t.UserID, "dryRun", job.dryRun, "attempt", attempt+1,
 				"tokenPrefix", tokenPrefix(t.Token), "messageID", msgID)
+			return
+		}
+
+		// For TESTING tokens Firebase may reject with INVALID_ARGUMENT because
+		// the token is fake. Do not mark it obsolete — it exists for testing only.
+		if job.dryRun {
+			logger.Debug("FCM dry-run validation failed (expected for fake TESTING tokens)",
+				"userID", t.UserID, "tokenPrefix", tokenPrefix(t.Token), "error", lastErr)
 			return
 		}
 
@@ -434,15 +615,15 @@ func (s *pushNotificationService) sendOne(ctx context.Context, job fcmJob) {
 
 // fcmPriorityForChannel returns the FCM Android delivery priority for a channel.
 //
-// "high"   – wakes the device immediately from Doze mode (Doze bypass).
+// "high"   – wakes the device immediately from Doze mode.
 // "normal" – delivered when the device is next active; does not wake from Doze.
 //
-// rental_request_messages, billsplitting_messages, and dispute_messages are all
-// time-sensitive and require "high" to produce heads-up banners and wake the device.
-// admin_messages and app_messages use "normal" to avoid unnecessary battery drain.
+// Only rental requests are time-sensitive enough to warrant waking the device.
+// Bill-splitting and dispute messages use "normal" so they do not unnecessarily
+// drain battery while still being delivered promptly when the device is active.
 func fcmPriorityForChannel(channelID string) string {
 	switch domain.NotificationChannel(channelID) {
-	case domain.ChannelRentalRequest, domain.ChannelBillSplitting, domain.ChannelDispute:
+	case domain.ChannelRentalRequest:
 		return "high"
 	default:
 		return "normal"
@@ -457,6 +638,18 @@ func buildPayload(extra map[string]string, notificationID int64, title, message 
 	payload["notification_id"] = fmt.Sprintf("%d", notificationID)
 	payload["title"] = title
 	payload["body"] = message
+	return payload
+}
+
+// buildMulticastPayload builds the FCM data map for a broadcast message that has
+// no per-recipient notification ID (unlike buildPayload which embeds one).
+func buildMulticastPayload(extra map[string]string, title, body string) map[string]string {
+	payload := make(map[string]string, len(extra)+2)
+	for k, v := range extra {
+		payload[k] = v
+	}
+	payload["title"] = title
+	payload["body"] = body
 	return payload
 }
 

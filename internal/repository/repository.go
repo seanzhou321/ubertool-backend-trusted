@@ -79,6 +79,9 @@ type NotificationRepository interface {
 type FcmTokenRepository interface {
 	Upsert(ctx context.Context, token *domain.FcmToken) error
 	GetActiveByUserID(ctx context.Context, userID int32) ([]domain.FcmToken, error)
+	// GetActiveByUserIDs returns all ACTIVE FCM tokens for the given set of users in a single query.
+	// Used for broadcast/multicast operations.
+	GetActiveByUserIDs(ctx context.Context, userIDs []int32) ([]domain.FcmToken, error)
 	MarkObsolete(ctx context.Context, token string) error
 	MarkObsoleteByDevice(ctx context.Context, userID int32, androidDeviceID string) error
 }

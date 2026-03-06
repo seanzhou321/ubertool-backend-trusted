@@ -99,7 +99,7 @@ func (h *RentalHandler) CompleteRental(ctx context.Context, req *pb.CompleteRent
 	if err != nil {
 		return nil, err
 	}
-	rt, err := h.rentalSvc.CompleteRental(ctx, userID, req.RequestId, req.ReturnCondition, req.SurchargeOrCreditCents, req.Notes)
+	rt, err := h.rentalSvc.CompleteRental(ctx, userID, req.RequestId, req.ReturnCondition, req.SurchargeOrCreditCents, req.Notes, req.ChargeBillsplit)
 	if err != nil {
 		return nil, err
 	}

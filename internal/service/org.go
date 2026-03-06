@@ -16,14 +16,18 @@ type organizationService struct {
 	userRepo   repository.UserRepository
 	inviteRepo repository.InvitationRepository
 	noteSvc    NotificationService
+	emailSvc   EmailService
+	pushSvc    PushNotificationService
 }
 
-func NewOrganizationService(orgRepo repository.OrganizationRepository, userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, noteSvc NotificationService) OrganizationService {
+func NewOrganizationService(orgRepo repository.OrganizationRepository, userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, noteSvc NotificationService, emailSvc EmailService, pushSvc PushNotificationService) OrganizationService {
 	return &organizationService{
 		orgRepo:    orgRepo,
 		userRepo:   userRepo,
 		inviteRepo: inviteRepo,
 		noteSvc:    noteSvc,
+		emailSvc:   emailSvc,
+		pushSvc:    pushSvc,
 	}
 }
 
@@ -111,8 +115,139 @@ func (s *organizationService) CreateOrganization(ctx context.Context, userID int
 	return s.userRepo.AddUserToOrg(ctx, userOrg)
 }
 
-func (s *organizationService) UpdateOrganization(ctx context.Context, org *domain.Organization) error {
-	return s.orgRepo.Update(ctx, org)
+func (s *organizationService) UpdateOrganization(ctx context.Context, callerID int32, org *domain.Organization) error {
+	// 1. Verify caller is at least ADMIN for this org.
+	callerUserOrg, err := s.userRepo.GetUserOrg(ctx, callerID, org.ID)
+	if err != nil {
+		return fmt.Errorf("permission denied: not a member of this organization")
+	}
+	if callerUserOrg.Role != domain.UserOrgRoleSuperAdmin && callerUserOrg.Role != domain.UserOrgRoleAdmin {
+		return fmt.Errorf("permission denied: ADMIN or SUPER_ADMIN role required to update organization")
+	}
+	// Only SUPER_ADMIN may modify the billsplit price threshold fields.
+	if callerUserOrg.Role != domain.UserOrgRoleSuperAdmin {
+		if org.SettlementThresholdCents != 0 || org.MaxBillsplitRentalCostCents != 0 {
+			return fmt.Errorf("permission denied: only SUPER_ADMIN can modify payment threshold values")
+		}
+	}
+
+	// 2. Fetch current org to detect threshold changes and to preserve zero-value fields.
+	current, err := s.orgRepo.GetByID(ctx, org.ID)
+	if err != nil {
+		return fmt.Errorf("organization not found: %w", err)
+	}
+
+	// 3. Detect whether either threshold has actually changed before replacing zeroes.
+	thresholdChanged := org.SettlementThresholdCents > 0 && org.SettlementThresholdCents != current.SettlementThresholdCents
+	maxCostChanged := org.MaxBillsplitRentalCostCents > 0 && org.MaxBillsplitRentalCostCents != current.MaxBillsplitRentalCostCents
+
+	// 4. Zero means "keep existing" — not a valid threshold value.
+	if org.SettlementThresholdCents == 0 {
+		org.SettlementThresholdCents = current.SettlementThresholdCents
+	}
+	if org.MaxBillsplitRentalCostCents == 0 {
+		org.MaxBillsplitRentalCostCents = current.MaxBillsplitRentalCostCents
+	}
+
+	// 5. Persist the update.
+	if err := s.orgRepo.Update(ctx, org); err != nil {
+		return err
+	}
+
+	// 6. Broadcast to all active members when either price threshold changed.
+	if thresholdChanged || maxCostChanged {
+		orgCopy := *org
+		go s.broadcastThresholdUpdate(&orgCopy)
+	}
+
+	return nil
+}
+
+// broadcastThresholdUpdate notifies all non-blocked org members that the payment
+// thresholds have changed. It runs in a background goroutine so that the gRPC
+// handler returns immediately. Each member receives:
+//   - an in-app notification (DB row, no per-user push)
+//   - an email (queued via the async email worker pool)
+//
+// A single FCM multicast covers all members' push notifications at once.
+func (s *organizationService) broadcastThresholdUpdate(org *domain.Organization) {
+	ctx := context.Background()
+
+	users, userOrgs, err := s.userRepo.ListMembersByOrg(ctx, org.ID)
+	if err != nil {
+		logger.Error("broadcastThresholdUpdate: failed to list org members", "orgID", org.ID, "error", err)
+		return
+	}
+
+	subject := fmt.Sprintf("[%s] Payment Threshold Update", org.Name)
+	msgBody := fmt.Sprintf(
+		"Settlement threshold updated to $%.2f; max bill-split rental cost updated to $%.2f. "+
+			"Rentals above the cap must be settled directly between Lender and Renter.",
+		float64(org.SettlementThresholdCents)/100,
+		float64(org.MaxBillsplitRentalCostCents)/100,
+	)
+
+	var memberUserIDs []int32
+	for i, uo := range userOrgs {
+		if uo.Status == domain.UserOrgStatusBlock {
+			continue
+		}
+		memberUserIDs = append(memberUserIDs, uo.UserID)
+
+		// In-app notification (DB row only — push is handled via multicast below).
+		if s.noteSvc != nil {
+			notif := &domain.Notification{
+				UserID:  uo.UserID,
+				OrgID:   org.ID,
+				Title:   subject,
+				Message: msgBody,
+				Attributes: map[string]string{
+					"topic":                                "org_threshold_update",
+					"organization_id":                      fmt.Sprintf("%d", org.ID),
+					"billsplit_settlement_threshold_cents": fmt.Sprintf("%d", org.SettlementThresholdCents),
+					"max_billsplit_rental_cost_cents":      fmt.Sprintf("%d", org.MaxBillsplitRentalCostCents),
+				},
+			}
+			if err := s.noteSvc.DispatchSilent(ctx, notif); err != nil {
+				logger.Warn("broadcastThresholdUpdate: failed to create notification", "userID", uo.UserID, "error", err)
+			}
+		}
+
+		// Email per member.
+		if s.emailSvc != nil {
+			user := users[i]
+			emailBody := fmt.Sprintf(
+				"Hello %s,\n\nThe payment thresholds for %s have been updated.\n\n"+
+					"Settlement Threshold: $%.2f\nMax Rental Cost for Bill Split: $%.2f\n\n"+
+					"Note: Rentals above the cap must be settled directly between Lender and Renter.\n\n"+
+					"Best regards,\nUbertool Team",
+				user.Name, org.Name,
+				float64(org.SettlementThresholdCents)/100,
+				float64(org.MaxBillsplitRentalCostCents)/100,
+			)
+			_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, emailBody)
+		}
+	}
+
+	// Single FCM multicast for all non-blocked members.
+	if s.pushSvc != nil && len(memberUserIDs) > 0 {
+		fcmData := map[string]string{
+			"channel_id":                               string(domain.ChannelAdmin),
+			"topic":                                    "org_threshold_update",
+			"organization_id":                          fmt.Sprintf("%d", org.ID),
+			"billsplit_settlement_threshold_cents":     fmt.Sprintf("%d", org.SettlementThresholdCents),
+			"max_billsplit_rental_cost_cents":          fmt.Sprintf("%d", org.MaxBillsplitRentalCostCents),
+		}
+		pushBody := fmt.Sprintf(
+			"Settlement threshold: $%.2f | Max rental cost: $%.2f",
+			float64(org.SettlementThresholdCents)/100,
+			float64(org.MaxBillsplitRentalCostCents)/100,
+		)
+		if err := s.pushSvc.SendMulticastToUsers(ctx, memberUserIDs, subject, pushBody, fcmData); err != nil {
+			logger.Warn("broadcastThresholdUpdate: FCM multicast failed",
+				"orgID", org.ID, "memberCount", len(memberUserIDs), "error", err)
+		}
+	}
 }
 
 func (s *organizationService) ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, []domain.UserOrg, error) {

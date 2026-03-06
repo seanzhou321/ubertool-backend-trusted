@@ -23,7 +23,7 @@ func TestOrganizationService_MemberCount(t *testing.T) {
 	notifSvc := &MockNotificationRepo{}
 
 	// Create organization service
-	orgSvc := service.NewOrganizationService(orgRepo, userRepo, inviteRepo, notifSvc)
+	orgSvc := service.NewOrganizationService(orgRepo, userRepo, inviteRepo, notifSvc, nil, nil)
 
 	ctx := context.Background()
 

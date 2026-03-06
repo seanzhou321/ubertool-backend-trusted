@@ -468,6 +468,15 @@ func (m *MockNotificationRepo) Dispatch(ctx context.Context, n *domain.Notificat
 	}
 	return nil
 }
+func (m *MockNotificationRepo) DispatchSilent(ctx context.Context, n *domain.Notification) error {
+	for _, call := range m.ExpectedCalls {
+		if call.Method == "DispatchSilent" {
+			args := m.Called(ctx, n)
+			return args.Error(0)
+		}
+	}
+	return nil
+}
 func (m *MockNotificationRepo) SyncDeviceToken(ctx context.Context, userID int32, fcmToken, androidDeviceID, deviceName string) error {
 	return nil
 }
@@ -512,4 +521,12 @@ func (m *MockFcmTokenRepo) MarkObsolete(ctx context.Context, token string) error
 func (m *MockFcmTokenRepo) MarkObsoleteByDevice(ctx context.Context, userID int32, androidDeviceID string) error {
 	args := m.Called(ctx, userID, androidDeviceID)
 	return args.Error(0)
+}
+
+func (m *MockFcmTokenRepo) GetActiveByUserIDs(ctx context.Context, userIDs []int32) ([]domain.FcmToken, error) {
+	args := m.Called(ctx, userIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.FcmToken), args.Error(1)
 }

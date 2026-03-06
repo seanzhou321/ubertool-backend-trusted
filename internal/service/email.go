@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/smtp"
 	"strings"
+	"sync"
+
+	"ubertool-backend-trusted/internal/logger"
 )
 
 type emailService struct {
@@ -351,5 +354,205 @@ func (s *emailService) SendBillDisputeResolutionNotification(ctx context.Context
 		Subject: subject,
 		Body:    body,
 		IsHTML:  false,
+	})
+}
+
+// ---------------------------------------------------------------------------
+// AsyncEmailService — fire-and-forget wrapper around EmailService
+// ---------------------------------------------------------------------------
+//
+// AsyncEmailService wraps any EmailService implementation and dispatches every
+// send call to a bounded background worker pool, returning nil to the caller
+// immediately. This decouples transactional email delivery from the gRPC hot
+// path so that SMTP latency never stalls an RPC handler.
+//
+// The pool is started by NewAsyncEmailService and must be stopped by calling
+// Shutdown during graceful server shutdown.
+
+const (
+	// emailWorkerCount is the number of long-running SMTP sender goroutines.
+	emailWorkerCount = 3
+
+	// emailJobQueueSize is the capacity of the buffered job channel. Jobs are
+	// dropped (with a warning) only when this many are already waiting.
+	emailJobQueueSize = 128
+)
+
+type emailJob struct {
+	fn         func() error
+	methodName string
+}
+
+// AsyncEmailService implements EmailService. Every method enqueues the send
+// operation and returns nil immediately; actual delivery happens in a worker.
+type AsyncEmailService struct {
+	underlying EmailService
+	jobs       chan emailJob
+	jobsMu     sync.Mutex
+	jobsClosed bool
+	wg         sync.WaitGroup
+}
+
+// NewAsyncEmailService creates an AsyncEmailService that delegates real sends
+// to underlying and starts the worker pool immediately.
+func NewAsyncEmailService(underlying EmailService) *AsyncEmailService {
+	svc := &AsyncEmailService{
+		underlying: underlying,
+		jobs:       make(chan emailJob, emailJobQueueSize),
+	}
+	for i := 0; i < emailWorkerCount; i++ {
+		svc.wg.Add(1)
+		go svc.runWorker()
+	}
+	return svc
+}
+
+// Shutdown closes the job queue and waits for all in-flight sends to finish.
+// Returns ctx.Err() if the deadline is exceeded before draining completes.
+func (s *AsyncEmailService) Shutdown(ctx context.Context) error {
+	s.jobsMu.Lock()
+	if !s.jobsClosed {
+		s.jobsClosed = true
+		close(s.jobs)
+	}
+	s.jobsMu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (s *AsyncEmailService) runWorker() {
+	defer s.wg.Done()
+	for job := range s.jobs {
+		if err := job.fn(); err != nil {
+			logger.Warn("Async email send failed", "method", job.methodName, "error", err)
+		}
+	}
+}
+
+// enqueue places a send closure on the job channel and returns nil immediately.
+// If the queue is full or already closed the job is dropped with a warning.
+func (s *AsyncEmailService) enqueue(methodName string, fn func() error) error {
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
+	if s.jobsClosed {
+		logger.Warn("Email job dropped: service is shutting down", "method", methodName)
+		return nil
+	}
+	select {
+	case s.jobs <- emailJob{fn: fn, methodName: methodName}:
+	default:
+		logger.Warn("Email job dropped: queue is full", "method", methodName)
+	}
+	return nil
+}
+
+// -- EmailService interface implementation -----------------------------------
+// Each method captures its arguments in a closure and enqueues it. The closure
+// uses context.Background() because the original request context is cancelled
+// as soon as the RPC returns — before the worker picks up the job.
+
+func (s *AsyncEmailService) SendInvitation(_ context.Context, email, name, token, orgName, ccEmail string) error {
+	return s.enqueue("SendInvitation", func() error {
+		return s.underlying.SendInvitation(context.Background(), email, name, token, orgName, ccEmail)
+	})
+}
+
+func (s *AsyncEmailService) SendAccountStatusNotification(_ context.Context, email, name, orgName, status, reason string) error {
+	return s.enqueue("SendAccountStatusNotification", func() error {
+		return s.underlying.SendAccountStatusNotification(context.Background(), email, name, orgName, status, reason)
+	})
+}
+
+func (s *AsyncEmailService) SendRentalRequestNotification(_ context.Context, ownerEmail, renterName, toolName, ccEmail string) error {
+	return s.enqueue("SendRentalRequestNotification", func() error {
+		return s.underlying.SendRentalRequestNotification(context.Background(), ownerEmail, renterName, toolName, ccEmail)
+	})
+}
+
+func (s *AsyncEmailService) SendRentalApprovalNotification(_ context.Context, renterEmail, toolName, ownerName, pickupNote, ccEmail string) error {
+	return s.enqueue("SendRentalApprovalNotification", func() error {
+		return s.underlying.SendRentalApprovalNotification(context.Background(), renterEmail, toolName, ownerName, pickupNote, ccEmail)
+	})
+}
+
+func (s *AsyncEmailService) SendRentalRejectionNotification(_ context.Context, renterEmail, toolName, ownerName, ccEmail string) error {
+	return s.enqueue("SendRentalRejectionNotification", func() error {
+		return s.underlying.SendRentalRejectionNotification(context.Background(), renterEmail, toolName, ownerName, ccEmail)
+	})
+}
+
+func (s *AsyncEmailService) SendRentalConfirmationNotification(_ context.Context, ownerEmail, renterName, toolName, ccEmail string) error {
+	return s.enqueue("SendRentalConfirmationNotification", func() error {
+		return s.underlying.SendRentalConfirmationNotification(context.Background(), ownerEmail, renterName, toolName, ccEmail)
+	})
+}
+
+func (s *AsyncEmailService) SendRentalCancellationNotification(_ context.Context, ownerEmail, renterName, toolName, reason, ccEmail string) error {
+	return s.enqueue("SendRentalCancellationNotification", func() error {
+		return s.underlying.SendRentalCancellationNotification(context.Background(), ownerEmail, renterName, toolName, reason, ccEmail)
+	})
+}
+
+func (s *AsyncEmailService) SendRentalCompletionNotification(_ context.Context, email, role, toolName string, amount int32) error {
+	return s.enqueue("SendRentalCompletionNotification", func() error {
+		return s.underlying.SendRentalCompletionNotification(context.Background(), email, role, toolName, amount)
+	})
+}
+
+func (s *AsyncEmailService) SendRentalPickupNotification(_ context.Context, email, name, toolName, startDate, endDate string) error {
+	return s.enqueue("SendRentalPickupNotification", func() error {
+		return s.underlying.SendRentalPickupNotification(context.Background(), email, name, toolName, startDate, endDate)
+	})
+}
+
+func (s *AsyncEmailService) SendReturnDateRejectionNotification(_ context.Context, renterEmail, toolName, newEndDate, reason string, totalCostCents int32) error {
+	return s.enqueue("SendReturnDateRejectionNotification", func() error {
+		return s.underlying.SendReturnDateRejectionNotification(context.Background(), renterEmail, toolName, newEndDate, reason, totalCostCents)
+	})
+}
+
+func (s *AsyncEmailService) SendAdminNotification(_ context.Context, adminEmail, subject, message string) error {
+	return s.enqueue("SendAdminNotification", func() error {
+		return s.underlying.SendAdminNotification(context.Background(), adminEmail, subject, message)
+	})
+}
+
+func (s *AsyncEmailService) SendBillPaymentNotice(_ context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth, orgName string) error {
+	return s.enqueue("SendBillPaymentNotice", func() error {
+		return s.underlying.SendBillPaymentNotice(context.Background(), debtorEmail, debtorName, creditorName, amountCents, settlementMonth, orgName)
+	})
+}
+
+func (s *AsyncEmailService) SendBillPaymentAcknowledgment(_ context.Context, creditorEmail, creditorName, debtorName string, amountCents int32, settlementMonth, orgName string) error {
+	return s.enqueue("SendBillPaymentAcknowledgment", func() error {
+		return s.underlying.SendBillPaymentAcknowledgment(context.Background(), creditorEmail, creditorName, debtorName, amountCents, settlementMonth, orgName)
+	})
+}
+
+func (s *AsyncEmailService) SendBillReceiptConfirmation(_ context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth, orgName string) error {
+	return s.enqueue("SendBillReceiptConfirmation", func() error {
+		return s.underlying.SendBillReceiptConfirmation(context.Background(), debtorEmail, debtorName, creditorName, amountCents, settlementMonth, orgName)
+	})
+}
+
+func (s *AsyncEmailService) SendBillDisputeNotification(_ context.Context, email, name, otherPartyName string, amountCents int32, reason, orgName string) error {
+	return s.enqueue("SendBillDisputeNotification", func() error {
+		return s.underlying.SendBillDisputeNotification(context.Background(), email, name, otherPartyName, amountCents, reason, orgName)
+	})
+}
+
+func (s *AsyncEmailService) SendBillDisputeResolutionNotification(_ context.Context, email, name string, amountCents int32, resolution, notes, orgName string) error {
+	return s.enqueue("SendBillDisputeResolutionNotification", func() error {
+		return s.underlying.SendBillDisputeResolutionNotification(context.Background(), email, name, amountCents, resolution, notes, orgName)
 	})
 }

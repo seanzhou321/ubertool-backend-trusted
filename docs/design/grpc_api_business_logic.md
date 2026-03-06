@@ -305,12 +305,29 @@ Business Logic:
 ### Update Organization
 Purpose: Update organization details.
 
-Input: `organization_id`, `name`, `description`, `address`, `metro`, `admin_email`, `admin_phone`
+Input: `organization_id`, `name`, `description`, `address`, `metro`, `admin_email`, `admin_phone`, `billsplit_settlement_threshold_cents`, `max_billsplit_rental_cost_cents`
 Output: updated organization info
 Business Logic:
-1. Verify user is `SUPER_ADMIN` of the organization.
-2. Update the organization record in `orgs` table.
-3. Return updated organization details.
+1. Verify the caller's `user_role` is `SUPER_ADMIN` for the given `organization_id`. Return permission error if otherwise.
+2. Update the `name`, `description`, `address`, `metro`, `admin_email`, and `admin_phone` fields on the `orgs` record.
+3. If `billsplit_settlement_threshold_cents` is greater than zero, update `orgs.billsplit_settlement_threshold_cents`. If the value is zero, leave the existing value unchanged — zero is not a valid threshold.
+4. If `max_billsplit_rental_cost_cents` is greater than zero, update `orgs.max_billsplit_rental_cost_cents`. If the value is zero, leave the existing value unchanged — zero is not a valid cap.
+5. Return the updated organization record.
+6. If either `billsplit_settlement_threshold_cents` or `max_billsplit_rental_cost_cents` was changed (i.e. the incoming value was greater than zero and differs from the value stored before the update), broadcast to all active members of the community:
+   - Fetch all `user_id` values from `users_orgs` where `organization_id` matches and the user is not blocked.
+   - For each member, create a `notifications` record with attributes:
+     ```
+     {
+       topic:                              org_threshold_update,
+       organization_id:                    organization_id,
+       billsplit_settlement_threshold_cents: <new value>,
+       max_billsplit_rental_cost_cents:      <new value>
+     }
+     ```
+   - Send an email to each member with the subject **"[Community Name] Payment Threshold Update"** and a body that states the new values of both thresholds, and reminds members that rentals above the cap must be settled directly between Lender and Renter.
+   - Send a push notification to all members using **FCM Multicast** (`messaging.SendEachForMulticast`) since the payload is identical for every recipient. Collect all active `fcm_tokens` for all affected `user_id` values in a single query, then batch them into multicast requests of up to 500 tokens each (FCM multicast limit). Use channel `admin_messages`. Include the new threshold values in the FCM `data` map. On `messaging.IsUnregistered(err)` for any token in the batch response, set that token's `fcm_tokens.status = 'OBSOLETE'`.
+
+Note: Only `SUPER_ADMIN` may modify the two billsplit price fields. Regular `ADMIN` role can update the other fields but the service must reject any attempt to change the price fields from a non-SUPER_ADMIN caller.
 
 ## Bill Split
 
@@ -638,32 +655,75 @@ Business Logic:
 ### Complete Rental
 Purpose: Mark tool as returned.
 
-Input: `request_id`, `return_condition`, `surcharge_or_credit_cents`, `notes`
+Input: `request_id`, `return_condition`, `surcharge_or_credit_cents`, `notes`, `charge_billsplit`
 Output: updated rental status
 Business Logic:
 1. Either owner or renter can signal completion.
-2. Verify the rental status is 'ACTIVE', 'SCHEDULED', or 'OVERDUE'. Report error if otherwise.
-3. Calculate `total_cost_cents` based on duration from start_date to end_date using the rental's price snapshot (captured at creation time). Duration is computed as `end_date - start_date` (end date is exclusive). See `tool-rental-pricing-algorithm.md` for the tiered pricing algorithm.
+2. Verify the rental status is `ACTIVE`, `SCHEDULED`, or `OVERDUE`. Return error if otherwise.
+3. Calculate `total_cost_cents` based on duration from `start_date` to `end_date` using the rental's price snapshot (captured at creation time). Duration is computed as `end_date - start_date` (end date is exclusive). See `tool-rental-pricing-algorithm.md` for the tiered pricing algorithm.
 4. The calculation uses `duration_unit`, `daily_price_cents`, `weekly_price_cents`, and `monthly_price_cents` stored on the rental record, not the tool's current prices.
-5. Update `rentals` status to 'COMPLETED' and set `completed_by` to `user_id`, `return_condition`, `surcharge_or_credit_cents`, `total_cost_cents`, and `notes`.
-6. Add `total_cost_cents`+`surcharge_or_credit_cents` to owner's balance in `users_orgs`.
-7. Create a `ledger_transactions` entry of type 'LENDING_CREDIT' to the owner using the org_id from the rentals.org_id and `total_cost_cents`+`surcharge_or_credit_cents` for the amount.
-8. Update owner's user_org record by adding `total_cost_cents` to the balance_cents field and set the last_balance_updated_on to today.
-9. Create a notification to the owner with attributes set to {topic:rental_credit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id} (insert into `notifications`).
-10. Send email to owner to inform the credit update from the rental.
-11. Send push notification to the owner (see Push Notification Pattern).
-12. Create a `ledger_transactions` record of type 'LENDING_DEBIT' to the renter using the org_id from the rentals.org_id
-13. Update renter's user_org record by adding `total_cost_cents`+`surcharge_or_credit_cents` to the balance_cents field and set the last_balance_updated_on to today.
-14. Create a notification to the renter with attributes set to {topic:rental_debit_update; transaction:ledger_id; amount:total_cost_cents; rental:rental_id} (insert into `notifications`).
-15. Send email to renter to inform the debit update from the rental.
-16. Send push notification to the renter (see Push Notification Pattern).
-17. Set `tools.status` back to 'AVAILABLE' if the tool has no more 'ACTIVE' or 'SCHEDULED' rental requests. Otherwise, set to 'RENTED'
-18. Create a notification to owner to inform the completion of the rental and the tool status change with attributes set to {topic:rental_completion; rental:rental_id} (insert into `notifications`).
-19. Send email to owner to inform the completion of the rental and the tool status change.
-20. Send push notification to the owner (see Push Notification Pattern).
-21. Create a notification to the renter to inform the completion of the rental with attributes set to {topic:rental_completion; rental:rental_id} (insert into `notifications`).
-22. Send email to renter to inform the completion of the rental and the tool status change.
-23. Send push notification to the renter (see Push Notification Pattern).
+5. Let `settlement_cents = total_cost_cents + surcharge_or_credit_cents`.
+6. Update `rentals`: set `status = 'COMPLETED'`, `completed_by = user_id`, `return_condition`, `surcharge_or_credit_cents`, `total_cost_cents`, `charge_billsplit`, and `notes`.
+7. **Owner — balance and ledger (only if `charge_billsplit = true`)**:
+   - Add `settlement_cents` to owner's `balance_cents` in `users_orgs` and set `last_balance_updated_on` to today.
+   - Create a `ledger_transactions` entry of type `LENDING_CREDIT` for the owner, using `org_id` from `rentals.org_id` and `settlement_cents` as the amount.
+8. Create a notification to the **owner** for the credit/balance update (insert into `notifications`) with attributes:
+   ```
+   {
+     topic:           rental_credit_update,
+     transaction:     ledger_id,          // omit if charge_billsplit=false (no ledger created)
+     amount:          settlement_cents,
+     rental:          rental_id,
+     charge_billsplit: charge_billsplit
+   }
+   ```
+   - If `charge_billsplit = false`, the notification body must include the following **highlighted** statement:
+     > "Reminder: The rental payment of this transaction should be settled directly between you and the renter. This transaction is not included in the monthly billsplit."
+9. Send email to the owner to inform the credit/balance update from the rental (include the highlighted statement above if `charge_billsplit = false`).
+10. Send push notification to the owner (see Push Notification Pattern). Include `charge_billsplit` in the FCM `data` map.
+11. **Renter — balance and ledger (only if `charge_billsplit = true`)**:
+    - Add `settlement_cents` to renter's `balance_cents` in `users_orgs` (as a debit — subtract from balance) and set `last_balance_updated_on` to today.
+    - Create a `ledger_transactions` record of type `LENDING_DEBIT` for the renter, using `org_id` from `rentals.org_id` and `settlement_cents` as the amount.
+12. Create a notification to the **renter** for the debit/balance update (insert into `notifications`) with attributes:
+    ```
+    {
+      topic:           rental_debit_update,
+      transaction:     ledger_id,          // omit if charge_billsplit=false (no ledger created)
+      amount:          settlement_cents,
+      rental:          rental_id,
+      charge_billsplit: charge_billsplit
+    }
+    ```
+    - If `charge_billsplit = false`, the notification body must include the following **highlighted** statement:
+      > "Reminder: The rental payment of this transaction should be settled directly between you and the owner. This transaction is not included in the monthly billsplit."
+13. Send email to the renter to inform the debit/balance update from the rental (include the highlighted statement above if `charge_billsplit = false`).
+14. Send push notification to the renter (see Push Notification Pattern). Include `charge_billsplit` in the FCM `data` map.
+15. Set `tools.status` back to `AVAILABLE` if the tool has no more `ACTIVE` or `SCHEDULED` rental requests. Otherwise set to `RENTED`.
+16. Create a notification to the **owner** for rental completion and tool status change (insert into `notifications`) with attributes:
+    ```
+    { topic: rental_completion, rental: rental_id, charge_billsplit: charge_billsplit }
+    ```
+17. Send email to the owner to inform completion of the rental and the tool status change.
+18. Send push notification to the owner (see Push Notification Pattern).
+19. Create a notification to the **renter** for rental completion (insert into `notifications`) with attributes:
+    ```
+    { topic: rental_completion, rental: rental_id, charge_billsplit: charge_billsplit }
+    ```
+20. Send email to the renter to inform completion of the rental.
+21. Send push notification to the renter (see Push Notification Pattern).
+
+**Summary — what changes based on `charge_billsplit`:**
+
+| Action | `charge_billsplit = true` | `charge_billsplit = false` |
+|---|---|---|
+| Owner `users_orgs.balance_cents` updated | ✅ +`settlement_cents` | ❌ No change |
+| Owner `ledger_transactions` (LENDING_CREDIT) created | ✅ | ❌ |
+| Renter `users_orgs.balance_cents` updated | ✅ −`settlement_cents` | ❌ No change |
+| Renter `ledger_transactions` (LENDING_DEBIT) created | ✅ | ❌ |
+| Notifications sent to owner and renter | ✅ Normal | ✅ With highlighted direct-settlement reminder |
+| `rentals.charge_billsplit` stored | ✅ `true` | ✅ `false` |
+
+
 
 ### Get Rental
 Purpose: View rental details.

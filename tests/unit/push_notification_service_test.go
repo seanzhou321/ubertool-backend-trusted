@@ -92,7 +92,7 @@ func TestPushSvc_SendToUser_SingleToken_Success(t *testing.T) {
 	token := domain.FcmToken{UserID: 3, Token: "tok-aaa"}
 	fcmRepo.On("GetActiveByUserID", mock.Anything, int32(3)).Return([]domain.FcmToken{token}, nil)
 	sender.On("Send", mock.Anything, mock.MatchedBy(func(msg *fcmmessaging.Message) bool {
-		return msg.Token == "tok-aaa" && msg.Notification.Title == "New Rental"
+		return msg.Token == "tok-aaa" && msg.Data["title"] == "New Rental"
 	})).Return("msg-id-1", nil)
 
 	err := svc.SendToUser(context.Background(), 3, "New Rental", "You have a request", 99, map[string]string{"type": "RENTAL_REQUEST"})

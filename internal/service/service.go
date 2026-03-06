@@ -27,7 +27,7 @@ type OrganizationService interface {
 	GetOrganization(ctx context.Context, id int32, callingUserID int32) (*domain.Organization, *domain.UserOrg, error)
 	CreateOrganization(ctx context.Context, userID int32, org *domain.Organization) error
 	SearchOrganizations(ctx context.Context, name, metro string) ([]domain.Organization, error)
-	UpdateOrganization(ctx context.Context, org *domain.Organization) error
+	UpdateOrganization(ctx context.Context, callerID int32, org *domain.Organization) error
 	ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, []domain.UserOrg, error)
 	JoinOrganizationWithInvite(ctx context.Context, userID int32, inviteCode string) (*domain.Organization, *domain.User, error)
 }
@@ -58,7 +58,7 @@ type RentalService interface {
 	RejectRentalRequest(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error)
 	CancelRental(ctx context.Context, renterID, rentalID int32, reason string) (*domain.Rental, error)
 	FinalizeRentalRequest(ctx context.Context, renterID, rentalID int32) (*domain.Rental, []domain.Rental, []domain.Rental, error)
-	CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32, notes string) (*domain.Rental, error)
+	CompleteRental(ctx context.Context, userID, rentalID int32, returnCondition string, surchargeOrCreditCents int32, notes string, chargeBillsplit bool) (*domain.Rental, error)
 	Update(ctx context.Context, rt *domain.Rental) error
 	ListRentals(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListLendings(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
@@ -87,6 +87,9 @@ type NotificationService interface {
 	ReportMessageEvent(ctx context.Context, userID int32, notificationID int64, eventType string, eventTime time.Time) error
 	// Dispatch creates the notification row in DB and fires a push notification if a push service is configured.
 	Dispatch(ctx context.Context, n *domain.Notification) error
+	// DispatchSilent creates the notification row in DB without firing a push notification.
+	// Use this when the caller will handle push delivery separately (e.g. via multicast).
+	DispatchSilent(ctx context.Context, n *domain.Notification) error
 	// SetPushService wires the FCM push service after construction (allows nil-safe late binding).
 	SetPushService(pushSvc PushNotificationService)
 }
@@ -94,6 +97,10 @@ type NotificationService interface {
 // PushNotificationService sends FCM push notifications to a user's registered devices.
 type PushNotificationService interface {
 	SendToUser(ctx context.Context, userID int32, title, body string, notificationID int64, data map[string]string) error
+	// SendMulticastToUsers sends an identical FCM push to all active devices of the given users
+	// in batches via SendEachForMulticast (payload is identical for every recipient). Non-blocking:
+	// the actual sends happen in a goroutine. Unregistered tokens are marked OBSOLETE.
+	SendMulticastToUsers(ctx context.Context, userIDs []int32, title, body string, data map[string]string) error
 	// Shutdown drains all in-flight send goroutines. Call during graceful server
 	// shutdown before exiting. Returns ctx.Err() if the deadline is exceeded.
 	Shutdown(ctx context.Context) error

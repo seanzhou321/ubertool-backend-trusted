@@ -76,6 +76,10 @@ func (h *OrganizationHandler) SearchOrganizations(ctx context.Context, req *pb.S
 	return &pb.ListOrganizationsResponse{Organizations: protoOrgs}, nil
 }
 func (h *OrganizationHandler) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {
+	callerID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	org := &domain.Organization{
 		ID:                          req.OrganizationId,
 		Name:                        req.Name,
@@ -87,7 +91,7 @@ func (h *OrganizationHandler) UpdateOrganization(ctx context.Context, req *pb.Up
 		SettlementThresholdCents:    req.BillsplitSettlementThresholdCents,
 		MaxBillsplitRentalCostCents: req.MaxBillsplitRentalCostCents,
 	}
-	err := h.orgSvc.UpdateOrganization(ctx, org)
+	err = h.orgSvc.UpdateOrganization(ctx, callerID, org)
 	if err != nil {
 		return nil, err
 	}

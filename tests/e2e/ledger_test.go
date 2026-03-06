@@ -179,6 +179,7 @@ func TestLedgerService_E2E(t *testing.T) {
 			RequestId:              rentalID,
 			ReturnCondition:        "Good condition",
 			SurchargeOrCreditCents: 0,
+			ChargeBillsplit:        true,
 		}
 		_, err = rentalClient.CompleteRental(ctx5, completeReq)
 		require.NoError(t, err)

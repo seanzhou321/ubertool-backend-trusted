@@ -464,8 +464,10 @@ func (db *TestDB) GetLatestBillAction(billID int32) map[string]interface{} {
 	return result
 }
 
-// CreateFcmToken seeds an active FCM token for a user directly in the database,
+// CreateFcmToken seeds an ACTIVE FCM token for a user directly in the database,
 // simulating what the Android client would send via SyncDeviceToken on startup.
+// Use only for users in tests/data-setup/user_org.yaml who own real device tokens;
+// their tokens are delivered to real devices. For all other test users use CreateDryRunFcmToken.
 func (db *TestDB) CreateFcmToken(userID int32, fcmToken, androidDeviceID string) {
 	_, err := db.Exec(`
 		INSERT INTO fcm_tokens (user_id, fcm_token, android_device_id, device_info, status)
@@ -474,6 +476,23 @@ func (db *TestDB) CreateFcmToken(userID int32, fcmToken, androidDeviceID string)
 	`, userID, fcmToken, androidDeviceID)
 	if err != nil {
 		db.t.Fatalf("failed to create fcm token for user %d: %v", userID, err)
+	}
+}
+
+// CreateDryRunFcmToken seeds a TESTING FCM token for a user whose token is known to be fake.
+// The push notification service detects status='TESTING' and uses Firebase's dry-run
+// (validate-only) mode, so Firebase validates the message structure without attempting
+// delivery and without returning UNREGISTERED/INVALID_ARGUMENT errors for the fake token.
+// Use this for all ephemeral E2E test users — only the two users in
+// tests/data-setup/user_org.yaml have real device tokens (use CreateFcmToken for those).
+func (db *TestDB) CreateDryRunFcmToken(userID int32, fcmToken, androidDeviceID string) {
+	_, err := db.Exec(`
+		INSERT INTO fcm_tokens (user_id, fcm_token, android_device_id, device_info, status)
+		VALUES ($1, $2, $3, '{}', 'TESTING')
+		ON CONFLICT (fcm_token) DO UPDATE SET user_id = EXCLUDED.user_id, status = 'TESTING'
+	`, userID, fcmToken, androidDeviceID)
+	if err != nil {
+		db.t.Fatalf("failed to create dry-run fcm token for user %d: %v", userID, err)
 	}
 }
 

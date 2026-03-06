@@ -171,6 +171,7 @@ func MapDomainRentalToProtoWithNames(r *domain.Rental, renterName, ownerName, to
 		OwnerPhone:             ownerPhone,
 		ReturnNote:             r.Notes,
 		RejectionReason:        r.RejectionReason,
+		ChargeBillsplit:        r.ChargeBillsplit,
 	}
 	return proto
 }

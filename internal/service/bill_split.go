@@ -218,14 +218,12 @@ func (s *billSplitService) GetPaymentDetail(ctx context.Context, userID, payment
 func (s *billSplitService) AcknowledgePayment(ctx context.Context, userID, paymentID int32) error {
 	logger.EnterMethod("billSplitService.AcknowledgePayment", "userID", userID, "paymentID", paymentID)
 
-	// Get the bill
 	bill, err := s.billRepo.GetByID(ctx, paymentID)
 	if err != nil {
 		logger.ExitMethodWithError("billSplitService.AcknowledgePayment", err, "paymentID", paymentID)
 		return err
 	}
 
-	// Get user info
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return err
@@ -233,129 +231,18 @@ func (s *billSplitService) AcknowledgePayment(ctx context.Context, userID, payme
 
 	now := time.Now()
 
-	if bill.DebtorUserID == userID {
-		// Debtor is acknowledging payment sent
-		if bill.Status != domain.BillStatusPending && bill.Status != domain.BillStatusDisputed {
-			return fmt.Errorf("payment is not in pending or disputed status")
-		}
-		if bill.DebtorAcknowledgedAt != nil {
-			return fmt.Errorf("payment already acknowledged by debtor")
-		}
-
-		bill.DebtorAcknowledgedAt = &now
-		if err := s.billRepo.Update(ctx, bill); err != nil {
-			logger.ExitMethodWithError("billSplitService.AcknowledgePayment", err, "paymentID", paymentID)
-			return err
-		}
-
-		// Create bill action
-		action := &domain.BillAction{
-			BillID:      bill.ID,
-			ActorUserID: &userID,
-			ActionType:  domain.BillActionTypeDebtorAcknowledged,
-			Notes:       "Debtor acknowledged payment sent",
-			CreatedAt:   now,
-		}
-		_ = s.billRepo.CreateAction(ctx, action)
-
-		// Get creditor info
-		creditor, err := s.userRepo.GetByID(ctx, bill.CreditorUserID)
-		if err == nil {
-			org, _ := s.orgRepo.GetByID(ctx, bill.OrgID)
-			orgName := ""
-			if org != nil {
-				orgName = org.Name
-			}
-
-			// Create notification for creditor
-			notification := &domain.Notification{
-				UserID:  creditor.ID,
-				OrgID:   bill.OrgID,
-				Title:   "Payment Acknowledged",
-				Message: fmt.Sprintf("%s acknowledged sending payment of $%.2f for %s settlement", user.Name, float64(bill.AmountCents)/100, bill.SettlementMonth),
-				Attributes: map[string]string{
-					"topic":        "bill_payment_acknowledged",
-					"bill_id":      fmt.Sprintf("%d", bill.ID),
-					"debtor_id":    fmt.Sprintf("%d", bill.DebtorUserID),
-					"amount_cents": fmt.Sprintf("%d", bill.AmountCents),
-					"channel_id":   string(domain.ChannelBillSplitting),
-				},
-			}
-			_ = s.noteSvc.Dispatch(ctx, notification)
-
-			// Send email to creditor
-			_ = s.emailSvc.SendBillPaymentAcknowledgment(ctx, creditor.Email, creditor.Name, user.Name, bill.AmountCents, bill.SettlementMonth, orgName)
-		}
-
-	} else if bill.CreditorUserID == userID {
-		// Creditor is acknowledging payment received
-		if bill.Status != domain.BillStatusPending && bill.Status != domain.BillStatusDisputed {
-			return fmt.Errorf("payment is not in pending or disputed status")
-		}
-		if bill.DebtorAcknowledgedAt == nil {
-			return fmt.Errorf("debtor has not acknowledged payment yet")
-		}
-		if bill.CreditorAcknowledgedAt != nil {
-			return fmt.Errorf("payment already acknowledged by creditor")
-		}
-
-		bill.CreditorAcknowledgedAt = &now
-		bill.Status = domain.BillStatusPaid
-		bill.ResolvedAt = &now
-		bill.ResolutionOutcome = string(domain.ResolutionOutcomeGraceful)
-
-		if err := s.billRepo.Update(ctx, bill); err != nil {
-			logger.ExitMethodWithError("billSplitService.AcknowledgePayment", err, "paymentID", paymentID)
-			return err
-		}
-
-		// Create bill action
-		action := &domain.BillAction{
-			BillID:      bill.ID,
-			ActorUserID: &userID,
-			ActionType:  domain.BillActionTypeCreditorAcknowledged,
-			Notes:       "Creditor acknowledged payment received",
-			CreatedAt:   now,
-		}
-		_ = s.billRepo.CreateAction(ctx, action)
-
-		// Update balances for both parties
-		if err := s.updateBalances(ctx, bill); err != nil {
-			logger.ExitMethodWithError("billSplitService.AcknowledgePayment", err, "paymentID", paymentID, "error", "failed to update balances")
-			return fmt.Errorf("failed to update balances: %w", err)
-		}
-
-		// Get debtor info
-		debtor, err := s.userRepo.GetByID(ctx, bill.DebtorUserID)
-		if err == nil {
-			org, _ := s.orgRepo.GetByID(ctx, bill.OrgID)
-			orgName := ""
-			if org != nil {
-				orgName = org.Name
-			}
-
-			// Create notification for debtor
-			notification := &domain.Notification{
-				UserID:  debtor.ID,
-				OrgID:   bill.OrgID,
-				Title:   "Payment Receipt Confirmed",
-				Message: fmt.Sprintf("%s confirmed receiving payment of $%.2f for %s settlement", user.Name, float64(bill.AmountCents)/100, bill.SettlementMonth),
-				Attributes: map[string]string{
-					"topic":        "bill_receipt_confirmed",
-					"bill_id":      fmt.Sprintf("%d", bill.ID),
-					"creditor_id":  fmt.Sprintf("%d", bill.CreditorUserID),
-					"amount_cents": fmt.Sprintf("%d", bill.AmountCents),
-					"channel_id":   string(domain.ChannelBillSplitting),
-				},
-			}
-			_ = s.noteSvc.Dispatch(ctx, notification)
-
-			// Send email to debtor
-			_ = s.emailSvc.SendBillReceiptConfirmation(ctx, debtor.Email, debtor.Name, user.Name, bill.AmountCents, bill.SettlementMonth, orgName)
-		}
-
-	} else {
+	switch {
+	case bill.DebtorUserID == userID:
+		err = s.acknowledgeAsDebtor(ctx, bill, user, now)
+	case bill.CreditorUserID == userID:
+		err = s.acknowledgeAsCreditor(ctx, bill, user, now)
+	default:
 		return fmt.Errorf("user is not involved in this payment")
+	}
+
+	if err != nil {
+		logger.ExitMethodWithError("billSplitService.AcknowledgePayment", err, "paymentID", paymentID)
+		return err
 	}
 
 	logger.ExitMethod("billSplitService.AcknowledgePayment", "paymentID", paymentID, "success", true)
@@ -392,14 +279,9 @@ func (s *billSplitService) updateBalances(ctx context.Context, bill *domain.Bill
 func (s *billSplitService) ListDisputedPayments(ctx context.Context, adminID, orgID int32) ([]domain.Bill, error) {
 	logger.EnterMethod("billSplitService.ListDisputedPayments", "adminID", adminID, "orgID", orgID)
 
-	// Verify admin rights
-	userOrg, err := s.userRepo.GetUserOrg(ctx, adminID, orgID)
-	if err != nil {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
 		logger.ExitMethodWithError("billSplitService.ListDisputedPayments", err, "adminID", adminID, "orgID", orgID)
-		return nil, fmt.Errorf("unauthorized: not a member of this organization")
-	}
-	if userOrg.Role != domain.UserOrgRoleAdmin && userOrg.Role != domain.UserOrgRoleSuperAdmin {
-		return nil, fmt.Errorf("unauthorized: admin privileges required")
+		return nil, err
 	}
 
 	// Get disputed bills, excluding those involving this admin
@@ -416,14 +298,9 @@ func (s *billSplitService) ListDisputedPayments(ctx context.Context, adminID, or
 func (s *billSplitService) ListResolvedDisputes(ctx context.Context, adminID, orgID int32) ([]domain.Bill, error) {
 	logger.EnterMethod("billSplitService.ListResolvedDisputes", "adminID", adminID, "orgID", orgID)
 
-	// Verify admin rights
-	userOrg, err := s.userRepo.GetUserOrg(ctx, adminID, orgID)
-	if err != nil {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
 		logger.ExitMethodWithError("billSplitService.ListResolvedDisputes", err, "adminID", adminID, "orgID", orgID)
-		return nil, fmt.Errorf("unauthorized: not a member of this organization")
-	}
-	if userOrg.Role != domain.UserOrgRoleAdmin && userOrg.Role != domain.UserOrgRoleSuperAdmin {
-		return nil, fmt.Errorf("unauthorized: admin privileges required")
+		return nil, err
 	}
 
 	bills, err := s.billRepo.ListResolvedDisputesByOrg(ctx, orgID)
@@ -439,29 +316,20 @@ func (s *billSplitService) ListResolvedDisputes(ctx context.Context, adminID, or
 func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentID int32, resolution, notes string) error {
 	logger.EnterMethod("billSplitService.ResolveDispute", "adminID", adminID, "paymentID", paymentID, "resolution", resolution, "notes", notes)
 
-	// Get the bill
 	bill, err := s.billRepo.GetByID(ctx, paymentID)
 	if err != nil {
 		logger.ExitMethodWithError("billSplitService.ResolveDispute", err, "paymentID", paymentID)
 		return err
 	}
 
-	// Verify admin rights
-	userOrg, err := s.userRepo.GetUserOrg(ctx, adminID, bill.OrgID)
-	if err != nil {
+	if err := s.verifyAdminRights(ctx, adminID, bill.OrgID); err != nil {
 		logger.ExitMethodWithError("billSplitService.ResolveDispute", err, "adminID", adminID, "orgID", bill.OrgID)
-		return fmt.Errorf("unauthorized: not a member of this organization")
-	}
-	if userOrg.Role != domain.UserOrgRoleAdmin && userOrg.Role != domain.UserOrgRoleSuperAdmin {
-		return fmt.Errorf("unauthorized: admin privileges required")
+		return err
 	}
 
-	// Verify admin is NOT involved in the payment
 	if bill.DebtorUserID == adminID || bill.CreditorUserID == adminID {
 		return fmt.Errorf("admins cannot resolve disputes they are involved in")
 	}
-
-	// Verify bill is in disputed status
 	if bill.Status != domain.BillStatusDisputed {
 		return fmt.Errorf("payment is not in disputed status")
 	}
@@ -472,67 +340,21 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 	bill.ResolutionOutcome = resolution
 	bill.ResolutionNotes = notes
 
-	// Apply resolution based on type
 	switch resolution {
 	case string(domain.ResolutionOutcomeDebtorFault):
-		// Debtor was at fault (e.g. refused valid payment): Enforce payment
 		if err := s.updateBalances(ctx, bill); err != nil {
 			return fmt.Errorf("failed to update balances: %w", err)
 		}
-
-		// Block debtor from renting
-		debtorUserOrg, err := s.userRepo.GetUserOrg(ctx, bill.DebtorUserID, bill.OrgID)
-		if err == nil {
-			debtorUserOrg.RentingBlocked = true
-			debtorUserOrg.BlockedDueToBillID = &bill.ID
-			debtorUserOrg.BlockedReason = "Blocked due to unresolved payment dispute (debtor at fault)"
-			_ = s.userRepo.UpdateUserOrg(ctx, debtorUserOrg)
-		}
+		s.blockDebtorFromRenting(ctx, bill.DebtorUserID, bill.OrgID, bill, "Blocked due to unresolved payment dispute (debtor at fault)")
 
 	case string(domain.ResolutionOutcomeCreditorFault):
-		// Creditor was at fault (invalid bill): Do not process payment.
-		// Apply penalty to creditor (subtract amount)
-		creditorUserOrg, err := s.userRepo.GetUserOrg(ctx, bill.CreditorUserID, bill.OrgID)
-		if err == nil {
-			creditorUserOrg.BalanceCents -= bill.AmountCents
-			nowDate := time.Now().Format("2006-01-02")
-			creditorUserOrg.LastBalanceUpdateOn = &nowDate
-
-			creditorUserOrg.LendingBlocked = true
-			creditorUserOrg.BlockedDueToBillID = &bill.ID
-			creditorUserOrg.BlockedReason = "Blocked due to dispute resolution (creditor at fault)"
-			_ = s.userRepo.UpdateUserOrg(ctx, creditorUserOrg)
-		}
+		s.penalizeAndBlockCreditorFromLending(ctx, bill.CreditorUserID, bill.OrgID, bill, "Blocked due to dispute resolution (creditor at fault)")
 
 	case string(domain.ResolutionOutcomeBothFault):
-		// Block debtor from renting, creditor from lending. Apply penalty to both.
-		debtorUserOrg, err := s.userRepo.GetUserOrg(ctx, bill.DebtorUserID, bill.OrgID)
-		if err == nil {
-			debtorUserOrg.BalanceCents -= bill.AmountCents // Penalty
-			nowDate := time.Now().Format("2006-01-02")
-			debtorUserOrg.LastBalanceUpdateOn = &nowDate
-
-			debtorUserOrg.RentingBlocked = true
-			debtorUserOrg.BlockedDueToBillID = &bill.ID
-			debtorUserOrg.BlockedReason = "Blocked due to unresolved payment dispute (both at fault)"
-			_ = s.userRepo.UpdateUserOrg(ctx, debtorUserOrg)
-		}
-
-		creditorUserOrg, err := s.userRepo.GetUserOrg(ctx, bill.CreditorUserID, bill.OrgID)
-		if err == nil {
-			creditorUserOrg.BalanceCents -= bill.AmountCents // Penalty
-			nowDate := time.Now().Format("2006-01-02")
-			creditorUserOrg.LastBalanceUpdateOn = &nowDate
-
-			creditorUserOrg.LendingBlocked = true
-			creditorUserOrg.BlockedDueToBillID = &bill.ID
-			creditorUserOrg.BlockedReason = "Blocked due to unresolved payment dispute (both at fault)"
-			_ = s.userRepo.UpdateUserOrg(ctx, creditorUserOrg)
-		}
+		s.penalizeAndBlockDebtorFromRenting(ctx, bill.DebtorUserID, bill.OrgID, bill, "Blocked due to unresolved payment dispute (both at fault)")
+		s.penalizeAndBlockCreditorFromLending(ctx, bill.CreditorUserID, bill.OrgID, bill, "Blocked due to unresolved payment dispute (both at fault)")
 
 	case string(domain.ResolutionOutcomeGraceful):
-		// Non-forced resolution: Admin confirms parties resolved it offline
-		// Complete payment normally without penalties or blocking
 		if err := s.updateBalances(ctx, bill); err != nil {
 			return fmt.Errorf("failed to update balances: %w", err)
 		}
@@ -546,7 +368,6 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 		return err
 	}
 
-	// Create bill action
 	action := &domain.BillAction{
 		BillID:      bill.ID,
 		ActorUserID: &adminID,
@@ -556,49 +377,186 @@ func (s *billSplitService) ResolveDispute(ctx context.Context, adminID, paymentI
 	}
 	_ = s.billRepo.CreateAction(ctx, action)
 
-	// Notify both parties
+	orgName := s.getOrgName(ctx, bill.OrgID)
 	debtor, _ := s.userRepo.GetByID(ctx, bill.DebtorUserID)
 	creditor, _ := s.userRepo.GetByID(ctx, bill.CreditorUserID)
-	org, _ := s.orgRepo.GetByID(ctx, bill.OrgID)
-	orgName := ""
-	if org != nil {
-		orgName = org.Name
-	}
-
 	if debtor != nil {
-		notification := &domain.Notification{
-			UserID:  debtor.ID,
-			OrgID:   bill.OrgID,
-			Title:   "Dispute Resolved",
-			Message: fmt.Sprintf("Dispute resolved by admin: %s", resolution),
-			Attributes: map[string]string{
-				"topic":      "bill_dispute_resolved",
-				"bill_id":    fmt.Sprintf("%d", bill.ID),
-				"resolution": resolution,
-				"channel_id": string(domain.ChannelDispute),
-			},
-		}
-		_ = s.noteSvc.Dispatch(ctx, notification)
-		_ = s.emailSvc.SendBillDisputeResolutionNotification(ctx, debtor.Email, debtor.Name, bill.AmountCents, resolution, bill.ResolutionNotes, orgName)
+		s.sendDisputeResolutionNotification(ctx, debtor, bill, resolution, notes, orgName)
 	}
-
 	if creditor != nil {
-		notification := &domain.Notification{
-			UserID:  creditor.ID,
-			OrgID:   bill.OrgID,
-			Title:   "Dispute Resolved",
-			Message: fmt.Sprintf("Dispute resolved by admin: %s", resolution),
-			Attributes: map[string]string{
-				"topic":      "bill_dispute_resolved",
-				"bill_id":    fmt.Sprintf("%d", bill.ID),
-				"resolution": resolution,
-				"channel_id": string(domain.ChannelDispute),
-			},
-		}
-		_ = s.noteSvc.Dispatch(ctx, notification)
-		_ = s.emailSvc.SendBillDisputeResolutionNotification(ctx, creditor.Email, creditor.Name, bill.AmountCents, resolution, bill.ResolutionNotes, orgName)
+		s.sendDisputeResolutionNotification(ctx, creditor, bill, resolution, notes, orgName)
 	}
 
 	logger.ExitMethod("billSplitService.ResolveDispute", "paymentID", paymentID, "success", true)
+	return nil
+}
+
+func (s *billSplitService) getOrgName(ctx context.Context, orgID int32) string {
+	org, _ := s.orgRepo.GetByID(ctx, orgID)
+	if org != nil {
+		return org.Name
+	}
+	return ""
+}
+
+func (s *billSplitService) verifyAdminRights(ctx context.Context, adminID, orgID int32) error {
+	userOrg, err := s.userRepo.GetUserOrg(ctx, adminID, orgID)
+	if err != nil {
+		return fmt.Errorf("unauthorized: not a member of this organization")
+	}
+	if userOrg.Role != domain.UserOrgRoleAdmin && userOrg.Role != domain.UserOrgRoleSuperAdmin {
+		return fmt.Errorf("unauthorized: admin privileges required")
+	}
+	return nil
+}
+
+func (s *billSplitService) blockDebtorFromRenting(ctx context.Context, debtorID, orgID int32, bill *domain.Bill, reason string) {
+	userOrg, err := s.userRepo.GetUserOrg(ctx, debtorID, orgID)
+	if err == nil {
+		userOrg.RentingBlocked = true
+		userOrg.BlockedDueToBillID = &bill.ID
+		userOrg.BlockedReason = reason
+		_ = s.userRepo.UpdateUserOrg(ctx, userOrg)
+	}
+}
+
+func (s *billSplitService) penalizeAndBlockDebtorFromRenting(ctx context.Context, debtorID, orgID int32, bill *domain.Bill, reason string) {
+	userOrg, err := s.userRepo.GetUserOrg(ctx, debtorID, orgID)
+	if err == nil {
+		userOrg.BalanceCents -= bill.AmountCents
+		nowDate := time.Now().Format("2006-01-02")
+		userOrg.LastBalanceUpdateOn = &nowDate
+		userOrg.RentingBlocked = true
+		userOrg.BlockedDueToBillID = &bill.ID
+		userOrg.BlockedReason = reason
+		_ = s.userRepo.UpdateUserOrg(ctx, userOrg)
+	}
+}
+
+func (s *billSplitService) penalizeAndBlockCreditorFromLending(ctx context.Context, creditorID, orgID int32, bill *domain.Bill, reason string) {
+	userOrg, err := s.userRepo.GetUserOrg(ctx, creditorID, orgID)
+	if err == nil {
+		userOrg.BalanceCents -= bill.AmountCents
+		nowDate := time.Now().Format("2006-01-02")
+		userOrg.LastBalanceUpdateOn = &nowDate
+		userOrg.LendingBlocked = true
+		userOrg.BlockedDueToBillID = &bill.ID
+		userOrg.BlockedReason = reason
+		_ = s.userRepo.UpdateUserOrg(ctx, userOrg)
+	}
+}
+
+func (s *billSplitService) sendDisputeResolutionNotification(ctx context.Context, user *domain.User, bill *domain.Bill, resolution, notes, orgName string) {
+	notification := &domain.Notification{
+		UserID:  user.ID,
+		OrgID:   bill.OrgID,
+		Title:   "Dispute Resolved",
+		Message: fmt.Sprintf("Dispute resolved by admin: %s", resolution),
+		Attributes: map[string]string{
+			"topic":      "bill_dispute_resolved",
+			"bill_id":    fmt.Sprintf("%d", bill.ID),
+			"resolution": resolution,
+			"channel_id": string(domain.ChannelDispute),
+		},
+	}
+	_ = s.noteSvc.Dispatch(ctx, notification)
+	_ = s.emailSvc.SendBillDisputeResolutionNotification(ctx, user.Email, user.Name, bill.AmountCents, resolution, notes, orgName)
+}
+
+func (s *billSplitService) acknowledgeAsDebtor(ctx context.Context, bill *domain.Bill, user *domain.User, now time.Time) error {
+	if bill.Status != domain.BillStatusPending && bill.Status != domain.BillStatusDisputed {
+		return fmt.Errorf("payment is not in pending or disputed status")
+	}
+	if bill.DebtorAcknowledgedAt != nil {
+		return fmt.Errorf("payment already acknowledged by debtor")
+	}
+
+	bill.DebtorAcknowledgedAt = &now
+	if err := s.billRepo.Update(ctx, bill); err != nil {
+		return err
+	}
+
+	action := &domain.BillAction{
+		BillID:      bill.ID,
+		ActorUserID: &user.ID,
+		ActionType:  domain.BillActionTypeDebtorAcknowledged,
+		Notes:       "Debtor acknowledged payment sent",
+		CreatedAt:   now,
+	}
+	_ = s.billRepo.CreateAction(ctx, action)
+
+	creditor, err := s.userRepo.GetByID(ctx, bill.CreditorUserID)
+	if err == nil {
+		orgName := s.getOrgName(ctx, bill.OrgID)
+		notification := &domain.Notification{
+			UserID:  creditor.ID,
+			OrgID:   bill.OrgID,
+			Title:   "Payment Acknowledged",
+			Message: fmt.Sprintf("%s acknowledged sending payment of $%.2f for %s settlement", user.Name, float64(bill.AmountCents)/100, bill.SettlementMonth),
+			Attributes: map[string]string{
+				"topic":        "bill_payment_acknowledged",
+				"bill_id":      fmt.Sprintf("%d", bill.ID),
+				"debtor_id":    fmt.Sprintf("%d", bill.DebtorUserID),
+				"amount_cents": fmt.Sprintf("%d", bill.AmountCents),
+				"channel_id":   string(domain.ChannelBillSplitting),
+			},
+		}
+		_ = s.noteSvc.Dispatch(ctx, notification)
+		_ = s.emailSvc.SendBillPaymentAcknowledgment(ctx, creditor.Email, creditor.Name, user.Name, bill.AmountCents, bill.SettlementMonth, orgName)
+	}
+	return nil
+}
+
+func (s *billSplitService) acknowledgeAsCreditor(ctx context.Context, bill *domain.Bill, user *domain.User, now time.Time) error {
+	if bill.Status != domain.BillStatusPending && bill.Status != domain.BillStatusDisputed {
+		return fmt.Errorf("payment is not in pending or disputed status")
+	}
+	if bill.DebtorAcknowledgedAt == nil {
+		return fmt.Errorf("debtor has not acknowledged payment yet")
+	}
+	if bill.CreditorAcknowledgedAt != nil {
+		return fmt.Errorf("payment already acknowledged by creditor")
+	}
+
+	bill.CreditorAcknowledgedAt = &now
+	bill.Status = domain.BillStatusPaid
+	bill.ResolvedAt = &now
+	bill.ResolutionOutcome = string(domain.ResolutionOutcomeGraceful)
+	if err := s.billRepo.Update(ctx, bill); err != nil {
+		return err
+	}
+
+	action := &domain.BillAction{
+		BillID:      bill.ID,
+		ActorUserID: &user.ID,
+		ActionType:  domain.BillActionTypeCreditorAcknowledged,
+		Notes:       "Creditor acknowledged payment received",
+		CreatedAt:   now,
+	}
+	_ = s.billRepo.CreateAction(ctx, action)
+
+	if err := s.updateBalances(ctx, bill); err != nil {
+		return fmt.Errorf("failed to update balances: %w", err)
+	}
+
+	debtor, err := s.userRepo.GetByID(ctx, bill.DebtorUserID)
+	if err == nil {
+		orgName := s.getOrgName(ctx, bill.OrgID)
+		notification := &domain.Notification{
+			UserID:  debtor.ID,
+			OrgID:   bill.OrgID,
+			Title:   "Payment Receipt Confirmed",
+			Message: fmt.Sprintf("%s confirmed receiving payment of $%.2f for %s settlement", user.Name, float64(bill.AmountCents)/100, bill.SettlementMonth),
+			Attributes: map[string]string{
+				"topic":        "bill_receipt_confirmed",
+				"bill_id":      fmt.Sprintf("%d", bill.ID),
+				"creditor_id":  fmt.Sprintf("%d", bill.CreditorUserID),
+				"amount_cents": fmt.Sprintf("%d", bill.AmountCents),
+				"channel_id":   string(domain.ChannelBillSplitting),
+			},
+		}
+		_ = s.noteSvc.Dispatch(ctx, notification)
+		_ = s.emailSvc.SendBillReceiptConfirmation(ctx, debtor.Email, debtor.Name, user.Name, bill.AmountCents, bill.SettlementMonth, orgName)
+	}
 	return nil
 }

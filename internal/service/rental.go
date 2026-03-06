@@ -384,14 +384,9 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 		return nil, err
 	}
 
-	// Determine role
-	var isRenter, isOwner bool
-	if userID == rt.RenterID {
-		isRenter = true
-	} else if userID == rt.OwnerID {
-		isOwner = true
-	} else {
-		return nil, errors.New("unauthorized")
+	isRenter, isOwner, err := s.resolveRentalRole(userID, rt)
+	if err != nil {
+		return nil, err
 	}
 
 	tool, err := s.toolRepo.GetByID(ctx, rt.ToolID)
@@ -399,131 +394,170 @@ func (s *rentalService) ChangeRentalDates(ctx context.Context, userID, rentalID 
 		return nil, err
 	}
 
-	// Parse dates
-	var nStart, nEnd time.Time
-	// var oStart, oEnd time.Time // Unused for now
-	if newStart != "" {
-		nStart, _ = time.Parse("2006-01-02", newStart)
-	} else {
-		nStart, _ = time.Parse("2006-01-02", rt.StartDate)
-	}
-	if newEnd != "" {
-		nEnd, _ = time.Parse("2006-01-02", newEnd)
-	} else {
-		nEnd, _ = time.Parse("2006-01-02", rt.EndDate)
-	}
-	// Verify old dates match (optimistic locking check) - skipping for simplicity as per requirement focus
-
-	if !nEnd.After(nStart) {
-		return nil, errors.New("end date must be after start date (minimum 1 day rental)")
-	}
-
-	// Calculate new cost using tiered pricing algorithm using the rental's price snapshot
-	rtSnapshot := utils.RentalPriceSnapshot{
-		DurationUnit:       domain.ToolDurationUnit(rt.DurationUnit),
-		PricePerDayCents:   rt.DailyPriceCents,
-		PricePerWeekCents:  rt.WeeklyPriceCents,
-		PricePerMonthCents: rt.MonthlyPriceCents,
-	}
-	newCost, err := utils.CalculateRentalCost(nStart, nEnd, rtSnapshot)
+	nStart, nEnd, err := s.resolveNewDates(newStart, newEnd, rt)
 	if err != nil {
 		return nil, err
 	}
 
-	// Logic Branching
-	if rt.Status == domain.RentalStatusPending || rt.Status == domain.RentalStatusApproved || rt.Status == domain.RentalStatusScheduled {
-		// Pre-active changes
-		rt.StartDate = nStart.Format("2006-01-02")
-		rt.EndDate = nEnd.Format("2006-01-02")
-		rt.TotalCostCents = newCost
+	newCost, err := s.calcCost(rt, nStart.Format("2006-01-02"), nEnd.Format("2006-01-02"))
+	if err != nil {
+		return nil, err
+	}
 
-		if isRenter {
-			rt.Status = domain.RentalStatusPending
-			// Notify Owner
-			owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
-			if owner != nil {
-				// Send email/notif about date change requiring approval
-				// Simplified notification dispatch
-				notif := &domain.Notification{
-					UserID:     owner.ID,
-					OrgID:      rt.OrgID,
-					Title:      "Rental Dates Changed",
-					Message:    fmt.Sprintf("Renter changed dates for %s. Please re-approve.", tool.Name),
-					Attributes: map[string]string{"type": "RENTAL_DATE_CHANGE", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
-				}
-				_ = s.noteSvc.Dispatch(ctx, notif)
-			}
-		} else if isOwner {
-			rt.Status = domain.RentalStatusApproved
-			// Notify Renter
-			renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
-			if renter != nil {
-				// Send email/notif about date change
-				notif := &domain.Notification{
-					UserID:     renter.ID,
-					OrgID:      rt.OrgID,
-					Title:      "Rental Dates Updated",
-					Message:    fmt.Sprintf("Owner updated dates for %s. Please confirm.", tool.Name),
-					Attributes: map[string]string{"type": "RENTAL_DATE_CHANGE", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
-				}
-				_ = s.noteSvc.Dispatch(ctx, notif)
-			}
-		}
-	} else if (rt.Status == domain.RentalStatusActive || rt.Status == domain.RentalStatusOverdue) && isRenter {
-		// Extension request
-		if newStart != "" && nStart.Format("2006-01-02") != rt.StartDate {
-			return nil, errors.New("cannot change start date of active rental")
-		}
-
-		// Store the requested new end date in the end_date field
-		// The last_agreed_end_date stores the original agreed date for potential rollback
-		rt.EndDate = nEnd.Format("2006-01-02")
-		rt.TotalCostCents = newCost
-		rt.Status = domain.RentalStatusReturnDateChanged
-
-		// Notify Owner
-		owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
-		if owner != nil {
-			notif := &domain.Notification{
-				UserID:     owner.ID,
-				OrgID:      rt.OrgID,
-				Title:      "Return Date Extension Request",
-				Message:    fmt.Sprintf("Renter requests to extend return date for %s to %s.", tool.Name, nEnd.Format("2006-01-02")),
-				Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_REQUEST", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
-			}
-			_ = s.noteSvc.Dispatch(ctx, notif)
-		}
-	} else if rt.Status == domain.RentalStatusReturnDateChanged && isRenter {
-		// Renter is updating their pending extension request
-		if newStart != "" && nStart.Format("2006-01-02") != rt.StartDate {
-			return nil, errors.New("cannot change start date of active rental")
-		}
-
-		// Update the requested new end date in the end_date field
-		rt.EndDate = nEnd.Format("2006-01-02")
-		rt.TotalCostCents = newCost
-		// Status remains RETURN_DATE_CHANGED
-
-		// Notify Owner about the updated request
-		owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
-		if owner != nil {
-			notif := &domain.Notification{
-				UserID:     owner.ID,
-				OrgID:      rt.OrgID,
-				Title:      "Extension Request Updated",
-				Message:    fmt.Sprintf("Renter updated their extension request for %s to %s.", tool.Name, nEnd.Format("2006-01-02")),
-				Attributes: map[string]string{"type": "RETURN_DATE_CHANGE_REQUEST_UPDATED", "rental_id": fmt.Sprintf("%d", rt.ID), "channel_id": string(domain.ChannelRentalRequest)},
-			}
-			_ = s.noteSvc.Dispatch(ctx, notif)
-		}
-	} else {
-		return nil, errors.New("cannot change dates in current status and role")
+	if err := s.applyDateChange(ctx, rt, tool, isRenter, isOwner, newStart, nStart, nEnd, newCost); err != nil {
+		return nil, err
 	}
 
 	if err := s.rentalRepo.Update(ctx, rt); err != nil {
 		return nil, err
 	}
 	return rt, nil
+}
+
+// resolveRentalRole returns (isRenter, isOwner) for the given user, or an error if they are not a participant.
+func (s *rentalService) resolveRentalRole(userID int32, rt *domain.Rental) (isRenter, isOwner bool, err error) {
+	switch userID {
+	case rt.RenterID:
+		return true, false, nil
+	case rt.OwnerID:
+		return false, true, nil
+	default:
+		return false, false, errors.New("unauthorized")
+	}
+}
+
+// resolveNewDates normalises the requested start/end dates against the rental's current dates and
+// validates that end is strictly after start.
+func (s *rentalService) resolveNewDates(newStart, newEnd string, rt *domain.Rental) (nStart, nEnd time.Time, err error) {
+	startStr := rt.StartDate
+	if newStart != "" {
+		startStr = newStart
+	}
+	endStr := rt.EndDate
+	if newEnd != "" {
+		endStr = newEnd
+	}
+	nStart, err = time.Parse("2006-01-02", startStr)
+	if err != nil {
+		return nStart, nEnd, fmt.Errorf("invalid start date: %w", err)
+	}
+	nEnd, err = time.Parse("2006-01-02", endStr)
+	if err != nil {
+		return nStart, nEnd, fmt.Errorf("invalid end date: %w", err)
+	}
+	if !nEnd.After(nStart) {
+		return nStart, nEnd, errors.New("end date must be after start date (minimum 1 day rental)")
+	}
+	return nStart, nEnd, nil
+}
+
+// applyDateChange mutates rt in-place based on the transition rule that applies to the current
+// status and caller role, and dispatches the appropriate notification.
+func (s *rentalService) applyDateChange(ctx context.Context, rt *domain.Rental, tool *domain.Tool, isRenter, isOwner bool, newStart string, nStart, nEnd time.Time, newCost int32) error {
+	rentalIDStr := fmt.Sprintf("%d", rt.ID)
+
+	switch {
+	case isPreActive(rt.Status):
+		// Both renter and owner can adjust dates before the rental goes active.
+		rt.StartDate = nStart.Format("2006-01-02")
+		rt.EndDate = nEnd.Format("2006-01-02")
+		rt.TotalCostCents = newCost
+		return s.notifyPreActiveDateChange(ctx, rt, tool, isRenter, isOwner, rentalIDStr)
+
+	case isRenter && isActiveOrOverdue(rt.Status):
+		// Active/overdue: renter may only extend the end date (start is locked).
+		if newStart != "" && nStart.Format("2006-01-02") != rt.StartDate {
+			return errors.New("cannot change start date of active rental")
+		}
+		rt.EndDate = nEnd.Format("2006-01-02")
+		rt.TotalCostCents = newCost
+		rt.Status = domain.RentalStatusReturnDateChanged
+		return s.notifyOwnerExtensionRequest(ctx, rt, tool, rentalIDStr, nEnd, "Return Date Extension Request",
+			fmt.Sprintf("Renter requests to extend return date for %s to %s.", tool.Name, nEnd.Format("2006-01-02")),
+			"RETURN_DATE_CHANGE_REQUEST")
+
+	case isRenter && rt.Status == domain.RentalStatusReturnDateChanged:
+		// Renter is amending their pending extension request.
+		if newStart != "" && nStart.Format("2006-01-02") != rt.StartDate {
+			return errors.New("cannot change start date of active rental")
+		}
+		rt.EndDate = nEnd.Format("2006-01-02")
+		rt.TotalCostCents = newCost
+		// Status stays RETURN_DATE_CHANGED.
+		return s.notifyOwnerExtensionRequest(ctx, rt, tool, rentalIDStr, nEnd, "Extension Request Updated",
+			fmt.Sprintf("Renter updated their extension request for %s to %s.", tool.Name, nEnd.Format("2006-01-02")),
+			"RETURN_DATE_CHANGE_REQUEST_UPDATED")
+
+	default:
+		return errors.New("cannot change dates in current status and role")
+	}
+}
+
+// notifyPreActiveDateChange sends the appropriate notification when dates are changed before pickup.
+// A renter change resets status to PENDING; an owner change keeps it APPROVED.
+func (s *rentalService) notifyPreActiveDateChange(ctx context.Context, rt *domain.Rental, tool *domain.Tool, isRenter, isOwner bool, rentalIDStr string) error {
+	if isRenter {
+		rt.Status = domain.RentalStatusPending
+		owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
+		if owner != nil {
+			_ = s.noteSvc.Dispatch(ctx, &domain.Notification{
+				UserID:  owner.ID,
+				OrgID:   rt.OrgID,
+				Title:   "Rental Dates Changed",
+				Message: fmt.Sprintf("Renter changed dates for %s. Please re-approve.", tool.Name),
+				Attributes: map[string]string{
+					"type": "RENTAL_DATE_CHANGE", "rental_id": rentalIDStr,
+					"channel_id": string(domain.ChannelRentalRequest),
+				},
+			})
+		}
+	} else if isOwner {
+		rt.Status = domain.RentalStatusApproved
+		renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
+		if renter != nil {
+			_ = s.noteSvc.Dispatch(ctx, &domain.Notification{
+				UserID:  renter.ID,
+				OrgID:   rt.OrgID,
+				Title:   "Rental Dates Updated",
+				Message: fmt.Sprintf("Owner updated dates for %s. Please confirm.", tool.Name),
+				Attributes: map[string]string{
+					"type": "RENTAL_DATE_CHANGE", "rental_id": rentalIDStr,
+					"channel_id": string(domain.ChannelRentalRequest),
+				},
+			})
+		}
+	}
+	return nil
+}
+
+// notifyOwnerExtensionRequest notifies the owner about a new or updated return-date extension request.
+func (s *rentalService) notifyOwnerExtensionRequest(ctx context.Context, rt *domain.Rental, tool *domain.Tool, rentalIDStr string, nEnd time.Time, title, message, notifType string) error {
+	owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
+	if owner != nil {
+		_ = s.noteSvc.Dispatch(ctx, &domain.Notification{
+			UserID:  owner.ID,
+			OrgID:   rt.OrgID,
+			Title:   title,
+			Message: message,
+			Attributes: map[string]string{
+				"type": notifType, "rental_id": rentalIDStr,
+				"channel_id": string(domain.ChannelRentalRequest),
+			},
+		})
+	}
+	return nil
+}
+
+// isPreActive reports whether the rental is in a state that precedes the tool being picked up.
+func isPreActive(status domain.RentalStatus) bool {
+	return status == domain.RentalStatusPending ||
+		status == domain.RentalStatusApproved ||
+		status == domain.RentalStatusScheduled
+}
+
+// isActiveOrOverdue reports whether the rental is currently active or overdue.
+func isActiveOrOverdue(status domain.RentalStatus) bool {
+	return status == domain.RentalStatusActive || status == domain.RentalStatusOverdue
 }
 
 func (s *rentalService) ApproveReturnDateChange(ctx context.Context, ownerID, rentalID int32) (*domain.Rental, error) {
@@ -609,15 +643,7 @@ func (s *rentalService) RejectReturnDateChange(ctx context.Context, ownerID, ren
 	// Update end_date with owner's counter-proposal
 	rt.EndDate = newEndDate.Format("2006-01-02")
 
-	// Recalculate total_cost_cents based on new end date using tiered pricing
-	startDate, _ := time.Parse("2006-01-02", rt.StartDate)
-	rtSnapshot := utils.RentalPriceSnapshot{
-		DurationUnit:       domain.ToolDurationUnit(rt.DurationUnit),
-		PricePerDayCents:   rt.DailyPriceCents,
-		PricePerWeekCents:  rt.WeeklyPriceCents,
-		PricePerMonthCents: rt.MonthlyPriceCents,
-	}
-	newCost, err := utils.CalculateRentalCost(startDate, newEndDate, rtSnapshot)
+	newCost, err := s.calcCost(rt, "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -664,19 +690,10 @@ func (s *rentalService) AcknowledgeReturnDateRejection(ctx context.Context, rent
 		return nil, errors.New("invalid status")
 	}
 
-	// Rollback: Copy LastAgreedEndDate back to EndDate
+	// Rollback: restore the last agreed end date and recalculate cost from the rental's snapshot.
 	if rt.LastAgreedEndDate != nil {
 		rt.EndDate = *rt.LastAgreedEndDate
-		// Recalculate cost using the last agreed end date and the rental's price snapshot
-		startDate, _ := time.Parse("2006-01-02", rt.StartDate)
-		endDate, _ := time.Parse("2006-01-02", rt.EndDate)
-		rtSnapshot := utils.RentalPriceSnapshot{
-			DurationUnit:       domain.ToolDurationUnit(rt.DurationUnit),
-			PricePerDayCents:   rt.DailyPriceCents,
-			PricePerWeekCents:  rt.WeeklyPriceCents,
-			PricePerMonthCents: rt.MonthlyPriceCents,
-		}
-		originalCost, err := utils.CalculateRentalCost(startDate, endDate, rtSnapshot)
+		originalCost, err := s.calcCost(rt, "", "")
 		if err != nil {
 			return nil, err
 		}
@@ -723,19 +740,10 @@ func (s *rentalService) CancelReturnDateChange(ctx context.Context, renterID, re
 		return nil, errors.New("invalid status")
 	}
 
-	// Rollback: Copy LastAgreedEndDate back to EndDate
+	// Rollback: restore the last agreed end date and recalculate cost from the rental's snapshot.
 	if rt.LastAgreedEndDate != nil {
 		rt.EndDate = *rt.LastAgreedEndDate
-		// Recalculate cost using the last agreed end date and the rental's price snapshot
-		startDate, _ := time.Parse("2006-01-02", rt.StartDate)
-		endDate, _ := time.Parse("2006-01-02", rt.EndDate)
-		rtSnapshot := utils.RentalPriceSnapshot{
-			DurationUnit:       domain.ToolDurationUnit(rt.DurationUnit),
-			PricePerDayCents:   rt.DailyPriceCents,
-			PricePerWeekCents:  rt.WeeklyPriceCents,
-			PricePerMonthCents: rt.MonthlyPriceCents,
-		}
-		originalCost, err := utils.CalculateRentalCost(startDate, endDate, rtSnapshot)
+		originalCost, err := s.calcCost(rt, "", "")
 		if err != nil {
 			return nil, err
 		}
@@ -785,80 +793,249 @@ func (s *rentalService) Update(ctx context.Context, rt *domain.Rental) error {
 	return s.rentalRepo.Update(ctx, rt)
 }
 
-func (s *rentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32, notes string) (*domain.Rental, error) {
+// CompleteRental marks a rental as returned, settles balances/ledger if applicable, and
+// fires off notifications and emails asynchronously so the caller gets a response immediately.
+func (s *rentalService) CompleteRental(ctx context.Context, userID, rentalID int32, returnCondition string, surchargeOrCreditCents int32, notes string, chargeBillsplit bool) (*domain.Rental, error) {
+	// Steps 1-2: Authorise and verify status.
+	rt, err := s.loadAndValidateRental(ctx, userID, rentalID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Steps 3-5: Compute cost from price snapshot; settlement includes any surcharge/credit.
+	totalCostCents, err := s.calcCost(rt, "", "")
+	if err != nil {
+		return nil, err
+	}
+	settlementCents := totalCostCents + surchargeOrCreditCents
+
+	// Step 6: Persist completion details.
+	rt.ReturnCondition = returnCondition
+	rt.SurchargeOrCreditCents = surchargeOrCreditCents
+	rt.TotalCostCents = totalCostCents
+	rt.Notes = notes
+	rt.ChargeBillsplit = chargeBillsplit
+	rt.Status = domain.RentalStatusCompleted
+	rt.CompletedBy = &userID
+	if err := s.rentalRepo.Update(ctx, rt); err != nil {
+		return nil, err
+	}
+
+	// Steps 7, 11: Apply financial settlement (balance + ledger) — skipped when chargeBillsplit=false.
+	ownerLedgerID, err := s.applyOwnerSettlement(ctx, rt, settlementCents, chargeBillsplit)
+	if err != nil {
+		return nil, err
+	}
+	renterLedgerID, err := s.applyRenterSettlement(ctx, rt, settlementCents, chargeBillsplit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 15: Set tool status to AVAILABLE or RENTED based on remaining active rentals.
+	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
+	toolName := ""
+	if tool != nil {
+		toolName = tool.Name
+		_, activeCount, _ := s.rentalRepo.ListByTool(ctx, rt.ToolID, rt.OrgID, []string{
+			string(domain.RentalStatusActive), string(domain.RentalStatusScheduled),
+		}, 1, 1)
+		if activeCount > 0 {
+			tool.Status = domain.ToolStatusRented
+		} else {
+			tool.Status = domain.ToolStatusAvailable
+		}
+		_ = s.toolRepo.Update(ctx, tool)
+	}
+
+	// Steps 8-14, 16-21: Notifications and emails are fire-and-forget.
+	// A detached context is used so cancellation of the request context does not abort delivery.
+	owner, _ := s.userRepo.GetByID(ctx, rt.OwnerID)
+	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
+	detachedCtx := context.WithoutCancel(ctx)
+	go s.dispatchSettlementNotifications(detachedCtx, rt, settlementCents, chargeBillsplit, owner, renter, ownerLedgerID, renterLedgerID, toolName)
+	go s.dispatchCompletionNotifications(detachedCtx, rt, settlementCents, chargeBillsplit, owner, renter, toolName)
+
+	return rt, nil
+}
+
+// loadAndValidateRental fetches the rental and checks that the caller is a participant and the
+// rental is in a state that allows completion (steps 1-2).
+func (s *rentalService) loadAndValidateRental(ctx context.Context, userID, rentalID int32) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
 		return nil, err
 	}
-	if rt.OwnerID != ownerID {
+	if rt.OwnerID != userID && rt.RenterID != userID {
 		return nil, errors.New("unauthorized")
 	}
+	if rt.Status != domain.RentalStatusActive && rt.Status != domain.RentalStatusScheduled && rt.Status != domain.RentalStatusOverdue {
+		return nil, fmt.Errorf("rental cannot be completed: status is %s", rt.Status)
+	}
+	return rt, nil
+}
 
-	// Set return condition, surcharge/credit, and notes
-	rt.ReturnCondition = returnCondition
-	rt.SurchargeOrCreditCents = surchargeOrCreditCents
-	rt.Notes = notes
+// calcCost computes the rental cost using the rental's stored price snapshot.
+// Pass empty strings for startStr/endStr to fall back to the rental's own StartDate/EndDate.
+func (s *rentalService) calcCost(rt *domain.Rental, startStr, endStr string) (int32, error) {
+	if startStr == "" {
+		startStr = rt.StartDate
+	}
+	if endStr == "" {
+		endStr = rt.EndDate
+	}
+	start, err := time.Parse("2006-01-02", startStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid start date: %w", err)
+	}
+	end, err := time.Parse("2006-01-02", endStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid end date: %w", err)
+	}
+	return utils.CalculateRentalCost(start, end, utils.RentalPriceSnapshot{
+		DurationUnit:       domain.ToolDurationUnit(rt.DurationUnit),
+		PricePerDayCents:   rt.DailyPriceCents,
+		PricePerWeekCents:  rt.WeeklyPriceCents,
+		PricePerMonthCents: rt.MonthlyPriceCents,
+	})
+}
 
-	// Calculate the full settlement amount (base rental + surcharge or - credit)
-	settlementAmount := rt.TotalCostCents + surchargeOrCreditCents
-
-	// In double-entry bookkeeping, credit and debit must run in pairs
-	// All transactions happen at rental completion (not at finalize)
-
-	// Credit owner with full settlement amount
+// applyOwnerSettlement creates a LENDING_CREDIT ledger entry for the owner.
+// Balance is updated automatically by the DB trigger on ledger_transactions.
+// No-ops when chargeBillsplit=false (step 7). Returns the new ledger transaction ID (0 if skipped).
+func (s *rentalService) applyOwnerSettlement(ctx context.Context, rt *domain.Rental, settlementCents int32, chargeBillsplit bool) (int32, error) {
+	if !chargeBillsplit {
+		return 0, nil
+	}
 	ownerCredit := &domain.LedgerTransaction{
 		OrgID:           rt.OrgID,
 		UserID:          rt.OwnerID,
-		Amount:          settlementAmount,
+		Amount:          settlementCents,
 		Type:            domain.TransactionTypeLendingCredit,
 		RelatedRentalID: &rt.ID,
 		Description:     fmt.Sprintf("Earnings from rental of tool %d", rt.ToolID),
 	}
 	if err := s.ledgerRepo.CreateTransaction(ctx, ownerCredit); err != nil {
-		return nil, err
+		return 0, err
 	}
+	return ownerCredit.ID, nil
+}
 
-	// Debit renter with full settlement amount (paired transaction)
+// applyRenterSettlement creates a LENDING_DEBIT ledger entry for the renter.
+// Balance is updated automatically by the DB trigger on ledger_transactions.
+// No-ops when chargeBillsplit=false (step 11). Returns the new ledger transaction ID (0 if skipped).
+func (s *rentalService) applyRenterSettlement(ctx context.Context, rt *domain.Rental, settlementCents int32, chargeBillsplit bool) (int32, error) {
+	if !chargeBillsplit {
+		return 0, nil
+	}
 	renterDebit := &domain.LedgerTransaction{
 		OrgID:           rt.OrgID,
 		UserID:          rt.RenterID,
-		Amount:          -settlementAmount,
+		Amount:          -settlementCents,
 		Type:            domain.TransactionTypeLendingDebit,
 		RelatedRentalID: &rt.ID,
 		Description:     fmt.Sprintf("Settlement for rental of tool %d", rt.ToolID),
 	}
 	if err := s.ledgerRepo.CreateTransaction(ctx, renterDebit); err != nil {
-		return nil, err
+		return 0, err
+	}
+	return renterDebit.ID, nil
+}
+
+// dispatchSettlementNotifications sends credit/debit update notifications and emails to the owner
+// and renter (steps 8-14). When chargeBillsplit=false the notification body includes a highlighted
+// reminder that settlement should happen directly between the parties.
+// Intended to be called as a goroutine.
+func (s *rentalService) dispatchSettlementNotifications(ctx context.Context, rt *domain.Rental, settlementCents int32, chargeBillsplit bool, owner, renter *domain.User, ownerLedgerID, renterLedgerID int32, toolName string) {
+	rentalIDStr := fmt.Sprintf("%d", rt.ID)
+	settlementStr := fmt.Sprintf("%d", settlementCents)
+	chargeBSStr := fmt.Sprintf("%t", chargeBillsplit)
+
+	const ownerReminder = " Reminder: The rental payment of this transaction should be settled directly between you and the renter. This transaction is not included in the monthly billsplit."
+	const renterReminder = " Reminder: The rental payment of this transaction should be settled directly between you and the owner. This transaction is not included in the monthly billsplit."
+
+	// Steps 8-10: Owner credit/balance update notification + email + push (via Dispatch).
+	ownerCreditAttrs := map[string]string{
+		"topic":            "rental_credit_update",
+		"amount":           settlementStr,
+		"rental":           rentalIDStr,
+		"charge_billsplit": chargeBSStr,
+	}
+	if chargeBillsplit {
+		ownerCreditAttrs["transaction"] = fmt.Sprintf("%d", ownerLedgerID)
+	}
+	ownerCreditMsg := fmt.Sprintf("Your rental has been credited %d cents.", settlementCents)
+	if !chargeBillsplit {
+		ownerCreditMsg += ownerReminder
+	}
+	_ = s.noteSvc.Dispatch(ctx, &domain.Notification{
+		UserID:     rt.OwnerID,
+		OrgID:      rt.OrgID,
+		Title:      "Rental Credit Update",
+		Message:    ownerCreditMsg,
+		Attributes: ownerCreditAttrs,
+	})
+	if owner != nil {
+		_ = s.emailSvc.SendRentalCompletionNotification(ctx, owner.Email, "Owner", toolName, settlementCents)
 	}
 
-	now := time.Now()
-	rt.EndDate = now.Format("2006-01-02")
-	rt.Status = domain.RentalStatusCompleted
-	rt.CompletedBy = &ownerID
-	if err := s.rentalRepo.Update(ctx, rt); err != nil {
-		return nil, err
+	// Steps 12-14: Renter debit/balance update notification + email + push (via Dispatch).
+	renterDebitAttrs := map[string]string{
+		"topic":            "rental_debit_update",
+		"amount":           settlementStr,
+		"rental":           rentalIDStr,
+		"charge_billsplit": chargeBSStr,
+	}
+	if chargeBillsplit {
+		renterDebitAttrs["transaction"] = fmt.Sprintf("%d", renterLedgerID)
+	}
+	renterDebitMsg := fmt.Sprintf("Your rental has been debited %d cents.", settlementCents)
+	if !chargeBillsplit {
+		renterDebitMsg += renterReminder
+	}
+	_ = s.noteSvc.Dispatch(ctx, &domain.Notification{
+		UserID:     rt.RenterID,
+		OrgID:      rt.OrgID,
+		Title:      "Rental Debit Update",
+		Message:    renterDebitMsg,
+		Attributes: renterDebitAttrs,
+	})
+	if renter != nil {
+		_ = s.emailSvc.SendRentalCompletionNotification(ctx, renter.Email, "Renter", toolName, settlementCents)
+	}
+}
+
+// dispatchCompletionNotifications sends rental-completion notifications and emails to the owner
+// and renter (steps 16-21). Intended to be called as a goroutine.
+func (s *rentalService) dispatchCompletionNotifications(ctx context.Context, rt *domain.Rental, settlementCents int32, chargeBillsplit bool, owner, renter *domain.User, toolName string) {
+	completionAttrs := map[string]string{
+		"topic":            "rental_completion",
+		"rental":           fmt.Sprintf("%d", rt.ID),
+		"charge_billsplit": fmt.Sprintf("%t", chargeBillsplit),
 	}
 
-	// Update tool status check logic
-	// Simplified: Set Available.
-	tool, _ := s.toolRepo.GetByID(ctx, rt.ToolID)
-	if tool != nil {
-		tool.Status = domain.ToolStatusAvailable
-		_ = s.toolRepo.Update(ctx, tool)
+	// Steps 16-18: Owner completion notification + email + push (via Dispatch).
+	_ = s.noteSvc.Dispatch(ctx, &domain.Notification{
+		UserID:     rt.OwnerID,
+		OrgID:      rt.OrgID,
+		Title:      "Rental Completed",
+		Message:    "The rental has been completed and the tool status has been updated.",
+		Attributes: completionAttrs,
+	})
+	if owner != nil {
+		_ = s.emailSvc.SendRentalCompletionNotification(ctx, owner.Email, "Owner", toolName, settlementCents)
 	}
 
-	// Notify both
-	renter, _ := s.userRepo.GetByID(ctx, rt.RenterID)
-	owner, _ := s.userRepo.GetByID(ctx, ownerID)
-
-	if renter != nil && owner != nil && tool != nil {
-		_ = s.emailSvc.SendRentalCompletionNotification(ctx, owner.Email, "Owner", tool.Name, settlementAmount)
-		_ = s.emailSvc.SendRentalCompletionNotification(ctx, renter.Email, "Renter", tool.Name, settlementAmount)
-
-		// Notifications...
+	// Steps 19-21: Renter completion notification + email + push (via Dispatch).
+	_ = s.noteSvc.Dispatch(ctx, &domain.Notification{
+		UserID:     rt.RenterID,
+		OrgID:      rt.OrgID,
+		Title:      "Rental Completed",
+		Message:    "The rental has been completed.",
+		Attributes: completionAttrs,
+	})
+	if renter != nil {
+		_ = s.emailSvc.SendRentalCompletionNotification(ctx, renter.Email, "Renter", toolName, settlementCents)
 	}
-
-	return rt, nil
 }
 
 func (s *rentalService) ListRentals(ctx context.Context, userID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {

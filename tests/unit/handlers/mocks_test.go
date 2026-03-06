@@ -83,8 +83,8 @@ func (m *MockRentalService) FinalizeRentalRequest(ctx context.Context, renterID,
 	}
 	return args.Get(0).(*domain.Rental), args.Get(1).([]domain.Rental), args.Get(2).([]domain.Rental), args.Error(3)
 }
-func (m *MockRentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32, notes string) (*domain.Rental, error) {
-	args := m.Called(ctx, ownerID, rentalID, returnCondition, surchargeOrCreditCents, notes)
+func (m *MockRentalService) CompleteRental(ctx context.Context, ownerID, rentalID int32, returnCondition string, surchargeOrCreditCents int32, notes string, chargeBillsplit bool) (*domain.Rental, error) {
+	args := m.Called(ctx, ownerID, rentalID, returnCondition, surchargeOrCreditCents, notes, chargeBillsplit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -182,8 +182,8 @@ func (m *MockOrganizationService) SearchOrganizations(ctx context.Context, name,
 	args := m.Called(ctx, name, metro)
 	return args.Get(0).([]domain.Organization), args.Error(1)
 }
-func (m *MockOrganizationService) UpdateOrganization(ctx context.Context, org *domain.Organization) error {
-	args := m.Called(ctx, org)
+func (m *MockOrganizationService) UpdateOrganization(ctx context.Context, callerID int32, org *domain.Organization) error {
+	args := m.Called(ctx, callerID, org)
 	return args.Error(0)
 }
 func (m *MockOrganizationService) ListMyOrganizations(ctx context.Context, userID int32) ([]domain.Organization, []domain.UserOrg, error) {

@@ -84,6 +84,9 @@ func (m *MockNotificationRepo) MarkAsRead(ctx context.Context, userID int32, not
 func (m *MockNotificationRepo) Dispatch(ctx context.Context, n *domain.Notification) error {
 	return nil
 }
+func (m *MockNotificationRepo) DispatchSilent(ctx context.Context, n *domain.Notification) error {
+	return nil
+}
 func (m *MockNotificationRepo) SyncDeviceToken(ctx context.Context, userID int32, fcmToken, androidDeviceID, deviceName string) error {
 	return nil
 }

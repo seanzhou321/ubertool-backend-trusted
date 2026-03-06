@@ -31,7 +31,7 @@ CREATE TABLE orgs (
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
-    phone_number TEXT UNIQUE NOT NULL,
+    phone_number TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     name TEXT NOT NULL,
     avatar_url TEXT,
@@ -157,6 +157,7 @@ CREATE TABLE rentals (
     return_condition TEXT,
     return_note TEXT,
     surcharge_or_credit_cents INTEGER, -- For late return or damage fees or credits for early return
+    charge_billsplit BOOLEAN NOT NULL DEFAULT TRUE, -- Whether the rental cost should be included in bill splitting calculation
     created_on DATE DEFAULT CURRENT_DATE,
     updated_on DATE DEFAULT CURRENT_DATE
 );
@@ -217,7 +218,7 @@ CREATE TABLE fcm_tokens (
     fcm_token TEXT NOT NULL, -- FCM registration token from the device
     android_device_id TEXT NOT NULL, -- identifier for the device (e.g., UUID from client)
     device_info JSONB, -- For storing device metadata
-    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, OBSOLETE
+    status TEXT NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, OBSOLETE, TESTING
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(fcm_token) -- fcm_token is a global unique identifier for the device registration with FCM
@@ -228,7 +229,10 @@ CREATE INDEX idx_fcm_tokens_user_id ON fcm_tokens(user_id) WHERE status = 'ACTIV
 -- Function to update balance on insert
 CREATE OR REPLACE FUNCTION update_user_balance() RETURNS TRIGGER AS $$
 BEGIN
-    UPDATE users_orgs SET balance_cents = balance_cents + NEW.amount WHERE user_id = NEW.user_id AND org_id = NEW.org_id;
+    UPDATE users_orgs
+    SET balance_cents = balance_cents + NEW.amount,
+        last_balance_updated_on = CURRENT_DATE
+    WHERE user_id = NEW.user_id AND org_id = NEW.org_id;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

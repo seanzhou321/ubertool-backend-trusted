@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"github.com/lib/pq"
+
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/repository"
 )
@@ -40,10 +42,12 @@ func (r *fcmTokenRepository) Upsert(ctx context.Context, t *domain.FcmToken) err
 	return err
 }
 
-// GetActiveByUserID returns all ACTIVE FCM tokens for a given user.
+// GetActiveByUserID returns all ACTIVE and TESTING FCM tokens for a given user.
+// TESTING tokens are sent using Firebase's dry-run (validate-only) mode so that
+// fake tokens used in tests never trigger UNREGISTERED errors on real devices.
 func (r *fcmTokenRepository) GetActiveByUserID(ctx context.Context, userID int32) ([]domain.FcmToken, error) {
 	query := `SELECT id, user_id, fcm_token, android_device_id, device_info, status, created_at, updated_at
-	          FROM fcm_tokens WHERE user_id = $1 AND status = 'ACTIVE'`
+	          FROM fcm_tokens WHERE user_id = $1 AND status IN ('ACTIVE', 'TESTING')`
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, err
@@ -81,4 +85,33 @@ func (r *fcmTokenRepository) MarkObsoleteByDevice(ctx context.Context, userID in
 	          WHERE user_id = $1 AND android_device_id = $2 AND status = 'ACTIVE'`
 	_, err := r.db.ExecContext(ctx, query, userID, androidDeviceID)
 	return err
+}
+
+// GetActiveByUserIDs returns all ACTIVE FCM tokens for the given set of user IDs in a single query.
+func (r *fcmTokenRepository) GetActiveByUserIDs(ctx context.Context, userIDs []int32) ([]domain.FcmToken, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
+	}
+	query := `SELECT id, user_id, fcm_token, android_device_id, device_info, status, created_at, updated_at
+	          FROM fcm_tokens WHERE user_id = ANY($1) AND status IN ('ACTIVE', 'TESTING')`
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(userIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tokens []domain.FcmToken
+	for rows.Next() {
+		var t domain.FcmToken
+		var infoBytes []byte
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Token, &t.AndroidDeviceID, &infoBytes,
+			&t.Status, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if len(infoBytes) > 0 {
+			_ = json.Unmarshal(infoBytes, &t.DeviceInfo)
+		}
+		tokens = append(tokens, t)
+	}
+	return tokens, rows.Err()
 }

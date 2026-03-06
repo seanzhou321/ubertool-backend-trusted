@@ -84,6 +84,8 @@ func main() {
 		store.UserRepository,
 		store.InvitationRepository,
 		noteSvc,
+		nil, // cronjob does not handle threshold-update broadcasts
+		nil,
 	)
 
 	userService := service.NewUserService(

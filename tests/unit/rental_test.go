@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRentalService_CreateRentalRequest(t *testing.T) {
@@ -74,44 +76,147 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 }
 
 func TestRentalService_CompleteRental(t *testing.T) {
-	rentalRepo := new(MockRentalRepo)
-	toolRepo := new(MockToolRepo)
-	ledgerRepo := new(MockLedgerRepo)
-	userRepo := new(MockUserRepo)
-	emailSvc := new(MockEmailService)
-	noteRepo := new(MockNotificationRepo)
-	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
-
 	ctx := context.Background()
 	ownerID := int32(10)
+	renterID := int32(1)
 	rentalID := int32(1)
+	orgID := int32(3)
+	toolID := int32(0)
 
-	rental := &domain.Rental{
-		ID:             rentalID,
-		RenterID:       1,
-		OwnerID:        ownerID,
-		OrgID:          3,
-		TotalCostCents: 1000,
-		Status:         domain.RentalStatusActive,
+	// startDate 2 days ago, endDate today → 2-day (end-exclusive) cost = 2000 cents.
+	startDate := time.Now().Add(-48 * time.Hour).Format("2006-01-02")
+	endDate := time.Now().Format("2006-01-02")
+
+	baseRental := &domain.Rental{
+		ID:                rentalID,
+		RenterID:          renterID,
+		OwnerID:           ownerID,
+		OrgID:             orgID,
+		ToolID:            toolID,
+		StartDate:         startDate,
+		EndDate:           endDate,
+		DurationUnit:      string(domain.ToolDurationUnitDay),
+		DailyPriceCents:   1000,
+		WeeklyPriceCents:  6000,
+		MonthlyPriceCents: 20000,
+		Status:            domain.RentalStatusActive,
 	}
 
-	t.Run("Success", func(t *testing.T) {
-		rentalRepo.On("GetByID", ctx, rentalID).Return(rental, nil)
-		ledgerRepo.On("CreateTransaction", ctx, mock.AnythingOfType("*domain.LedgerTransaction")).Return(nil)
+	newMocks := func() (
+		*MockRentalRepo, *MockToolRepo, *MockLedgerRepo, *MockUserRepo, *MockEmailService, *MockNotificationRepo,
+	) {
+		return new(MockRentalRepo), new(MockToolRepo), new(MockLedgerRepo), new(MockUserRepo), new(MockEmailService), new(MockNotificationRepo)
+	}
+
+	t.Run("Success with charge_billsplit=true", func(t *testing.T) {
+		rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo := newMocks()
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+
+		rt := *baseRental
+		rentalRepo.On("GetByID", ctx, rentalID).Return(&rt, nil)
 		rentalRepo.On("Update", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
-		toolRepo.On("GetByID", ctx, int32(0)).Return(&domain.Tool{Name: "Tool"}, nil) // ToolID is 0 in setup
-		toolRepo.On("Update", ctx, mock.AnythingOfType("*domain.Tool")).Return(nil)
+		rentalRepo.On("ListByTool", ctx, toolID, orgID, mock.Anything, int32(1), int32(1)).Return([]domain.Rental{}, int32(0), nil)
 
-		userRepo.On("GetByID", ctx, int32(1)).Return(&domain.User{Email: "renter@test.com"}, nil)
+		userRepo.On("GetByID", ctx, renterID).Return(&domain.User{Email: "renter@test.com"}, nil)
 		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{Email: "owner@test.com"}, nil)
-		emailSvc.On("SendRentalCompletionNotification", ctx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		res, err := svc.CompleteRental(ctx, ownerID, rentalID, "Good condition", 0, "All good")
+		ledgerRepo.On("CreateTransaction", ctx, mock.AnythingOfType("*domain.LedgerTransaction")).Return(nil)
+		toolRepo.On("GetByID", ctx, toolID).Return(&domain.Tool{Name: "Tool"}, nil)
+		toolRepo.On("Update", ctx, mock.AnythingOfType("*domain.Tool")).Return(nil)
+		// Notification/email calls happen in goroutines with a detached context; use mock.Anything for ctx.
+		emailSvc.On("SendRentalCompletionNotification", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(nil)
+
+		res, err := svc.CompleteRental(ctx, ownerID, rentalID, "Good condition", 0, "All good", true)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
+		assert.Equal(t, domain.RentalStatusCompleted, res.Status)
+		assert.True(t, res.ChargeBillsplit)
 
-		// Two transactions should be created: credit owner + debit renter (paired)
+		// Allow goroutines to finish so ledger call counts are stable.
+		time.Sleep(20 * time.Millisecond)
+
+		// With charge_billsplit=true: credit owner + debit renter = 2 ledger entries.
 		ledgerRepo.AssertNumberOfCalls(t, "CreateTransaction", 2)
+		// Balance updates are handled by the DB trigger; the service does not call UpdateUserOrg.
+		userRepo.AssertNotCalled(t, "UpdateUserOrg")
+	})
+
+	t.Run("Success with charge_billsplit=false", func(t *testing.T) {
+		rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo := newMocks()
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+
+		rt := *baseRental
+		rentalRepo.On("GetByID", ctx, rentalID).Return(&rt, nil)
+		rentalRepo.On("Update", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
+		rentalRepo.On("ListByTool", ctx, toolID, orgID, mock.Anything, int32(1), int32(1)).Return([]domain.Rental{}, int32(0), nil)
+
+		userRepo.On("GetByID", ctx, renterID).Return(&domain.User{Email: "renter@test.com"}, nil)
+		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{Email: "owner@test.com"}, nil)
+
+		toolRepo.On("GetByID", ctx, toolID).Return(&domain.Tool{Name: "Tool"}, nil)
+		toolRepo.On("Update", ctx, mock.AnythingOfType("*domain.Tool")).Return(nil)
+		// Notification/email calls happen in goroutines with a detached context; use mock.Anything for ctx.
+		emailSvc.On("SendRentalCompletionNotification", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(nil)
+
+		res, err := svc.CompleteRental(ctx, ownerID, rentalID, "Good condition", 0, "All good", false)
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, domain.RentalStatusCompleted, res.Status)
+		assert.False(t, res.ChargeBillsplit)
+
+		// Allow goroutines to finish.
+		time.Sleep(20 * time.Millisecond)
+
+		// With charge_billsplit=false: NO ledger entries, NO balance updates.
+		ledgerRepo.AssertNumberOfCalls(t, "CreateTransaction", 0)
+		userRepo.AssertNotCalled(t, "GetUserOrg")
+		userRepo.AssertNotCalled(t, "UpdateUserOrg")
+	})
+
+	t.Run("Settlement notification reminder text when charge_billsplit=false", func(t *testing.T) {
+		rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo := newMocks()
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+
+		rt := *baseRental
+		rentalRepo.On("GetByID", ctx, rentalID).Return(&rt, nil)
+		rentalRepo.On("Update", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
+		rentalRepo.On("ListByTool", ctx, toolID, orgID, mock.Anything, int32(1), int32(1)).Return([]domain.Rental{}, int32(0), nil)
+
+		userRepo.On("GetByID", ctx, renterID).Return(&domain.User{ID: renterID, Email: "renter@test.com", Name: "Renter"}, nil)
+		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{ID: ownerID, Email: "owner@test.com", Name: "Owner"}, nil)
+
+		toolRepo.On("GetByID", ctx, toolID).Return(&domain.Tool{Name: "Tool"}, nil)
+		toolRepo.On("Update", ctx, mock.AnythingOfType("*domain.Tool")).Return(nil)
+
+		emailSvc.On("SendRentalCompletionNotification", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(nil)
+		// Allow any Dispatch call so the goroutines don't hit unexpected-call failures.
+		noteRepo.On("Dispatch", mock.Anything, mock.AnythingOfType("*domain.Notification")).Maybe().Return(nil)
+
+		_, err := svc.CompleteRental(ctx, ownerID, rentalID, "Good condition", 0, "", false)
+		require.NoError(t, err)
+
+		// Wait for the fire-and-forget settlement and completion goroutines to run.
+		time.Sleep(100 * time.Millisecond)
+
+		// Inspect all Dispatch calls: settlement notifications must include the direct-settlement reminder.
+		var ownerReminderFound, renterReminderFound bool
+		for _, call := range noteRepo.Calls {
+			if call.Method != "Dispatch" {
+				continue
+			}
+			n, ok := call.Arguments.Get(1).(*domain.Notification)
+			if !ok {
+				continue
+			}
+			if n.UserID == ownerID && strings.Contains(n.Message, "settled directly between you and the renter") {
+				ownerReminderFound = true
+			}
+			if n.UserID == renterID && strings.Contains(n.Message, "settled directly between you and the owner") {
+				renterReminderFound = true
+			}
+		}
+		assert.True(t, ownerReminderFound, "owner settlement notification should contain the direct-settlement reminder")
+		assert.True(t, renterReminderFound, "renter settlement notification should contain the direct-settlement reminder")
 	})
 }
 

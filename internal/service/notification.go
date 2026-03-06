@@ -48,6 +48,12 @@ func (s *notificationService) Dispatch(ctx context.Context, n *domain.Notificati
 	return nil
 }
 
+// DispatchSilent inserts a notification into the database without firing a push notification.
+// Use this when the caller handles push delivery separately (e.g. via FCM multicast broadcast).
+func (s *notificationService) DispatchSilent(ctx context.Context, n *domain.Notification) error {
+	return s.noteRepo.Create(ctx, n)
+}
+
 // SyncDeviceToken upserts an FCM token for the user's device.
 func (s *notificationService) SyncDeviceToken(ctx context.Context, userID int32, fcmToken, androidDeviceID, deviceName string) error {
 	t := &domain.FcmToken{

@@ -105,14 +105,14 @@ func main() {
 		storageService,
 	)
 
-	// Initialize Email Service
-	emailSvc := service.NewEmailService(
+	// Initialize Email Service (wrapped in async worker pool so SMTP never blocks gRPC handlers)
+	emailSvc := service.NewAsyncEmailService(service.NewEmailService(
 		cfg.SMTP.Host,
 		fmt.Sprintf("%d", cfg.SMTP.Port),
 		cfg.SMTP.User,
 		cfg.SMTP.Password,
 		cfg.SMTP.From,
-	)
+	))
 
 	// Initialize Services
 	authSvc := service.NewAuthService(
@@ -126,7 +126,7 @@ func main() {
 		store.FcmTokenRepository,
 	)
 	userSvc := service.NewUserService(store.UserRepository, store.OrganizationRepository)
-	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository, store.InvitationRepository, noteSvc)
+	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository, store.InvitationRepository, noteSvc, emailSvc, pushSvc)
 	toolSvc := service.NewToolService(store.ToolRepository, store.UserRepository, store.OrganizationRepository)
 	ledgerSvc := service.NewLedgerService(store.LedgerRepository)
 	rentalSvc := service.NewRentalService(
@@ -241,5 +241,12 @@ func main() {
 		logger.Warn("FCM drain timed out; some in-flight pushes may be lost", "error", err)
 	} else {
 		logger.Info("FCM goroutines drained")
+	}
+
+	// Drain in-flight async email sends.
+	if err := emailSvc.Shutdown(drainCtx); err != nil {
+		logger.Warn("Email drain timed out; some in-flight emails may be lost", "error", err)
+	} else {
+		logger.Info("Email goroutines drained")
 	}
 }
