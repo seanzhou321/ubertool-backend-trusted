@@ -33,32 +33,32 @@
    * community bylaws
    * Dispute resolution policy
 
-5. enable refresh token and comprehensive manual testing
-6. (done) enable 2fa
+5. (done) enable 2fa
 
 ## Milestone 3: MVP Production Release - Limited to Trial Groups
 
-1. https certification
-2. Form a company - researched legal process and costs
-3. deploy backend to cloud and frontend to Google Play Store
-4. release to selected communities
-5. Port frontend code into the iOS app and release it to Apple App Store
+1. (done) push notification through FCM (Firebase Cloud Messaging, a free messaging service from Google, delivers to both Android and iOS devices)
+2. (implemented, need testing) change/reset password
+3. (implemented) Implement user management rules: super_admin creates/promotes admin and member. admin creates members. 
+4. (implemented) Copying the rental prices to rental request at the creation. Use the pricing in the rental request to derive final credit. show the rental request price throughout the rental state transitions. 
+5. test image capture and display
+6. implement baseline offset in billsplitting
+7. test billsplitting
+8. https certification
+9. Set up Patreon/GoFundMe/support us contribution process.
+10. (firebase account created, Android app registered) deploy backend to cloud and frontend to Google Play Store
+11. release to selected communities
 
 ## Milestone 4: Enhancements
 
-1. image capture and display
-2. passkey
-3. (done) push notification through FCM (Firebase Cloud Messaging, a free messaging service from Google, delivers to both Android and iOS devices)
-4. Set up Patreon/GoFundMe/support us contribution process.
-5. Setup feedback collection links.
-6. Enforce the data deletion 30 days after user unsubscribe without balance and pending disputes. 
-7. Copying the rental prices to rental request at the creation. Use the pricing in the rental request to derive final credit. show the rental request price throughout the rental state transitions. 
-8. Implement user management rules: super_admin creates/promotes admin and member. admin creates members. 
+1. Port frontend code into the iOS app and release it to Apple App Store
+2. (researched) Form a company
+3. enable refresh token and comprehensive manual testing
 
 ## Milestone 5: General Production Release
 
 1. Self registering a community/org endorsed by an existing SUPER_ADMIN, a community leader, or by the app platform. 
-2. Implement legally required data retention processes.
+2. Enforce the data deletion 30 days after user unsubscribe without balance and pending disputes. 
 3. Implement support of legal updates.
 4. Production release to general public
 5. Apply small business innovation grants from Amazon, Google, Microsoft, Meta, Salesforce, etc. 
@@ -74,7 +74,7 @@
 
 ## Milestone 8: Feature upgrades
 
-1. Create adult supervised minor accounts for toy lending
-2. Create adult supervised junior accounts for general item lending.
-
-
+1. Setup feedback collection links.
+2. biometric passkey
+3. Create adult supervised junior accounts for general item lending.
+4. Create adult supervised minor accounts for toy lending
