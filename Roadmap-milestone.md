@@ -25,7 +25,7 @@
    * send bill splitting notice reminders to both creditors and debtors regarding to the unresolved bills (nightly)
 
 3. (done) Build UI screen and api to handle bill payment acknowledgements and ledger transactions
-4. Add legal statements:
+4. (done) Add legal statements:
 
    * Privacy policy - based on Facebook
    * Terms of service - based on Facebook
@@ -34,12 +34,12 @@
    * Dispute resolution policy
 
 5. enable refresh token and comprehensive manual testing
-6. enable 2fa
+6. (done) enable 2fa
 
 ## Milestone 3: MVP Production Release - Limited to Trial Groups
 
 1. https certification
-2. Form a company
+2. Form a company - researched legal process and costs
 3. deploy backend to cloud and frontend to Google Play Store
 4. release to selected communities
 5. Port frontend code into the iOS app and release it to Apple App Store
@@ -48,13 +48,12 @@
 
 1. image capture and display
 2. passkey
-3. push notification through FCM (Firebase Cloud Messaging, a free messaging service from Google, delivers to both Android and iOS devices)
+3. (done) push notification through FCM (Firebase Cloud Messaging, a free messaging service from Google, delivers to both Android and iOS devices)
 4. Set up Patreon/GoFundMe/support us contribution process.
 5. Setup feedback collection links.
-6. Impose $300 ceiling rule. 
-7. Enforce the data deletion 30 days after user unsubscribe without balance and pending disputes. 
-8. Copying the rental prices to rental request at the creation. Use the pricing in the rental request to derive final credit. show the rental request price throughout the rental state transitions. 
-9. Implement user management rules: super_admin creates/promotes admin and member. admin creates members. 
+6. Enforce the data deletion 30 days after user unsubscribe without balance and pending disputes. 
+7. Copying the rental prices to rental request at the creation. Use the pricing in the rental request to derive final credit. show the rental request price throughout the rental state transitions. 
+8. Implement user management rules: super_admin creates/promotes admin and member. admin creates members. 
 
 ## Milestone 5: General Production Release
 
