@@ -42,8 +42,8 @@
 3. (implemented) Implement user management rules: super_admin creates/promotes admin and member. admin creates members. 
 4. (implemented) Copying the rental prices to rental request at the creation. Use the pricing in the rental request to derive final credit. show the rental request price throughout the rental state transitions. 
 5. test image capture and display
-6. implement baseline offset in billsplitting
-7. test billsplitting
+6. implement a baseline offset before billsplitting caculation
+7. test billsplitting -- a). strengthen automatic tests (unit/integ./e2e), b). design a set of fake balances. c).enable manually initiation of the cronjob. d). test cronjob scheduler.
 8. https certification
 9. Set up Patreon/GoFundMe/support us contribution process.
 10. (firebase account created, Android app registered) deploy backend to cloud and frontend to Google Play Store
@@ -78,3 +78,4 @@
 2. biometric passkey
 3. Create adult supervised junior accounts for general item lending.
 4. Create adult supervised minor accounts for toy lending
+5. dispute a completed rental transaction that was settled by billspliting. -- very low possibility given the small amount. 
