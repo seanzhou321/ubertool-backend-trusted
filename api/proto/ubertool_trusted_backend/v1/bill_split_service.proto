@@ -24,7 +24,7 @@ service BillSplitService {
   rpc GetPaymentDetail(GetPaymentDetailRequest) returns (GetPaymentDetailResponse);
 
   // User: Acknowledge payment (as debtor sending or creditor receiving)
-  rpc AcknowledgePayment(AcknowledgePaymentRequest) returns (AcknowledgePaymentResponse);
+  rpc AcknowledgePayment(AcknowledgePaymentRequest) returns (VanilaResponse);
 
   // Admin: List unresolved disputed payments requiring intervention
   rpc ListDisputedPayments(ListDisputedPaymentsRequest) returns (ListDisputedPaymentsResponse);
@@ -33,7 +33,7 @@ service BillSplitService {
   rpc ListResolvedDisputes(ListResolvedDisputesRequest) returns (ListResolvedDisputesResponse);
 
   // Admin: Resolve a dispute
-  rpc ResolveDispute(ResolveDisputeRequest) returns (ResolveDisputeResponse);
+  rpc ResolveDispute(ResolveDisputeRequest) returns (VanilaResponse);
 }
 
 message BillSplitSummary {
@@ -126,11 +126,6 @@ message AcknowledgePaymentRequest {
   int32 payment_id = 1;
 }
 
-message AcknowledgePaymentResponse {
-  bool success = 1;
-  string message = 2;
-}
-
 message ListDisputedPaymentsRequest {
   int32 organization_id = 1;
   PaginationRequest pagination = 2; // Optional: Pagination support
@@ -177,10 +172,5 @@ message ResolveDisputeRequest {
   int32 payment_id = 1;
   DisputeResolution resolution = 2;
   string notes = 3; // Admin's explanation for the resolution
-}
-
-message ResolveDisputeResponse {
-  bool success = 1;
-  string message = 2;
 }
 

@@ -6,6 +6,7 @@ import (
 
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/service"
+
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -113,7 +114,7 @@ func (h *ImageStorageHandler) DeleteImage(ctx context.Context, req *pb.DeleteIma
 }
 
 // SetPrimaryImage sets an image as the primary image for a tool
-func (h *ImageStorageHandler) SetPrimaryImage(ctx context.Context, req *pb.SetPrimaryImageRequest) (*pb.SetPrimaryImageResponse, error) {
+func (h *ImageStorageHandler) SetPrimaryImage(ctx context.Context, req *pb.SetPrimaryImageRequest) (*pb.VanilaResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -124,7 +125,7 @@ func (h *ImageStorageHandler) SetPrimaryImage(ctx context.Context, req *pb.SetPr
 		return nil, err
 	}
 
-	return &pb.SetPrimaryImageResponse{
+	return &pb.VanilaResponse{
 		Success: true,
 		Message: "Primary image updated successfully",
 	}, nil

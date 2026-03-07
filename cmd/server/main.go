@@ -124,6 +124,7 @@ func main() {
 		emailSvc,
 		cfg.JWT.Secret,
 		store.FcmTokenRepository,
+		store.PendingCredentialsRepository,
 	)
 	userSvc := service.NewUserService(store.UserRepository, store.OrganizationRepository)
 	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository, store.InvitationRepository, noteSvc, emailSvc, pushSvc)

@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 type User struct {
 	ID           int32          `json:"id"`
 	Email        string         `json:"email"`
@@ -41,4 +43,13 @@ type UserOrg struct {
 	RentingBlocked      bool          `json:"renting_blocked"`
 	LendingBlocked      bool          `json:"lending_blocked"`
 	BlockedDueToBillID  *int32        `json:"blocked_due_to_bill_id"`
+}
+
+// PendingCredential holds a temporary password for a user awaiting password reset.
+// It is valid only when UsedAt is nil and ExpiresAt is in the future.
+type PendingCredential struct {
+	UserID            int32      `json:"user_id"`
+	TempPasswordHash  string     `json:"-"`
+	ExpiresAt         time.Time  `json:"expires_at"`
+	UsedAt            *time.Time `json:"used_at"`
 }

@@ -530,3 +530,26 @@ func (m *MockFcmTokenRepo) GetActiveByUserIDs(ctx context.Context, userIDs []int
 	}
 	return args.Get(0).([]domain.FcmToken), args.Error(1)
 }
+
+// MockPendingCredentialsRepo mocks repository.PendingCredentialsRepository.
+type MockPendingCredentialsRepo struct {
+	mock.Mock
+}
+
+func (m *MockPendingCredentialsRepo) Upsert(ctx context.Context, cred *domain.PendingCredential) error {
+	args := m.Called(ctx, cred)
+	return args.Error(0)
+}
+
+func (m *MockPendingCredentialsRepo) GetByUserID(ctx context.Context, userID int32) (*domain.PendingCredential, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.PendingCredential), args.Error(1)
+}
+
+func (m *MockPendingCredentialsRepo) StampUsedAt(ctx context.Context, userID int32) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}

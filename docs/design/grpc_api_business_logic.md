@@ -91,22 +91,29 @@ Note: User must go through normal login process after signup. Signup does NOT re
 Purpose: Authenticate existing user and initiate two-factor authentication.
 
 Input: `email`, `password`
-Output: success/failure boolean, temporary_token, expires_at, message
+Output: success/failure boolean, two_fa_token, expires_at, message
 Business Logic:
 1. Fetch user by `email`.
-2. Verify `password` against hashed password in database.
-3. If valid, generate a two_fa_code, send the 2FA code by email to the user.
-4. If valid, generate a temporary_token and return the temporary_token and milisecond time stamp of expires at.
-5. If not valid, return false and a message, "Either the email and/or the password is wrong".
+2. Verify `password` against `users.password_hash`.
+3. If the canonical password does not match, check `pending_credentials` for this user:
+   - A pending credential is valid only when `used_at IS NULL` and `expires_at > NOW()`.
+   - If a valid temporary password matches, proceed and flag the session as `temp_pwd=true`.
+4. If neither password matches, return error "Either the email and/or the password is wrong".
+5. Generate a 5-digit 2FA code and send it by email to the user.
+6. Generate a `two_fa_token` (JWT of type `2fa_pending`) containing `user_id` and the `temp_pwd` flag.
+7. Return the `two_fa_token`.
 
 ### Verify 2FA
 Purpose: Complete authentication with a second factor.
 
-Input: `two_fa_code`
-Output: bool, access token, refresh token, user profile
+Input: `two_fa_code` (2FA token required in header)
+Output: bool, access token, refresh token, user profile, reset_password flag
 Business Logic:
-1. Validate the `two_fa_code` with previously generated one in the session.
-2. If match, Generate and return JWT tokens (access_token, refresh_token) and the user profile.
+1. Extract `user_id` and `temp_pwd` from the `2fa_pending` token (injected into context by the auth interceptor).
+2. Validate the `two_fa_code` against the pending code stored for this user.
+3. If match, generate JWT `access_token` and `refresh_token` and return the user profile.
+4. Set `reset_password = temp_pwd` in the response. When `true`, the client must redirect the user to the change-password screen before allowing normal app access.
+5. Delete the pending 2FA code to prevent reuse.
 
 ### Refresh Token
 Purpose: Get a new access token using a refresh token.
@@ -121,14 +128,47 @@ Business Logic:
 ### Logout
 Purpose: Invalidate the current session and stop push notifications to the device.
 
-Input: `android_device_id`
+Input: `android_device_id` (access token required in header)
 Output: success flag
 Business Logic:
-1. Extract `user_id` from the JWT token.
+1. Extract `user_id` from the JWT access token.
 2. Invalidate/blacklist the current JWT tokens (access and refresh tokens).
 3. Mark the FCM token(s) for this device as OBSOLETE:
    `UPDATE fcm_tokens SET status = 'OBSOLETE', updated_at = NOW() WHERE user_id = $user_id AND android_device_id = $android_device_id AND status = 'ACTIVE'`
    This prevents the backend from routing future push notifications to a logged-out device.
+
+### Change Password
+Purpose: Authenticated user changes their own password.
+
+Input: `old_password`, `new_password` (access token required in header)
+Output: success, message
+Business Logic:
+1. Extract `user_id` from the JWT access token.
+2. Verify `old_password` against `users.password_hash`.
+3. If the canonical password does not match, check `pending_credentials` for this user:
+   - A pending credential is valid only when `used_at IS NULL` and `expires_at > NOW()`.
+   - If a valid temporary password matches, proceed.
+4. If neither password matches, return error "invalid email or password".
+5. Hash `new_password` with bcrypt and update `users.password_hash`.
+6. Stamp `pending_credentials.used_at = NOW()` for this user (if a row with `used_at IS NULL` exists), invalidating the temporary password.
+7. Return success and message "Password changed successfully."
+
+### Reset Password
+Purpose: Self-service password reset — no authentication required. Generates a temporary password and emails it to the user.
+
+Input: `user_email` (no access token required)
+Output: success, message
+Business Logic:
+1. Look up the user by `user_email` in the `users` table.
+2. If not found, return a generic success message to avoid leaking user existence: "If an account with that email exists, a temporary password has been sent."
+3. Generate a cryptographically secure random temporary password (16 hex characters).
+4. Hash the temporary password with bcrypt.
+5. Upsert a row in `pending_credentials` for this user:
+   - `temp_password_hash` = the bcrypt hash
+   - `expires_at` = NOW() + 48 hours
+   - `used_at` = NULL
+6. Send an email to the user containing the plain-text temporary password and instructions to log in and change it immediately.
+7. Return the generic success message.
 
 ## Administration
 

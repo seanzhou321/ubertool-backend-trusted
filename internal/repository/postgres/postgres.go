@@ -19,20 +19,22 @@ type Store struct {
 	repository.InvitationRepository
 	repository.JoinRequestRepository
 	repository.BillRepository
+	repository.PendingCredentialsRepository
 }
 
 func NewStore(db *sql.DB) *Store {
 	return &Store{
-		db:                     db,
-		UserRepository:         NewUserRepository(db),
-		OrganizationRepository: NewOrganizationRepository(db),
-		ToolRepository:         NewToolRepository(db),
-		RentalRepository:       NewRentalRepository(db),
-		LedgerRepository:       NewLedgerRepository(db),
-		NotificationRepository: NewNotificationRepository(db),
-		FcmTokenRepository:     NewFcmTokenRepository(db),
-		InvitationRepository:   NewInvitationRepository(db),
-		JoinRequestRepository:  NewJoinRequestRepository(db),
-		BillRepository:         NewBillRepository(db),
+		db:                           db,
+		UserRepository:               NewUserRepository(db),
+		OrganizationRepository:       NewOrganizationRepository(db),
+		ToolRepository:               NewToolRepository(db),
+		RentalRepository:             NewRentalRepository(db),
+		LedgerRepository:             NewLedgerRepository(db),
+		NotificationRepository:       NewNotificationRepository(db),
+		FcmTokenRepository:           NewFcmTokenRepository(db),
+		InvitationRepository:         NewInvitationRepository(db),
+		JoinRequestRepository:        NewJoinRequestRepository(db),
+		BillRepository:               NewBillRepository(db),
+		PendingCredentialsRepository: NewPendingCredentialsRepository(db),
 	}
 }

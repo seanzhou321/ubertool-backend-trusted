@@ -30,3 +30,15 @@ func GetUserIDFromContext(ctx context.Context) (int32, error) {
 
 	return int32(userID), nil
 }
+
+// GetTempPwdFromContext returns true when the 2FA token used for authentication
+// was issued after a login via a temporary (pending_credentials) password.
+// The flag is injected by the auth interceptor and defaults to false if absent.
+func GetTempPwdFromContext(ctx context.Context) bool {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return false
+	}
+	vals := md.Get("temp-pwd")
+	return len(vals) > 0 && vals[0] == "true"
+}

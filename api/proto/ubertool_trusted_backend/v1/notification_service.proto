@@ -4,6 +4,7 @@ package ubertool.trusted.api.v1;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
+import "ubertool_trusted_backend/v1/ubertool_schema.proto";
 
 option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
@@ -18,7 +19,7 @@ service NotificationService {
   rpc GetNotifications(GetNotificationsRequest) returns (GetNotificationsResponse);
 
   // Mark notification as read
-  rpc MarkNotificationRead(MarkNotificationReadRequest) returns (MarkNotificationReadResponse);
+  rpc MarkNotificationRead(MarkNotificationReadRequest) returns (VanilaResponse);
 
   // Client calls this on app start and token refresh
   rpc SyncDeviceToken(SyncTokenRequest) returns (google.protobuf.Empty);
@@ -47,11 +48,6 @@ message GetNotificationsResponse {
 // Mark notification read request
 message MarkNotificationReadRequest {
   int64 notification_id = 1;
-}
-
-// Mark notification read response
-message MarkNotificationReadResponse {
-  bool success = 1;
 }
 
 // Notification message

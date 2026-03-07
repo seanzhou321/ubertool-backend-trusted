@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/rand"
+	randmath "math/rand"
 	"sync"
 	"time"
 
@@ -26,27 +28,29 @@ var (
 )
 
 type authService struct {
-	userRepo        repository.UserRepository
-	inviteRepo      repository.InvitationRepository
-	reqRepo         repository.JoinRequestRepository
-	orgRepo         repository.OrganizationRepository
-	noteSvc         NotificationService
-	emailSvc        EmailService
-	tm              security.TokenManager
-	fcmRepo         repository.FcmTokenRepository
-	pending2FACodes sync.Map // key: userID (int32), value: string (5-digit code)
+	userRepo         repository.UserRepository
+	inviteRepo       repository.InvitationRepository
+	reqRepo          repository.JoinRequestRepository
+	orgRepo          repository.OrganizationRepository
+	noteSvc          NotificationService
+	emailSvc         EmailService
+	tm               security.TokenManager
+	fcmRepo          repository.FcmTokenRepository
+	pendingCredsRepo repository.PendingCredentialsRepository
+	pending2FACodes  sync.Map // key: userID (int32), value: string (5-digit code)
 }
 
-func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string, fcmRepo repository.FcmTokenRepository) AuthService {
+func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string, fcmRepo repository.FcmTokenRepository, pendingCredsRepo repository.PendingCredentialsRepository) AuthService {
 	return &authService{
-		userRepo:   userRepo,
-		inviteRepo: inviteRepo,
-		reqRepo:    reqRepo,
-		orgRepo:    orgRepo,
-		noteSvc:    noteSvc,
-		emailSvc:   emailSvc,
-		tm:         security.NewTokenManager(secret),
-		fcmRepo:    fcmRepo,
+		userRepo:         userRepo,
+		inviteRepo:       inviteRepo,
+		reqRepo:          reqRepo,
+		orgRepo:          orgRepo,
+		noteSvc:          noteSvc,
+		emailSvc:         emailSvc,
+		tm:               security.NewTokenManager(secret),
+		fcmRepo:          fcmRepo,
+		pendingCredsRepo: pendingCredsRepo,
 	}
 }
 
@@ -276,74 +280,76 @@ func (s *authService) Signup(ctx context.Context, inviteToken, name, email, phon
 	return nil
 }
 
-func (s *authService) Login(ctx context.Context, email, password string) (string, string, string, bool, error) {
+func (s *authService) Login(ctx context.Context, email, password string) (string, bool, bool, error) {
 	logger.EnterMethod("authService.Login", "email", email)
 
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		logger.ExitMethodWithError("authService.Login", ErrInvalidCredentials, "reason", "user not found")
-		return "", "", "", false, ErrInvalidCredentials
+		return "", false, false, ErrInvalidCredentials
 	}
 
+	// First try the canonical password in the users table.
+	tempPwd := false
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		logger.ExitMethodWithError("authService.Login", ErrInvalidCredentials, "reason", "password mismatch")
-		return "", "", "", false, ErrInvalidCredentials
-	}
-
-	logger.Info("Password validated successfully", "userID", user.ID, "email", email)
-
-	// Assume 2FA is always enabled for trusted backend
-	requires2FA := true
-
-	if requires2FA {
-		logger.Debug("Generating 2FA token", "userID", user.ID)
-		sessionToken, err := s.tm.Generate2FAToken(user.ID, "email")
-		if err != nil {
-			logger.ExitMethodWithError("authService.Login", err, "reason", "failed to generate 2FA token")
-			return "", "", "", false, err
+		// Fall back to the pending (temporary) password if one exists and is still valid.
+		logger.Debug("Canonical password mismatch — checking pending_credentials", "userID", user.ID)
+		cred, credErr := s.pendingCredsRepo.GetByUserID(ctx, user.ID)
+		if credErr != nil || cred == nil {
+			logger.ExitMethodWithError("authService.Login", ErrInvalidCredentials, "reason", "password mismatch, no pending credential")
+			return "", false, false, ErrInvalidCredentials
 		}
-		logger.Debug("2FA token generated", "userID", user.ID, "tokenPrefix", sessionToken[:20])
-
-		// Generate a random 5-digit 2FA code and store it for verification.
-		code := fmt.Sprintf("%05d", rand.Intn(100000))
-		s.pending2FACodes.Store(user.ID, code)
-		logger.Info("2FA code generated", "userID", user.ID)
-		subject := "Your 2FA Code"
-		message := fmt.Sprintf("Your login code is: %s", code)
-		_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message)
-
-		logger.ExitMethod("authService.Login", "userID", user.ID, "requires2FA", true)
-		return "", "", sessionToken, true, nil
+		// Validate: not used, not expired
+		if cred.UsedAt != nil || cred.ExpiresAt.Before(time.Now()) {
+			logger.ExitMethodWithError("authService.Login", ErrInvalidCredentials, "reason", "pending credential expired or already used")
+			return "", false, false, ErrInvalidCredentials
+		}
+		if bcryptErr := bcrypt.CompareHashAndPassword([]byte(cred.TempPasswordHash), []byte(password)); bcryptErr != nil {
+			logger.ExitMethodWithError("authService.Login", ErrInvalidCredentials, "reason", "password mismatch")
+			return "", false, false, ErrInvalidCredentials
+		}
+		tempPwd = true
+		logger.Info("Authenticated via temporary password", "userID", user.ID)
+	} else {
+		logger.Info("Password validated successfully", "userID", user.ID, "email", email)
 	}
 
-	// TODO: Retrieve actual roles from database
-	access, err := s.tm.GenerateAccessToken(user.ID, user.Email, []string{"user"})
+	// 2FA is always required for the trusted backend.
+	logger.Debug("Generating 2FA token", "userID", user.ID, "tempPwd", tempPwd)
+	sessionToken, err := s.tm.Generate2FAToken(user.ID, "email", tempPwd)
 	if err != nil {
-		return "", "", "", false, err
+		logger.ExitMethodWithError("authService.Login", err, "reason", "failed to generate 2FA token")
+		return "", false, false, err
 	}
-	refresh, err := s.tm.GenerateRefreshToken(user.ID, user.Email)
-	if err != nil {
-		return "", "", "", false, err
-	}
+	logger.Debug("2FA token generated", "userID", user.ID, "tokenPrefix", sessionToken[:20])
 
-	return access, refresh, "", false, nil
+	// Generate a random 5-digit 2FA code and store it for verification.
+	code := fmt.Sprintf("%05d", randmath.Intn(100000))
+	s.pending2FACodes.Store(user.ID, code)
+	logger.Info("2FA code generated and emailed", "userID", user.ID)
+	subject := "Your 2FA Code"
+	message := fmt.Sprintf("Your login code is: %s", code)
+	_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message)
+
+	logger.ExitMethod("authService.Login", "userID", user.ID, "requires2FA", true, "tempPwd", tempPwd)
+	return sessionToken, true, tempPwd, nil
 }
 
-func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) (string, string, *domain.User, error) {
-	logger.EnterMethod("authService.Verify2FA", "userID", userID, "codeProvided", code)
+func (s *authService) Verify2FA(ctx context.Context, userID int32, code string, tempPwd bool) (string, string, *domain.User, bool, error) {
+	logger.EnterMethod("authService.Verify2FA", "userID", userID, "codeProvided", code, "tempPwd", tempPwd)
 
 	// Retrieve and validate the stored 2FA code for this user.
 	expected, ok := s.pending2FACodes.Load(userID)
 	if !ok {
 		logger.Warn("No pending 2FA code found", "userID", userID)
 		logger.ExitMethodWithError("authService.Verify2FA", ErrInvalid2FACode, "userID", userID)
-		return "", "", nil, ErrInvalid2FACode
+		return "", "", nil, false, ErrInvalid2FACode
 	}
 	logger.Debug("Validating 2FA code", "userID", userID)
 	if code != expected.(string) {
 		logger.Warn("2FA code validation FAILED", "userID", userID)
 		logger.ExitMethodWithError("authService.Verify2FA", ErrInvalid2FACode, "userID", userID)
-		return "", "", nil, ErrInvalid2FACode
+		return "", "", nil, false, ErrInvalid2FACode
 	}
 	// Delete after successful validation to prevent code reuse.
 	s.pending2FACodes.Delete(userID)
@@ -354,7 +360,7 @@ func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) 
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "user not found", "userID", userID)
-		return "", "", nil, err
+		return "", "", nil, false, err
 	}
 
 	// Generate tokens
@@ -363,17 +369,119 @@ func (s *authService) Verify2FA(ctx context.Context, userID int32, code string) 
 	access, err := s.tm.GenerateAccessToken(userID, user.Email, []string{"user"})
 	if err != nil {
 		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "failed to generate access token")
-		return "", "", nil, err
+		return "", "", nil, false, err
 	}
 	refresh, err := s.tm.GenerateRefreshToken(userID, user.Email)
 	if err != nil {
 		logger.ExitMethodWithError("authService.Verify2FA", err, "reason", "failed to generate refresh token")
-		return "", "", nil, err
+		return "", "", nil, false, err
 	}
 
-	logger.Info("2FA verification completed successfully", "userID", userID)
+	logger.Info("2FA verification completed successfully", "userID", userID, "resetPassword", tempPwd)
 	logger.ExitMethod("authService.Verify2FA", "userID", userID)
-	return access, refresh, user, nil
+	return access, refresh, user, tempPwd, nil
+}
+
+func (s *authService) ChangePassword(ctx context.Context, userID int32, oldPassword, newPassword string) error {
+	logger.EnterMethod("authService.ChangePassword", "userID", userID)
+
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		logger.ExitMethodWithError("authService.ChangePassword", err, "reason", "user not found")
+		return ErrInvalidCredentials
+	}
+
+	// Verify old password: check both canonical hash and pending credential.
+	validViaCanonical := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)) == nil
+	if !validViaCanonical {
+		// Check pending credential
+		cred, credErr := s.pendingCredsRepo.GetByUserID(ctx, userID)
+		if credErr != nil || cred == nil || cred.UsedAt != nil || cred.ExpiresAt.Before(time.Now()) {
+			logger.ExitMethodWithError("authService.ChangePassword", ErrInvalidCredentials, "reason", "old password mismatch")
+			return ErrInvalidCredentials
+		}
+		if bcrypt.CompareHashAndPassword([]byte(cred.TempPasswordHash), []byte(oldPassword)) != nil {
+			logger.ExitMethodWithError("authService.ChangePassword", ErrInvalidCredentials, "reason", "old password mismatch")
+			return ErrInvalidCredentials
+		}
+	}
+
+	// Hash and store the new password.
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		logger.ExitMethodWithError("authService.ChangePassword", err, "reason", "bcrypt error")
+		return err
+	}
+	user.PasswordHash = string(newHash)
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		logger.ExitMethodWithError("authService.ChangePassword", err, "reason", "failed to update user")
+		return err
+	}
+
+	// Stamp used_at on any unused pending credential so the temp password is invalidated.
+	if stampErr := s.pendingCredsRepo.StampUsedAt(ctx, userID); stampErr != nil {
+		// Non-fatal: log but do not fail the request.
+		logger.Warn("ChangePassword: failed to stamp pending_credentials.used_at", "userID", userID, "error", stampErr)
+	}
+
+	logger.Info("Password changed successfully", "userID", userID)
+	logger.ExitMethod("authService.ChangePassword", "userID", userID)
+	return nil
+}
+
+func (s *authService) ResetPassword(ctx context.Context, email string) error {
+	logger.EnterMethod("authService.ResetPassword", "email", email)
+
+	// Validate the email exists in users table.
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil || user == nil {
+		// Return a generic error to avoid leaking user existence information.
+		logger.Warn("ResetPassword: user not found", "email", email)
+		return errors.New("if an account with that email exists, a temporary password has been sent")
+	}
+
+	// Generate a secure random temporary password (16 hex chars = 8 bytes).
+	rawBytes := make([]byte, 8)
+	if _, err := rand.Read(rawBytes); err != nil {
+		logger.ExitMethodWithError("authService.ResetPassword", err, "reason", "failed to generate temp password")
+		return err
+	}
+	tempPassword := hex.EncodeToString(rawBytes)
+
+	// Hash the temporary password before storing.
+	tempHash, err := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
+	if err != nil {
+		logger.ExitMethodWithError("authService.ResetPassword", err, "reason", "bcrypt error")
+		return err
+	}
+
+	cred := &domain.PendingCredential{
+		UserID:           user.ID,
+		TempPasswordHash: string(tempHash),
+		ExpiresAt:        time.Now().Add(48 * time.Hour),
+		UsedAt:           nil,
+	}
+	if err := s.pendingCredsRepo.Upsert(ctx, cred); err != nil {
+		logger.ExitMethodWithError("authService.ResetPassword", err, "reason", "failed to upsert pending_credentials")
+		return err
+	}
+
+	// Email the plain-text temporary password to the user.
+	subject := "Your temporary password"
+	message := fmt.Sprintf(
+		"A password reset was requested for your account.\n\nTemporary password: %s\n\n"+
+			"This password expires in 48 hours. Log in and change your password immediately.\n"+
+			"If you did not request this, please contact your organization administrator.",
+		tempPassword,
+	)
+	if emailErr := s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message); emailErr != nil {
+		logger.Warn("ResetPassword: failed to send email", "userID", user.ID, "email", user.Email, "error", emailErr)
+		// Non-fatal for the caller; the credential is already stored.
+	}
+
+	logger.Info("Password reset credential created and emailed", "userID", user.ID)
+	logger.ExitMethod("authService.ResetPassword", "userID", user.ID)
+	return nil
 }
 
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {

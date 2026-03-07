@@ -29,9 +29,11 @@ var EndpointSecurityConfig = map[string]SecurityLevel{
 	"/ubertool.trusted.api.v1.AuthService/RefreshToken": SecurityRefresh,
 
 	// AuthService - Access Protected
-	"/ubertool.trusted.api.v1.AuthService/Logout": SecurityAccess,
-	// TODO: add change password to auth service
-	// "/ubertool.trusted.api.v1.AuthService/ChangePassword": SecurityAccess,
+	"/ubertool.trusted.api.v1.AuthService/Logout":         SecurityAccess,
+	"/ubertool.trusted.api.v1.AuthService/ChangePassword": SecurityAccess,
+
+	// AuthService - Public (self-service password reset; no auth token required)
+	"/ubertool.trusted.api.v1.AuthService/ResetPassword": SecurityPublic,
 
 	// OrganizationService - Public
 	"/ubertool.trusted.api.v1.OrganizationService/SearchOrganizations": SecurityPublic,

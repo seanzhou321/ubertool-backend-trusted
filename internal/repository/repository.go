@@ -102,6 +102,17 @@ type JoinRequestRepository interface {
 	ListByOrg(ctx context.Context, orgID int32) ([]domain.JoinRequest, error)
 }
 
+// PendingCredentialsRepository manages temporary passwords used in the reset-password flow.
+// At most one row exists per user (PRIMARY KEY on user_id).
+type PendingCredentialsRepository interface {
+	// Upsert inserts or replaces the pending credential for the user.
+	Upsert(ctx context.Context, cred *domain.PendingCredential) error
+	// GetByUserID returns the pending credential for the user, or sql.ErrNoRows if absent.
+	GetByUserID(ctx context.Context, userID int32) (*domain.PendingCredential, error)
+	// StampUsedAt sets used_at to now for the user's pending credential if used_at is currently null.
+	StampUsedAt(ctx context.Context, userID int32) error
+}
+
 type BillRepository interface {
 	Create(ctx context.Context, bill *domain.Bill) error
 	GetByID(ctx context.Context, id int32) (*domain.Bill, error)

@@ -126,7 +126,7 @@ func (h *BillSplitHandler) GetPaymentDetail(ctx context.Context, req *pb.GetPaym
 	}, nil
 }
 
-func (h *BillSplitHandler) AcknowledgePayment(ctx context.Context, req *pb.AcknowledgePaymentRequest) (*pb.AcknowledgePaymentResponse, error) {
+func (h *BillSplitHandler) AcknowledgePayment(ctx context.Context, req *pb.AcknowledgePaymentRequest) (*pb.VanilaResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -134,13 +134,13 @@ func (h *BillSplitHandler) AcknowledgePayment(ctx context.Context, req *pb.Ackno
 
 	err = h.billSplitSvc.AcknowledgePayment(ctx, userID, req.PaymentId)
 	if err != nil {
-		return &pb.AcknowledgePaymentResponse{
+		return &pb.VanilaResponse{
 			Success: false,
 			Message: err.Error(),
 		}, nil
 	}
 
-	return &pb.AcknowledgePaymentResponse{
+	return &pb.VanilaResponse{
 		Success: true,
 		Message: "Payment acknowledged successfully",
 	}, nil
@@ -194,7 +194,7 @@ func (h *BillSplitHandler) ListResolvedDisputes(ctx context.Context, req *pb.Lis
 	}, nil
 }
 
-func (h *BillSplitHandler) ResolveDispute(ctx context.Context, req *pb.ResolveDisputeRequest) (*pb.ResolveDisputeResponse, error) {
+func (h *BillSplitHandler) ResolveDispute(ctx context.Context, req *pb.ResolveDisputeRequest) (*pb.VanilaResponse, error) {
 	adminID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -203,13 +203,13 @@ func (h *BillSplitHandler) ResolveDispute(ctx context.Context, req *pb.ResolveDi
 	resolution := MapProtoDisputeResolutionToDomain(req.Resolution)
 	err = h.billSplitSvc.ResolveDispute(ctx, adminID, req.PaymentId, resolution, req.Notes)
 	if err != nil {
-		return &pb.ResolveDisputeResponse{
+		return &pb.VanilaResponse{
 			Success: false,
 			Message: err.Error(),
 		}, nil
 	}
 
-	return &pb.ResolveDisputeResponse{
+	return &pb.VanilaResponse{
 		Success: true,
 		Message: "Dispute resolved successfully",
 	}, nil

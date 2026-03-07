@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package ubertool.trusted.api.v1;
 
-option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
+import "ubertool_trusted_backend/v1/ubertool_schema.proto";
 
+option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
 option java_multiple_files = true;
 option java_package = "com.ubertool.trusted.api.v1";
@@ -28,7 +29,7 @@ service AdminService {
 
 
   // Admin: Reject pending join request
-  rpc RejectRequestToJoin(RejectRequestToJoinRequest) returns (RejectRequestToJoinResponse);
+  rpc RejectRequestToJoin(RejectRequestToJoinRequest) returns (VanilaResponse);
 
   // Admin: Send invitation to join organization
   rpc SendInvitation(SendInvitationRequest) returns (SendInvitationResponse);
@@ -103,11 +104,6 @@ message RejectRequestToJoinRequest {
   int32 organization_id = 1;
   int32 join_request_id = 2;
   string reason = 3;
-}
-
-message RejectRequestToJoinResponse {
-  bool success = 1;
-  string message = 2;
 }
 
 message SendInvitationRequest {

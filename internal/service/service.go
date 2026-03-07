@@ -11,9 +11,19 @@ type AuthService interface {
 	ValidateInvite(ctx context.Context, inviteCode, email string) (bool, string, *domain.User, error)
 	RequestToJoin(ctx context.Context, orgID int32, name, email, note, adminEmail string) error
 	Signup(ctx context.Context, inviteToken, name, email, phone, password string) error
-	Login(ctx context.Context, email, password string) (string, string, string, bool, error) // access, refresh, session, requires2FA
-	Verify2FA(ctx context.Context, userID int32, code string) (string, string, *domain.User, error)
+	// Login returns (session 2FA token, requires2FA, tempPwd, error).
+	// tempPwd is true when authentication succeeded via a temporary password from pending_credentials.
+	Login(ctx context.Context, email, password string) (string, bool, bool, error)
+	// Verify2FA returns (accessToken, refreshToken, user, resetPassword, error).
+	// resetPassword is true when the user authenticated via a temporary password and must change it.
+	Verify2FA(ctx context.Context, userID int32, code string, tempPwd bool) (string, string, *domain.User, bool, error)
 	RefreshToken(ctx context.Context, refresh string) (string, string, error)
+	// ChangePassword verifies oldPassword (against users table and/or pending_credentials),
+	// updates users.password_hash, and stamps pending_credentials.used_at when applicable.
+	ChangePassword(ctx context.Context, userID int32, oldPassword, newPassword string) error
+	// ResetPassword validates the email, generates a temporary password, upserts pending_credentials,
+	// and emails the temporary password to the user.
+	ResetPassword(ctx context.Context, email string) error
 	Logout(ctx context.Context, userID int32, refresh, androidDeviceID string) error
 }
 

@@ -6,6 +6,7 @@ import (
 
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/service"
+
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -30,7 +31,7 @@ func (h *NotificationHandler) GetNotifications(ctx context.Context, req *pb.GetN
 	}
 	page := (req.Offset / limit) + 1
 	pageSize := limit
-	
+
 	notes, count, err := h.noteSvc.GetNotifications(ctx, userID, page, pageSize)
 	if err != nil {
 		return nil, err
@@ -45,7 +46,7 @@ func (h *NotificationHandler) GetNotifications(ctx context.Context, req *pb.GetN
 	}, nil
 }
 
-func (h *NotificationHandler) MarkNotificationRead(ctx context.Context, req *pb.MarkNotificationReadRequest) (*pb.MarkNotificationReadResponse, error) {
+func (h *NotificationHandler) MarkNotificationRead(ctx context.Context, req *pb.MarkNotificationReadRequest) (*pb.VanilaResponse, error) {
 	userID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -54,7 +55,7 @@ func (h *NotificationHandler) MarkNotificationRead(ctx context.Context, req *pb.
 	if err != nil {
 		return nil, err
 	}
-	return &pb.MarkNotificationReadResponse{Success: true}, nil
+	return &pb.VanilaResponse{Success: true}, nil
 }
 
 func (h *NotificationHandler) SyncDeviceToken(ctx context.Context, req *pb.SyncTokenRequest) (*emptypb.Empty, error) {

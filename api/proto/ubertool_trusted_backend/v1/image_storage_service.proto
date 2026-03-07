@@ -3,6 +3,7 @@ syntax = "proto3";
 package ubertool.trusted.api.v1;
 
 import "google/protobuf/timestamp.proto";
+import "ubertool_trusted_backend/v1/ubertool_schema.proto";
 
 option go_package = "ubertool-backend-trusted/api/gen/v1;ubertool_v1";
 
@@ -29,7 +30,7 @@ service ImageStorageService {
   rpc DeleteImage(DeleteImageRequest) returns (DeleteImageResponse);
 
   // Set primary image
-  rpc SetPrimaryImage(SetPrimaryImageRequest) returns (SetPrimaryImageResponse);
+  rpc SetPrimaryImage(SetPrimaryImageRequest) returns (VanilaResponse);
 }
 
 // Presigned URL methods
@@ -92,11 +93,6 @@ message DeleteImageResponse {
 message SetPrimaryImageRequest {
   int32 image_id = 1;
   int32 tool_id = 2;
-}
-
-message SetPrimaryImageResponse {
-  bool success = 1;
-  string message = 2;
 }
 
 message ToolImage {

@@ -79,7 +79,7 @@ func (h *AdminHandler) ListJoinRequests(ctx context.Context, req *pb.ListJoinReq
 	return &pb.ListJoinRequestsResponse{Requests: protoReqs}, nil
 }
 
-func (h *AdminHandler) RejectRequestToJoin(ctx context.Context, req *pb.RejectRequestToJoinRequest) (*pb.RejectRequestToJoinResponse, error) {
+func (h *AdminHandler) RejectRequestToJoin(ctx context.Context, req *pb.RejectRequestToJoinRequest) (*pb.VanilaResponse, error) {
 	adminID, err := GetUserIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (h *AdminHandler) RejectRequestToJoin(ctx context.Context, req *pb.RejectRe
 	if err != nil {
 		return nil, err
 	}
-	return &pb.RejectRequestToJoinResponse{Success: true}, nil
+	return &pb.VanilaResponse{Success: true}, nil
 }
 
 func (h *AdminHandler) SendInvitation(ctx context.Context, req *pb.SendInvitationRequest) (*pb.SendInvitationResponse, error) {

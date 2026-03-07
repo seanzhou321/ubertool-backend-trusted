@@ -58,3 +58,8 @@ message PaginationResponse {
   int32 page = 3;             // Current page number (for offset-based pagination)
   int32 page_size = 4;        // Items per page (for offset-based pagination)
 }
+
+message VanilaResponse {
+  bool success = 1;
+  string message = 2;
+}

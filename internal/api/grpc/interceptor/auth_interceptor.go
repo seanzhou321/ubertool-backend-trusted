@@ -72,6 +72,15 @@ func (i *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 		}
 
 		md.Set("user-id", strconv.Itoa(int(claims.UserID)))
+		// For 2FA tokens, propagate the temp_pwd flag so the Verify2FA handler can
+		// determine whether the user authenticated via a temporary password.
+		if claims.Type == security.TokenType2FAPending {
+			tempPwdVal := "false"
+			if claims.TempPwd {
+				tempPwdVal = "true"
+			}
+			md.Set("temp-pwd", tempPwdVal)
+		}
 		newCtx := metadata.NewIncomingContext(ctx, md)
 		logger.Debug("User ID injected into context", "method", info.FullMethod, "userID", claims.UserID)
 

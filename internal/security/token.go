@@ -30,14 +30,15 @@ type UserClaims struct {
 	Scope     []string  `json:"scope,omitempty"`
 	Roles     []string  `json:"roles,omitempty"`
 	Permissions []string `json:"permissions,omitempty"`
-	AuthMethod string    `json:"2fa_method,omitempty"` 
+	AuthMethod string    `json:"2fa_method,omitempty"`
+	TempPwd   bool      `json:"temp_pwd,omitempty"` // True when login used a temporary password
 	jwt.RegisteredClaims
 }
 
 type TokenManager interface {
 	GenerateAccessToken(userID int32, email string, roles []string) (string, error)
 	GenerateRefreshToken(userID int32, email string) (string, error)
-	Generate2FAToken(userID int32, method string) (string, error)
+	Generate2FAToken(userID int32, method string, tempPwd bool) (string, error)
 	ValidateToken(tokenString string) (*UserClaims, error)
 }
 
@@ -88,11 +89,12 @@ func (m *tokenManager) GenerateRefreshToken(userID int32, email string) (string,
 	return token.SignedString(m.secret)
 }
 
-func (m *tokenManager) Generate2FAToken(userID int32, method string) (string, error) {
+func (m *tokenManager) Generate2FAToken(userID int32, method string, tempPwd bool) (string, error) {
 	claims := UserClaims{
 		UserID:     userID,
 		Type:       TokenType2FAPending,
 		AuthMethod: method,
+		TempPwd:    tempPwd,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   strconv.Itoa(int(userID)),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(10 * time.Minute)), // 10 minutes

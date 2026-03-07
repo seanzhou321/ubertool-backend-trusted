@@ -19,11 +19,11 @@ service AuthService {
 
   // Request to join organization
   // No access_token required
-  rpc RequestToJoinOrganization(RequestToJoinRequest) returns (RequestToJoinResponse);
+  rpc RequestToJoinOrganization(RequestToJoinRequest) returns (VanilaResponse);
 
   // User register after invitation and signup an organization
   // No access_token required
-  rpc UserSignup(SignupRequest) returns (SignupResponse);
+  rpc UserSignup(SignupRequest) returns (VanilaResponse);
 
   // Login with email and password
   // No access_token required
@@ -37,9 +37,17 @@ service AuthService {
   // RefreshToken sent in metadata
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
 
+  // User request to change password
+  // AccessToken required
+  rpc ChangePassword(ChangePasswordRequest) returns (VanilaResponse);
+
+  // user request to reset password by an Admin
+  // No access_token required
+  rpc ResetPassword(ResetPasswordRequest) returns (VanilaResponse);
+
   // Logout
   // AccessToken required
-  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc Logout(LogoutRequest) returns (VanilaResponse);
 }
 
 // Validate invitation request
@@ -82,6 +90,7 @@ message Verify2FAResponse {
   string refresh_token = 3;
   google.protobuf.Timestamp expires_at = 4;
   User user = 5;
+  bool reset_password = 6;
 }
 
 // Signup request
@@ -91,12 +100,6 @@ message SignupRequest {
   string email = 3;
   string phone = 4;
   string password = 5;
-}
-
-// Signup response
-message SignupResponse {
-  bool success = 1;
-  string message = 2;
 }
 
 // Refresh token request
@@ -118,11 +121,6 @@ message LogoutRequest {
   string android_device_id = 1;
 }
 
-// Logout response
-message LogoutResponse {
-  bool success = 1;
-}
-
 // Request to join request
 message RequestToJoinRequest {
   int32 organization_id = 1;
@@ -132,9 +130,12 @@ message RequestToJoinRequest {
   string admin_email = 5; 
 }
 
-// Request to join response
-message RequestToJoinResponse {
-  bool success = 1;
-  string message = 2;
+message ChangePasswordRequest {
+  string old_password = 1;
+  string new_password = 2;
+}
+
+message ResetPasswordRequest {
+  string user_email = 1;
 }
 
