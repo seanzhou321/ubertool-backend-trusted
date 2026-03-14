@@ -457,7 +457,7 @@ func (s *authService) ResetPassword(ctx context.Context, email string) error {
 	cred := &domain.PendingCredential{
 		UserID:           user.ID,
 		TempPasswordHash: string(tempHash),
-		ExpiresAt:        time.Now().Add(48 * time.Hour),
+		ExpiresAt:        time.Now().Add(30 * time.Minute),
 		UsedAt:           nil,
 	}
 	if err := s.pendingCredsRepo.Upsert(ctx, cred); err != nil {
@@ -469,7 +469,7 @@ func (s *authService) ResetPassword(ctx context.Context, email string) error {
 	subject := "Your temporary password"
 	message := fmt.Sprintf(
 		"A password reset was requested for your account.\n\nTemporary password: %s\n\n"+
-			"This password expires in 48 hours. Log in and change your password immediately.\n"+
+			"This password expires in 30 minutes. Log in and change your password immediately.\n"+
 			"If you did not request this, please contact your organization administrator.",
 		tempPassword,
 	)

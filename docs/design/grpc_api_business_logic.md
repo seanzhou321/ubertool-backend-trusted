@@ -165,7 +165,7 @@ Business Logic:
 4. Hash the temporary password with bcrypt.
 5. Upsert a row in `pending_credentials` for this user:
    - `temp_password_hash` = the bcrypt hash
-   - `expires_at` = NOW() + 48 hours
+   - `expires_at` = NOW() + 30 minutes
    - `used_at` = NULL
 6. Send an email to the user containing the plain-text temporary password and instructions to log in and change it immediately.
 7. Return the generic success message.
