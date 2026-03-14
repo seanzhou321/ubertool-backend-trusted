@@ -327,7 +327,7 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	code := fmt.Sprintf("%05d", randmath.Intn(100000))
 	s.pending2FACodes.Store(user.ID, code)
 	logger.Info("2FA code generated and emailed", "userID", user.ID)
-	subject := "Your 2FA Code"
+	subject := fmt.Sprintf("Your 2FA Code - %s", code)
 	message := fmt.Sprintf("Your login code is: %s", code)
 	_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message)
 
@@ -412,9 +412,8 @@ func (s *authService) ChangePassword(ctx context.Context, userID int32, oldPassw
 		logger.ExitMethodWithError("authService.ChangePassword", err, "reason", "bcrypt error")
 		return err
 	}
-	user.PasswordHash = string(newHash)
-	if err := s.userRepo.Update(ctx, user); err != nil {
-		logger.ExitMethodWithError("authService.ChangePassword", err, "reason", "failed to update user")
+	if err := s.userRepo.UpdatePassword(ctx, userID, string(newHash)); err != nil {
+		logger.ExitMethodWithError("authService.ChangePassword", err, "reason", "failed to update password")
 		return err
 	}
 

@@ -39,6 +39,10 @@ func (m *MockUserRepo) Update(ctx context.Context, user *domain.User) error {
 	args := m.Called(ctx, user)
 	return args.Error(0)
 }
+func (m *MockUserRepo) UpdatePassword(ctx context.Context, userID int32, passwordHash string) error {
+	args := m.Called(ctx, userID, passwordHash)
+	return args.Error(0)
+}
 func (m *MockUserRepo) AddUserToOrg(ctx context.Context, userOrg *domain.UserOrg) error {
 	args := m.Called(ctx, userOrg)
 	return args.Error(0)

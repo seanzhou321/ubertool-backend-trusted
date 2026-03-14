@@ -12,6 +12,7 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id int32) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
+	UpdatePassword(ctx context.Context, userID int32, passwordHash string) error
 
 	// User Organizations
 	AddUserToOrg(ctx context.Context, userOrg *domain.UserOrg) error

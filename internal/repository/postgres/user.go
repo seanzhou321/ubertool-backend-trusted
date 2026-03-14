@@ -61,6 +61,13 @@ func (r *userRepository) Update(ctx context.Context, u *domain.User) error {
 	return err
 }
 
+func (r *userRepository) UpdatePassword(ctx context.Context, userID int32, passwordHash string) error {
+	query := `UPDATE users SET password_hash=$1, updated_on=$2 WHERE id=$3`
+	now := time.Now().Format("2006-01-02")
+	_, err := r.db.ExecContext(ctx, query, passwordHash, now, userID)
+	return err
+}
+
 func (r *userRepository) AddUserToOrg(ctx context.Context, uo *domain.UserOrg) error {
 	query := `INSERT INTO users_orgs (user_id, org_id, joined_on, balance_cents, last_balance_updated_on, status, role, blocked_on, blocked_reason, renting_blocked, lending_blocked, blocked_due_to_bill_id) 
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
