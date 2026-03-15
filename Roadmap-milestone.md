@@ -38,9 +38,9 @@
 ## Milestone 3: MVP Production Release - Limited to Trial Groups
 
 1. (done) push notification through FCM (Firebase Cloud Messaging, a free messaging service from Google, delivers to both Android and iOS devices)
-2. (implemented, need testing) change/reset password
+2. (done) change/reset password
 3. (implemented) Implement user management rules: super_admin creates/promotes admin and member. admin creates members. 
-4. (implemented) Copying the rental prices to rental request at the creation. Use the pricing in the rental request to derive final credit. show the rental request price throughout the rental state transitions. 
+4. (done) Copying the rental prices to rental request at the creation. Use the pricing in the rental request to derive final credit. show the rental request price throughout the rental state transitions. 
 5. test image capture and display
 6. implement a baseline offset before billsplitting caculation
 7. test billsplitting -- a). strengthen automatic tests (unit/integ./e2e), b). design a set of fake balances. c).enable manually initiation of the cronjob. d). test cronjob scheduler.

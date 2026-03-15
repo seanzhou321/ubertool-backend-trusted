@@ -1,11 +1,19 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image"
+	"image/jpeg"
+	_ "image/png" // register PNG decoder
+	"path"
 	"time"
 
+	xdraw "golang.org/x/image/draw"
+
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository"
 	"ubertool-backend-trusted/internal/storage"
 )
@@ -150,7 +158,101 @@ func (s *imageStorageService) ConfirmImageUpload(
 		return nil, fmt.Errorf("failed to update image: %w", err)
 	}
 
+	// Kick off thumbnail generation asynchronously so the RPC returns immediately.
+	go s.generateThumbnail(image.ID, image.FilePath)
+
 	return image, nil
+}
+
+// generateThumbnail reads the confirmed image from storage, resizes it to fit within
+// 300×300 pixels (preserving aspect ratio), saves the result as JPEG, and updates
+// the thumbnail_path column. Runs in a background goroutine.
+func (s *imageStorageService) generateThumbnail(imageID int32, filePath string) {
+	ctx := context.Background()
+
+	// Derive thumbnail storage key beside the original, always as JPEG.
+	dir := path.Dir(filePath)
+	base := path.Base(filePath)
+	ext := path.Ext(base)
+	stem := base[:len(base)-len(ext)]
+	thumbnailPath := path.Join(dir, "thumb_"+stem+".jpg")
+
+	// Read original image from storage.
+	reader, err := s.storage.ReadFile(filePath)
+	if err != nil {
+		logger.Error("thumbnail: failed to read image", "image_id", imageID, "error", err)
+		return
+	}
+	defer reader.Close()
+
+	// Decode (JPEG and PNG are registered; add more blank imports above for other formats).
+	src, _, err := image.Decode(reader)
+	if err != nil {
+		logger.Error("thumbnail: failed to decode image", "image_id", imageID, "error", err)
+		return
+	}
+
+	// Resize to fit within 300×300 preserving aspect ratio.
+	dst := resizeToFit(src, 300, 300)
+
+	// Encode as JPEG.
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 85}); err != nil {
+		logger.Error("thumbnail: failed to encode", "image_id", imageID, "error", err)
+		return
+	}
+
+	// Persist thumbnail.
+	if err := s.storage.SaveFile(thumbnailPath, &buf); err != nil {
+		logger.Error("thumbnail: failed to save", "image_id", imageID, "error", err)
+		return
+	}
+
+	// Update the DB record with the thumbnail path.
+	img, err := s.toolRepo.GetImageByID(ctx, imageID)
+	if err != nil {
+		logger.Error("thumbnail: failed to fetch image record", "image_id", imageID, "error", err)
+		return
+	}
+	img.ThumbnailPath = thumbnailPath
+	if err := s.toolRepo.UpdateImage(ctx, img); err != nil {
+		logger.Error("thumbnail: failed to update record", "image_id", imageID, "error", err)
+		return
+	}
+
+	logger.Info("thumbnail: generated", "image_id", imageID, "path", thumbnailPath)
+}
+
+// resizeToFit scales src so that it fits within maxW×maxH while preserving the
+// original aspect ratio. If the source already fits, it is returned unchanged.
+func resizeToFit(src image.Image, maxW, maxH int) image.Image {
+	b := src.Bounds()
+	srcW, srcH := b.Dx(), b.Dy()
+
+	// Already small enough — no scaling needed.
+	if srcW <= maxW && srcH <= maxH {
+		return src
+	}
+
+	scaleW := float64(maxW) / float64(srcW)
+	scaleH := float64(maxH) / float64(srcH)
+	scale := scaleW
+	if scaleH < scale {
+		scale = scaleH
+	}
+
+	dstW := int(float64(srcW) * scale)
+	dstH := int(float64(srcH) * scale)
+	if dstW < 1 {
+		dstW = 1
+	}
+	if dstH < 1 {
+		dstH = 1
+	}
+
+	dst := image.NewRGBA(image.Rect(0, 0, dstW, dstH))
+	xdraw.BiLinear.Scale(dst, dst.Bounds(), src, b, xdraw.Over, nil)
+	return dst
 }
 
 // GetDownloadUrl generates a presigned URL for downloading an image

@@ -1072,10 +1072,18 @@ Business Logic:
    - Verify the tool exists and belongs to the user.
    - Link image to tool.
    - If `is_primary` is true, unset other images' `is_primary` flag for this tool.
-9. Schedule async job to generate thumbnail (300x300).
+9. Launch a background goroutine (`generateThumbnail`) to generate a thumbnail asynchronously. The RPC returns before this completes. The goroutine:
+   - Reads the confirmed file from storage.
+   - Decodes it (JPEG and PNG supported).
+   - Scales it to fit within **300×300 px** preserving aspect ratio using BiLinear interpolation. If the original is already ≤300×300, it is kept at its original size.
+   - Encodes the result as JPEG (85% quality).
+   - Saves the thumbnail at `tools/{tool_id}/{image_id}/thumb_{stem}.jpg`.
+   - Updates `thumbnail_path` in the `tool_images` record.
+   - All errors are logged; failures do not affect the already-returned response.
 10. Return success with complete `ToolImage` object including:
     - `id`, `tool_id`, `file_name`, `file_path`, `thumbnail_path`
     - `file_size`, `is_primary`, `display_order`, `uploaded_on`
+    - Note: `thumbnail_path` will be empty in the immediate response and populated once the background goroutine completes.
 
 ### Get Download URL
 Purpose: Get a presigned download URL for an image (for secure access) or return CDN URL.
@@ -1090,8 +1098,9 @@ Business Logic:
    - If tool is public and status='AVAILABLE' → Allow
    - Otherwise → Return PERMISSION_DENIED error
 4. Determine file path:
-   - If `is_thumbnail` = true: use `thumbnail_path`
-   - Otherwise: use `file_path`
+   - If `is_thumbnail` = true and `thumbnail_path` is non-empty: use `thumbnail_path`.
+   - If `is_thumbnail` = true but `thumbnail_path` is empty (thumbnail still generating): fall back to `file_path`.
+   - Otherwise: use `file_path`.
 5. Generate presigned GET URL (1-hour expiration) or return public CDN URL.
 6. Return:
    - `download_url`: Presigned GET URL or CDN URL
@@ -1142,40 +1151,6 @@ Business Logic:
 7. Set image1.`is_primary` = false
 8. Set image2.`is_primary` = true
 9. Return success with message "Primary image updated successfully."
-
----
-
-## Legacy Image Storage Methods (Deprecated)
-
-### Upload Image (Streaming - Deprecated)
-**Status:** Deprecated - Use presigned URL pattern instead (GetUploadUrl → Upload → ConfirmImageUpload)
-
-Purpose: Upload image via gRPC streaming.
-
-Input: stream of `UploadImageRequest` (first message contains metadata, subsequent messages contain chunks)
-Output: `UploadImageResponse` with `ToolImage`
-Business Logic:
-1. Receive first message with metadata (tool_id, filename, mime_type, is_primary).
-2. Stream subsequent chunks and write to temporary file.
-3. Save to storage and create `tool_images` record.
-4. Generate thumbnail.
-5. Return ToolImage metadata.
-
-**Note:** This method is kept for backward compatibility but presigned URL pattern is recommended for new implementations.
-
-### Download Image (Streaming - Deprecated)
-**Status:** Deprecated - Use GetDownloadUrl instead
-
-Purpose: Download image via gRPC streaming.
-
-Input: `image_id`, `tool_id`, `is_thumbnail`
-Output: stream of `DownloadImageResponse` (first message contains metadata, subsequent messages contain chunks)
-Business Logic:
-1. Find image record and verify access.
-2. Read file from storage.
-3. Stream chunks to client.
-
-**Note:** This method is kept for backward compatibility but presigned URL pattern (GetDownloadUrl) is recommended.
 
 ---
 
