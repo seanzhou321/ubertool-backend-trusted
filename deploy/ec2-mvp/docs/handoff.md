@@ -38,30 +38,29 @@ but the service is crash-looping with this error:
   Failed to load configuration: failed to read config file:
   open config/config.dev.yaml: no such file or directory
 
-Three fixes are needed before redeploying.
+Fixes 1 and 2 below have been applied. Fix 3 (port) is still pending.
 
-## Pending Fix 1 - Upload config.prod.yaml to EC2
-The binary accepts a -config flag (cmd/server/main.go line 36).
-It defaults to config/config.dev.yaml which does not exist on EC2.
-config.prod.yaml must be uploaded and the service pointed at it.
+## Fix 1 - Config file upload to EC2 (DONE)
+Both main.go files updated to default to config/config.yaml instead of
+config/config.dev.yaml. Production config moved from config/config.prod.yaml
+to deploy/ec2-mvp/config.yaml (kept alongside deploy scripts, gitignored).
 
-In 04_deploy.ps1, add config.prod.yaml to the scp command in step 3:
-  scp ... "$PROJECT_ROOT\config\config.prod.yaml" "ubuntu@${ELASTIC_IP}:/tmp/"
+04_deploy.ps1 step 3 now uploads deploy/ec2-mvp/config.yaml:
+  scp ... "$PSScriptRoot\config.yaml" "ubuntu@${ELASTIC_IP}:/tmp/"
 
-Add these lines to the install script in step 4:
-  sudo mv /tmp/config.prod.yaml /etc/ubertool/config.prod.yaml
-  sudo chown root:ubertool /etc/ubertool/config.prod.yaml
-  sudo chmod 640 /etc/ubertool/config.prod.yaml
+04_deploy.ps1 step 4 installs it as /etc/ubertool/config.yaml:
+  sudo mv /tmp/config.yaml /etc/ubertool/config.yaml
+  sudo chown root:ubertool /etc/ubertool/config.yaml
+  sudo chmod 640 /etc/ubertool/config.yaml
 
-## Pending Fix 2 - Update ubertool-api.service ExecStart
-File location: deploy/ec2-mvp/ubertool-api.service
-Change ExecStart from:
-  ExecStart=/usr/local/bin/ubertool-api
-To:
-  ExecStart=/usr/local/bin/ubertool-api -config /etc/ubertool/config.prod.yaml
+Step 4 also creates /var/ubertool/uploads (required for local file storage).
+
+## Fix 2 - ubertool-api.service ExecStart (DONE)
+File: deploy/ec2-mvp/ubertool-api.service
+  ExecStart=/usr/local/bin/ubertool-api -config /etc/ubertool/config.yaml
 
 ## Pending Fix 3 - Port mismatch
-config.prod.yaml has server.port=50052 (correct for plaintext gRPC).
+config.yaml has server.port=50052 (correct for plaintext gRPC).
 The EC2 security group currently only opens port 443, not 50052.
 Run this once to open the port:
   aws ec2 authorize-security-group-ingress \
@@ -71,15 +70,16 @@ Run this once to open the port:
 
 Also update GRPC_PORT=50052 in config.env.
 
-## config.prod.yaml Notes
-Located at: config/config.prod.yaml
+## config.yaml Notes
+Located at: deploy/ec2-mvp/config.yaml (gitignored, contains secrets)
+Installed on EC2 at: /etc/ubertool/config.yaml
 - server.port = 50052 (changes to 443 in Phase 2 after TLS)
 - database.host must equal the RDS endpoint from infra_state.env
   (the current value is a stale hostname from a previous project)
 - smtp configured with Gmail app password
 - jwt secret is set
 - storage uses local filesystem mock (upload_dir: /var/ubertool/uploads)
-  The directory /var/ubertool/uploads must exist on EC2
+  04_deploy.ps1 now creates /var/ubertool/uploads on EC2 automatically
 - firebase-admin-key.json is at config/firebase-admin-key.json
   InitFirebase() logs a warning and continues if it cannot find the key
   so push notifications will be disabled but the server will still start
@@ -87,7 +87,7 @@ Located at: config/config.prod.yaml
 ## Deployment Plan - Remaining Steps
 
 ### Phase 1 - Fix and verify microservice (current phase, no TLS)
-1. Apply the three pending fixes above
+1. Apply Pending Fix 3 (port) - open port 50052 in EC2 security group
 2. Redeploy with .\04_deploy.ps1
 3. Verify service starts cleanly:
      ssh ubertool-ec2 "sudo journalctl -u ubertool-api -n 50 --no-pager"
@@ -109,7 +109,7 @@ Steps:
 3. Point domain A-record to the Elastic IP (TTL 300)
 4. Wait for DNS propagation (a few minutes)
 5. Run .\03_setup_tls.ps1
-6. Update config.prod.yaml server.port from 50052 to 443
+6. Update deploy/ec2-mvp/config.yaml server.port from 50052 to 443
 7. Redeploy with .\04_deploy.ps1
 8. Update Android client channel to use domain and useTransportSecurity()
 

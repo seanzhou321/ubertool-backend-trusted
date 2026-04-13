@@ -16,7 +16,7 @@ User=ubertool
 Group=ubertool
 
 # Binary
-ExecStart=/usr/local/bin/ubertool-api
+ExecStart=/usr/local/bin/ubertool-api -config /etc/ubertool/config.yaml
 
 # Load environment from file
 EnvironmentFile=/etc/ubertool/ubertool.env
