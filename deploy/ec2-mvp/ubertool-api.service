@@ -1,0 +1,49 @@
+# =============================================================================
+# ubertool-api.service
+# systemd unit file for the Ubertool gRPC API microservice.
+# Installed to /etc/systemd/system/ by 04_deploy.sh
+# =============================================================================
+
+[Unit]
+Description=Ubertool gRPC API
+Documentation=https://github.com/seanzhou321/ubertool-backend-trusted
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubertool
+Group=ubertool
+
+# Binary
+ExecStart=/usr/local/bin/ubertool-api
+
+# Load environment from file
+EnvironmentFile=/etc/ubertool/ubertool.env
+
+# Working directory
+WorkingDirectory=/var/lib/ubertool
+
+# Logging — redirect to journald (use: journalctl -u ubertool-api -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ubertool-api
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=60s
+StartLimitBurst=3
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/ubertool /var/lib/ubertool
+ReadOnlyPaths=/etc/ubertool
+
+# Resource limits (appropriate for t3.micro)
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
