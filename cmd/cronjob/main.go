@@ -21,7 +21,7 @@ import (
 
 func main() {
 	// Parse command-line flags
-	configPath := flag.String("config", "config/config.dev.yaml", "Path to configuration file")
+	configPath := flag.String("config", "config/config.yaml", "Path to configuration file")
 	runOnce := flag.String("run-once", "", "Run a specific job once and exit (e.g., 'mark-overdue-rentals', 'all-nightly', 'all-monthly')")
 	flag.Parse()
 

@@ -9,13 +9,14 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Server    ServerConfig    `yaml:"server"`
-	Database  DatabaseConfig  `yaml:"database"`
-	SMTP      SMTPConfig      `yaml:"smtp"`
-	JWT       JWTConfig       `yaml:"jwt"`
-	Storage   StorageConfig   `yaml:"storage"`
-	Log       LogConfig       `yaml:"log"`
-	Scheduler SchedulerConfig `yaml:"scheduler"`
+	Server         ServerConfig    `yaml:"server"`
+	Database       DatabaseConfig  `yaml:"database"`
+	SMTP           SMTPConfig      `yaml:"smtp"`
+	JWT            JWTConfig       `yaml:"jwt"`
+	Storage        StorageConfig   `yaml:"storage"`
+	Log            LogConfig       `yaml:"log"`
+	Scheduler      SchedulerConfig `yaml:"scheduler"`
+	FirebaseKeyPath string         `yaml:"firebase_key_path"`
 }
 
 // ServerConfig contains gRPC server settings
@@ -53,11 +54,13 @@ type JWTConfig struct {
 
 // StorageConfig contains file storage settings
 type StorageConfig struct {
-	Type         string   `yaml:"type"`       // "mock" or "s3"
-	UploadDir    string   `yaml:"upload_dir"` // For mock storage
-	BaseURL      string   `yaml:"base_url"`   // Server base URL for mock URLs
+	Type         string   `yaml:"type"`             // "mock" or "s3"
+	UploadDir    string   `yaml:"upload_dir"`       // For mock storage
+	BaseURL      string   `yaml:"base_url"`         // Server base URL for mock URLs
 	MaxFileSize  int64    `yaml:"max_file_size_mb"`
 	AllowedTypes []string `yaml:"allowed_types"`
+	S3Bucket     string   `yaml:"s3_bucket"`        // S3 bucket name
+	S3Region     string   `yaml:"s3_region"`        // AWS region
 }
 
 // LogConfig contains logging settings
@@ -200,8 +203,17 @@ func (c *Config) Validate() error {
 	}
 
 	// Storage validation
-	if c.Storage.UploadDir == "" {
-		return fmt.Errorf("upload directory is required")
+	if c.Storage.Type == "s3" {
+		if c.Storage.S3Bucket == "" {
+			return fmt.Errorf("s3_bucket is required when storage type is s3")
+		}
+		if c.Storage.S3Region == "" {
+			return fmt.Errorf("s3_region is required when storage type is s3")
+		}
+	} else {
+		if c.Storage.UploadDir == "" {
+			return fmt.Errorf("upload directory is required")
+		}
 	}
 
 	// Scheduler defaults

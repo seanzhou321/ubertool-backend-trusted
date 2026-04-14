@@ -9,18 +9,17 @@ import (
 	"google.golang.org/api/option"
 )
 
-func initFirebase() (*messaging.Client, error) {
-	opt := option.WithCredentialsFile("config/firebase-admin-key.json")
+// InitFirebase initialises the Firebase Messaging client.
+// It returns (nil, nil) when keyPath is empty or the credentials file is absent
+// so callers can treat a missing file as "push disabled" rather than a fatal error.
+func InitFirebase(keyPath string) (*messaging.Client, error) {
+	if keyPath == "" {
+		keyPath = "config/firebase-admin-key.json"
+	}
+	opt := option.WithCredentialsFile(keyPath)
 	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
 		return nil, err
 	}
 	return app.Messaging(context.Background())
-}
-
-// InitFirebase initialises the Firebase Messaging client.
-// It returns (nil, nil) when the credentials file is absent so callers
-// can treat a missing file as "push disabled" rather than a fatal error.
-func InitFirebase() (*messaging.Client, error) {
-	return initFirebase()
 }

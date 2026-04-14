@@ -43,15 +43,16 @@ tmp/
 temp/
 
 # Hide config files with sensitive information
+config/config.yaml 
 config/config.dev.yaml
 config/config.stage.yaml
 config/config.prod.yaml
 config/config.test.yaml
-config/config.yaml
 config/mail_config.test.yaml
 
 # EC2 Secrets
 deploy/ec2-mvp/config.env
+deploy/ec2-mvp/config.yaml
 deploy/ec2-mvp/infra_state.env
 deploy/ec2-mvp/secrets.txt
 

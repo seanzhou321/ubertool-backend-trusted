@@ -33,7 +33,7 @@ import (
 
 func main() {
 	// Parse command-line flags
-	configPath := flag.String("config", "config/config.dev.yaml", "Path to configuration file")
+	configPath := flag.String("config", "config/config.yaml", "Path to configuration file")
 	flag.Parse()
 
 	// Load configuration
@@ -69,7 +69,7 @@ func main() {
 	store := postgres.NewStore(db)
 
 	// Initialize Notification + Push services (created first so other services can depend on noteSvc)
-	fcmClient, fcmErr := config.InitFirebase()
+	fcmClient, fcmErr := config.InitFirebase(cfg.FirebaseKeyPath)
 	if fcmErr != nil {
 		logger.Warn("FCM client unavailable — push notifications disabled", "error", fcmErr)
 		fcmClient = nil
@@ -84,7 +84,15 @@ func main() {
 
 	// Initialize Storage Service
 	var storageService storage.StorageInterface
-	if cfg.Storage.Type == "" || cfg.Storage.Type == "mock" {
+	if cfg.Storage.Type == "s3" {
+		logger.Info("Using S3 storage", "bucket", cfg.Storage.S3Bucket, "region", cfg.Storage.S3Region)
+		s3Storage, err := storage.NewS3StorageService(context.Background(), cfg.Storage.S3Bucket, cfg.Storage.S3Region)
+		if err != nil {
+			logger.Error("Failed to initialize S3 storage", "error", err)
+			log.Fatalf("Failed to initialize S3 storage: %v", err)
+		}
+		storageService = s3Storage
+	} else {
 		logger.Info("Using mock storage (local filesystem)", "upload_dir", cfg.Storage.UploadDir)
 		mockStorage, err := storage.NewMockStorageService(cfg.Storage.BaseURL, cfg.Storage.UploadDir)
 		if err != nil {
@@ -92,9 +100,6 @@ func main() {
 			log.Fatalf("Failed to initialize mock storage: %v", err)
 		}
 		storageService = mockStorage
-	} else {
-		logger.Error("Unsupported storage type", "type", cfg.Storage.Type)
-		log.Fatalf("Storage type '%s' not yet implemented", cfg.Storage.Type)
 	}
 
 	// Initialize Image Storage Service
@@ -192,14 +197,13 @@ func main() {
 	// Register reflection service for grpcurl
 	reflection.Register(s)
 
-	// Set up HTTP server for mock storage endpoints (if using mock storage)
-	if cfg.Storage.Type == "" || cfg.Storage.Type == "mock" {
+	// Set up HTTP server for mock storage endpoints (only when using mock storage)
+	if cfg.Storage.Type != "s3" {
 		mockStorage := storageService.(*storage.MockStorageService)
 		router := mux.NewRouter()
 		httpapi.RegisterMockStorageRoutes(router, mockStorage)
 
-		// Start HTTP server in a goroutine
-		httpPort := cfg.Server.Port + 1 // Use next port for HTTP
+		httpPort := cfg.Server.Port + 1
 		httpAddr := fmt.Sprintf("%s:%d", cfg.Server.Host, httpPort)
 		go func() {
 			logger.Info("HTTP server for mock storage listening", "address", httpAddr)
