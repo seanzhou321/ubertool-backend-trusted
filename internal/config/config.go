@@ -9,14 +9,15 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Server         ServerConfig    `yaml:"server"`
-	Database       DatabaseConfig  `yaml:"database"`
-	SMTP           SMTPConfig      `yaml:"smtp"`
-	JWT            JWTConfig       `yaml:"jwt"`
-	Storage        StorageConfig   `yaml:"storage"`
-	Log            LogConfig       `yaml:"log"`
-	Scheduler      SchedulerConfig `yaml:"scheduler"`
-	FirebaseKeyPath string         `yaml:"firebase_key_path"`
+	Server          ServerConfig    `yaml:"server"`
+	Database        DatabaseConfig  `yaml:"database"`
+	SMTP            SMTPConfig      `yaml:"smtp"`
+	JWT             JWTConfig       `yaml:"jwt"`
+	Storage         StorageConfig   `yaml:"storage"`
+	Log             LogConfig       `yaml:"log"`
+	Scheduler       SchedulerConfig `yaml:"scheduler"`
+	TLS             TLSConfig       `yaml:"tls"`
+	FirebaseKeyPath string          `yaml:"firebase_key_path"`
 }
 
 // ServerConfig contains gRPC server settings
@@ -67,6 +68,13 @@ type StorageConfig struct {
 type LogConfig struct {
 	Level  string `yaml:"level"`  // "debug", "info", "warn", "error"
 	Format string `yaml:"format"` // "json" or "text"
+}
+
+// TLSConfig contains TLS certificate settings for the gRPC server
+type TLSConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
 }
 
 // Load reads configuration from a YAML file
@@ -157,6 +165,14 @@ func (c *Config) overrideWithEnv() {
 	}
 	if val := os.Getenv("LOG_FORMAT"); val != "" {
 		c.Log.Format = val
+	}
+
+	// TLS
+	if val := os.Getenv("TLS_CERT"); val != "" {
+		c.TLS.CertFile = val
+	}
+	if val := os.Getenv("TLS_KEY"); val != "" {
+		c.TLS.KeyFile = val
 	}
 
 	// Set defaults for log if not configured

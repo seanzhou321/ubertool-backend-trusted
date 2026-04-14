@@ -4,6 +4,11 @@ server:
   host: "0.0.0.0"
   port: 50051
 
+tls:
+  enabled: false                                   # set to true on EC2 after running 03_setup_tls.ps1
+  cert_file: "/etc/ubertool/certs/fullchain.pem"   # populated by 03_setup_tls.ps1
+  key_file:  "/etc/ubertool/certs/privkey.pem"     # populated by 03_setup_tls.ps1
+
 database:
   host: "production-db-host"
   port: 5432

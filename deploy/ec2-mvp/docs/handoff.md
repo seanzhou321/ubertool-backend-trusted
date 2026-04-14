@@ -1,5 +1,7 @@
 # Ubertool Backend Deployment - Handoff Notes
-# Date: April 13, 2026
+# Date: April 14, 2026
+# Status: COMPLETE — all phases through Phase 2b (TLS + domain) are done.
+#          Next: Phase 3 (Android app release)
 
 ## Project Overview
 Ubertool is a mobile app backend consisting of:
@@ -15,8 +17,8 @@ Ubertool is a mobile app backend consisting of:
 
 ## AWS Infrastructure (deployed, us-west-2)
 - EC2 t3.micro  : i-023402e9ce97c0c86
-- Public IP     : 44.237.82.249 (TEMPORARY - changes on EC2 restart)
-                  Elastic IP has NOT been allocated yet.
+- Elastic IP    : 44.237.82.249 (allocated and associated)
+- Domain        : app.ixorashare.com → 44.237.82.249 (A record)
 - RDS db.t3.micro PostgreSQL 17.6 : ubertool-backend-trusted-db
 - EC2 SG and RDS SG IDs : see infra_state.env
 - SSH alias     : ubertool-ec2 -> ubuntu@44.237.82.249
@@ -25,22 +27,23 @@ Ubertool is a mobile app backend consisting of:
 ## Deployment Scripts (PowerShell, deploy/ec2-mvp/)
 - 01_create_infra.ps1  DONE - infrastructure created
 - 02_init_db.ps1       DONE - schema applied to RDS
-- 03_setup_tls.ps1     PENDING - run in Phase 2 after domain and Elastic IP
-- 04_deploy.ps1        IN PROGRESS - see pending fixes below
+- 03_setup_tls.ps1     DONE - Let's Encrypt cert issued for app.ixorashare.com
+- 04_deploy.ps1        DONE - binary deployed, service running, DB data verified
 - 99_teardown.ps1      destroys all AWS resources
 - Load-Env.ps1         shared helper, dot-sourced by all scripts
 - config.env           local secrets (gitignored)
 - infra_state.env      auto-generated AWS resource IDs (gitignored)
 
 ## Current Status
-Infrastructure and database are up and healthy. The binary is deployed
-but the service is crash-looping with this error:
-  Failed to load configuration: failed to read config file:
-  open config/config.dev.yaml: no such file or directory
+Phase 1 complete. The gRPC microservice is running on EC2 and healthy.
+- 04_deploy.ps1 executed successfully
+- ec2_userdata.sh executed successfully  
+- Database population verified from EC2 terminal
+- Service is listening on port 50052 (plaintext gRPC)
 
-Fixes 1 and 2 below have been applied. Fix 3 (port) is still pending.
+## Applied Fixes (all done, for reference)
 
-## Fix 1 - Config file upload to EC2 (DONE)
+### Fix 1 - Config file upload to EC2 (DONE)
 Both main.go files updated to default to config/config.yaml instead of
 config/config.dev.yaml. Production config moved from config/config.prod.yaml
 to deploy/ec2-mvp/config.yaml (kept alongside deploy scripts, gitignored).
@@ -59,16 +62,9 @@ Step 4 also creates /var/ubertool/uploads (required for local file storage).
 File: deploy/ec2-mvp/ubertool-api.service
   ExecStart=/usr/local/bin/ubertool-api -config /etc/ubertool/config.yaml
 
-## Pending Fix 3 - Port mismatch
+## Fix 3 - Port mismatch (DONE)
 config.yaml has server.port=50052 (correct for plaintext gRPC).
-The EC2 security group currently only opens port 443, not 50052.
-Run this once to open the port:
-  aws ec2 authorize-security-group-ingress \
-    --group-id <EC2_SG_ID from infra_state.env> \
-    --protocol tcp --port 50052 --cidr "0.0.0.0/0" \
-    --region us-west-2
-
-Also update GRPC_PORT=50052 in config.env.
+EC2 security group port 50052 opened. GRPC_PORT=50052 confirmed in config.env.
 
 ## config.yaml Notes
 Located at: deploy/ec2-mvp/config.yaml (gitignored, contains secrets)
@@ -86,63 +82,80 @@ Installed on EC2 at: /etc/ubertool/config.yaml
 
 ## Deployment Plan - Remaining Steps
 
-### Phase 1 - Fix and verify microservice (current phase, no TLS)
-1. Apply Pending Fix 3 (port) - open port 50052 in EC2 security group
-2. Redeploy with .\04_deploy.ps1
-3. Verify service starts cleanly:
-     ssh ubertool-ec2 "sudo journalctl -u ubertool-api -n 50 --no-pager"
-4. Verify port is listening:
-     ssh ubertool-ec2 "sudo ss -tlnp | grep 50052"
-5. Test gRPC connectivity from Android app using plaintext over temporary IP
+### Phase 1 - COMPLETE
+All deployment scripts executed successfully. Service running on 44.237.82.249:50052
+(plaintext gRPC). Database data verified from EC2 terminal.
 
-### Phase 2 - Elastic IP + Domain + TLS (before Android app release)
-TLS via Let's Encrypt. Trusted natively by Android and iOS with no extra
-app configuration. No cert bundling needed.
+### Phase 2 - Domain + Elastic IP + TLS - COMPLETE
+Domain: app.ixorashare.com | Elastic IP: 44.237.82.249 | TLS: Let's Encrypt
+Cert: /etc/ubertool/certs/fullchain.pem (expires 2026-07-13, auto-renews via certbot.timer)
+gRPC endpoint: app.ixorashare.com:50052 (TLS, useTransportSecurity())
 
-Steps:
-1. Allocate Elastic IP and associate with EC2:
-     aws ec2 allocate-address --domain vpc --region us-west-2
-     aws ec2 associate-address --instance-id i-023402e9ce97c0c86 \
-       --allocation-id <alloc-id> --region us-west-2
-   Update ELASTIC_IP and ALLOC_ID in infra_state.env
-2. Register a domain (~$10/yr, e.g. Namecheap)
-3. Point domain A-record to the Elastic IP (TTL 300)
-4. Wait for DNS propagation (a few minutes)
-5. Run .\03_setup_tls.ps1
-6. Update deploy/ec2-mvp/config.yaml server.port from 50052 to 443
-7. Redeploy with .\04_deploy.ps1
-8. Update Android client channel to use domain and useTransportSecurity()
+### Phase 2b - E2E Testing Against EC2
+
+The e2e tests (tests/e2e/) require both a gRPC connection and a direct database
+connection. RDS is not publicly accessible, so a local SSH tunnel is needed to
+reach the database.
+
+Step 1 - Open SSH tunnel (keep this terminal open while tests run):
+  ssh -L 5454:ubertool-backend-trusted-db.cx66cg08ai98.us-west-2.rds.amazonaws.com:5432 ubertool-ec2 -N
+
+Step 2 - Create a test config pointing at EC2.
+  Copy config/config.test.yaml → config/config.test.ec2.yaml (gitignored).
+  Edit the copy:
+    server:
+      host: app.ixorashare.com
+      port: 50052
+    tls:
+      enabled: true
+    database:
+      host: localhost            # tunnelled via SSH above
+      port: 5454
+      ssl_mode: disable          # tunnel handles transport; RDS TLS terminated at EC2 side
+
+Step 3 - Run selected e2e tests (from repo root):
+  # Auth smoke test
+  go test ./tests/e2e/ -run TestSignup -v -config config/config.test.ec2.yaml
+
+  # Core rental lifecycle
+  go test ./tests/e2e/ -run TestFullRentalWorkflow -v -config config/config.test.ec2.yaml
+
+  # Broader smoke suite (excludes push notification tests - FCB key not deployed)
+  go test ./tests/e2e/ -run "Test(Signup|Login|CreateOrg|AddTool|FullRentalWorkflow|GetBalance)" \
+    -v -config config/config.test.ec2.yaml
+
+  # Full suite
+  go test ./tests/e2e/ -v -config config/config.test.ec2.yaml -timeout 120s
+
+Note: push_notification_test.go will fail gracefully (FCM key not on EC2 by design).
+      image_storage_test.go requires /var/ubertool/uploads to exist (already created
+      by 04_deploy.ps1).
 
 ### Phase 3 - Android App Release
 1. Final testing against TLS endpoint
 2. Submit to Google Play Store (developer account already registered, $25 paid)
 
-## Android Client Connection (Phase 1, plaintext, temporary IP)
+## Android Client Connection (active — TLS, app.ixorashare.com)
   val channel = ManagedChannelBuilder
-      .forAddress("44.237.82.249", 50052)
-      .usePlaintext()
-      .build()
-
-## Android Client Connection (Phase 2, Let's Encrypt TLS, domain)
-  val channel = ManagedChannelBuilder
-      .forAddress("api.yourdomain.com", 443)
+      .forAddress("app.ixorashare.com", 50052)
       .useTransportSecurity()
       .build()
   // No custom TrustManager needed - Let's Encrypt trusted natively on Android and iOS
 
-## iOS Client Connection (future, same as Android approach)
+## iOS Client Connection (future, same approach)
   let channel = ClientConnection
       .usingTLSBackedByNIOSSL(on: group)
-      .connect(host: "api.yourdomain.com", port: 443)
+      .connect(host: "app.ixorashare.com", port: 50052)
   // No custom CA needed - Let's Encrypt trusted natively
 
 ## Key Architecture Decisions
 - EC2 t3.micro + RDS db.t3.micro handles up to ~10,000 users
-- Elastic IP not yet allocated - current IP is temporary, changes on EC2 restart
-- Domain will be registered before Android app release (~$10/yr)
+- Elastic IP: 35.160.176.235 (allocated, attached to EC2)
+- Domain: app.ixorashare.com (Namecheap, A record → Elastic IP)
 - TLS via Let's Encrypt - trusted natively on Android and iOS, no cert bundling
-- Port 50052 for Phase 1 plaintext, port 443 for Phase 2 TLS
+- Port 50052 with TLS (Let's Encrypt cert at /etc/ubertool/certs/)
 - RDS not publicly accessible - only reachable from EC2 security group
+- E2E tests connect to RDS via SSH tunnel (ssh -L 5454:<RDS>:5432 ubertool-ec2 -N)
 - RDS backup retention = 0 (free tier requirement)
 - PostgreSQL 17.6, Ubuntu 24.04 LTS
 - AWS $200 promotional credits cover ~8 months at ~$25/month

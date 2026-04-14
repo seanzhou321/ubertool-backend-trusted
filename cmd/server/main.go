@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 
 	pb "ubertool-backend-trusted/api/gen/v1"
@@ -178,11 +179,19 @@ func main() {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer(
+	serverOpts := []grpc.ServerOption{
 		grpc.UnaryInterceptor(authInterceptor.Unary()),
-	)
-
-	// Register services
+	}
+	if cfg.TLS.Enabled {
+		creds, err := credentials.NewServerTLSFromFile(cfg.TLS.CertFile, cfg.TLS.KeyFile)
+		if err != nil {
+			logger.Error("Failed to load TLS credentials", "error", err)
+			log.Fatalf("Failed to load TLS credentials: %v", err)
+		}
+		serverOpts = append(serverOpts, grpc.Creds(creds))
+		logger.Info("TLS enabled", "cert_file", cfg.TLS.CertFile)
+	}
+	s := grpc.NewServer(serverOpts...)
 	pb.RegisterAuthServiceServer(s, authHandler)
 	pb.RegisterUserServiceServer(s, userHandler)
 	pb.RegisterOrganizationServiceServer(s, orgHandler)

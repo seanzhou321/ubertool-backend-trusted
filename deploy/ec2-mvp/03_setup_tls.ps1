@@ -53,7 +53,7 @@ sudo cp /etc/letsencrypt/live/ubertool/fullchain.pem /etc/ubertool/certs/
 sudo cp /etc/letsencrypt/live/ubertool/privkey.pem   /etc/ubertool/certs/
 sudo chmod 644 /etc/ubertool/certs/fullchain.pem
 sudo chmod 640 /etc/ubertool/certs/privkey.pem
-sudo chown root:ubuntu /etc/ubertool/certs/privkey.pem
+sudo chown root:ubertool /etc/ubertool/certs/privkey.pem
 echo 'TLS setup complete.'"
 
 ssh -i $SSH_KEY_PATH -o StrictHostKeyChecking=no "ubuntu@$ELASTIC_IP" $remoteScript
