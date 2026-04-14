@@ -1,0 +1,25 @@
+# Test Data Setup Configuration
+# This file defines test organization and user data for the ubertool trusted backend
+
+# Database configuration - reference the test config file
+config_file: "/etc/ubertool/config.yaml"
+
+# Organization data
+organization:
+  name: "Harvest Evangelical Community"
+  description: "The number oneorganization for MVP Release"
+  address: "2034 Jewell Ridge, Vista, CA 92081"
+  metro: "San Diego, CA"
+  admin_phone_number: "+1-760-613-0273"
+  admin_email: "sean.zhou321@gmail.com"
+
+# Users for the organization (supports multiple users with different roles)
+users:
+  - email: "sean.zhou321@gmail.com"
+    phone_number: "+1-760-613-0273"
+    password: "h"
+    name: "Sean Zhou"
+    avatar_url: ""
+    role: "SUPER_ADMIN"
+    status: "ACTIVE"
+    balance_cents: 0

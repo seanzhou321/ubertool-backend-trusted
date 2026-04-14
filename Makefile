@@ -1,4 +1,4 @@
-.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e docker-build docker-push deploy-services deploy-cronjob deploy-all
+.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e docker-build docker-push deploy-services deploy-cronjob deploy-all setup-data-ec2-mvp
 
 PROTO_SRC_DIR = api/proto
 PROTO_DEST_DIR = .
@@ -109,6 +109,11 @@ test-e2e-admin-retrieve:
 test-e2e-push-notification:
 	go test -v ./tests/e2e -run "TestPushNotificationService_E2E"
 
-setup-test-data:
+setup-data-test:
 	@echo "Populating test data from YAML..."
-	go run ./tests/data-setup/setup.go
+	go run ./tests/data-setup/setup.go -setup=tests/data-setup/user_org.test.yaml
+
+setup-data-ec2-mvp:
+	@echo To populate EC2 RDS with initial data, run from a PowerShell terminal:
+	@echo   .\deploy\ec2-mvp\05_setup_data.ps1
+

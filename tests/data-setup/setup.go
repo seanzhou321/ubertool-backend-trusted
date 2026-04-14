@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -55,15 +56,19 @@ type SetupData struct {
 }
 
 func main() {
-	// Read the setup YAML file
-	setupFile := "tests/data-setup/user_org.yaml"
+	// Parse flags
+	setupFile := flag.String("setup", "", "Path to setup YAML file (default: tests/data-setup/user_org.yaml)")
+	flag.Parse()
 
-	// Check if file exists, if not try relative path
-	if _, err := os.Stat(setupFile); os.IsNotExist(err) {
-		setupFile = "user_org.yaml"
+	// Default setup file path
+	if *setupFile == "" {
+		*setupFile = "tests/data-setup/user_org.yaml"
+		if _, err := os.Stat(*setupFile); os.IsNotExist(err) {
+			*setupFile = "user_org.yaml"
+		}
 	}
 
-	setupData, err := readSetupFile(setupFile)
+	setupData, err := readSetupFile(*setupFile)
 	if err != nil {
 		log.Fatalf("Failed to read setup file: %v", err)
 	}
