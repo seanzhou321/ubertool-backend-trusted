@@ -1,4 +1,4 @@
-.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e docker-build docker-push deploy-services deploy-cronjob deploy-all setup-data-ec2-mvp
+.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-smoke-ec2 docker-build docker-push deploy-services deploy-cronjob deploy-all setup-data-ec2-mvp
 
 PROTO_SRC_DIR = api/proto
 PROTO_DEST_DIR = .
@@ -116,4 +116,9 @@ setup-data-test:
 setup-data-ec2-mvp:
 	@echo To populate EC2 RDS with initial data, run from a PowerShell terminal:
 	@echo   .\deploy\ec2-mvp\05_setup_data.ps1
+
+# Smoke tests against the live EC2 deployment.
+# Ensure config/config.smoke.ec2.yaml exists (see deploy/ec2-mvp/docs/handoff.md Phase 2b)
+test-smoke-ec2:
+	go test -v -count=1 -timeout 30s ./tests/smoke/ -args -config=config/config.smoke.ec2.yaml
 

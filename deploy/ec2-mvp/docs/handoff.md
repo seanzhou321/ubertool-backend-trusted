@@ -17,17 +17,17 @@ Ubertool is a mobile app backend consisting of:
 
 ## AWS Infrastructure (deployed, us-west-2)
 - EC2 t3.micro  : i-023402e9ce97c0c86
-- Elastic IP    : 44.237.82.249 (allocated and associated)
-- Domain        : app.ixorashare.com → 44.237.82.249 (A record)
+- Elastic IP    : 35.160.176.235 (allocated and associated)
+- Domain        : api.ixorashare.com → 35.160.176.235 (A record)
 - RDS db.t3.micro PostgreSQL 17.6 : ubertool-backend-trusted-db
 - EC2 SG and RDS SG IDs : see infra_state.env
-- SSH alias     : ubertool-ec2 -> ubuntu@44.237.82.249
+- SSH alias     : ubertool-ec2 -> ubuntu@35.160.176.235
 - SSH key       : ~/.ssh/ixorashare-ec2-key.pem
 
 ## Deployment Scripts (PowerShell, deploy/ec2-mvp/)
 - 01_create_infra.ps1  DONE - infrastructure created
 - 02_init_db.ps1       DONE - schema applied to RDS
-- 03_setup_tls.ps1     DONE - Let's Encrypt cert issued for app.ixorashare.com
+- 03_setup_tls.ps1     DONE - Let's Encrypt cert issued for api.ixorashare.com
 - 04_deploy.ps1        DONE - binary deployed, service running, DB data verified
 - 99_teardown.ps1      destroys all AWS resources
 - Load-Env.ps1         shared helper, dot-sourced by all scripts
@@ -83,61 +83,44 @@ Installed on EC2 at: /etc/ubertool/config.yaml
 ## Deployment Plan - Remaining Steps
 
 ### Phase 1 - COMPLETE
-All deployment scripts executed successfully. Service running on 44.237.82.249:50052
+All deployment scripts executed successfully. Service running on 35.160.176.235:50052
 (plaintext gRPC). Database data verified from EC2 terminal.
 
 ### Phase 2 - Domain + Elastic IP + TLS - COMPLETE
-Domain: app.ixorashare.com | Elastic IP: 44.237.82.249 | TLS: Let's Encrypt
+Domain: api.ixorashare.com | Elastic IP: 35.160.176.235 | TLS: Let's Encrypt
 Cert: /etc/ubertool/certs/fullchain.pem (expires 2026-07-13, auto-renews via certbot.timer)
-gRPC endpoint: app.ixorashare.com:50052 (TLS, useTransportSecurity())
+gRPC endpoint: api.ixorashare.com:50052 (TLS, useTransportSecurity())
 
-### Phase 2b - E2E Testing Against EC2
+### Phase 2b - Smoke Tests - COMPLETE
 
-The e2e tests (tests/e2e/) require both a gRPC connection and a direct database
-connection. RDS is not publicly accessible, so a local SSH tunnel is needed to
-reach the database.
+Smoke tests (tests/smoke/) verify TLS, API liveness, and DB connectivity via
+the live gRPC endpoint — no SSH tunnel required.
 
-Step 1 - Open SSH tunnel (keep this terminal open while tests run):
-  ssh -L 5454:ubertool-backend-trusted-db.cx66cg08ai98.us-west-2.rds.amazonaws.com:5432 ubertool-ec2 -N
+Config: config/config.smoke.ec2.yaml (gitignored)
+  server:
+    host: api.ixorashare.com
+    port: 50052
+  tls:
+    enabled: true
 
-Step 2 - Create a test config pointing at EC2.
-  Copy config/config.test.yaml → config/config.test.ec2.yaml (gitignored).
-  Edit the copy:
-    server:
-      host: app.ixorashare.com
-      port: 50052
-    tls:
-      enabled: true
-    database:
-      host: localhost            # tunnelled via SSH above
-      port: 5454
-      ssl_mode: disable          # tunnel handles transport; RDS TLS terminated at EC2 side
+Run smoke tests:
+  make test-smoke-ec2
 
-Step 3 - Run selected e2e tests (from repo root):
-  # Auth smoke test
-  go test ./tests/e2e/ -run TestSignup -v -config config/config.test.ec2.yaml
+Tests covered:
+  TestTLSConnectivity       - raw TLS handshake, cert chain valid, expiry checked
+  TestAPILiveness           - gRPC Login probe, server reachable and responding
+  TestDatabaseConnectivity  - SearchOrganizations (orgs table), Login (users table),
+                              ValidateInvite (invitations table)
 
-  # Core rental lifecycle
-  go test ./tests/e2e/ -run TestFullRentalWorkflow -v -config config/config.test.ec2.yaml
-
-  # Broader smoke suite (excludes push notification tests - FCB key not deployed)
-  go test ./tests/e2e/ -run "Test(Signup|Login|CreateOrg|AddTool|FullRentalWorkflow|GetBalance)" \
-    -v -config config/config.test.ec2.yaml
-
-  # Full suite
-  go test ./tests/e2e/ -v -config config/config.test.ec2.yaml -timeout 120s
-
-Note: push_notification_test.go will fail gracefully (FCM key not on EC2 by design).
-      image_storage_test.go requires /var/ubertool/uploads to exist (already created
-      by 04_deploy.ps1).
+All three tests pass against api.ixorashare.com:50052 as of April 14, 2026.
 
 ### Phase 3 - Android App Release
 1. Final testing against TLS endpoint
 2. Submit to Google Play Store (developer account already registered, $25 paid)
 
-## Android Client Connection (active — TLS, app.ixorashare.com)
+## Android Client Connection (active — TLS, api.ixorashare.com)
   val channel = ManagedChannelBuilder
-      .forAddress("app.ixorashare.com", 50052)
+      .forAddress("api.ixorashare.com", 50052)
       .useTransportSecurity()
       .build()
   // No custom TrustManager needed - Let's Encrypt trusted natively on Android and iOS
@@ -145,13 +128,13 @@ Note: push_notification_test.go will fail gracefully (FCM key not on EC2 by desi
 ## iOS Client Connection (future, same approach)
   let channel = ClientConnection
       .usingTLSBackedByNIOSSL(on: group)
-      .connect(host: "app.ixorashare.com", port: 50052)
+      .connect(host: "api.ixorashare.com", port: 50052)
   // No custom CA needed - Let's Encrypt trusted natively
 
 ## Key Architecture Decisions
 - EC2 t3.micro + RDS db.t3.micro handles up to ~10,000 users
 - Elastic IP: 35.160.176.235 (allocated, attached to EC2)
-- Domain: app.ixorashare.com (Namecheap, A record → Elastic IP)
+- Domain: api.ixorashare.com (Namecheap, A record → Elastic IP)
 - TLS via Let's Encrypt - trusted natively on Android and iOS, no cert bundling
 - Port 50052 with TLS (Let's Encrypt cert at /etc/ubertool/certs/)
 - RDS not publicly accessible - only reachable from EC2 security group
