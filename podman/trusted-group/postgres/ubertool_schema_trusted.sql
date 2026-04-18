@@ -242,6 +242,21 @@ CREATE TABLE fcm_tokens (
 
 CREATE INDEX idx_fcm_tokens_user_id ON fcm_tokens(user_id) WHERE status = 'ACTIVE';
 
+-- 8. Legal Consent
+
+-- Record of each user's acceptance of each document version.
+-- doc_name = filename without .md extension, e.g. '00_user_agreement_and_consent'
+-- version  = ISO date string matching CURRENT_LEGAL_VERSION, e.g. '2026-04-15'
+CREATE TABLE user_legal_consents (
+    user_id      INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doc_name     TEXT        NOT NULL,
+    version      TEXT        NOT NULL,
+    consented_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, doc_name, version)
+);
+
+CREATE INDEX idx_user_legal_consents_user_id ON user_legal_consents(user_id);
+
 -- Function to update balance on insert
 CREATE OR REPLACE FUNCTION update_user_balance() RETURNS TRIGGER AS $$
 BEGIN

@@ -21,7 +21,8 @@ func TestAuthService_ValidateInvite(t *testing.T) {
 	emailSvc := new(MockEmailService)
 	fcmRepo := new(MockFcmTokenRepo)
 	pendingCredsRepo := new(MockPendingCredentialsRepo)
-	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo)
+	legalConsentRepo := new(MockLegalConsentRepo)
+	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo)
 
 	ctx := context.Background()
 	token := "valid-token"
@@ -94,8 +95,9 @@ func TestAuthService_RequestToJoin(t *testing.T) {
 	emailSvc := new(MockEmailService)
 	fcmRepo := new(MockFcmTokenRepo)
 	pendingCredsRepo := new(MockPendingCredentialsRepo)
+	legalConsentRepo := new(MockLegalConsentRepo)
 
-	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo)
+	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo)
 
 	ctx := context.Background()
 

@@ -48,6 +48,14 @@ service AuthService {
   // Logout
   // AccessToken required
   rpc Logout(LogoutRequest) returns (VanilaResponse);
+
+  // Record user consent for a set of document versions
+  // access_token required (called after account exists or after re-consent)
+  rpc RecordLegalConsent(RecordLegalConsentRequest) returns (VanilaResponse);
+
+  // Check if user has consented to all docs at the current version
+  // access_token required
+  rpc GetUserConsentStatus(GetUserConsentStatusRequest) returns (GetUserConsentStatusResponse);
 }
 
 // Validate invitation request
@@ -137,5 +145,19 @@ message ChangePasswordRequest {
 
 message ResetPasswordRequest {
   string user_email = 1;
+}
+
+message RecordLegalConsentRequest {
+  repeated string doc_names = 1;  // filenames without .md, e.g. "00_user_agreement_and_consent"
+  string          version   = 2;  // ISO date, matches CURRENT_LEGAL_VERSION
+}
+
+message GetUserConsentStatusRequest {
+  string current_version = 1;  // CURRENT_LEGAL_VERSION from the app build
+}
+
+message GetUserConsentStatusResponse {
+  bool            all_current  = 1;  // false = at least one doc not yet consented
+  repeated string pending_docs = 2;  // doc_names missing consent for current_version
 }
 

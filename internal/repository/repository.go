@@ -132,3 +132,11 @@ type BillRepository interface {
 	CreateAction(ctx context.Context, action *domain.BillAction) error
 	ListActionsByBill(ctx context.Context, billID int32) ([]domain.BillAction, error)
 }
+
+type LegalConsentRepository interface {
+	// Record inserts a consent row for each doc_name in the slice.
+	// Uses ON CONFLICT DO NOTHING so duplicate calls are idempotent.
+	Record(ctx context.Context, userID int32, docNames []string, version string) error
+	// ListByUser returns all consent rows for the user, ordered by doc_name.
+	ListByUser(ctx context.Context, userID int32) ([]domain.LegalConsent, error)
+}

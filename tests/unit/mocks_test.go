@@ -557,3 +557,21 @@ func (m *MockPendingCredentialsRepo) StampUsedAt(ctx context.Context, userID int
 	args := m.Called(ctx, userID)
 	return args.Error(0)
 }
+
+// MockLegalConsentRepo mocks repository.LegalConsentRepository.
+type MockLegalConsentRepo struct {
+	mock.Mock
+}
+
+func (m *MockLegalConsentRepo) Record(ctx context.Context, userID int32, docNames []string, version string) error {
+	args := m.Called(ctx, userID, docNames, version)
+	return args.Error(0)
+}
+
+func (m *MockLegalConsentRepo) ListByUser(ctx context.Context, userID int32) ([]domain.LegalConsent, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.LegalConsent), args.Error(1)
+}

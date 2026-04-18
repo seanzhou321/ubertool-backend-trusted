@@ -25,6 +25,12 @@ type AuthService interface {
 	// and emails the temporary password to the user.
 	ResetPassword(ctx context.Context, email string) error
 	Logout(ctx context.Context, userID int32, refresh, androidDeviceID string) error
+	// RecordLegalConsent records that the user accepted the given document versions.
+	// Idempotent — duplicate calls for the same (user, doc, version) tuple are silently ignored.
+	RecordLegalConsent(ctx context.Context, userID int32, docNames []string, version string) error
+	// GetUserConsentStatus checks whether the user has consented to all known docs at currentVersion.
+	// Returns (allCurrent, pendingDocs, error).
+	GetUserConsentStatus(ctx context.Context, userID int32, currentVersion string) (bool, []string, error)
 }
 
 type UserService interface {

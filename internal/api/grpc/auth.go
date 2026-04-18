@@ -191,3 +191,42 @@ func (h *AuthHandler) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.Va
 	return &pb.VanilaResponse{Success: true}, nil
 }
 
+func (h *AuthHandler) RecordLegalConsent(ctx context.Context, req *pb.RecordLegalConsentRequest) (*pb.VanilaResponse, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "missing or invalid access token")
+	}
+
+	if len(req.DocNames) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "doc_names must not be empty")
+	}
+	if req.Version == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "version must not be empty")
+	}
+
+	if err := h.authSvc.RecordLegalConsent(ctx, int32(userID), req.DocNames, req.Version); err != nil {
+		return nil, err
+	}
+	return &pb.VanilaResponse{Success: true}, nil
+}
+
+func (h *AuthHandler) GetUserConsentStatus(ctx context.Context, req *pb.GetUserConsentStatusRequest) (*pb.GetUserConsentStatusResponse, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "missing or invalid access token")
+	}
+
+	if req.CurrentVersion == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "current_version must not be empty")
+	}
+
+	allCurrent, pending, err := h.authSvc.GetUserConsentStatus(ctx, int32(userID), req.CurrentVersion)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetUserConsentStatusResponse{
+		AllCurrent:  allCurrent,
+		PendingDocs: pending,
+	}, nil
+}
+

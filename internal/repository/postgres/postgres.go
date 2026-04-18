@@ -20,6 +20,7 @@ type Store struct {
 	repository.JoinRequestRepository
 	repository.BillRepository
 	repository.PendingCredentialsRepository
+	repository.LegalConsentRepository
 }
 
 func NewStore(db *sql.DB) *Store {
@@ -36,5 +37,6 @@ func NewStore(db *sql.DB) *Store {
 		JoinRequestRepository:        NewJoinRequestRepository(db),
 		BillRepository:               NewBillRepository(db),
 		PendingCredentialsRepository: NewPendingCredentialsRepository(db),
+		LegalConsentRepository:       NewLegalConsentRepository(db),
 	}
 }

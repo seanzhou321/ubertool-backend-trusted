@@ -28,19 +28,20 @@ var (
 )
 
 type authService struct {
-	userRepo         repository.UserRepository
-	inviteRepo       repository.InvitationRepository
-	reqRepo          repository.JoinRequestRepository
-	orgRepo          repository.OrganizationRepository
-	noteSvc          NotificationService
-	emailSvc         EmailService
-	tm               security.TokenManager
-	fcmRepo          repository.FcmTokenRepository
-	pendingCredsRepo repository.PendingCredentialsRepository
-	pending2FACodes  sync.Map // key: userID (int32), value: string (5-digit code)
+	userRepo          repository.UserRepository
+	inviteRepo        repository.InvitationRepository
+	reqRepo           repository.JoinRequestRepository
+	orgRepo           repository.OrganizationRepository
+	noteSvc           NotificationService
+	emailSvc          EmailService
+	tm                security.TokenManager
+	fcmRepo           repository.FcmTokenRepository
+	pendingCredsRepo  repository.PendingCredentialsRepository
+	legalConsentRepo  repository.LegalConsentRepository
+	pending2FACodes   sync.Map // key: userID (int32), value: string (5-digit code)
 }
 
-func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string, fcmRepo repository.FcmTokenRepository, pendingCredsRepo repository.PendingCredentialsRepository) AuthService {
+func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string, fcmRepo repository.FcmTokenRepository, pendingCredsRepo repository.PendingCredentialsRepository, legalConsentRepo repository.LegalConsentRepository) AuthService {
 	return &authService{
 		userRepo:         userRepo,
 		inviteRepo:       inviteRepo,
@@ -51,6 +52,7 @@ func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.In
 		tm:               security.NewTokenManager(secret),
 		fcmRepo:          fcmRepo,
 		pendingCredsRepo: pendingCredsRepo,
+		legalConsentRepo: legalConsentRepo,
 	}
 }
 
@@ -517,4 +519,42 @@ func (s *authService) Logout(ctx context.Context, userID int32, refresh, android
 		}
 	}
 	return nil
+}
+
+func (s *authService) RecordLegalConsent(ctx context.Context, userID int32, docNames []string, version string) error {
+	logger.EnterMethod("authService.RecordLegalConsent", "userID", userID, "version", version, "docCount", len(docNames))
+	if err := s.legalConsentRepo.Record(ctx, userID, docNames, version); err != nil {
+		logger.ExitMethodWithError("authService.RecordLegalConsent", err, "userID", userID)
+		return err
+	}
+	logger.ExitMethod("authService.RecordLegalConsent", "userID", userID)
+	return nil
+}
+
+func (s *authService) GetUserConsentStatus(ctx context.Context, userID int32, currentVersion string) (bool, []string, error) {
+	logger.EnterMethod("authService.GetUserConsentStatus", "userID", userID, "currentVersion", currentVersion)
+
+	existing, err := s.legalConsentRepo.ListByUser(ctx, userID)
+	if err != nil {
+		logger.ExitMethodWithError("authService.GetUserConsentStatus", err, "userID", userID)
+		return false, nil, err
+	}
+
+	// Build a set of (doc_name, version) pairs the user has already consented to.
+	consented := make(map[string]struct{}, len(existing))
+	for _, c := range existing {
+		if c.Version == currentVersion {
+			consented[c.DocName] = struct{}{}
+		}
+	}
+
+	var pending []string
+	for _, doc := range domain.KnownLegalDocs {
+		if _, ok := consented[doc]; !ok {
+			pending = append(pending, doc)
+		}
+	}
+
+	logger.ExitMethod("authService.GetUserConsentStatus", "userID", userID, "pendingCount", len(pending))
+	return len(pending) == 0, pending, nil
 }
