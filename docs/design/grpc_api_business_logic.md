@@ -170,6 +170,37 @@ Business Logic:
 6. Send an email to the user containing the plain-text temporary password and instructions to log in and change it immediately.
 7. Return the generic success message.
 
+### Record Legal Consent
+Purpose: Persist the user's acceptance of a set of legal documents at a specific version. Called by the client after the user taps "I Accept" on the consent screen, and also at signup.
+
+Input: `doc_names` (repeated string), `version` (ISO date string, e.g. `"2026-04-15"`) — access token required
+Output: success flag
+Business Logic:
+1. Extract `user_id` from the JWT access token.
+2. Validate that `doc_names` is non-empty and `version` is non-empty; return `INVALID_ARGUMENT` otherwise.
+3. For each entry in `doc_names`, insert a row into `user_legal_consents`:
+   ```sql
+   INSERT INTO user_legal_consents (user_id, doc_name, version)
+   VALUES ($user_id, $doc_name, $version)
+   ON CONFLICT DO NOTHING
+   ```
+   The `ON CONFLICT DO NOTHING` makes repeated calls idempotent — safe to call multiple times.
+4. Return success.
+
+### Get User Consent Status
+Purpose: Check whether the user has consented to all known legal documents at the current app version. Called by the client immediately after login (post-Verify2FA) to decide whether to show the re-consent screen.
+
+Input: `current_version` (ISO date string matching `CURRENT_LEGAL_VERSION`) — access token required
+Output: `all_current` (bool), `pending_docs` (repeated string)
+Business Logic:
+1. Extract `user_id` from the JWT access token.
+2. Validate that `current_version` is non-empty; return `INVALID_ARGUMENT` otherwise.
+3. Query all rows from `user_legal_consents` for this user.
+4. For each document name in the server-side canonical list (`domain.KnownLegalDocs`), check whether a row exists with `version = current_version`.
+5. Collect all document names that do **not** have a matching row into `pending_docs`.
+6. Set `all_current = (len(pending_docs) == 0)`.
+7. Return the response. The client shows the re-consent screen when `all_current = false` and today ≥ the effective date.
+
 ## Administration
 
 ### Approve Request To Join
