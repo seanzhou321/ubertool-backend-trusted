@@ -74,6 +74,8 @@ func main() {
 	if fcmErr != nil {
 		logger.Warn("FCM client unavailable — push notifications disabled", "error", fcmErr)
 		fcmClient = nil
+	} else {
+		logger.Info("Firebase Messaging Service connection established")
 	}
 	noteSvc := service.NewNotificationService(store.NotificationRepository, store.FcmTokenRepository)
 	pushSvc := service.NewPushNotificationService(fcmClient, store.FcmTokenRepository)
