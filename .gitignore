@@ -64,7 +64,7 @@ logs/
 
 # generated artifacts
 api/gen/
-config/firebase-admin-key.json
+config/firebase-admin-key.json*
 bin/
 client/
 deploy/ec2-mvp/build/
