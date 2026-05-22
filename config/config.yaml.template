@@ -1,59 +1,306 @@
-# Ubertool Trusted Backend Configuration - Production
+# =============================================================================
+# Ubertool Trusted Backend — Configuration Template
+# =============================================================================
+#
+# Copy this file to one of the named scenario configs and fill in every
+# CHANGE_ME value.  Never commit a file that contains real secrets.
+#
+# Scenario configs (see config/README.md for the full matrix):
+#   config.precommit.yaml       A1 — desktop pre-commit coding tests
+#   config.desktop.uitest.yaml  A2 — desktop UI automated tests (emulator/device)
+#   config.desktop.manual.yaml  A3 — desktop UI manual tests
+#   config.ec2.apitest.yaml      B1 — EC2 API automated tests (gitignored; contains live hostname)
+#   config.ec2.uitest.yaml      B2+B3 — EC2 UI automated tests
+#   config.prod.yaml            B4 — EC2 production-equivalent (template with CHANGE_ME)
+#
+# Every field can also be overridden at runtime via an environment variable
+# (listed next to each field below).  Environment variables take precedence
+# over the values in this file.
+# =============================================================================
 
+
+# -----------------------------------------------------------------------------
+# server — gRPC listener
+# -----------------------------------------------------------------------------
 server:
+  # IP address the gRPC server binds to.
+  # Use "0.0.0.0" to accept connections on all interfaces (normal for servers).
+  # Env: SERVER_HOST
   host: "0.0.0.0"
-  port: 50051
 
+  # TCP port for the gRPC endpoint.
+  # Desktop scenarios typically use 50052.
+  # EC2 uses 50052 with TLS terminated by the Go server itself (Let's Encrypt).
+  # Valid range: 1–65535.
+  # Env: SERVER_PORT
+  port: 50052
+
+  # Enable gRPC server reflection (allows grpcurl to enumerate services and methods).
+  # Set to true for all non-production scenarios to aid development and testing.
+  # Set to false in production (config.prod.yaml) to prevent API schema enumeration.
+  # Env: GRPC_REFLECTION  ("true" or "false")
+  grpc_reflection: true  # set to false in config.prod.yaml
+
+
+# -----------------------------------------------------------------------------
+# tls — gRPC transport-layer security
+# -----------------------------------------------------------------------------
 tls:
-  enabled: false                                   # set to true on EC2 after running 03_setup_tls.ps1
-  cert_file: "/etc/ubertool/certs/fullchain.pem"   # populated by 03_setup_tls.ps1
-  key_file:  "/etc/ubertool/certs/privkey.pem"     # populated by 03_setup_tls.ps1
+  # Set to true when the server must present a TLS certificate to clients.
+  # Required for all EC2 scenarios (B1–B4).
+  # Desktop scenarios (A1–A3) leave this false; the LAN connection is trusted.
+  # When false, cert_file and key_file are ignored.
+  enabled: false
 
+  # Path to the PEM-encoded certificate chain (fullchain.pem from Let's Encrypt).
+  # Populated automatically on EC2 by deploy/ec2-mvp/03_setup_tls.ps1.
+  # Env: TLS_CERT
+  cert_file: "/etc/myapp/certs/fullchain.pem"
+
+  # Path to the PEM-encoded private key (privkey.pem from Let's Encrypt).
+  # Env: TLS_KEY
+  key_file: "/etc/myapp/certs/privkey.pem"
+
+
+# -----------------------------------------------------------------------------
+# database — PostgreSQL connection
+# -----------------------------------------------------------------------------
 database:
-  host: "production-db-host"
+  # Hostname or IP of the PostgreSQL server.
+  # Desktop: "localhost"
+  # EC2:     RDS endpoint, e.g. ubertool-db.cx66cg08ai98.us-west-2.rds.amazonaws.com
+  # Env: DB_HOST
+  host: "localhost"  # desktop example; EC2 example: ubertool-db.abc123xyz.us-west-2.rds.amazonaws.com
+
+  # PostgreSQL port.
+  # Desktop local Podman container: 5454
+  # RDS / standard PostgreSQL: 5432
+  # Env: DB_PORT
   port: 5432
-  user: "ubertool_prod"
-  password: "CHANGE_ME_WITH_PRODUCTION_DB_PASSWORD"
-  database: "ubertool_prod_db"
+
+  # Database role used by the application.
+  # Env: DB_USER
+  user: "ubertool_user"
+
+  # Password for the database role.
+  # Prefer setting this via the DB_PASSWORD environment variable so the secret
+  # is never written to disk in plaintext.
+  # Env: DB_PASSWORD
+  password: "Tr00l!SecretExample2026"  # replace with real password; prefer DB_PASSWORD env var
+
+  # Name of the PostgreSQL database.
+  # Env: DB_NAME
+  database: "ubertool_db"
+
+  # PostgreSQL SSL mode.
+  # "disable"     — plaintext; safe only on localhost or a trusted private network.
+  # "require"     — encrypted; server certificate not verified (use for RDS in VPC).
+  # "verify-ca"   — encrypted; verifies the CA but not the hostname.
+  # "verify-full" — encrypted; verifies CA and hostname (strictest).
+  # Desktop: "disable"   EC2/RDS: "require"
   ssl_mode: "require"
 
+
+# -----------------------------------------------------------------------------
+# smtp — outbound email (2FA codes, invitations, notifications)
+# -----------------------------------------------------------------------------
 smtp:
+  # SMTP server hostname.
+  # Set to "mock" to suppress all email delivery and log messages instead.
+  # Use "mock" for all automated-test scenarios (A1, A2, B1, B2, B3).
+  # Use "smtp.gmail.com" for manual and production scenarios (A3, B4).
+  # Env: SMTP_HOST
   host: "smtp.gmail.com"
+
+  # SMTP port.
+  # 587  — STARTTLS (recommended for Gmail)
+  # 465  — implicit TLS (SMTPS)
+  # Env: SMTP_PORT
   port: 587
-  user: "production-email@yourdomain.com"
-  password: "CHANGE_ME_WITH_PRODUCTION_SMTP_PASSWORD"
-  from: "noreply@yourdomain.com"
 
-# For testing with mock SMTP server, set smtp.host to mock
-# host: "mock"
+  # SMTP login username (usually the sender email address).
+  # Env: SMTP_USER
+  user: "ubertool.example@gmail.com"
 
+  # SMTP password.
+  # For Gmail, generate an App Password (Google Account → Security → App Passwords).
+  # Never use your Google account password here.
+  # Prefer the SMTP_PASSWORD environment variable.
+  # Env: SMTP_PASSWORD
+  password: "wxyz abcd efgh ijkl"  # 16-char Gmail App Password format; never use your account password
+
+  # The "From:" address that appears in delivered emails.
+  # Env: SMTP_FROM
+  from: "no-reply@example.com"
+
+
+# -----------------------------------------------------------------------------
+# jwt — JSON Web Token settings
+# -----------------------------------------------------------------------------
 jwt:
-  secret: "CHANGE_ME_TO_STRONG_RANDOM_SECRET_MIN_32_CHARS"
+  # Signing secret for all JWT tokens (access, refresh, 2FA-pending).
+  # Must be at least 32 characters.  Use a cryptographically random string.
+  # Generate one with: openssl rand -base64 48
+  # Never reuse the same secret across environments.
+  # Prefer the JWT_SECRET environment variable.
+  # Env: JWT_SECRET
+  secret: "sK8nVpQ2xHwRzLmAjBcDeEfGiJkMoNpTs3UvWxYy5Za7Bc"  # example only — generate with: openssl rand -base64 48
+
+  # Lifetime of the access token in minutes.
+  # Short-lived tokens limit the blast radius of a leaked token.
+  # Default: 15 minutes.
   access_token_expiry_minutes: 15
+
+  # Lifetime of the refresh token in minutes.
+  # Default: 10080 (7 days).  Clients use this to obtain new access tokens
+  # without requiring the user to log in again.
   refresh_token_expiry_minutes: 10080  # 7 days
+
+  # Lifetime of the 2FA-pending token in minutes.
+  # This short-lived token is issued after a successful password check and
+  # must be exchanged for a full access/refresh pair by supplying the 2FA code.
+  # Default: 5 minutes.
   temp_token_expiry_minutes: 5
 
+
+# -----------------------------------------------------------------------------
+# two_fa — two-factor authentication
+# -----------------------------------------------------------------------------
+two_fa:
+  # Controls whether live 2FA is enforced.
+  #
+  # true  (production / manual-test scenarios A3, B4):
+  #   A cryptographically random 5-digit code is generated on every login and
+  #   delivered to the user's email address via SMTP.  fixed_passcode is ignored.
+  #
+  # false (automated-test scenarios A1, A2, B1, B2, B3):
+  #   fixed_passcode is stored as the pending code; no email is sent.
+  #   A WARN log entry is emitted at each login to make bypass mode visible.
+  #   Automated UI tests supply this known value to complete the login flow.
+  #
+  # Env: TWO_FA_ENABLED  ("true" or "false")
+  enabled: true
+
+  # Fixed 5-digit numeric passcode used when enabled=false.
+  # Must be exactly 5 numeric digits (e.g. "47291").
+  # Required (and validated at startup) only when enabled=false.
+  # Choose a value that is consistent across all automated-test configs so
+  # the UI test suite only needs one hardcoded string.
+  # Env: TWO_FA_FIXED_PASSCODE
+  fixed_passcode: ""  # unused when enabled=true
+
+
+# -----------------------------------------------------------------------------
+# storage — file / image storage backend
+# -----------------------------------------------------------------------------
 storage:
-  type: "mock"  # "mock" for local storage, "s3" for AWS S3 (not yet implemented)
+  # Storage backend to use.
+  # "mock" — files are written to the local filesystem (upload_dir).
+  #          Suitable for desktop development and automated tests.
+  # "s3"   — files are stored in AWS S3.  Requires s3_bucket and s3_region.
+  #          Used in EC2 scenarios (B1–B4).
+  type: "mock"
+
+  # (mock only) Directory where uploaded files are written.
+  # Created automatically if it does not exist.
+  # Env: UPLOAD_DIR
   upload_dir: "./uploads"
-  base_url: "http://localhost:50052"  # HTTP server for mock storage uploads/downloads
+
+  # (mock only) Base URL at which the HTTP file server exposes stored files.
+  # The embedded HTTP server listens on SERVER_PORT+1 by default (e.g. 50053).
+  base_url: "http://localhost:50053"
+
+  # (s3 only) Name of the S3 bucket.
+  s3_bucket: "ubertool-uploads-example"
+
+  # (s3 only) AWS region where the bucket lives.
+  s3_region: "us-west-2"
+
+  # Maximum permitted upload size in megabytes.
   max_file_size_mb: 10
+
+  # MIME types that the server will accept for upload.
+  # Requests with any other Content-Type are rejected with HTTP 415.
   allowed_types:
     - "image/jpeg"
     - "image/png"
     - "image/gif"
     - "image/webp"
 
-log:
-  level: "debug"  # debug, info, warn, error
-  format: "json"  # text or json
 
+# -----------------------------------------------------------------------------
+# log — structured logging
+# -----------------------------------------------------------------------------
+log:
+  # Minimum log level emitted.
+  # "debug" — verbose; use during development and automated tests.
+  # "info"  — normal operational messages; recommended for EC2.
+  # "warn"  — warnings and above only.
+  # "error" — errors only.
+  # Env: LOG_LEVEL
+  level: "info"
+
+  # Log output format.
+  # "json" — structured JSON; best for log aggregation (CloudWatch, Datadog).
+  # "text" — human-readable; convenient for local development.
+  # Env: LOG_FORMAT
+  format: "json"
+
+
+# -----------------------------------------------------------------------------
+# firebase_key_path — Firebase Cloud Messaging (FCM / push notifications)
+# -----------------------------------------------------------------------------
+# Absolute or relative path to the Firebase Admin SDK service-account JSON key.
+# The key file is generated in the Firebase Console:
+#   Project Settings → Service Accounts → Generate new private key.
+#
+# Desktop scenarios:
+#   A1 (precommit): leave empty ("") — FCM disabled, push notifications skipped.
+#   A2, A3:         "config/firebase-admin-key.json" — FCM enabled.
+#
+# EC2 scenarios (B1–B4):
+#   "/etc/myapp/firebase-admin-key.json" — deployed by 04_deploy.ps1.
+#
+# When the path is empty or the file is absent the server starts normally and
+# logs a warning; push notifications are silently disabled for that session.
+firebase_key_path: ""  # empty = FCM disabled; desktop example: "config/firebase-admin-key.json"; EC2: "/etc/myapp/firebase-admin-key.json"
+
+
+# -----------------------------------------------------------------------------
+# scheduler — background cron jobs
+# -----------------------------------------------------------------------------
+# All values use 6-field cron syntax: second minute hour day month weekday
+# (same as the robfig/cron v3 library with seconds enabled).
+# Omitted fields default to the values shown below.
 scheduler:
+  # Mark rentals as OVERDUE when their end date has passed.
+  # Default: daily at 02:00 UTC.
   mark_overdue_rentals: "0 0 2 * * *"
+
+  # Send reminder emails to borrowers with overdue rentals.
+  # Default: daily at 03:00 UTC (after mark_overdue_rentals runs).
   send_overdue_reminders: "0 0 3 * * *"
+
+  # Send upcoming-payment reminder emails for bills due soon.
+  # Default: daily at 04:00 UTC.
   send_bill_reminders: "0 0 4 * * *"
+
+  # Transition bills to OVERDUE status when their due date has passed.
+  # Default: 10th of every month at 05:00 UTC.
   check_overdue_bills: "0 0 5 10 * *"
+
+  # Auto-resolve bills that have been in DISPUTED status past their deadline.
+  # Default: last day of every month at 23:00 UTC.
   resolve_disputed_bills: "0 0 23 L * *"
+
+  # Take end-of-month ledger balance snapshots for reporting.
+  # Default: last day of every month at 23:30 UTC (after resolve_disputed_bills).
   take_balance_snapshots: "0 30 23 L * *"
+
+  # Run the monthly bill-splitting algorithm for all active organizations.
+  # Default: 1st of every month at 00:00 UTC.
   perform_bill_splitting: "0 0 0 1 * *"
+
+  # Email bill statements to organization members.
+  # Default: daily at 09:00 UTC.
   send_bill_notices: "0 0 9 * * *"

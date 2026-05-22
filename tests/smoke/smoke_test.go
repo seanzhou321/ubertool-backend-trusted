@@ -10,7 +10,7 @@
 // No SSH tunnel or direct database credentials are required.
 //
 // Prerequisites:
-//   - config/config.smoke.ec2.yaml with server.host, server.port, tls.enabled
+//   - config/config.ec2.apitest.yaml with server.host, server.port, tls.enabled
 //     (see deploy/ec2-mvp/docs/handoff.md Phase 2b)
 //
 // Run via Makefile:
@@ -20,7 +20,7 @@
 // Or manually:
 //
 //	go test -v -count=1 ./tests/smoke/... \
-//	  -config=config/config.smoke.ec2.yaml -timeout 30s
+//	  -config=config/config.ec2.apitest.yaml -timeout 30s
 package smoke
 
 import (
@@ -178,4 +178,3 @@ func TestDatabaseConnectivity(t *testing.T) {
 		}
 	})
 }
-

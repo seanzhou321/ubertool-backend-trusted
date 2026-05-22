@@ -1,4 +1,4 @@
-.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-smoke-ec2 docker-build docker-push deploy-services deploy-cronjob deploy-all setup-data-ec2-mvp
+.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-smoke-ec2 docker-build docker-push deploy-services deploy-cronjob deploy-all setup-data-ec2-mvp my-ip
 
 PROTO_SRC_DIR = api/proto
 PROTO_DEST_DIR = .
@@ -28,6 +28,18 @@ run-dev:
 	@echo "Starting server in DEBUG mode for testing..."
 	set LOG_LEVEL=debug && go run ./cmd/server -config=config/config.dev.yaml
 
+run-precommit:
+	@echo "Starting server — Scenario A1: pre-commit coding tests (no TLS, no FCM, 2FA bypassed)..."
+	go run ./cmd/server -config=config/config.precommit.yaml
+
+run-desktop-uitest:
+	@echo "Starting server — Scenario A2: desktop UI automated tests (FCM on, 2FA bypassed)..."
+	go run ./cmd/server -config=config/config.desktop.uitest.yaml
+
+run-desktop-manual:
+	@echo "Starting server — Scenario A3: desktop UI manual tests (FCM on, 2FA live email)..."
+	go run ./cmd/server -config=config/config.desktop.manual.yaml
+
 run-cronjob-dev:
 	@echo "Starting cronjob in DEBUG mode for testing..."
 	set LOG_LEVEL=debug && go run ./cmd/cronjob -config=config/config.dev.yaml
@@ -56,6 +68,12 @@ clean:
 
 test-unit:
 	go test -v ./tests/unit/...
+
+test-precommit:
+	@echo "Running full pre-commit test suite (unit + integration + e2e) — Scenario A1..."
+	go test -v ./tests/unit/...
+	go test -v ./tests/integration/... -config=config/config.precommit.yaml
+	go test -v ./tests/e2e/... -config=config/config.precommit.yaml
 
 test-integration:
 	go test -v ./tests/integration/... -config=config/config.test.yaml
@@ -118,7 +136,10 @@ setup-data-ec2-mvp:
 	@echo   .\deploy\ec2-mvp\05_setup_data.ps1
 
 # Smoke tests against the live EC2 deployment.
-# Ensure config/config.smoke.ec2.yaml exists (see deploy/ec2-mvp/docs/handoff.md Phase 2b)
+# Ensure config/config.ec2.apitest.yaml exists (see deploy/ec2-mvp/docs/handoff.md Phase 2b)
 test-smoke-ec2:
-	go test -v -count=1 -timeout 30s ./tests/smoke/ -args -config=config/config.smoke.ec2.yaml
+	go test -v -count=1 -timeout 30s ./tests/smoke/ -args -config=config/config.ec2.apitest.yaml
+
+my-ip:
+	@powershell -NoProfile -Command "(Invoke-RestMethod https://checkip.amazonaws.com).Trim()"
 

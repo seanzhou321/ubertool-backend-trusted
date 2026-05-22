@@ -146,11 +146,41 @@ func Test2FAFlow(t *testing.T) {
 	})
 
 	t.Run("Step4_Verify2FA_With_Valid_Code_Should_Succeed", func(t *testing.T) {
-		// TODO: The 2FA code is now randomly generated and delivered via email.
-		// Automated verification requires either a mock email service that
-		// captures the code, or manual retrieval from the email sent to the user.
-		// Re-enable and supply the actual code once email interception is in place.
-		t.Skip("Skipping: valid code must be obtained from the email sent during login")
+		if twoFAToken == "" {
+			t.Skip("No 2FA token available from previous test")
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// Add 2FA token to context metadata
+		md := metadata.New(map[string]string{
+			"authorization": "Bearer " + twoFAToken,
+		})
+		ctx = metadata.NewOutgoingContext(ctx, md)
+
+		// The server must be running with two_fa.enabled=false (e.g. config.precommit.yaml).
+		// The fixed_passcode in that config is "47291" — see config/config.precommit.yaml.
+		const fixedPasscode = "47291"
+		t.Logf("Testing 2FA verification with fixed passcode: %s", fixedPasscode)
+
+		req := &pb.Verify2FARequest{
+			TwoFaCode: fixedPasscode,
+		}
+
+		resp, err := authClient.Verify2FA(ctx, req)
+		require.NoError(t, err, "Verify2FA should succeed with the fixed passcode")
+		require.NotNil(t, resp, "Response should not be nil")
+
+		assert.True(t, resp.Success, "Success should be true")
+		assert.NotEmpty(t, resp.AccessToken, "Access token should be returned")
+		assert.NotEmpty(t, resp.RefreshToken, "Refresh token should be returned")
+
+		t.Logf("✅ 2FA Verification SUCCESSFUL!")
+		t.Logf("   Access Token (prefix): %s...", resp.AccessToken[:min(30, len(resp.AccessToken))])
+		t.Logf("   Refresh Token (prefix): %s...", resp.RefreshToken[:min(30, len(resp.RefreshToken))])
+
+		accessToken = resp.AccessToken
 	})
 
 	t.Run("Step5_Use_Access_Token_To_Get_Notifications", func(t *testing.T) {

@@ -134,6 +134,7 @@ func main() {
 		store.FcmTokenRepository,
 		store.PendingCredentialsRepository,
 		store.LegalConsentRepository,
+		cfg.TwoFA,
 	)
 	userSvc := service.NewUserService(store.UserRepository, store.OrganizationRepository)
 	orgSvc := service.NewOrganizationService(store.OrganizationRepository, store.UserRepository, store.InvitationRepository, noteSvc, emailSvc, pushSvc)
@@ -183,7 +184,10 @@ func main() {
 	}
 
 	serverOpts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(authInterceptor.Unary()),
+		grpc.ChainUnaryInterceptor(
+			interceptor.NewRateLimitInterceptor(security.NewIPRateLimiter()).Unary(),
+			authInterceptor.Unary(),
+		),
 	}
 	if cfg.TLS.Enabled {
 		creds, err := credentials.NewServerTLSFromFile(cfg.TLS.CertFile, cfg.TLS.KeyFile)
@@ -206,8 +210,13 @@ func main() {
 	pb.RegisterImageStorageServiceServer(s, imageHandler)
 	pb.RegisterBillSplitServiceServer(s, billSplitHandler)
 
-	// Register reflection service for grpcurl
-	reflection.Register(s)
+	// Register reflection service (disabled in production via server.grpc_reflection: false)
+	if cfg.Server.GRPCReflection {
+		reflection.Register(s)
+		logger.Info("gRPC reflection enabled")
+	} else {
+		logger.Info("gRPC reflection disabled")
+	}
 
 	// Set up HTTP server for mock storage endpoints (only when using mock storage)
 	if cfg.Storage.Type != "s3" {

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,13 +18,25 @@ type Config struct {
 	Log             LogConfig       `yaml:"log"`
 	Scheduler       SchedulerConfig `yaml:"scheduler"`
 	TLS             TLSConfig       `yaml:"tls"`
+	TwoFA           TwoFAConfig     `yaml:"two_fa"`
 	FirebaseKeyPath string          `yaml:"firebase_key_path"`
+}
+
+// TwoFAConfig controls whether 2FA is enforced and provides a fixed passcode for
+// automated testing when 2FA is disabled.
+type TwoFAConfig struct {
+	// Enabled=true: generate a random 5-digit code and deliver it via email (production behaviour).
+	// Enabled=false: use FixedPasscode from config — no email is sent. Use for automated UI tests.
+	Enabled bool `yaml:"enabled"`
+	// FixedPasscode must be exactly 5 numeric digits. Required when Enabled=false.
+	FixedPasscode string `yaml:"fixed_passcode"`
 }
 
 // ServerConfig contains gRPC server settings
 type ServerConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Host           string `yaml:"host"`
+	Port           int    `yaml:"port"`
+	GRPCReflection bool   `yaml:"grpc_reflection"`
 }
 
 // DatabaseConfig contains PostgreSQL connection settings
@@ -55,13 +68,13 @@ type JWTConfig struct {
 
 // StorageConfig contains file storage settings
 type StorageConfig struct {
-	Type         string   `yaml:"type"`             // "mock" or "s3"
-	UploadDir    string   `yaml:"upload_dir"`       // For mock storage
-	BaseURL      string   `yaml:"base_url"`         // Server base URL for mock URLs
+	Type         string   `yaml:"type"`       // "mock" or "s3"
+	UploadDir    string   `yaml:"upload_dir"` // For mock storage
+	BaseURL      string   `yaml:"base_url"`   // Server base URL for mock URLs
 	MaxFileSize  int64    `yaml:"max_file_size_mb"`
 	AllowedTypes []string `yaml:"allowed_types"`
-	S3Bucket     string   `yaml:"s3_bucket"`        // S3 bucket name
-	S3Region     string   `yaml:"s3_region"`        // AWS region
+	S3Bucket     string   `yaml:"s3_bucket"` // S3 bucket name
+	S3Region     string   `yaml:"s3_region"` // AWS region
 }
 
 // LogConfig contains logging settings
@@ -153,6 +166,9 @@ func (c *Config) overrideWithEnv() {
 	if val := os.Getenv("SERVER_PORT"); val != "" {
 		fmt.Sscanf(val, "%d", &c.Server.Port)
 	}
+	if val := os.Getenv("GRPC_REFLECTION"); val != "" {
+		c.Server.GRPCReflection = val == "true" || val == "1"
+	}
 
 	// Storage
 	if val := os.Getenv("UPLOAD_DIR"); val != "" {
@@ -173,6 +189,14 @@ func (c *Config) overrideWithEnv() {
 	}
 	if val := os.Getenv("TLS_KEY"); val != "" {
 		c.TLS.KeyFile = val
+	}
+
+	// 2FA
+	if val := os.Getenv("TWO_FA_ENABLED"); val != "" {
+		c.TwoFA.Enabled = val == "true" || val == "1"
+	}
+	if val := os.Getenv("TWO_FA_FIXED_PASSCODE"); val != "" {
+		c.TwoFA.FixedPasscode = val
 	}
 
 	// Set defaults for log if not configured
@@ -216,6 +240,13 @@ func (c *Config) Validate() error {
 	}
 	if len(c.JWT.Secret) < 32 {
 		return fmt.Errorf("JWT secret must be at least 32 characters")
+	}
+
+	// 2FA validation
+	if !c.TwoFA.Enabled {
+		if matched, _ := regexp.MatchString(`^\d{5}$`, c.TwoFA.FixedPasscode); !matched {
+			return fmt.Errorf("two_fa.fixed_passcode must be exactly 5 numeric digits when two_fa.enabled is false")
+		}
 	}
 
 	// Storage validation

@@ -7,14 +7,14 @@ The gRPC backend is fully deployed and smoke-tested. The Android app can connect
 to the live production endpoint immediately.
 
 ## gRPC Endpoint
-- Host : api.ixorashare.com
+- Host : api.marigoldshare.marigoldintelligence.us
 - Port : 50052
 - TLS  : enabled (Let's Encrypt — trusted natively on Android, no cert bundling needed)
 
 ## Android Channel Configuration
 ```kotlin
 val channel = ManagedChannelBuilder
-    .forAddress("api.ixorashare.com", 50052)
+    .forAddress("api.marigoldshare.marigoldintelligence.us", 50052)
     .useTransportSecurity()
     .build()
 ```
@@ -26,7 +26,7 @@ All service stubs are under: `com.ubertool.trusted.api.v1`
 
 ## TLS Certificate Details
 - Issued by  : Let's Encrypt
-- Common name: api.ixorashare.com
+- Common name: api.marigoldshare.marigoldintelligence.us
 - Expires    : 2026-07-13 (auto-renews via certbot.timer on EC2)
 - No pinning required for MVP; standard system trust store validation is sufficient
 
@@ -45,7 +45,7 @@ custom trust anchors; the endpoint is TLS-only.
 
 ## Google Play Release Checklist (for Android AI agent)
 The following are the backend-relevant prerequisites — all complete:
-- [x] gRPC endpoint live: api.ixorashare.com:50052
+- [x] gRPC endpoint live: api.marigoldshare.marigoldintelligence.us:50052
 - [x] TLS certificate valid and auto-renewing
 - [x] Smoke tests passing (make test-smoke-ec2 in backend repo)
 - [x] Google Play Developer account registered ($25 one-time fee paid)

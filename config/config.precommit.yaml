@@ -1,0 +1,75 @@
+# Scenario A1 — Desktop: Automated Pre-commit Coding Tests
+#
+# Purpose : Run all automated server-only tests (unit, integration, e2e) on a
+#           developer's desktop before committing.  No TLS, no FCM, no real email.
+#           2FA is bypassed with a fixed passcode so integration tests can complete
+#           the full login flow without intercepting an email.
+#
+# Server  : desktop (go run ./cmd/server -config=config/config.precommit.yaml)
+# Client  : Go test suite (make test-precommit)
+# TLS     : disabled
+# FCM     : disabled (firebase_key_path is empty)
+# 2FA     : bypassed — fixed_passcode used, no email sent
+# SMTP    : mock
+
+server:
+  host: "0.0.0.0"
+  port: 50052
+  grpc_reflection: true
+
+tls:
+  enabled: false
+  cert_file: ""
+  key_file: ""
+
+database:
+  host: "localhost"
+  port: 5454
+  user: "ubertool_trusted"
+  password: "ubertool123"
+  database: "ubertool_db"
+  ssl_mode: "disable"
+
+smtp:
+  host: "mock"
+  port: 587
+  user: ""
+  password: ""
+  from: "noreply@ubertool.local"
+
+jwt:
+  secret: ":B*i+:ZgC?Nh7=E-59Z)aY_B9FHM3^^9f2.vX,9%yZArNo4)iE"
+  access_token_expiry_minutes: 15
+  refresh_token_expiry_minutes: 10080  # 7 days
+  temp_token_expiry_minutes: 5
+
+two_fa:
+  enabled: false
+  fixed_passcode: "47291"  # Used by automated tests — must match test expectations
+
+storage:
+  type: "mock"
+  upload_dir: "./tests/uploads"
+  base_url: "http://localhost:50053"
+  max_file_size_mb: 10
+  allowed_types:
+    - "image/jpeg"
+    - "image/png"
+    - "image/gif"
+    - "image/webp"
+
+log:
+  level: "debug"
+  format: "json"
+
+firebase_key_path: ""  # FCM disabled
+
+scheduler:
+  mark_overdue_rentals: "0 0 2 * * *"
+  send_overdue_reminders: "0 0 3 * * *"
+  send_bill_reminders: "0 0 4 * * *"
+  check_overdue_bills: "0 0 5 10 * *"
+  resolve_disputed_bills: "0 0 23 L * *"
+  take_balance_snapshots: "0 30 23 L * *"
+  perform_bill_splitting: "0 0 0 1 * *"
+  send_bill_notices: "0 0 9 * * *"

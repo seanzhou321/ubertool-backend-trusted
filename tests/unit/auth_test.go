@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"ubertool-backend-trusted/internal/config"
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
 
@@ -22,7 +23,8 @@ func TestAuthService_ValidateInvite(t *testing.T) {
 	fcmRepo := new(MockFcmTokenRepo)
 	pendingCredsRepo := new(MockPendingCredentialsRepo)
 	legalConsentRepo := new(MockLegalConsentRepo)
-	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo)
+	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+		config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
 
 	ctx := context.Background()
 	token := "valid-token"
@@ -97,7 +99,8 @@ func TestAuthService_RequestToJoin(t *testing.T) {
 	pendingCredsRepo := new(MockPendingCredentialsRepo)
 	legalConsentRepo := new(MockLegalConsentRepo)
 
-	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo)
+	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+		config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
 
 	ctx := context.Background()
 

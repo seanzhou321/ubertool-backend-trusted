@@ -16,7 +16,7 @@ import (
 var configPath string
 
 func init() {
-	flag.StringVar(&configPath, "config", "../../config/config.smoke.ec2.yaml", "smoke test config file")
+	flag.StringVar(&configPath, "config", "../../config/config.ec2.apitest.yaml", "smoke test config file")
 }
 
 // smokeConfig holds only the fields the smoke tests need.
@@ -54,7 +54,7 @@ func loadSmokeConfig(t *testing.T) *smokeConfig {
 	if err != nil {
 		t.Fatalf(
 			"failed to read smoke config %s: %v\n"+
-				"  Ensure config/config.smoke.ec2.yaml exists — see deploy/ec2-mvp/docs/handoff.md Phase 2b",
+				"  Ensure config/config.ec2.apitest.yaml exists — see deploy/ec2-mvp/docs/handoff.md Phase 2b",
 			finalPath, err,
 		)
 	}

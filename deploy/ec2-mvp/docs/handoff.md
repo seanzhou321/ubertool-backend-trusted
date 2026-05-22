@@ -18,7 +18,7 @@ Ubertool is a mobile app backend consisting of:
 ## AWS Infrastructure (deployed, us-west-2)
 - EC2 t3.micro  : i-023402e9ce97c0c86
 - Elastic IP    : 35.160.176.235 (allocated and associated)
-- Domain        : api.ixorashare.com → 35.160.176.235 (A record)
+- Domain        : api.marigoldshare.marigoldintelligence.us → 35.160.176.235 (A record)
 - RDS db.t3.micro PostgreSQL 17.6 : ubertool-backend-trusted-db
 - EC2 SG and RDS SG IDs : see infra_state.env
 - SSH alias     : ubertool-ec2 -> ubuntu@35.160.176.235
@@ -27,7 +27,7 @@ Ubertool is a mobile app backend consisting of:
 ## Deployment Scripts (PowerShell, deploy/ec2-mvp/)
 - 01_create_infra.ps1  DONE - infrastructure created
 - 02_init_db.ps1       DONE - schema applied to RDS
-- 03_setup_tls.ps1     DONE - Let's Encrypt cert issued for api.ixorashare.com
+- 03_setup_tls.ps1     DONE - Let's Encrypt cert issued for api.marigoldshare.marigoldintelligence.us
 - 04_deploy.ps1        DONE - binary deployed, service running, DB data verified
 - 99_teardown.ps1      destroys all AWS resources
 - Load-Env.ps1         shared helper, dot-sourced by all scripts
@@ -87,18 +87,18 @@ All deployment scripts executed successfully. Service running on 35.160.176.235:
 (plaintext gRPC). Database data verified from EC2 terminal.
 
 ### Phase 2 - Domain + Elastic IP + TLS - COMPLETE
-Domain: api.ixorashare.com | Elastic IP: 35.160.176.235 | TLS: Let's Encrypt
+Domain: api.marigoldshare.marigoldintelligence.us | Elastic IP: 35.160.176.235 | TLS: Let's Encrypt
 Cert: /etc/ubertool/certs/fullchain.pem (expires 2026-07-13, auto-renews via certbot.timer)
-gRPC endpoint: api.ixorashare.com:50052 (TLS, useTransportSecurity())
+gRPC endpoint: api.marigoldshare.marigoldintelligence.us:50052 (TLS, useTransportSecurity())
 
 ### Phase 2b - Smoke Tests - COMPLETE
 
 Smoke tests (tests/smoke/) verify TLS, API liveness, and DB connectivity via
 the live gRPC endpoint — no SSH tunnel required.
 
-Config: config/config.smoke.ec2.yaml (gitignored)
+Config: config/config.ec2.apitest.yaml (gitignored)
   server:
-    host: api.ixorashare.com
+    host: api.marigoldshare.marigoldintelligence.us
     port: 50052
   tls:
     enabled: true
@@ -112,15 +112,15 @@ Tests covered:
   TestDatabaseConnectivity  - SearchOrganizations (orgs table), Login (users table),
                               ValidateInvite (invitations table)
 
-All three tests pass against api.ixorashare.com:50052 as of April 14, 2026.
+All three tests pass against api.marigoldshare.marigoldintelligence.us:50052 as of April 14, 2026.
 
 ### Phase 3 - Android App Release
 1. Final testing against TLS endpoint
 2. Submit to Google Play Store (developer account already registered, $25 paid)
 
-## Android Client Connection (active — TLS, api.ixorashare.com)
+## Android Client Connection (active — TLS, api.marigoldshare.marigoldintelligence.us)
   val channel = ManagedChannelBuilder
-      .forAddress("api.ixorashare.com", 50052)
+      .forAddress("api.marigoldshare.marigoldintelligence.us", 50052)
       .useTransportSecurity()
       .build()
   // No custom TrustManager needed - Let's Encrypt trusted natively on Android and iOS
@@ -128,13 +128,13 @@ All three tests pass against api.ixorashare.com:50052 as of April 14, 2026.
 ## iOS Client Connection (future, same approach)
   let channel = ClientConnection
       .usingTLSBackedByNIOSSL(on: group)
-      .connect(host: "api.ixorashare.com", port: 50052)
+      .connect(host: "api.marigoldshare.marigoldintelligence.us", port: 50052)
   // No custom CA needed - Let's Encrypt trusted natively
 
 ## Key Architecture Decisions
 - EC2 t3.micro + RDS db.t3.micro handles up to ~10,000 users
 - Elastic IP: 35.160.176.235 (allocated, attached to EC2)
-- Domain: api.ixorashare.com (Namecheap, A record → Elastic IP)
+- Domain: api.marigoldshare.marigoldintelligence.us (Namecheap, A record → Elastic IP)
 - TLS via Let's Encrypt - trusted natively on Android and iOS, no cert bundling
 - Port 50052 with TLS (Let's Encrypt cert at /etc/ubertool/certs/)
 - RDS not publicly accessible - only reachable from EC2 security group

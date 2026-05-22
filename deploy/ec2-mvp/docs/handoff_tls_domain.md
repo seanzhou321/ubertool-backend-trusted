@@ -1,5 +1,5 @@
 # Ubertool Backend — TLS & Domain Handoff Notes
-# Status: COMPLETE — TLS live on app.ixorashare.com:50052 as of April 14, 2026
+# Status: COMPLETE — TLS live on api.marigoldshare.marigoldintelligence.us:50052 as of April 14, 2026
 
 ## Project Context
 
@@ -19,8 +19,8 @@
 | SSH alias | `ubertool-ec2` |
 | SSH key | `C:\Users\yixio\.ssh\ixorashare-ec2-key.pem` |
 | Elastic IP | Attached and running (no charge while attached) |
-| Domain | `ixorashare.com` via Namecheap |
-| API subdomain | `api.ixorashare.com` → A record → Elastic IP |
+| Domain | `marigoldintelligence.us` |
+| API subdomain | `api.marigoldshare.marigoldintelligence.us` → A record → Elastic IP |
 | RDS instance | `ubertool-db-mvp.cx66cg08ai98.us-west-2.rds.amazonaws.com` |
 | RDS database | `ubertool_db_prod` |
 | RDS user | `ubertool_db_prod` |
@@ -33,8 +33,8 @@
 | Item | Details |
 |---|---|
 | Provider | Let's Encrypt (via Certbot 2.9.0) |
-| Certificate | `/etc/letsencrypt/live/api.ixorashare.com/fullchain.pem` |
-| Private key | `/etc/letsencrypt/live/api.ixorashare.com/privkey.pem` |
+| Certificate | `/etc/letsencrypt/live/api.marigoldshare.marigoldintelligence.us/fullchain.pem` |
+| Private key | `/etc/letsencrypt/live/api.marigoldshare.marigoldintelligence.us/privkey.pem` |
 | App cert copy | `/var/ubertool/certs/fullchain.pem` |
 | App key copy | `/var/ubertool/certs/privkey.pem` |
 | Expiry | 2026-07-13 (auto-renews via Certbot scheduled task) |
@@ -223,8 +223,8 @@ Add this content:
 
 ```bash
 #!/bin/bash
-cp /etc/letsencrypt/live/api.ixorashare.com/fullchain.pem /var/ubertool/certs/
-cp /etc/letsencrypt/live/api.ixorashare.com/privkey.pem /var/ubertool/certs/
+cp /etc/letsencrypt/live/api.marigoldshare.marigoldintelligence.us/fullchain.pem /var/ubertool/certs/
+cp /etc/letsencrypt/live/api.marigoldshare.marigoldintelligence.us/privkey.pem /var/ubertool/certs/
 chown root:ubertool /var/ubertool/certs/privkey.pem
 chmod 640 /var/ubertool/certs/privkey.pem
 systemctl restart ubertool
@@ -246,7 +246,7 @@ curl -L https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl
 sudo mv grpcurl /usr/local/bin/
 
 # Test TLS connection
-grpcurl api.ixorashare.com:50052 list
+grpcurl api.marigoldshare.marigoldintelligence.us:50052 list
 ```
 
 ---
@@ -259,7 +259,7 @@ no certificate bundling is needed. Just update your gRPC channel:
 ```kotlin
 // In your Android gRPC client setup
 val channel = ManagedChannelBuilder
-    .forAddress("api.ixorashare.com", 50052)
+    .forAddress("api.marigoldshare.marigoldintelligence.us", 50052)
     .useTransportSecurity()  // enables TLS
     .build()
 ```

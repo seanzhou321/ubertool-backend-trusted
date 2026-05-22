@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"ubertool-backend-trusted/internal/config"
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/logger"
 	"ubertool-backend-trusted/internal/repository"
@@ -28,20 +29,21 @@ var (
 )
 
 type authService struct {
-	userRepo          repository.UserRepository
-	inviteRepo        repository.InvitationRepository
-	reqRepo           repository.JoinRequestRepository
-	orgRepo           repository.OrganizationRepository
-	noteSvc           NotificationService
-	emailSvc          EmailService
-	tm                security.TokenManager
-	fcmRepo           repository.FcmTokenRepository
-	pendingCredsRepo  repository.PendingCredentialsRepository
-	legalConsentRepo  repository.LegalConsentRepository
-	pending2FACodes   sync.Map // key: userID (int32), value: string (5-digit code)
+	userRepo         repository.UserRepository
+	inviteRepo       repository.InvitationRepository
+	reqRepo          repository.JoinRequestRepository
+	orgRepo          repository.OrganizationRepository
+	noteSvc          NotificationService
+	emailSvc         EmailService
+	tm               security.TokenManager
+	fcmRepo          repository.FcmTokenRepository
+	pendingCredsRepo repository.PendingCredentialsRepository
+	legalConsentRepo repository.LegalConsentRepository
+	pending2FACodes  sync.Map // key: userID (int32), value: string (5-digit code)
+	twoFACfg         config.TwoFAConfig
 }
 
-func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string, fcmRepo repository.FcmTokenRepository, pendingCredsRepo repository.PendingCredentialsRepository, legalConsentRepo repository.LegalConsentRepository) AuthService {
+func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.InvitationRepository, reqRepo repository.JoinRequestRepository, orgRepo repository.OrganizationRepository, noteSvc NotificationService, emailSvc EmailService, secret string, fcmRepo repository.FcmTokenRepository, pendingCredsRepo repository.PendingCredentialsRepository, legalConsentRepo repository.LegalConsentRepository, twoFACfg config.TwoFAConfig) AuthService {
 	return &authService{
 		userRepo:         userRepo,
 		inviteRepo:       inviteRepo,
@@ -53,6 +55,7 @@ func NewAuthService(userRepo repository.UserRepository, inviteRepo repository.In
 		fcmRepo:          fcmRepo,
 		pendingCredsRepo: pendingCredsRepo,
 		legalConsentRepo: legalConsentRepo,
+		twoFACfg:         twoFACfg,
 	}
 }
 
@@ -325,13 +328,24 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	}
 	logger.Debug("2FA token generated", "userID", user.ID, "tokenPrefix", sessionToken[:20])
 
-	// Generate a random 5-digit 2FA code and store it for verification.
-	code := fmt.Sprintf("%05d", randmath.Intn(100000))
-	s.pending2FACodes.Store(user.ID, code)
-	logger.Info("2FA code generated and emailed", "userID", user.ID)
-	subject := fmt.Sprintf("Your 2FA Code - %s", code)
-	message := fmt.Sprintf("Your login code is: %s", code)
-	_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message)
+	// Determine the 2FA code based on the configuration toggle.
+	// When two_fa.enabled=false the fixed passcode is used and no email is sent —
+	// this mode is intended exclusively for automated UI tests.
+	var code string
+	if s.twoFACfg.Enabled {
+		// Production/manual mode: generate a random 5-digit code and deliver it via email.
+		code = fmt.Sprintf("%05d", randmath.Intn(100000))
+		s.pending2FACodes.Store(user.ID, code)
+		logger.Info("2FA code generated and emailed", "userID", user.ID)
+		subject := fmt.Sprintf("Your 2FA Code - %s", code)
+		message := fmt.Sprintf("Your login code is: %s", code)
+		_ = s.emailSvc.SendAdminNotification(ctx, user.Email, subject, message)
+	} else {
+		// Automated test mode: use the fixed passcode from config; skip email delivery.
+		code = s.twoFACfg.FixedPasscode
+		s.pending2FACodes.Store(user.ID, code)
+		logger.Warn("2FA bypass mode: using fixed passcode from config (two_fa.enabled=false)", "userID", user.ID)
+	}
 
 	logger.ExitMethod("authService.Login", "userID", user.ID, "requires2FA", true, "tempPwd", tempPwd)
 	return sessionToken, true, tempPwd, nil
