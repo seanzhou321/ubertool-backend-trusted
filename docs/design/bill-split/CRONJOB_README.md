@@ -97,16 +97,16 @@ make docker-build
 
 ```bash
 # Run scheduler (all jobs on schedule)
-go run cmd/cronjob/main.go --config=config/config.dev.yaml
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml
 
 # Run a specific job once
-go run cmd/cronjob/main.go --config=config/config.dev.yaml --run-once=mark-overdue-rentals
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml --run-once=mark-overdue-rentals
 
 # Run all nightly jobs
-go run cmd/cronjob/main.go --config=config/config.dev.yaml --run-once=all-nightly
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml --run-once=all-nightly
 
 # Run all monthly jobs
-go run cmd/cronjob/main.go --config=config/config.dev.yaml --run-once=all-monthly
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml --run-once=all-monthly
 ```
 
 ### Deployment
@@ -252,7 +252,7 @@ go test ./internal/jobs/...
 ### Integration Tests
 ```bash
 # Test against real database
-go test ./internal/jobs/... -config=config/config.test.yaml
+go test ./internal/jobs/... -config=config/config.precommit.yaml
 ```
 
 ### Manual Testing

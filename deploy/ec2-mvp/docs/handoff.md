@@ -45,7 +45,7 @@ Phase 1 complete. The gRPC microservice is running on EC2 and healthy.
 
 ### Fix 1 - Config file upload to EC2 (DONE)
 Both main.go files updated to default to config/config.yaml instead of
-config/config.dev.yaml. Production config moved from config/config.prod.yaml
+config/config.desktop.manual.yaml. Production config moved from config/config.prod.yaml
 to deploy/ec2-mvp/config.yaml (kept alongside deploy scripts, gitignored).
 
 04_deploy.ps1 step 3 now uploads deploy/ec2-mvp/config.yaml:

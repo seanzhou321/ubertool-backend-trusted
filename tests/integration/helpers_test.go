@@ -17,7 +17,7 @@ import (
 var configPath string
 
 func init() {
-	flag.StringVar(&configPath, "config", "../../config/config.test.yaml", "path to config file")
+	flag.StringVar(&configPath, "config", "../../config/config.precommit.yaml", "path to config file")
 }
 
 func prepareDB(t *testing.T) *sql.DB {

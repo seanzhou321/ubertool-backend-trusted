@@ -28,7 +28,7 @@ go test -v ./tests/integration/... -run Test2FAFlow
 
 ### Run with Configuration
 ```bash
-go test -v ./tests/integration/... -run Test2FAFlow -config=../../config/config.test.yaml
+go test -v ./tests/integration/... -run Test2FAFlow -config=../../config/config.precommit.yaml
 ```
 
 ### Run Detailed Logging Version

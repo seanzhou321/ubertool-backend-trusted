@@ -118,10 +118,10 @@ podman build -t ubertool-backend:latest .
 ### Test locally:
 ```bash
 # Run a single job
-go run cmd/cronjob/main.go --config=config/config.dev.yaml --run-once mark-overdue-rentals
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml --run-once mark-overdue-rentals
 
 # Start the scheduler
-go run cmd/cronjob/main.go --config=config/config.dev.yaml
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml
 ```
 
 ## Production Considerations

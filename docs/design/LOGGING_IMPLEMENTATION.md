@@ -5,7 +5,7 @@ Comprehensive debug logging has been implemented to track application actions du
 
 ## Configuration
 
-### Test Configuration (`config/config.test.yaml`)
+### Test Configuration (`config/config.precommit.yaml`)
 ```yaml
 log:
   level: "debug"  # debug, info, warn, error
@@ -27,14 +27,14 @@ make run-test-debug  # Explicitly sets debug level via env var
 
 ### Method 2: Direct Command
 ```bash
-go run ./cmd/server -config=config/config.test.yaml
+go run ./cmd/server -config=config/config.precommit.yaml
 ```
 
 ### Method 3: Override via Environment
 ```bash
 set LOG_LEVEL=debug
 set LOG_FORMAT=json
-go run ./cmd/server -config=config/config.test.yaml
+go run ./cmd/server -config=config/config.precommit.yaml
 ```
 
 ## Logging Categories

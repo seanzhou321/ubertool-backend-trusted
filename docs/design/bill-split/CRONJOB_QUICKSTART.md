@@ -32,10 +32,10 @@ ls bin/
 
 ```bash
 # Run mark-overdue-rentals once
-go run cmd/cronjob/main.go --config=config/config.dev.yaml --run-once=mark-overdue-rentals
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml --run-once=mark-overdue-rentals
 
 # Run all nightly jobs
-go run cmd/cronjob/main.go --config=config/config.dev.yaml --run-once=all-nightly
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml --run-once=all-nightly
 ```
 
 ### 4. Build Docker Image
@@ -76,7 +76,7 @@ make cronjob-logs
 
 ```bash
 # Run scheduler locally (terminal stays open)
-go run cmd/cronjob/main.go --config=config/config.dev.yaml
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml
 
 # Run with specific job
 make run-cronjob-once JOB=mark-overdue-rentals
@@ -166,10 +166,10 @@ podman exec ubertool-postgres psql -U ubertool -d ubertool_trusted -c "SELECT 1"
 
 ```bash
 # Check SMTP config
-cat config/config.dev.yaml | grep -A 5 smtp
+cat config/config.desktop.manual.yaml | grep -A 5 smtp
 
 # Test email service separately
-go run cmd/server/main.go --config=config/config.dev.yaml
+go run cmd/server/main.go --config=config/config.desktop.manual.yaml
 # Then use API to send test email
 ```
 
@@ -237,10 +237,10 @@ make deploy-cronjob
 go test ./internal/jobs/... -v
 
 # Integration test with real DB
-go test ./internal/jobs/... -config=config/config.test.yaml -v
+go test ./internal/jobs/... -config=config/config.precommit.yaml -v
 
 # Manual test
-go run cmd/cronjob/main.go --config=config/config.test.yaml --run-once=my-new-job
+go run cmd/cronjob/main.go --config=config/config.precommit.yaml --run-once=my-new-job
 ```
 
 ## Architecture Summary

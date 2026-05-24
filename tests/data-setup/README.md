@@ -31,7 +31,7 @@ go run setup.go
 
 The `user_org.yaml` file contains:
 
-- **config_file**: Path to config file (relative to project root: `config/config.test.yaml`)
+- **config_file**: Path to config file (relative to project root: `config/config.precommit.yaml`)
 - **organization**: Organization details to create
 - **users**: Array of users to create with their roles and settings
 
@@ -42,7 +42,7 @@ Each user will be:
 ## Example
 
 ```yaml
-config_file: "config/config.test.yaml"
+config_file: "config/config.precommit.yaml"
 
 organization:
   name: "Test Community Church"

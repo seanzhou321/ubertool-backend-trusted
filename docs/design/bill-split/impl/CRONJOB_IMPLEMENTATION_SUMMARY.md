@@ -137,10 +137,10 @@ ubertool-backend-trusted/
 ### Quick Test (Local)
 ```bash
 # Test a single job
-go run cmd/cronjob/main.go --config=config/config.dev.yaml --run-once=mark-overdue-rentals
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml --run-once=mark-overdue-rentals
 
 # Start scheduler
-go run cmd/cronjob/main.go --config=config/config.dev.yaml
+go run cmd/cronjob/main.go --config=config/config.desktop.manual.yaml
 ```
 
 ### Container Test

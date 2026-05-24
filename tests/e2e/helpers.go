@@ -25,7 +25,7 @@ var testConfig *config.Config
 var tokenManager security.TokenManager
 
 func init() {
-	flag.StringVar(&configPath, "config", "../../config/config.test.yaml", "path to config file")
+	flag.StringVar(&configPath, "config", "../../config/config.precommit.yaml", "path to config file")
 }
 
 func loadConfig(t *testing.T) *config.Config {
