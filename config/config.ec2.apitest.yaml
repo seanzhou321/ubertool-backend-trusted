@@ -1,0 +1,16 @@
+# Ubertool - Smoke Test Config (EC2 target)
+#
+# Used by: make test-smoke-ec2
+#
+# Only server and tls blocks are read by the smoke tests.
+# No SSH tunnel or direct DB credentials needed — DB health is
+# verified through the microservice API.
+#
+# This file is gitignored.
+
+server:
+  host: "api.marigoldshare.marigoldintelligence.us"
+  port: 50052
+
+tls:
+  enabled: true

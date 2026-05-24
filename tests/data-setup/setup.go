@@ -58,6 +58,7 @@ type SetupData struct {
 func main() {
 	// Parse flags
 	setupFile := flag.String("setup", "", "Path to setup YAML file (default: tests/data-setup/user_org.yaml)")
+	wipe := flag.Bool("wipe", false, "Wipe all data from the database, leaving the schema intact")
 	flag.Parse()
 
 	// Default setup file path
@@ -87,12 +88,55 @@ func main() {
 	}
 	defer db.Close()
 
+	if *wipe {
+		if err := wipeAllData(db); err != nil {
+			log.Fatalf("Failed to wipe data: %v", err)
+		}
+		log.Println("✅ All data wiped. Schema is intact. Run without -wipe to restore baseline data.")
+		return
+	}
+
 	// Populate data
 	if err := populateData(db, setupData); err != nil {
 		log.Fatalf("Failed to populate data: %v", err)
 	}
 
 	log.Println("✅ Test data successfully populated!")
+}
+
+// wipeAllData truncates every application table in a single statement.
+// CASCADE handles foreign-key ordering automatically.
+func wipeAllData(db *sql.DB) error {
+	log.Println("Wiping all data from the database...")
+
+	_, err := db.Exec(`
+		TRUNCATE TABLE
+			bill_actions,
+			bills,
+			balance_snapshots,
+			rental_disputes,
+			rentals,
+			ledger_transactions,
+			tool_images,
+			tools,
+			user_legal_consents,
+			fcm_tokens,
+			notifications,
+			pending_credentials,
+			pending_2fa_codes,
+			invitations,
+			join_requests,
+			users_orgs,
+			users,
+			orgs
+		CASCADE
+	`)
+	if err != nil {
+		return err
+	}
+
+	log.Println("✓ All tables truncated")
+	return nil
 }
 
 func readSetupFile(filename string) (*SetupData, error) {

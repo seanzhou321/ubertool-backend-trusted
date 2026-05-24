@@ -7,7 +7,7 @@ config_file: "/etc/ubertool/config.yaml"
 # Organization data
 organization:
   name: "Harvest Evangelical Community"
-  description: "The number oneorganization for MVP Release"
+  description: "The number one organization for MVP Release"
   address: "2034 Jewell Ridge, Vista, CA 92081"
   metro: "San Diego, CA"
   admin_phone_number: "+1-760-613-0273"

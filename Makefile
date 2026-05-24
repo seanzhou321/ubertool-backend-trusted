@@ -1,4 +1,4 @@
-.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-smoke-ec2 docker-build docker-push deploy-services deploy-cronjob deploy-all setup-data-ec2-mvp my-ip
+.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-smoke-ec2 docker-build docker-push deploy-services deploy-cronjob deploy-all setup-data-ec2-mvp wipe-db-test reset-db-test wipe-db-ec2-mvp reset-db-ec2-mvp my-ip
 
 PROTO_SRC_DIR = api/proto
 PROTO_DEST_DIR = .
@@ -26,7 +26,7 @@ build-cronjob:
 
 run-dev:
 	@echo "Starting server in DEBUG mode for testing..."
-	set LOG_LEVEL=debug && go run ./cmd/server -config=config/config.dev.yaml
+	set LOG_LEVEL=debug && go run ./cmd/server -config=config/config.desktop.manual.yaml
 
 run-precommit:
 	@echo "Starting server — Scenario A1: pre-commit coding tests (no TLS, no FCM, 2FA bypassed)..."
@@ -42,22 +42,22 @@ run-desktop-manual:
 
 run-cronjob-dev:
 	@echo "Starting cronjob in DEBUG mode for testing..."
-	set LOG_LEVEL=debug && go run ./cmd/cronjob -config=config/config.dev.yaml
+	set LOG_LEVEL=debug && go run ./cmd/cronjob -config=config/config.desktop.manual.yaml
 
 run-cronjob-once:
-	@if "$(JOB)"=="" (echo Error: Please specify JOB variable, e.g., make run-cronjob-once JOB=mark-overdue-rentals) else (go run ./cmd/cronjob -config=config/config.dev.yaml -run-once=$(JOB))
+	@if "$(JOB)"=="" (echo Error: Please specify JOB variable, e.g., make run-cronjob-once JOB=mark-overdue-rentals) else (go run ./cmd/cronjob -config=config/config.desktop.manual.yaml -run-once=$(JOB))
 
 run-test:
 	@echo "Starting server in DEBUG mode for testing..."
-	go run ./cmd/server -config=config/config.test.yaml
+	go run ./cmd/server -config=config/config.precommit.yaml
 
 run-test-debug:
 	@echo "Starting server in DEBUG mode with verbose output..."
-	set LOG_LEVEL=debug&& go run ./cmd/server -config=config/config.test.yaml
+	set LOG_LEVEL=debug&& go run ./cmd/server -config=config/config.precommit.yaml
 
 run-test-cron-debug:
 	@echo "Starting cronjob in DEBUG mode with verbose output..."
-	set LOG_LEVEL=debug&& go run ./cmd/cronjob -config=config/config.test.yaml
+	set LOG_LEVEL=debug&& go run ./cmd/cronjob -config=config/config.precommit.yaml
 
 tidy:
 	go mod tidy
@@ -76,13 +76,13 @@ test-precommit:
 	go test -v ./tests/e2e/... -config=config/config.precommit.yaml
 
 test-integration:
-	go test -v ./tests/integration/... -config=config/config.test.yaml
+	go test -v ./tests/integration/... -config=config/config.precommit.yaml
 
 test-e2e:
-	go test -v ./tests/e2e/... -config=config/config.test.yaml
+	go test -v ./tests/e2e/... -config=config/config.precommit.yaml
 
 test-ext-integration:
-	go test -v ./tests/ext-integration/... -run Gmail -config=config/config.test.yaml
+	go test -v ./tests/ext-integration/... -run Gmail -config=config/config.precommit.yaml
 
 
 # Docker commands
@@ -131,8 +131,24 @@ setup-data-test:
 	@echo "Populating test data from YAML..."
 	go run ./tests/data-setup/setup.go -setup=tests/data-setup/user_org.test.yaml
 
+wipe-db-test:
+	@echo "Wiping all data from local test database (schema is preserved)..."
+	go run ./tests/data-setup/setup.go -wipe -setup=tests/data-setup/user_org.test.yaml
+
+reset-db-test: wipe-db-test setup-data-test
+	@echo "Local test database reset complete."
+
 setup-data-ec2-mvp:
 	@echo To populate EC2 RDS with initial data, run from a PowerShell terminal:
+	@echo   .\deploy\ec2-mvp\05_setup_data.ps1
+
+wipe-db-ec2-mvp:
+	@echo To wipe all data from EC2 RDS, run from a PowerShell terminal:
+	@echo   .\deploy\ec2-mvp\06_wipe_data.ps1
+
+reset-db-ec2-mvp:
+	@echo To reset EC2 RDS to baseline, run from a PowerShell terminal:
+	@echo   .\deploy\ec2-mvp\06_wipe_data.ps1
 	@echo   .\deploy\ec2-mvp\05_setup_data.ps1
 
 # Smoke tests against the live EC2 deployment.
@@ -142,4 +158,6 @@ test-smoke-ec2:
 
 my-ip:
 	@powershell -NoProfile -Command "(Invoke-RestMethod https://checkip.amazonaws.com).Trim()"
+	@echo "Use the above IP address to whitelist in AWS security groups for EC2 access."
+	@echo https://us-west-2.console.aws.amazon.com/ec2/home?region=us-west-2#SecurityGroup:group-id=sg-0604272042828172f
 

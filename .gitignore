@@ -50,7 +50,6 @@ config/mail_config.test.yaml
 
 config/config.prod.yaml
 config/config.ec2.uitest.yaml
-config/config.ec2.apitest.yaml
 config/config.desktop.manual.yaml
 config/config.desktop.uitest.yaml
 

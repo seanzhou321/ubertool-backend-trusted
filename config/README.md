@@ -32,14 +32,13 @@ The service supports six run scenarios split across two deployment targets.
 > **B4 actual credentials** live in `deploy/ec2-mvp/config.yaml` (gitignored).
 > `config.prod.yaml` in this directory is the committed template with `CHANGE_ME` placeholders.
 
-### Legacy / backward-compatible files
+### Config template files and client config file
 
 | File | Purpose |
 |---|---|
 | `config.yaml` | Default config loaded when no `-config` flag is supplied (`make run-dev`) |
-| `config.dev.yaml` | Development with real SMTP — used by `make run-dev` |
-| `config.test.yaml` | Used by existing `make test-integration` and `make test-e2e` targets |
 | `config.yaml.template` | Documented production template (predates `config.prod.yaml`) |
+| `mail_config.test.yaml.template` | Documented test template for mail service testing |
 | `config.ec2.apitest.yaml` | Client-side config used by `make test-smoke-ec2` (server host + TLS only) |
 
 ## 2FA Toggle
@@ -147,7 +146,7 @@ make test-precommit
 # Unit tests only
 make test-unit
 
-# Integration tests (uses config.test.yaml)
+# Integration tests (uses config.precommit.yaml)
 make test-integration
 
 # Smoke tests against live EC2
@@ -289,13 +288,13 @@ Invalid configurations cause the application to exit at startup with a descripti
 ## Development Tips
 
 ### Quick Start for Development
-1. Copy `config.dev.yaml` to `config.local.yaml`
+1. Copy `config.desktop.manual.yaml` to `config.local.yaml`
 2. Update with your local settings
 3. Add `config.local.yaml` to `.gitignore`
 4. Run with: `go run ./cmd/server -config=config/config.local.yaml`
 
 ### Testing Configuration
-Use `config.test.yaml` for running tests:
+Use `config.precommit.yaml` for running tests:
 ```bash
-go test ./... -config=../config/config.test.yaml
+go test ./... -config=../config/config.precommit.yaml
 ```

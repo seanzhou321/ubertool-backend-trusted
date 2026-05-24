@@ -1,7 +1,7 @@
 # Teardown script for Ubertool Trusted Backend Database Schema
 # This script removes all tables, functions, and triggers from the database
 
-# Database connection parameters (from config.test.yaml)
+# Database connection parameters (from config.precommit.yaml)
 $DB_HOST = "localhost"
 $DB_PORT = "5454"
 $DB_USER = "ubertool_trusted"

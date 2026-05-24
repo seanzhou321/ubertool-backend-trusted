@@ -2,7 +2,7 @@
 # This file defines test organization and user data for the ubertool trusted backend
 
 # Database configuration - reference the test config file
-config_file: "config/config.dev.yaml"
+config_file: "config/config.desktop.manual.yaml"
 
 # Organization data
 organization:
