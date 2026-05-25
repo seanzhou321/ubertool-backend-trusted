@@ -1,4 +1,4 @@
-.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-smoke-ec2 docker-build docker-push deploy-services deploy-cronjob deploy-all setup-data-ec2-mvp wipe-db-test reset-db-test wipe-db-ec2-mvp reset-db-ec2-mvp my-ip
+.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-smoke-ec2 docker-build docker-push deploy-services deploy-cronjob deploy-all setup-data-local wipe-db-local reset-db-local setup-data-ec2 wipe-db-ec2 reset-db-ec2 my-ip
 
 PROTO_SRC_DIR = api/proto
 PROTO_DEST_DIR = .
@@ -127,29 +127,29 @@ test-e2e-admin-retrieve:
 test-e2e-push-notification:
 	go test -v ./tests/e2e -run "TestPushNotificationService_E2E"
 
-setup-data-test:
+setup-data-local:
 	@echo "Populating test data from YAML..."
-	go run ./tests/data-setup/setup.go -setup=tests/data-setup/user_org.test.yaml
+	go run ./tests/data-setup/setup.go -config=config/config.precommit.yaml -setup=tests/data-setup/user_org.test.yaml
 
-wipe-db-test:
+wipe-db-local:
 	@echo "Wiping all data from local test database (schema is preserved)..."
-	go run ./tests/data-setup/setup.go -wipe -setup=tests/data-setup/user_org.test.yaml
+	go run ./tests/data-setup/setup.go -config=config/config.precommit.yaml -wipe
 
-reset-db-test: wipe-db-test setup-data-test
+reset-db-local: wipe-db-local setup-data-local
 	@echo "Local test database reset complete."
 
-setup-data-ec2-mvp:
+setup-data-ec2:
 	@echo To populate EC2 RDS with initial data, run from a PowerShell terminal:
-	@echo   .\deploy\ec2-mvp\05_setup_data.ps1
+	@echo   .\deploy\ec2-mvp\05_setup_data.ps1 -DataFile tests\data-setup\user_org.test.yaml
 
-wipe-db-ec2-mvp:
+wipe-db-ec2:
 	@echo To wipe all data from EC2 RDS, run from a PowerShell terminal:
 	@echo   .\deploy\ec2-mvp\06_wipe_data.ps1
 
-reset-db-ec2-mvp:
+reset-db-ec2:
 	@echo To reset EC2 RDS to baseline, run from a PowerShell terminal:
 	@echo   .\deploy\ec2-mvp\06_wipe_data.ps1
-	@echo   .\deploy\ec2-mvp\05_setup_data.ps1
+	@echo   .\deploy\ec2-mvp\05_setup_data.ps1 -DataFile tests\data-setup\user_org.test.yaml
 
 # Smoke tests against the live EC2 deployment.
 # Ensure config/config.ec2.apitest.yaml exists (see deploy/ec2-mvp/docs/handoff.md Phase 2b)

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -50,38 +49,25 @@ type User struct {
 }
 
 type SetupData struct {
-	ConfigFile   string       `yaml:"config_file"`
 	Organization Organization `yaml:"organization"`
 	Users        []User       `yaml:"users"`
 }
 
 func main() {
-	// Parse flags
-	setupFile := flag.String("setup", "", "Path to setup YAML file (default: tests/data-setup/user_org.yaml)")
-	wipe := flag.Bool("wipe", false, "Wipe all data from the database, leaving the schema intact")
+	configFile := flag.String("config", "", "Path to app config file (e.g., config/config.precommit.yaml)")
+	setupFile  := flag.String("setup", "", "Path to data YAML file (required for seeding, not needed for -wipe)")
+	wipe       := flag.Bool("wipe", false, "Wipe all data from the database, leaving the schema intact")
 	flag.Parse()
 
-	// Default setup file path
-	if *setupFile == "" {
-		*setupFile = "tests/data-setup/user_org.yaml"
-		if _, err := os.Stat(*setupFile); os.IsNotExist(err) {
-			*setupFile = "user_org.yaml"
-		}
+	if *configFile == "" {
+		log.Fatal("Error: -config flag is required (e.g., -config=config/config.precommit.yaml)")
 	}
 
-	setupData, err := readSetupFile(*setupFile)
-	if err != nil {
-		log.Fatalf("Failed to read setup file: %v", err)
-	}
-
-	// Read the config file
-	configPath := resolveConfigPath(setupData.ConfigFile)
-	config, err := readConfig(configPath)
+	config, err := readConfig(*configFile)
 	if err != nil {
 		log.Fatalf("Failed to read config file: %v", err)
 	}
 
-	// Connect to database
 	db, err := connectDB(config)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -96,7 +82,15 @@ func main() {
 		return
 	}
 
-	// Populate data
+	if *setupFile == "" {
+		log.Fatal("Error: -setup flag is required for seeding (or use -wipe to clear data)")
+	}
+
+	setupData, err := readSetupFile(*setupFile)
+	if err != nil {
+		log.Fatalf("Failed to read setup file: %v", err)
+	}
+
 	if err := populateData(db, setupData); err != nil {
 		log.Fatalf("Failed to populate data: %v", err)
 	}
@@ -151,39 +145,6 @@ func readSetupFile(filename string) (*SetupData, error) {
 	}
 
 	return &setupData, nil
-}
-
-func resolveConfigPath(configPath string) string {
-	// Try the path as-is first
-	if _, err := os.Stat(configPath); err == nil {
-		return configPath
-	}
-
-	// Try from project root
-	projectRoot := findProjectRoot()
-	fullPath := filepath.Join(projectRoot, configPath)
-	if _, err := os.Stat(fullPath); err == nil {
-		return fullPath
-	}
-
-	// Return original path and let it fail with a clear error
-	return configPath
-}
-
-func findProjectRoot() string {
-	// Look for go.mod to identify project root
-	dir, _ := os.Getwd()
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-	return "."
 }
 
 func readConfig(filename string) (*Config, error) {

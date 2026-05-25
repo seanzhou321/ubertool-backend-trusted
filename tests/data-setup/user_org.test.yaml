@@ -1,8 +1,6 @@
 # Test Data Setup Configuration
 # This file defines test organization and user data for the ubertool trusted backend
-
-# Database configuration - reference the test config file
-config_file: "config/config.desktop.manual.yaml"
+# Pass the environment config separately via: setup-data -config=<path> -setup=<this-file>
 
 # Organization data
 organization:
