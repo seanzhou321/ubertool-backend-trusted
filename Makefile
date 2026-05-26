@@ -82,7 +82,7 @@ test-e2e:
 	go test -v ./tests/e2e/... -config=config/config.precommit.yaml
 
 test-ext-integration:
-	go test -v ./tests/ext-integration/... -run Gmail -config=config/config.precommit.yaml
+	go test -v ./tests/ext-integration/... -run Gmail -config=config/mail_config.test.yaml
 
 
 # Docker commands

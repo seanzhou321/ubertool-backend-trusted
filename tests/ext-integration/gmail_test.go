@@ -2,6 +2,7 @@ package extintegration
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"testing"
@@ -10,7 +11,6 @@ import (
 	"ubertool-backend-trusted/internal/service"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -28,13 +28,24 @@ type GmailConfig struct {
 }
 
 func loadGmailConfig(t *testing.T) *GmailConfig {
-	// Try to find config.test.mail.yaml
-	configPath := "../../config/mail_config.test.yaml"
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		t.Skip("Skipping Gmail integration test: config/config.test.mail.yaml not found")
+	if !flag.Parsed() {
+		flag.Parse()
 	}
 
-	data, err := os.ReadFile(configPath)
+	// go test sets cwd to the package dir; if the path is relative to the
+	// project root, fall back to the ../../ prefix (same pattern as integration tests).
+	mailCfgPath := configPath
+	if _, err := os.Stat(mailCfgPath); os.IsNotExist(err) {
+		altPath := "../../" + configPath
+		if _, err := os.Stat(altPath); err == nil {
+			mailCfgPath = altPath
+		}
+	}
+	if _, err := os.Stat(mailCfgPath); os.IsNotExist(err) {
+		t.Skip("Skipping Gmail integration test: mail_config.test.yaml not found")
+	}
+
+	data, err := os.ReadFile(mailCfgPath)
 	if err != nil {
 		t.Skipf("Skipping Gmail integration test: cannot read config: %v", err)
 	}
@@ -78,7 +89,7 @@ func TestGmailIntegration(t *testing.T) {
 		orgName := "Test Organization"
 
 		err := emailService.SendInvitation(context.Background(), testEmailTo, "Test User", invitationCode, orgName, testEmailCC)
-		require.NoError(t, err, "Failed to send invitation email via Gmail")
+		assert.NoError(t, err, "Failed to send invitation email via Gmail")
 
 		t.Logf("✅ Successfully sent invitation email to %s via Gmail", testEmailTo)
 		if testEmailCC != "" {
@@ -93,7 +104,7 @@ func TestGmailIntegration(t *testing.T) {
 		toolName := "Power Drill"
 
 		err := emailService.SendRentalRequestNotification(context.Background(), testEmailTo, renterName, toolName, testEmailCC)
-		require.NoError(t, err, "Failed to send rental request notification via Gmail")
+		assert.NoError(t, err, "Failed to send rental request notification via Gmail")
 
 		t.Logf("✅ Successfully sent rental request notification to %s via Gmail", testEmailTo)
 		if testEmailCC != "" {
@@ -108,7 +119,7 @@ func TestGmailIntegration(t *testing.T) {
 		pickupNote := "Please pick up the tool from my garage at 123 Main St. Available after 5 PM."
 
 		err := emailService.SendRentalApprovalNotification(context.Background(), testEmailTo, toolName, "Owner Name", pickupNote, testEmailCC)
-		require.NoError(t, err, "Failed to send rental approval notification via Gmail")
+		assert.NoError(t, err, "Failed to send rental approval notification via Gmail")
 
 		t.Logf("✅ Successfully sent rental approval notification to %s via Gmail", testEmailTo)
 		if testEmailCC != "" {
@@ -122,7 +133,7 @@ func TestGmailIntegration(t *testing.T) {
 		toolName := "Power Drill"
 
 		err := emailService.SendRentalRejectionNotification(context.Background(), testEmailTo, toolName, "Owner Name", testEmailCC)
-		require.NoError(t, err, "Failed to send rental rejection notification via Gmail")
+		assert.NoError(t, err, "Failed to send rental rejection notification via Gmail")
 
 		t.Logf("✅ Successfully sent rental rejection notification to %s via Gmail", testEmailTo)
 		if testEmailCC != "" {
@@ -137,7 +148,7 @@ func TestGmailIntegration(t *testing.T) {
 		reason := "Your account has been reactivated after review."
 
 		err := emailService.SendAccountStatusNotification(context.Background(), testEmailTo, "User Name", orgName, status, reason)
-		require.NoError(t, err, "Failed to send account status notification via Gmail")
+		assert.NoError(t, err, "Failed to send account status notification via Gmail")
 
 		t.Logf("✅ Successfully sent account status notification to %s via Gmail", testEmailTo)
 		t.Logf("   Organization: %s", orgName)
@@ -149,7 +160,7 @@ func TestGmailIntegration(t *testing.T) {
 		message := "User john.doe@example.com has requested to join your organization."
 
 		err := emailService.SendAdminNotification(context.Background(), testEmailTo, subject, message)
-		require.NoError(t, err, "Failed to send admin notification via Gmail")
+		assert.NoError(t, err, "Failed to send admin notification via Gmail")
 
 		t.Logf("✅ Successfully sent admin notification to %s via Gmail", testEmailTo)
 		t.Logf("   Subject: %s", subject)
