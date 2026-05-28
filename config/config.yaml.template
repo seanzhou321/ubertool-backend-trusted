@@ -104,6 +104,25 @@ database:
 # -----------------------------------------------------------------------------
 # smtp — outbound email (2FA codes, invitations, notifications)
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# email_provider — selects the outbound email backend
+# -----------------------------------------------------------------------------
+# "smtp" (default) — uses the smtp: block below.  Works with Gmail, Yahoo, or
+#                    any STARTTLS/TLS SMTP server.  Good for development and
+#                    environments without AWS credentials.
+# "ses"            — uses the AWS SES API v2 via the ses: block below.
+#                    AWS credentials are resolved from the standard SDK chain:
+#                    AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars,
+#                    ~/.aws/credentials file, or an EC2 IAM instance role.
+#                    Recommended for production on AWS.
+# Env: EMAIL_PROVIDER
+email_provider: "smtp"  # "smtp" or "ses"
+
+
+# -----------------------------------------------------------------------------
+# smtp — outbound email (2FA codes, invitations, notifications)
+# -----------------------------------------------------------------------------
+# Used only when email_provider is "smtp".
 smtp:
   # SMTP server hostname.
   # Set to "mock" to suppress all email delivery and log messages instead.
@@ -131,6 +150,25 @@ smtp:
 
   # The "From:" address that appears in delivered emails.
   # Env: SMTP_FROM
+  from: "no-reply@example.com"
+
+
+# -----------------------------------------------------------------------------
+# ses — AWS Simple Email Service (alternative to SMTP)
+# -----------------------------------------------------------------------------
+# Used only when email_provider is "ses".
+# The "from" address must be verified in your AWS SES account before sending.
+# SES sandbox accounts can only send to verified addresses; request production
+# access to remove this restriction.
+ses:
+  # AWS region where your SES sending identity is verified.
+  # Common values: "us-east-1", "us-west-2", "eu-west-1"
+  # Env: SES_REGION
+  region: "us-east-1"
+
+  # Verified sender address shown in the "From:" header.
+  # Must be either a verified email address or a domain identity in SES.
+  # Env: SES_FROM
   from: "no-reply@example.com"
 
 

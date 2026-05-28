@@ -84,6 +84,12 @@ test-e2e:
 test-ext-integration:
 	go test -v ./tests/ext-integration/... -run Gmail -config=config/mail_config.test.yaml
 
+test-ext-integration-ses:
+	go test -v ./tests/ext-integration/... -run TestSES -config=config/mail_config.test.yaml
+
+test-ext-integration-all:
+	go test -v ./tests/ext-integration/... -run "Gmail|TestSES" -config=config/mail_config.test.yaml
+
 
 # Docker commands
 docker-build:

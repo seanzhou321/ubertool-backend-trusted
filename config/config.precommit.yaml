@@ -30,12 +30,18 @@ database:
   database: "ubertool_db"
   ssl_mode: "disable"
 
+email_provider: "smtp"  # "smtp" or "ses"
+
 smtp:
   host: "mock"
   port: 587
   user: ""
   password: ""
   from: "noreply@ubertool.local"
+
+ses:
+  region: ""                      # not used in this scenario (email_provider is smtp/mock)
+  from: ""
 
 jwt:
   secret: ":B*i+:ZgC?Nh7=E-59Z)aY_B9FHM3^^9f2.vX,9%yZArNo4)iE"

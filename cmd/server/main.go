@@ -113,14 +113,27 @@ func main() {
 		storageService,
 	)
 
-	// Initialize Email Service (wrapped in async worker pool so SMTP never blocks gRPC handlers)
-	emailSvc := service.NewAsyncEmailService(service.NewEmailService(
-		cfg.SMTP.Host,
-		fmt.Sprintf("%d", cfg.SMTP.Port),
-		cfg.SMTP.User,
-		cfg.SMTP.Password,
-		cfg.SMTP.From,
-	))
+	// Initialize Email Service (wrapped in async worker pool so sends never block gRPC handlers)
+	var baseEmailSvc service.EmailService
+	if cfg.EmailProvider == "ses" {
+		logger.Info("Using AWS SES email provider", "region", cfg.SES.Region, "from", cfg.SES.From)
+		sesEmailSvc, err := service.NewSESEmailService(cfg.SES.Region, cfg.SES.From)
+		if err != nil {
+			logger.Error("Failed to initialize SES email service", "error", err)
+			log.Fatalf("Failed to initialize SES email service: %v", err)
+		}
+		baseEmailSvc = sesEmailSvc
+	} else {
+		logger.Info("Using SMTP email provider", "host", cfg.SMTP.Host)
+		baseEmailSvc = service.NewEmailService(
+			cfg.SMTP.Host,
+			fmt.Sprintf("%d", cfg.SMTP.Port),
+			cfg.SMTP.User,
+			cfg.SMTP.Password,
+			cfg.SMTP.From,
+		)
+	}
+	emailSvc := service.NewAsyncEmailService(baseEmailSvc)
 
 	// Initialize Services
 	authSvc := service.NewAuthService(

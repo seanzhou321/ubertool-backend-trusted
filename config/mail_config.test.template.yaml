@@ -7,6 +7,12 @@ smtp:
   to: "recipient@example.com"
   cc: "cc-recipient@example.com"
 
+ses:
+  region: "us-east-1"              # AWS region where your SES identity is verified
+  from: "CHANGE_ME@yourdomain.com" # verified SES sender (email address or domain identity)
+  to: "CHANGE_ME@example.com"      # recipient — must be verified if account is in SES sandbox
+  cc: ""                           # optional CC — must be verified if account is in SES sandbox
+
 log:
   level: "debug"  # debug, info, warn, error
   format: "json"  # text or json

@@ -1,0 +1,295 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sesv2"
+	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+)
+
+// sesEmailService sends email via AWS SES API v2.
+// Credentials are resolved from the standard AWS credential chain
+// (environment variables, ~/.aws/credentials, IAM instance role, etc.).
+type sesEmailService struct {
+	client    *sesv2.Client
+	fromEmail string
+}
+
+// NewSESEmailService creates an email service backed by AWS SES v2.
+// region is the AWS region where the SES identity is verified (e.g. "us-east-1").
+// fromEmail must be a verified SES sender address.
+func NewSESEmailService(region, fromEmail string) (EmailService, error) {
+	cfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithRegion(region),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load AWS config for SES: %w", err)
+	}
+	return &sesEmailService{
+		client:    sesv2.NewFromConfig(cfg),
+		fromEmail: fromEmail,
+	}, nil
+}
+
+func (s *sesEmailService) sendEmail(msg EmailMessage) error {
+	if s.fromEmail == "" || s.fromEmail == "mock" {
+		log.Printf("[MOCK SES EMAIL] To: %v, Subject: %s", msg.To, msg.Subject)
+		return nil
+	}
+
+	toAddresses := make([]string, len(msg.To))
+	copy(toAddresses, msg.To)
+
+	ccAddresses := make([]string, len(msg.Cc))
+	copy(ccAddresses, msg.Cc)
+
+	dest := &types.Destination{
+		ToAddresses: toAddresses,
+	}
+	if len(ccAddresses) > 0 {
+		dest.CcAddresses = ccAddresses
+	}
+
+	var body types.Body
+	if msg.IsHTML {
+		body = types.Body{
+			Html: &types.Content{Data: aws.String(msg.Body)},
+		}
+	} else {
+		body = types.Body{
+			Text: &types.Content{Data: aws.String(msg.Body)},
+		}
+	}
+
+	input := &sesv2.SendEmailInput{
+		FromEmailAddress: aws.String(s.fromEmail),
+		Destination:      dest,
+		Content: &types.EmailContent{
+			Simple: &types.Message{
+				Subject: &types.Content{Data: aws.String(msg.Subject)},
+				Body:    &body,
+			},
+		},
+	}
+
+	_, err := s.client.SendEmail(context.Background(), input)
+	if err != nil {
+		return fmt.Errorf("ses SendEmail failed: %w", err)
+	}
+	return nil
+}
+
+func (s *sesEmailService) SendInvitation(ctx context.Context, email, name, token string, orgName string, ccEmail string) error {
+	subject := fmt.Sprintf("Invitation to join %s", orgName)
+	body := fmt.Sprintf("Hello %s,\n\nYou have been invited to join %s.\nYour invitation code is: %s\n\nPlease use this code to sign up.", name, orgName, token)
+	var cc []string
+	if ccEmail != "" {
+		cc = []string{ccEmail}
+	}
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Cc:      cc,
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendAccountStatusNotification(ctx context.Context, email, name, orgName, status, reason string) error {
+	subject := fmt.Sprintf("Account Status Update for %s", orgName)
+	body := fmt.Sprintf("Hello %s,\n\nYour account status in %s has been updated to: %s.\nReason: %s", name, orgName, status, reason)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendRentalRequestNotification(ctx context.Context, ownerEmail, renterName, toolName string, ccEmail string) error {
+	subject := fmt.Sprintf("New Rental Request for %s", toolName)
+	body := fmt.Sprintf("Hello,\n\n%s has requested to rent your tool: %s.\nPlease log in to approve or reject the request.", renterName, toolName)
+	var cc []string
+	if ccEmail != "" {
+		cc = []string{ccEmail}
+	}
+	return s.sendEmail(EmailMessage{
+		To:      []string{ownerEmail},
+		Cc:      cc,
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendRentalApprovalNotification(ctx context.Context, renterEmail, toolName, ownerName, pickupNote string, ccEmail string) error {
+	subject := fmt.Sprintf("Rental Request Approved: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\nYour rental request for %s has been approved by %s.\n\nPickup Instructions:\n%s", toolName, ownerName, pickupNote)
+	var cc []string
+	if ccEmail != "" {
+		cc = []string{ccEmail}
+	}
+	return s.sendEmail(EmailMessage{
+		To:      []string{renterEmail},
+		Cc:      cc,
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendRentalRejectionNotification(ctx context.Context, renterEmail, toolName, ownerName string, ccEmail string) error {
+	subject := fmt.Sprintf("Rental Request Rejected: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\nYour rental request for %s has been rejected by %s.", toolName, ownerName)
+	var cc []string
+	if ccEmail != "" {
+		cc = []string{ccEmail}
+	}
+	return s.sendEmail(EmailMessage{
+		To:      []string{renterEmail},
+		Cc:      cc,
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendRentalConfirmationNotification(ctx context.Context, ownerEmail, renterName, toolName string, ccEmail string) error {
+	subject := fmt.Sprintf("Rental Confirmed: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\n%s has confirmed the rental for %s. The transaction is now scheduled.", renterName, toolName)
+	var cc []string
+	if ccEmail != "" {
+		cc = []string{ccEmail}
+	}
+	return s.sendEmail(EmailMessage{
+		To:      []string{ownerEmail},
+		Cc:      cc,
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendRentalCancellationNotification(ctx context.Context, ownerEmail, renterName, toolName, reason string, ccEmail string) error {
+	subject := fmt.Sprintf("Rental Canceled: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\n%s has canceled the rental request for %s.\nReason: %s", renterName, toolName, reason)
+	var cc []string
+	if ccEmail != "" {
+		cc = []string{ccEmail}
+	}
+	return s.sendEmail(EmailMessage{
+		To:      []string{ownerEmail},
+		Cc:      cc,
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendRentalCompletionNotification(ctx context.Context, email, role, toolName string, amount int32) error {
+	subject := fmt.Sprintf("Rental Completed: %s", toolName)
+	body := fmt.Sprintf("Hello,\n\nThe rental for %s has been completed.\nAmount: %d cents\nRole: %s", toolName, amount, role)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendRentalPickupNotification(ctx context.Context, email, name, toolName, startDate, endDate string) error {
+	subject := fmt.Sprintf("Rental Picked Up: %s", toolName)
+	body := fmt.Sprintf("Hello %s,\n\nThe tool %s has been picked up.\nStart Date: %s\nScheduled End Date: %s", name, toolName, startDate, endDate)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendReturnDateRejectionNotification(ctx context.Context, renterEmail, toolName, newEndDate, reason string, totalCostCents int32) error {
+	subject := fmt.Sprintf("Return Date Extension Rejected: %s", toolName)
+	costInDollars := float64(totalCostCents) / 100.0
+	body := fmt.Sprintf("Hello,\n\nYour request to extend the return date for %s has been rejected.\n\nRejection Reason: %s\nNew Return Date Set by Owner: %s\nUpdated Rental Cost: $%.2f\n\nPlease acknowledge this change to continue.",
+		toolName, reason, newEndDate, costInDollars)
+	return s.sendEmail(EmailMessage{
+		To:      []string{renterEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error {
+	return s.sendEmail(EmailMessage{
+		To:      []string{adminEmail},
+		Subject: subject,
+		Body:    message,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendBillPaymentNotice(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error {
+	subject := fmt.Sprintf("Payment Notice: $%.2f Due to %s (%s)", float64(amountCents)/100, creditorName, orgName)
+	body := fmt.Sprintf("Hello %s,\n\nYou have a payment due for the %s settlement period.\n\nAmount: $%.2f\nPayable to: %s\nOrganization: %s\n\nPlease settle this payment using your mutually agreed-upon payment method, then acknowledge the payment in the app.\n\nBest regards,\nUbertool Team",
+		debtorName, settlementMonth, float64(amountCents)/100, creditorName, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{debtorEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendBillPaymentAcknowledgment(ctx context.Context, creditorEmail, creditorName, debtorName string, amountCents int32, settlementMonth string, orgName string) error {
+	subject := fmt.Sprintf("Payment Acknowledgment: %s sent $%.2f (%s)", debtorName, float64(amountCents)/100, orgName)
+	body := fmt.Sprintf("Hello %s,\n\n%s has acknowledged sending you a payment for the %s settlement period.\n\nAmount: $%.2f\nOrganization: %s\n\nPlease confirm receipt of this payment in the app once you have received it.\n\nBest regards,\nUbertool Team",
+		creditorName, debtorName, settlementMonth, float64(amountCents)/100, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{creditorEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendBillReceiptConfirmation(ctx context.Context, debtorEmail, debtorName, creditorName string, amountCents int32, settlementMonth string, orgName string) error {
+	subject := fmt.Sprintf("Receipt Confirmed: %s received $%.2f (%s)", creditorName, float64(amountCents)/100, orgName)
+	body := fmt.Sprintf("Hello %s,\n\n%s has confirmed receiving your payment for the %s settlement period.\n\nAmount: $%.2f\nOrganization: %s\n\nYour account balances have been updated accordingly.\n\nBest regards,\nUbertool Team",
+		debtorName, creditorName, settlementMonth, float64(amountCents)/100, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{debtorEmail},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendBillDisputeNotification(ctx context.Context, email, name, otherPartyName string, amountCents int32, reason string, orgName string) error {
+	subject := fmt.Sprintf("Payment Dispute Opened: $%.2f with %s (%s)", float64(amountCents)/100, otherPartyName, orgName)
+	body := fmt.Sprintf("Hello %s,\n\nA payment dispute has been opened for a $%.2f transaction with %s.\n\nReason: %s\nOrganization: %s\n\nPlease work with the other party to resolve this dispute. If the dispute cannot be resolved, an admin may need to intervene.\n\nBest regards,\nUbertool Team",
+		name, float64(amountCents)/100, otherPartyName, reason, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}
+
+func (s *sesEmailService) SendBillDisputeResolutionNotification(ctx context.Context, email, name string, amountCents int32, resolution, notes string, orgName string) error {
+	subject := fmt.Sprintf("Dispute Resolved: $%.2f Payment (%s)", float64(amountCents)/100, orgName)
+	body := fmt.Sprintf("Hello %s,\n\nThe dispute for a $%.2f payment has been resolved by an admin.\n\nResolution: %s\nNotes: %s\nOrganization: %s\n\nPlease check the app for details and any actions you may need to take.\n\nBest regards,\nUbertool Team",
+		name, float64(amountCents)/100, resolution, notes, orgName)
+	return s.sendEmail(EmailMessage{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+		IsHTML:  false,
+	})
+}

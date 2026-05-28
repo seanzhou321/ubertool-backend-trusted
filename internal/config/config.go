@@ -13,6 +13,8 @@ type Config struct {
 	Server          ServerConfig    `yaml:"server"`
 	Database        DatabaseConfig  `yaml:"database"`
 	SMTP            SMTPConfig      `yaml:"smtp"`
+	SES             SESConfig       `yaml:"ses"`
+	EmailProvider   string          `yaml:"email_provider"` // "smtp" (default) or "ses"
 	JWT             JWTConfig       `yaml:"jwt"`
 	Storage         StorageConfig   `yaml:"storage"`
 	Log             LogConfig       `yaml:"log"`
@@ -56,6 +58,14 @@ type SMTPConfig struct {
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 	From     string `yaml:"from"`
+}
+
+// SESConfig contains AWS SES email service settings.
+// AWS credentials are resolved from the standard SDK chain
+// (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars, ~/.aws/credentials, or IAM role).
+type SESConfig struct {
+	Region string `yaml:"region"` // e.g. "us-east-1"
+	From   string `yaml:"from"`   // verified SES sender address
 }
 
 // JWTConfig contains JWT token settings
@@ -137,6 +147,11 @@ func (c *Config) overrideWithEnv() {
 		c.Database.SSLMode = val
 	}
 
+	// Email provider toggle
+	if val := os.Getenv("EMAIL_PROVIDER"); val != "" {
+		c.EmailProvider = val
+	}
+
 	// SMTP
 	if val := os.Getenv("SMTP_HOST"); val != "" {
 		c.SMTP.Host = val
@@ -152,6 +167,14 @@ func (c *Config) overrideWithEnv() {
 	}
 	if val := os.Getenv("SMTP_FROM"); val != "" {
 		c.SMTP.From = val
+	}
+
+	// SES
+	if val := os.Getenv("SES_REGION"); val != "" {
+		c.SES.Region = val
+	}
+	if val := os.Getenv("SES_FROM"); val != "" {
+		c.SES.From = val
 	}
 
 	// JWT
@@ -206,6 +229,11 @@ func (c *Config) overrideWithEnv() {
 	if c.Log.Format == "" {
 		c.Log.Format = "text"
 	}
+
+	// Default email provider
+	if c.EmailProvider == "" {
+		c.EmailProvider = "smtp"
+	}
 }
 
 // Validate checks if the configuration is valid
@@ -226,12 +254,26 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("database name is required")
 	}
 
-	// SMTP validation
-	if c.SMTP.Host == "" {
-		return fmt.Errorf("SMTP host is required")
-	}
-	if c.SMTP.Port <= 0 || c.SMTP.Port > 65535 {
-		return fmt.Errorf("invalid SMTP port: %d", c.SMTP.Port)
+	// Email provider validation
+	switch c.EmailProvider {
+	case "", "smtp":
+		// SMTP validation
+		if c.SMTP.Host == "" {
+			return fmt.Errorf("SMTP host is required")
+		}
+		if c.SMTP.Port <= 0 || c.SMTP.Port > 65535 {
+			return fmt.Errorf("invalid SMTP port: %d", c.SMTP.Port)
+		}
+	case "ses":
+		// SES validation
+		if c.SES.Region == "" {
+			return fmt.Errorf("ses.region is required when email_provider is \"ses\"")
+		}
+		if c.SES.From == "" {
+			return fmt.Errorf("ses.from is required when email_provider is \"ses\"")
+		}
+	default:
+		return fmt.Errorf("unknown email_provider %q: must be \"smtp\" or \"ses\"", c.EmailProvider)
 	}
 
 	// JWT validation
