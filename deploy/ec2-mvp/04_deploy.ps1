@@ -62,7 +62,7 @@ $envContent | Set-Content "$BUILD_DIR\ubertool.env" -Encoding ASCII
 
 # 3. Upload binary, env file, config, firebase key, and service unit to EC2
 Write-Host "[3/6] Uploading files to EC2..."
-scp -i $SSH_KEY_PATH -o StrictHostKeyChecking=no "$BUILD_DIR\$BINARY_NAME" "$BUILD_DIR\ubertool.env" "$PSScriptRoot\config.yaml" "$PROJECT_ROOT\config\firebase-admin-key.json" "$PSScriptRoot\ubertool-api.service" "ubuntu@${ELASTIC_IP}:/tmp/"
+scp -i $SSH_KEY_PATH -o StrictHostKeyChecking=no "$BUILD_DIR\$BINARY_NAME" "$BUILD_DIR\ubertool.env" "$PROJECT_ROOT\config\config.ec2.prod.yaml" "$PROJECT_ROOT\config\firebase-admin-key.json" "$PSScriptRoot\ubertool-api.service" "ubuntu@${ELASTIC_IP}:/tmp/"
 
 # 4. Install on EC2
 Write-Host "[4/6] Installing binary and service on EC2..."
@@ -75,7 +75,7 @@ sudo mkdir -p /etc/ubertool
 sudo mv /tmp/ubertool.env /etc/ubertool/ubertool.env
 sudo chown root:ubertool /etc/ubertool/ubertool.env
 sudo chmod 640 /etc/ubertool/ubertool.env
-sudo mv /tmp/config.yaml /etc/ubertool/config.yaml
+sudo mv /tmp/config.ec2.prod.yaml /etc/ubertool/config.yaml
 sudo chown root:ubertool /etc/ubertool/config.yaml
 sudo chmod 640 /etc/ubertool/config.yaml
 sudo mv /tmp/firebase-admin-key.json /etc/ubertool/firebase-admin-key.json
