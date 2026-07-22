@@ -58,6 +58,10 @@ func (h *ToolHandler) GetTool(ctx context.Context, req *pb.GetToolRequest) (*pb.
 }
 
 func (h *ToolHandler) UpdateTool(ctx context.Context, req *pb.UpdateToolRequest) (*pb.UpdateToolResponse, error) {
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	tool := &domain.Tool{
 		ID:                   req.ToolId,
 		Name:                 req.Name,
@@ -70,7 +74,7 @@ func (h *ToolHandler) UpdateTool(ctx context.Context, req *pb.UpdateToolRequest)
 		DurationUnit:         domain.ToolDurationUnit(req.Duration),
 		Condition:            MapProtoToolConditionToDomain(req.Condition),
 	}
-	err := h.toolSvc.UpdateTool(ctx, tool)
+	err = h.toolSvc.UpdateTool(ctx, userID, tool)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +82,11 @@ func (h *ToolHandler) UpdateTool(ctx context.Context, req *pb.UpdateToolRequest)
 }
 
 func (h *ToolHandler) DeleteTool(ctx context.Context, req *pb.DeleteToolRequest) (*pb.DeleteToolResponse, error) {
-	err := h.toolSvc.DeleteTool(ctx, req.ToolId)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = h.toolSvc.DeleteTool(ctx, userID, req.ToolId)
 	if err != nil {
 		return nil, err
 	}

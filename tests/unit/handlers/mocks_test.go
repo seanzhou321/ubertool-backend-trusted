@@ -21,12 +21,12 @@ func (m *MockToolService) GetTool(ctx context.Context, id, requestingUserID int3
 	args := m.Called(ctx, id, requestingUserID)
 	return args.Get(0).(*domain.Tool), args.Get(1).([]domain.ToolImage), args.Error(2)
 }
-func (m *MockToolService) UpdateTool(ctx context.Context, tool *domain.Tool) error {
-	args := m.Called(ctx, tool)
+func (m *MockToolService) UpdateTool(ctx context.Context, callerID int32, tool *domain.Tool) error {
+	args := m.Called(ctx, callerID, tool)
 	return args.Error(0)
 }
-func (m *MockToolService) DeleteTool(ctx context.Context, id int32) error {
-	args := m.Called(ctx, id)
+func (m *MockToolService) DeleteTool(ctx context.Context, callerID, id int32) error {
+	args := m.Called(ctx, callerID, id)
 	return args.Error(0)
 }
 func (m *MockToolService) ListTools(ctx context.Context, orgID, requestingUserID int32, page, pageSize int32) ([]domain.Tool, int32, error) {

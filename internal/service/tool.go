@@ -58,11 +58,25 @@ func (s *toolService) GetTool(ctx context.Context, id, requestingUserID int32) (
 	return tool, images, nil
 }
 
-func (s *toolService) UpdateTool(ctx context.Context, tool *domain.Tool) error {
+func (s *toolService) UpdateTool(ctx context.Context, callerID int32, tool *domain.Tool) error {
+	existing, err := s.toolRepo.GetByID(ctx, tool.ID)
+	if err != nil {
+		return err
+	}
+	if existing.OwnerID != callerID {
+		return fmt.Errorf("unauthorized: only the tool owner may update this tool")
+	}
 	return s.toolRepo.Update(ctx, tool)
 }
 
-func (s *toolService) DeleteTool(ctx context.Context, id int32) error {
+func (s *toolService) DeleteTool(ctx context.Context, callerID, id int32) error {
+	existing, err := s.toolRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if existing.OwnerID != callerID {
+		return fmt.Errorf("unauthorized: only the tool owner may delete this tool")
+	}
 	return s.toolRepo.Delete(ctx, id)
 }
 

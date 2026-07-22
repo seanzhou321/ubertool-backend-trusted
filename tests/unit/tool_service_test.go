@@ -8,6 +8,7 @@ import (
 	"ubertool-backend-trusted/internal/service"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestToolService_AddTool(t *testing.T) {
@@ -23,6 +24,70 @@ func TestToolService_AddTool(t *testing.T) {
 
 		err := svc.AddTool(ctx, tool, []string{})
 		assert.NoError(t, err)
+	})
+}
+
+// TestToolService_UpdateDelete_RequiresOwnership locks in the fix for the ownership gap
+// found while writing specs/007-tools-image-storage/spec.md: UpdateTool and DeleteTool
+// previously performed no ownership check at any layer (handler, service, or repository),
+// so any authenticated user could modify or soft-delete any tool by ID. Regression coverage
+// for a real, previously unguarded vulnerability — do not remove without replacing.
+func TestToolService_UpdateDelete_RequiresOwnership(t *testing.T) {
+	const toolID = int32(5)
+	const ownerID = int32(1)
+	const otherUserID = int32(2)
+
+	t.Run("UpdateTool rejects a non-owner caller", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		svc := service.NewToolService(repo, new(MockUserRepo), new(MockOrganizationRepo))
+		ctx := context.Background()
+
+		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID}, nil).Once()
+
+		err := svc.UpdateTool(ctx, otherUserID, &domain.Tool{ID: toolID, Name: "Hijacked"})
+		assert.Error(t, err)
+		repo.AssertNotCalled(t, "Update", ctx, mock.Anything)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("UpdateTool accepts the actual owner", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		svc := service.NewToolService(repo, new(MockUserRepo), new(MockOrganizationRepo))
+		ctx := context.Background()
+
+		tool := &domain.Tool{ID: toolID, Name: "Updated"}
+		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID}, nil).Once()
+		repo.On("Update", ctx, tool).Return(nil).Once()
+
+		err := svc.UpdateTool(ctx, ownerID, tool)
+		assert.NoError(t, err)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("DeleteTool rejects a non-owner caller", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		svc := service.NewToolService(repo, new(MockUserRepo), new(MockOrganizationRepo))
+		ctx := context.Background()
+
+		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID}, nil).Once()
+
+		err := svc.DeleteTool(ctx, otherUserID, toolID)
+		assert.Error(t, err)
+		repo.AssertNotCalled(t, "Delete", ctx, toolID)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("DeleteTool accepts the actual owner", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		svc := service.NewToolService(repo, new(MockUserRepo), new(MockOrganizationRepo))
+		ctx := context.Background()
+
+		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID}, nil).Once()
+		repo.On("Delete", ctx, toolID).Return(nil).Once()
+
+		err := svc.DeleteTool(ctx, ownerID, toolID)
+		assert.NoError(t, err)
+		repo.AssertExpectations(t)
 	})
 }
 
