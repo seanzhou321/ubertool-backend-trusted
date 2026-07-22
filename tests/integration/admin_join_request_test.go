@@ -92,8 +92,19 @@ func TestAdminService_ListJoinRequests_UsedOnField(t *testing.T) {
 		t.Logf("Created invitations: id1=%d (used %s), id2=%d (used %s)",
 			invID1, usedDate1.Format("2006-01-02"), invID2, usedDate2.Format("2006-01-02"))
 
+		// Create an admin caller — ListJoinRequests now requires ADMIN/SUPER_ADMIN
+		// membership in orgID (see internal/service/admin.go verifyAdminRights).
+		adminEmail := fmt.Sprintf("test-join-req-admin-%d@test.com", time.Now().UnixNano())
+		var adminUserID int32
+		err = db.QueryRow(`INSERT INTO users (email, phone_number, password_hash, name)
+			VALUES ($1, '555-3333', 'hash', 'Test Admin') RETURNING id`, adminEmail).Scan(&adminUserID)
+		require.NoError(t, err)
+		_, err = db.Exec(`INSERT INTO users_orgs (user_id, org_id, role, status) VALUES ($1, $2, 'ADMIN', 'ACTIVE')`,
+			adminUserID, orgID)
+		require.NoError(t, err)
+
 		// Now test the service method
-		reqs, err := adminSvc.ListJoinRequests(ctx, orgID)
+		reqs, err := adminSvc.ListJoinRequests(ctx, adminUserID, orgID)
 		require.NoError(t, err)
 		require.Len(t, reqs, 2, "Should return 2 join requests")
 

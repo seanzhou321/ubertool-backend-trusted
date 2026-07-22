@@ -2,6 +2,7 @@ package unit
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -23,6 +24,9 @@ func TestAdminService_BlockUser(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Block", func(t *testing.T) {
+		adminUo := &domain.UserOrg{UserID: 999, OrgID: 1, Role: domain.UserOrgRoleAdmin, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, int32(999), int32(1)).Return(adminUo, nil).Once()
+
 		uo := &domain.UserOrg{UserID: 1, OrgID: 1, Status: domain.UserOrgStatusActive}
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(uo, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(1)).Return(&domain.User{ID: 1, Name: "User 1", Email: "u1@test.com"}, nil).Once()
@@ -37,6 +41,9 @@ func TestAdminService_BlockUser(t *testing.T) {
 	})
 
 	t.Run("Unblock", func(t *testing.T) {
+		adminUo := &domain.UserOrg{UserID: 999, OrgID: 1, Role: domain.UserOrgRoleAdmin, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, int32(999), int32(1)).Return(adminUo, nil).Once()
+
 		dateStr := time.Now().Format("2006-01-02")
 		uo := &domain.UserOrg{UserID: 1, OrgID: 1, Status: domain.UserOrgStatusBlock, BlockedReason: "violation", BlockedOn: &dateStr}
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(uo, nil).Once()
@@ -60,11 +67,14 @@ func TestAdminService_ListMembers(t *testing.T) {
 	svc := service.NewAdminService(nil, mockUserRepo, nil, nil, nil, nil)
 	ctx := context.Background()
 
+	adminUo := &domain.UserOrg{UserID: 999, OrgID: 1, Role: domain.UserOrgRoleAdmin}
+	mockUserRepo.On("GetUserOrg", ctx, int32(999), int32(1)).Return(adminUo, nil).Once()
+
 	users := []domain.User{{ID: 1, Name: "User 1"}}
 	uos := []domain.UserOrg{{UserID: 1, OrgID: 1}}
 	mockUserRepo.On("ListMembersByOrg", ctx, int32(1)).Return(users, uos, nil)
 
-	rUsers, rUos, err := svc.ListMembers(ctx, 1)
+	rUsers, rUos, err := svc.ListMembers(ctx, 999, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(rUsers))
 	assert.Equal(t, int32(1), rUos[0].OrgID)
@@ -87,6 +97,11 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	joinRequestID := int32(42)
 	email := "applicant@test.com"
 	name := "Applicant"
+
+	// Caller must hold ADMIN/SUPER_ADMIN in orgID before anything else runs.
+	mockUserRepo.On("GetUserOrg", ctx, adminID, orgID).Return(&domain.UserOrg{
+		UserID: adminID, OrgID: orgID, Role: domain.UserOrgRoleAdmin,
+	}, nil)
 
 	// Mock fetching the join request by ID
 	mockJoinRepo.On("GetByID", ctx, joinRequestID).Return(&domain.JoinRequest{
@@ -126,4 +141,160 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	mockJoinRepo.AssertExpectations(t)
 	mockInviteRepo.AssertExpectations(t)
 	mockEmailSvc.AssertExpectations(t)
+}
+
+// TestAdminService_RequiresAdminRole locks in the fix for the authorization gap recorded
+// in specs/004-organizations-administration/spec.md (Known Discrepancy 1): every
+// AdminService method must reject a caller who is not ADMIN/SUPER_ADMIN in the target org,
+// before performing any of its side effects. Regression coverage for a real, previously
+// unguarded vulnerability — do not remove without replacing.
+func TestAdminService_RequiresAdminRole(t *testing.T) {
+	const orgID = int32(1)
+	const targetUserID = int32(2)
+	const callerID = int32(999)
+
+	t.Run("BlockUser rejects a plain MEMBER caller", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		svc := service.NewAdminService(nil, mockUserRepo, nil, nil, nil, nil)
+		ctx := context.Background()
+
+		mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).
+			Return(&domain.UserOrg{UserID: callerID, OrgID: orgID, Role: domain.UserOrgRoleMember}, nil).Once()
+
+		err := svc.BlockUser(ctx, callerID, targetUserID, orgID, true, true, "abuse")
+		assert.Error(t, err)
+		// GetUserOrg for the *target* user must never be reached once authorization fails.
+		mockUserRepo.AssertNotCalled(t, "GetUserOrg", ctx, targetUserID, orgID)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("BlockUser rejects a caller with no membership in the org at all", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		svc := service.NewAdminService(nil, mockUserRepo, nil, nil, nil, nil)
+		ctx := context.Background()
+
+		mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).Return(nil, errors.New("sql: no rows")).Once()
+
+		err := svc.BlockUser(ctx, callerID, targetUserID, orgID, true, true, "abuse")
+		assert.Error(t, err)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("ListMembers rejects a plain MEMBER caller", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		svc := service.NewAdminService(nil, mockUserRepo, nil, nil, nil, nil)
+		ctx := context.Background()
+
+		mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).
+			Return(&domain.UserOrg{UserID: callerID, OrgID: orgID, Role: domain.UserOrgRoleMember}, nil).Once()
+
+		_, _, err := svc.ListMembers(ctx, callerID, orgID)
+		assert.Error(t, err)
+		mockUserRepo.AssertNotCalled(t, "ListMembersByOrg", ctx, orgID)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("SearchUsers rejects a plain MEMBER caller", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		svc := service.NewAdminService(nil, mockUserRepo, nil, nil, nil, nil)
+		ctx := context.Background()
+
+		mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).
+			Return(&domain.UserOrg{UserID: callerID, OrgID: orgID, Role: domain.UserOrgRoleMember}, nil).Once()
+
+		_, _, err := svc.SearchUsers(ctx, callerID, orgID, "query")
+		assert.Error(t, err)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("ListJoinRequests rejects a plain MEMBER caller", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		mockJoinRepo := new(MockJoinRequestRepo)
+		svc := service.NewAdminService(mockJoinRepo, mockUserRepo, nil, nil, nil, nil)
+		ctx := context.Background()
+
+		mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).
+			Return(&domain.UserOrg{UserID: callerID, OrgID: orgID, Role: domain.UserOrgRoleMember}, nil).Once()
+
+		_, err := svc.ListJoinRequests(ctx, callerID, orgID)
+		assert.Error(t, err)
+		mockJoinRepo.AssertNotCalled(t, "ListByOrg", ctx, orgID)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetMemberProfile rejects a plain MEMBER caller", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		svc := service.NewAdminService(nil, mockUserRepo, nil, nil, nil, nil)
+		ctx := context.Background()
+
+		mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).
+			Return(&domain.UserOrg{UserID: callerID, OrgID: orgID, Role: domain.UserOrgRoleMember}, nil).Once()
+
+		_, _, err := svc.GetMemberProfile(ctx, callerID, orgID, targetUserID)
+		assert.Error(t, err)
+		mockUserRepo.AssertNotCalled(t, "GetByID", ctx, targetUserID)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("ApproveJoinRequest rejects a plain MEMBER caller", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		mockJoinRepo := new(MockJoinRequestRepo)
+		svc := service.NewAdminService(mockJoinRepo, mockUserRepo, nil, nil, nil, nil)
+		ctx := context.Background()
+
+		mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).
+			Return(&domain.UserOrg{UserID: callerID, OrgID: orgID, Role: domain.UserOrgRoleMember}, nil).Once()
+
+		_, err := svc.ApproveJoinRequest(ctx, callerID, orgID, 42)
+		assert.Error(t, err)
+		mockJoinRepo.AssertNotCalled(t, "GetByID", ctx, int32(42))
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("RejectJoinRequest rejects a plain MEMBER caller", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		mockJoinRepo := new(MockJoinRequestRepo)
+		svc := service.NewAdminService(mockJoinRepo, mockUserRepo, nil, nil, nil, nil)
+		ctx := context.Background()
+
+		mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).
+			Return(&domain.UserOrg{UserID: callerID, OrgID: orgID, Role: domain.UserOrgRoleMember}, nil).Once()
+
+		err := svc.RejectJoinRequest(ctx, callerID, orgID, 42, "no thanks")
+		assert.Error(t, err)
+		mockJoinRepo.AssertNotCalled(t, "GetByID", ctx, int32(42))
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("SendInvitation rejects a plain MEMBER caller", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		mockOrgRepo := new(MockOrganizationRepo)
+		svc := service.NewAdminService(nil, mockUserRepo, nil, mockOrgRepo, nil, nil)
+		ctx := context.Background()
+
+		mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).
+			Return(&domain.UserOrg{UserID: callerID, OrgID: orgID, Role: domain.UserOrgRoleMember}, nil).Once()
+
+		_, err := svc.SendInvitation(ctx, callerID, orgID, "new@test.com", "New Person")
+		assert.Error(t, err)
+		mockOrgRepo.AssertNotCalled(t, "GetByID", ctx, orgID)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("ADMIN and SUPER_ADMIN callers are both accepted by verifyAdminRights", func(t *testing.T) {
+		for _, role := range []domain.UserOrgRole{domain.UserOrgRoleAdmin, domain.UserOrgRoleSuperAdmin} {
+			mockUserRepo := new(MockUserRepo)
+			svc := service.NewAdminService(nil, mockUserRepo, nil, nil, nil, nil)
+			ctx := context.Background()
+
+			mockUserRepo.On("GetUserOrg", ctx, callerID, orgID).
+				Return(&domain.UserOrg{UserID: callerID, OrgID: orgID, Role: role}, nil).Once()
+			mockUserRepo.On("ListMembersByOrg", ctx, orgID).
+				Return([]domain.User{}, []domain.UserOrg{}, nil).Once()
+
+			_, _, err := svc.ListMembers(ctx, callerID, orgID)
+			assert.NoError(t, err, "role %s should be accepted", role)
+			mockUserRepo.AssertExpectations(t)
+		}
+	})
 }

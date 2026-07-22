@@ -44,7 +44,11 @@ func (h *AdminHandler) AdminBlockUserAccount(ctx context.Context, req *pb.AdminB
 }
 
 func (h *AdminHandler) ListMembers(ctx context.Context, req *pb.ListMembersRequest) (*pb.ListMembersResponse, error) {
-	users, uos, err := h.adminSvc.ListMembers(ctx, req.OrganizationId)
+	adminID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	users, uos, err := h.adminSvc.ListMembers(ctx, adminID, req.OrganizationId)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +60,11 @@ func (h *AdminHandler) ListMembers(ctx context.Context, req *pb.ListMembersReque
 }
 
 func (h *AdminHandler) SearchUsers(ctx context.Context, req *pb.SearchUsersRequest) (*pb.SearchUsersResponse, error) {
-	users, uos, err := h.adminSvc.SearchUsers(ctx, req.OrganizationId, req.Query)
+	adminID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	users, uos, err := h.adminSvc.SearchUsers(ctx, adminID, req.OrganizationId, req.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +76,11 @@ func (h *AdminHandler) SearchUsers(ctx context.Context, req *pb.SearchUsersReque
 }
 
 func (h *AdminHandler) ListJoinRequests(ctx context.Context, req *pb.ListJoinRequestsRequest) (*pb.ListJoinRequestsResponse, error) {
-	reqs, err := h.adminSvc.ListJoinRequests(ctx, req.OrganizationId)
+	adminID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	reqs, err := h.adminSvc.ListJoinRequests(ctx, adminID, req.OrganizationId)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +119,11 @@ func (h *AdminHandler) SendInvitation(ctx context.Context, req *pb.SendInvitatio
 }
 
 func (h *AdminHandler) GetMemberProfile(ctx context.Context, req *pb.GetMemberProfileRequest) (*pb.GetMemberProfileResponse, error) {
-	user, uo, err := h.adminSvc.GetMemberProfile(ctx, req.OrganizationId, req.UserId)
+	adminID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	user, uo, err := h.adminSvc.GetMemberProfile(ctx, adminID, req.OrganizationId, req.UserId)
 	if err != nil {
 		return nil, err
 	}

@@ -36,7 +36,25 @@ func NewAdminService(
 	}
 }
 
+// verifyAdminRights confirms the caller holds ADMIN or SUPER_ADMIN membership in orgID.
+// Mirrors billSplitService.verifyAdminRights (internal/service/bill_split.go) — every
+// AdminService method must call this before doing anything else.
+func (s *adminService) verifyAdminRights(ctx context.Context, adminID, orgID int32) error {
+	userOrg, err := s.userRepo.GetUserOrg(ctx, adminID, orgID)
+	if err != nil {
+		return fmt.Errorf("unauthorized: not a member of this organization")
+	}
+	if userOrg.Role != domain.UserOrgRoleAdmin && userOrg.Role != domain.UserOrgRoleSuperAdmin {
+		return fmt.Errorf("unauthorized: admin privileges required")
+	}
+	return nil
+}
+
 func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID, joinRequestID int32) (string, error) {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
+		return "", err
+	}
+
 	// 1. Fetch the join request by ID
 	joinReq, err := s.reqRepo.GetByID(ctx, joinRequestID)
 	if err != nil {
@@ -112,6 +130,10 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID, j
 }
 
 func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int32, blockRenting, blockLending bool, reason string) error {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
+		return err
+	}
+
 	uo, err := s.userRepo.GetUserOrg(ctx, userID, orgID)
 	if err != nil {
 		return err
@@ -152,19 +174,32 @@ func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int
 	return nil
 }
 
-func (s *adminService) ListMembers(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error) {
+func (s *adminService) ListMembers(ctx context.Context, adminID, orgID int32) ([]domain.User, []domain.UserOrg, error) {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
+		return nil, nil, err
+	}
 	return s.userRepo.ListMembersByOrg(ctx, orgID)
 }
 
-func (s *adminService) SearchUsers(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error) {
+func (s *adminService) SearchUsers(ctx context.Context, adminID, orgID int32, query string) ([]domain.User, []domain.UserOrg, error) {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
+		return nil, nil, err
+	}
 	return s.userRepo.SearchMembersByOrg(ctx, orgID, query)
 }
 
-func (s *adminService) ListJoinRequests(ctx context.Context, orgID int32) ([]domain.JoinRequest, error) {
+func (s *adminService) ListJoinRequests(ctx context.Context, adminID, orgID int32) ([]domain.JoinRequest, error) {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
+		return nil, err
+	}
 	return s.reqRepo.ListByOrg(ctx, orgID)
 }
 
 func (s *adminService) RejectJoinRequest(ctx context.Context, adminID, orgID, joinRequestID int32, reason string) error {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
+		return err
+	}
+
 	// 1. Fetch the join request by ID
 	joinReq, err := s.reqRepo.GetByID(ctx, joinRequestID)
 	if err != nil {
@@ -199,6 +234,10 @@ func (s *adminService) RejectJoinRequest(ctx context.Context, adminID, orgID, jo
 }
 
 func (s *adminService) SendInvitation(ctx context.Context, adminID, orgID int32, email, name string) (string, error) {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
+		return "", err
+	}
+
 	// Get organization
 	org, err := s.orgRepo.GetByID(ctx, orgID)
 	if err != nil {
@@ -238,7 +277,11 @@ func (s *adminService) SendInvitation(ctx context.Context, adminID, orgID int32,
 	return inv.InvitationCode, nil
 }
 
-func (s *adminService) GetMemberProfile(ctx context.Context, orgID, userID int32) (*domain.User, *domain.UserOrg, error) {
+func (s *adminService) GetMemberProfile(ctx context.Context, adminID, orgID, userID int32) (*domain.User, *domain.UserOrg, error) {
+	if err := s.verifyAdminRights(ctx, adminID, orgID); err != nil {
+		return nil, nil, err
+	}
+
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get user: %w", err)
