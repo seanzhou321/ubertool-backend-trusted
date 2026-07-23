@@ -262,3 +262,56 @@ pattern from Phases 1/2).
 **Environment note**: `TestPushNotificationService_E2E` still fails independently of this
 remediation, for the same reason documented in Phase 2 (stale real Firebase device tokens) —
 reproduced identically before and after Phase 4's changes; not a regression.
+
+## Post-Phase-4 hardening pass (2026-07-23)
+
+A user follow-up flagged that several RTM rows marked `Complete` carried blank tier cells with
+no stated reason, contrary to `sbr/README.md`'s own rule that every omitted tier must be
+justified in Notes ("not every requirement needs every tier" is a judgment call the RTM has to
+show its work on, not a blanket excuse). This pass re-audited **every cell in all 8 RTM files**
+— not just the Phase 4 rows — against that rule, going FR by FR through the underlying
+implementation to decide, per blank cell: add a real test, or write down why the tier
+genuinely doesn't apply. It also caught 005/FR-005 having been dropped from the master Phase 4
+list despite Phase 3's own RTM entry promising it — corrected and closed in the same pass (see
+Phase 4 results above).
+
+**Real gaps closed with new tests (16 new test functions across 8 files, 0 bugs found):**
+
+| Spec | Item | What was added |
+|---|---|---|
+| 001 | FR-001, FR-004 | L1 unit tests for `Login` and `RefreshToken` — previously evidenced only via L2/L3 paths that share the server's per-IP rate limiter budget; these are mocked/DB-free and don't compete for it. |
+| 001 | FR-005, FR-008, FR-009 | L2 real-DB integration tests (`tests/integration/auth_test.go`, new file) for `Logout`, `ChangePassword`, `ResetPassword` — previously mocked-only. |
+| 003 | FR-002/FR-003, FR-004, FR-006 | 3 RPCs — `UpdateOrganization`, `JoinOrganizationWithInvite`, `RejectRequestToJoin` — had **never once been called through the real gRPC handler against a live database** (confirmed by grep returning nothing in `tests/e2e`/`tests/integration`). New e2e subtests close all three, including polling for FR-003's async threshold-change broadcast. |
+| 004 | FR-003 | Real-DB `Dispatch` test, independent of live Firebase (its only prior non-L1 evidence depends on device tokens documented as stale in this environment). |
+| 004 | FR-006 | L1 test for `SyncDeviceToken`'s own parameter-mapping logic (distinct from the DB reassignment semantic already covered at L2). |
+| 004 | FR-007 | L2 test for `MarkDelivered`/`MarkClicked`'s DB-level first-write-wins semantics (same pattern as FR-002's `MarkNotificationRead`). |
+| 004 | FR-008 | L2 test for `GetActiveByUserIDs` — the actual SQL query the multicast batching logic depends on, previously only ever mocked. |
+| 005 | FR-006 | e2e test for `GetRental` — previously only a mock-interface stub anywhere in the suite. |
+| 007 | FR-003 | L1 pass-through test for `GetLedgerSummary`, matching its `GetBalance`/`GetTransactions` siblings. |
+
+**Remaining blanks investigated and documented as legitimate (no test added), with the
+specific reason now in each row's Notes column:**
+
+- **Authorization/query gates already proven at L1 against a real repo interface**, where an
+  L2 test would add negligible confidence (002/FR-001, 005/FR-001–003, 006/FR-001–005,
+  008/FR-011).
+- **L3 already subsumes L2** — the e2e test asserts the exact same real-DB effect a separate L2
+  test would check (001/FR-006–007/FR-010–011, 003/FR-001, 004/FR-001/FR-005, 006/FR-002–003,
+  008/FR-010).
+- **Structurally inapplicable tiers** — no repository to mock (001/FR-004/FR-011/FR-012's L2;
+  004/FR-004's L1), no gRPC/proto surface to exercise (008/FR-002–005's L1/L3, cron jobs
+  confirmed by reading `internal/jobs/*.go` to be raw-SQL/DB-function calls with zero
+  gRPC-reachable surface), or an unexported method that would require an API change to reach
+  from outside its package (006/FR-006's `generateThumbnail`).
+- **Negative/absence claims that only a real-DB test can prove** — a mocked repo only reflects
+  its own permissiveness, telling us nothing about actual Postgres constraint behavior
+  (002/FR-002/FR-005, 006/FR-007).
+- **Marginal benefit not worth new scaffolding** — 008/FR-013's handler-level field-dropping is
+  already outcome-proven at e2e; proving the mechanism at L1 would require building a new
+  `MockBillSplitService` for a large interface with no other current test need.
+
+**New files**: `tests/integration/auth_test.go`.
+**Production code changed**: none.
+**Full suite**: unit + integration + e2e re-verified green after every file's changes (the one
+`TestPushNotificationService_E2E` failure is the same pre-existing environment issue noted
+above, unrelated to this pass).

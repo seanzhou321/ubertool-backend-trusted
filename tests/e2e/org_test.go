@@ -49,6 +49,88 @@ func TestOrganizationService_E2E(t *testing.T) {
 		assert.Equal(t, "SUPER_ADMIN", role)
 	})
 
+	// FR-002/FR-003 (specs/003-organizations-administration): UpdateOrganization had thorough L1
+	// coverage but was never exercised through the real gRPC handler against a live DB — prior to
+	// this test, `grep -r UpdateOrganization tests/e2e tests/integration` returned nothing. Also
+	// covers FR-003's threshold-change broadcast (the member below must be notified).
+	t.Run("UpdateOrganization by SUPER_ADMIN updates fields and price thresholds", func(t *testing.T) {
+		orgID := db.CreateTestOrg("E2E-Test-UpdateOrg-Original")
+		superAdminID := db.CreateTestUser("e2e-test-updateorg-superadmin@test.com", "Super Admin")
+		memberID := db.CreateTestUser("e2e-test-updateorg-member@test.com", "Member")
+		db.AddUserToOrg(superAdminID, orgID, "SUPER_ADMIN", "ACTIVE", 0)
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(superAdminID, 5*time.Second)
+		defer cancel()
+
+		req := &pb.UpdateOrganizationRequest{
+			OrganizationId:                    orgID,
+			Name:                              "E2E-Test-UpdateOrg-Renamed",
+			Description:                       "Updated description",
+			Address:                           "456 Updated Ave",
+			Metro:                             "San Jose",
+			AdminEmail:                        "updated-admin@e2etest.com",
+			AdminPhone:                        "555-1111",
+			BillsplitSettlementThresholdCents: 999,
+			MaxBillsplitRentalCostCents:       2500,
+		}
+
+		resp, err := orgClient.UpdateOrganization(ctx, req)
+		require.NoError(t, err)
+		assert.Equal(t, "E2E-Test-UpdateOrg-Renamed", resp.Organization.Name)
+
+		var name, adminEmail string
+		var threshold, maxRentalCost int32
+		err = db.QueryRow(
+			"SELECT name, admin_email, billsplit_settlement_threshold_cents, max_billsplit_rental_cost_cents FROM orgs WHERE id = $1",
+			orgID,
+		).Scan(&name, &adminEmail, &threshold, &maxRentalCost)
+		require.NoError(t, err)
+		assert.Equal(t, "E2E-Test-UpdateOrg-Renamed", name)
+		assert.Equal(t, "updated-admin@e2etest.com", adminEmail)
+		assert.EqualValues(t, 999, threshold)
+		assert.EqualValues(t, 2500, maxRentalCost)
+
+		// FR-003: the broadcast fires from a background goroutine, so poll for the member's
+		// in-app notification rather than asserting immediately.
+		notified := pollDB(3*time.Second, 100*time.Millisecond, func() bool {
+			var count int
+			db.QueryRow("SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND org_id = $2", memberID, orgID).Scan(&count)
+			return count >= 1
+		})
+		assert.True(t, notified, "an active member must be notified when the settlement threshold changes")
+	})
+
+	// FR-004 (specs/003-organizations-administration): JoinOrganizationWithInvite had thorough
+	// L1 coverage but was never exercised through the real gRPC handler against a live DB.
+	t.Run("JoinOrganizationWithInvite", func(t *testing.T) {
+		orgID := db.CreateTestOrg("E2E-Test-JoinOrg")
+		adminID := db.CreateTestUser("e2e-test-joinorg-admin@test.com", "Admin")
+		db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
+
+		joinerEmail := "e2e-test-joinorg-joiner@test.com"
+		joinerID := db.CreateTestUser(joinerEmail, "Joiner")
+		inviteCode := db.CreateTestInvitation(orgID, joinerEmail, adminID)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(joinerID, 5*time.Second)
+		defer cancel()
+
+		resp, err := orgClient.JoinOrganizationWithInvite(ctx, &pb.JoinOrganizationRequest{InvitationCode: inviteCode})
+		require.NoError(t, err)
+		assert.True(t, resp.Success)
+
+		var role, status string
+		err = db.QueryRow("SELECT role, status FROM users_orgs WHERE user_id = $1 AND org_id = $2", joinerID, orgID).Scan(&role, &status)
+		require.NoError(t, err)
+		assert.Equal(t, "MEMBER", role)
+		assert.Equal(t, "ACTIVE", status)
+
+		var usedOn *time.Time
+		err = db.QueryRow("SELECT used_on FROM invitations WHERE invitation_code = $1", inviteCode).Scan(&usedOn)
+		require.NoError(t, err)
+		assert.NotNil(t, usedOn, "the invitation must be marked used")
+	})
+
 	t.Run("ListMyOrganizations", func(t *testing.T) {
 		// Setup: Create user and add to multiple orgs
 		userID := db.CreateTestUser("e2e-test-member@test.com", "Member User")

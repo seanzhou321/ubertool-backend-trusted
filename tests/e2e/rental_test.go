@@ -168,6 +168,35 @@ func TestRentalService_E2E(t *testing.T) {
 		assertNotifiedAtLeastOnce(t, db, env.ownerID, env.orgID)
 	})
 
+	// FR-006 (specs/005-rentals): GetRental had thorough L1 coverage but was never exercised
+	// through the real gRPC handler against a live DB — prior to this test,
+	// `grep -r GetRental tests/e2e tests/integration` returned nothing.
+	t.Run("GetRental grants access to renter and owner, rejects others", func(t *testing.T) {
+		env := setupRentalTestEnv(t, db, "getrental", 5000)
+		start := time.Now().Add(24 * time.Hour)
+		end := start.Add(24 * time.Hour)
+		rentalID := doCreateRentalRequest(t, rentalClient, env, start, end)
+
+		outsiderID := db.CreateTestUser("e2e-test-getrental-outsider@test.com", "Outsider")
+
+		renterCtx, cancel := ContextWithUserIDAndTimeout(env.renterID, 5*time.Second)
+		defer cancel()
+		resp, err := rentalClient.GetRental(renterCtx, &pb.GetRentalRequest{RequestId: rentalID})
+		require.NoError(t, err, "the renter must be granted access")
+		assert.Equal(t, rentalID, resp.RentalRequest.Id)
+
+		ownerCtx, cancel2 := ContextWithUserIDAndTimeout(env.ownerID, 5*time.Second)
+		defer cancel2()
+		resp, err = rentalClient.GetRental(ownerCtx, &pb.GetRentalRequest{RequestId: rentalID})
+		require.NoError(t, err, "the owner must be granted access")
+		assert.Equal(t, rentalID, resp.RentalRequest.Id)
+
+		outsiderCtx, cancel3 := ContextWithUserIDAndTimeout(outsiderID, 5*time.Second)
+		defer cancel3()
+		_, err = rentalClient.GetRental(outsiderCtx, &pb.GetRentalRequest{RequestId: rentalID})
+		require.Error(t, err, "a caller who is neither renter nor owner must be rejected")
+	})
+
 	// Balance check is disabled for now
 	// t.Run("CreateRentalRequest with Insufficient Balance", func(t *testing.T) { ... })
 

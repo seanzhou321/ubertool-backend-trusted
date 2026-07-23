@@ -123,3 +123,25 @@ func TestNotificationService_ReportMessageEvent(t *testing.T) {
 		noteRepo.AssertNotCalled(t, "MarkClicked", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }
+
+// TestNotificationService_SyncDeviceToken covers FR-006 (specs/004-notifications): SyncDeviceToken
+// must construct the FcmToken correctly (ACTIVE status, device_name mapped into DeviceInfo) before
+// upserting. The upsert's own DB-level reassignment semantic is covered separately at L2
+// (TestFcmTokenRepository_Upsert_Reassignment) — this isolates the service's own parameter
+// mapping, which was previously untested at any tier.
+func TestNotificationService_SyncDeviceToken(t *testing.T) {
+	ctx := context.Background()
+	noteRepo := new(MockNotificationDBRepo)
+	fcmRepo := new(MockFcmTokenRepo)
+	svc := service.NewNotificationService(noteRepo, fcmRepo)
+
+	fcmRepo.On("Upsert", ctx, mock.MatchedBy(func(token *domain.FcmToken) bool {
+		return token.UserID == 42 && token.Token == "device-token-abc" &&
+			token.AndroidDeviceID == "device-xyz" && token.Status == "ACTIVE" &&
+			token.DeviceInfo["device_name"] == "Pixel 9"
+	})).Return(nil)
+
+	err := svc.SyncDeviceToken(ctx, 42, "device-token-abc", "device-xyz", "Pixel 9")
+	require.NoError(t, err)
+	fcmRepo.AssertExpectations(t)
+}

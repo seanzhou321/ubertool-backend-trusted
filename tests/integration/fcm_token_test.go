@@ -79,3 +79,53 @@ func TestFcmTokenRepository_Upsert_Reassignment(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, rowCount, "reassignment must update the existing row, not insert a duplicate")
 }
+
+// TestFcmTokenRepository_GetActiveByUserIDs covers FR-008 (specs/004-notifications):
+// SendMulticastToUsers fetches its recipients via GetActiveByUserIDs, which must return only
+// ACTIVE/TESTING tokens across the given set of users, excluding OBSOLETE ones. Prior to this
+// test, this repository method — the actual SQL query the multicast batching logic depends
+// on — had zero coverage at any tier (only ever mocked in the L1 push-notification tests).
+func TestFcmTokenRepository_GetActiveByUserIDs(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	repo := postgres.NewFcmTokenRepository(db)
+	ctx := context.Background()
+
+	userAEmail := fmt.Sprintf("test-integration-fcmulti-a-%d@test.com", time.Now().UnixNano())
+	userBEmail := fmt.Sprintf("test-integration-fcmulti-b-%d@test.com", time.Now().UnixNano())
+	userCEmail := fmt.Sprintf("test-integration-fcmulti-c-%d@test.com", time.Now().UnixNano())
+	var userAID, userBID, userCID int32
+	require.NoError(t, db.QueryRow(
+		`INSERT INTO users (email, phone_number, password_hash, name) VALUES ($1, $2, 'hash', 'User A') RETURNING id`,
+		userAEmail, fmt.Sprintf("555-ma-%d", time.Now().UnixNano()),
+	).Scan(&userAID))
+	require.NoError(t, db.QueryRow(
+		`INSERT INTO users (email, phone_number, password_hash, name) VALUES ($1, $2, 'hash', 'User B') RETURNING id`,
+		userBEmail, fmt.Sprintf("555-mb-%d", time.Now().UnixNano()),
+	).Scan(&userBID))
+	require.NoError(t, db.QueryRow(
+		`INSERT INTO users (email, phone_number, password_hash, name) VALUES ($1, $2, 'hash', 'User C') RETURNING id`,
+		userCEmail, fmt.Sprintf("555-mc-%d", time.Now().UnixNano()),
+	).Scan(&userCID))
+	defer func() {
+		db.Exec("DELETE FROM fcm_tokens WHERE user_id IN ($1, $2, $3)", userAID, userBID, userCID)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2, $3)", userAID, userBID, userCID)
+	}()
+
+	require.NoError(t, repo.Upsert(ctx, &domain.FcmToken{UserID: userAID, Token: fmt.Sprintf("tok-a-%d", time.Now().UnixNano()), AndroidDeviceID: "dev-a"}))
+	require.NoError(t, repo.Upsert(ctx, &domain.FcmToken{UserID: userBID, Token: fmt.Sprintf("tok-b-%d", time.Now().UnixNano()), AndroidDeviceID: "dev-b"}))
+	// User C's token is explicitly marked obsolete and must be excluded.
+	obsoleteToken := fmt.Sprintf("tok-c-%d", time.Now().UnixNano())
+	require.NoError(t, repo.Upsert(ctx, &domain.FcmToken{UserID: userCID, Token: obsoleteToken, AndroidDeviceID: "dev-c"}))
+	require.NoError(t, repo.MarkObsolete(ctx, obsoleteToken))
+
+	tokens, err := repo.GetActiveByUserIDs(ctx, []int32{userAID, userBID, userCID})
+	require.NoError(t, err)
+
+	var gotUserIDs []int32
+	for _, tok := range tokens {
+		gotUserIDs = append(gotUserIDs, tok.UserID)
+	}
+	assert.ElementsMatch(t, []int32{userAID, userBID}, gotUserIDs, "must return A and B's active tokens but exclude C's obsolete one")
+}

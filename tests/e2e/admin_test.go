@@ -106,6 +106,54 @@ func TestAdminService_E2E(t *testing.T) {
 		assert.Equal(t, "INVITED", status)
 	})
 
+	// FR-006 (specs/003-organizations-administration): RejectRequestToJoin's invitation-expiry
+	// side effect had thorough L1 coverage but was never exercised through the real gRPC handler
+	// against a live DB — prior to this test, `grep -r RejectRequestToJoin tests/e2e
+	// tests/integration` returned nothing.
+	t.Run("RejectRequestToJoin expires the linked invitation", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		adminID := db.CreateTestUser("e2e-test-admin-reject@test.com", "Admin User")
+		db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
+
+		applicantEmail := "e2e-test-reject-applicant@test.com"
+		var joinRequestID int32
+		err := db.QueryRow(`
+			INSERT INTO join_requests (org_id, user_id, name, email, note, status)
+			VALUES ($1, NULL, 'Applicant', $2, 'Please let me join', 'PENDING')
+			RETURNING id
+		`, orgID, applicantEmail).Scan(&joinRequestID)
+		require.NoError(t, err)
+
+		var invitationID int32
+		err = db.QueryRow(`
+			INSERT INTO invitations (invitation_code, org_id, email, join_request_id, created_by, expires_on)
+			VALUES ($1, $2, $3, $4, $5, CURRENT_DATE + INTERVAL '7 days')
+			RETURNING id
+		`, "REJ-TEST-INV-CODE", orgID, applicantEmail, joinRequestID, adminID).Scan(&invitationID)
+		require.NoError(t, err)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(adminID, 5*time.Second)
+		defer cancel()
+
+		resp, err := adminClient.RejectRequestToJoin(ctx, &pb.RejectRequestToJoinRequest{
+			OrganizationId: orgID,
+			JoinRequestId:  joinRequestID,
+			Reason:         "not a fit",
+		})
+		require.NoError(t, err)
+		assert.True(t, resp.Success)
+
+		var status string
+		err = db.QueryRow("SELECT status FROM join_requests WHERE id = $1", joinRequestID).Scan(&status)
+		require.NoError(t, err)
+		assert.Equal(t, "REJECTED", status)
+
+		var expiresOn time.Time
+		err = db.QueryRow("SELECT expires_on FROM invitations WHERE id = $1", invitationID).Scan(&expiresOn)
+		require.NoError(t, err)
+		assert.True(t, expiresOn.Before(time.Now()), "the linked invitation must be expired")
+	})
+
 	t.Run("BlockUser", func(t *testing.T) {
 		// Setup: Create org, admin, and member
 		orgID := db.CreateTestOrg("")

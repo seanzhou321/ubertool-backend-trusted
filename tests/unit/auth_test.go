@@ -8,6 +8,7 @@ import (
 
 	"ubertool-backend-trusted/internal/config"
 	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/security"
 	"ubertool-backend-trusted/internal/service"
 
 	"github.com/stretchr/testify/assert"
@@ -252,6 +253,101 @@ func newAuthServiceForTest() (service.AuthService, *MockUserRepo, *MockEmailServ
 	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
 		config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
 	return svc, userRepo, emailSvc, pendingCredsRepo
+}
+
+// TestAuthService_Login covers FR-001's L1 tier: Login must authenticate against the canonical
+// password_hash, fall back to pending_credentials, and reject with a generic error if neither
+// matches. This FR previously had zero unit coverage — only L2/L3/Grounding evidence, all of
+// which share the server's per-IP Login rate limiter budget (FR-012). This mocked, service-level
+// test verifies the same 3 clauses without touching that shared budget.
+func TestAuthService_Login(t *testing.T) {
+	ctx := context.Background()
+	const userID = int32(80)
+	const email = "login-unit@example.com"
+	const password = "correct-horse-battery-staple"
+
+	t.Run("Succeeds via the canonical password_hash", func(t *testing.T) {
+		svc, userRepo, _, _ := newAuthServiceForTest()
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		userRepo.On("GetByEmail", ctx, email).Return(&domain.User{ID: userID, Email: email, PasswordHash: string(hash)}, nil)
+
+		_, requires2FA, tempPwd, err := svc.Login(ctx, email, password)
+		require.NoError(t, err)
+		assert.True(t, requires2FA)
+		assert.False(t, tempPwd, "canonical-password success must not be reported as a temp-password login")
+	})
+
+	t.Run("Falls back to a valid pending_credentials entry", func(t *testing.T) {
+		svc, userRepo, _, pendingCredsRepo := newAuthServiceForTest()
+		// Canonical hash deliberately does not match — only the pending credential does.
+		canonicalHash, err := bcrypt.GenerateFromPassword([]byte("unrelated-password"), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		tempHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		userRepo.On("GetByEmail", ctx, email).Return(&domain.User{ID: userID, Email: email, PasswordHash: string(canonicalHash)}, nil)
+		pendingCredsRepo.On("GetByUserID", ctx, userID).Return(&domain.PendingCredential{
+			UserID: userID, TempPasswordHash: string(tempHash), ExpiresAt: time.Now().Add(20 * time.Minute),
+		}, nil)
+
+		_, requires2FA, tempPwd, err := svc.Login(ctx, email, password)
+		require.NoError(t, err, "must fall back to the pending credential when the canonical password doesn't match")
+		assert.True(t, requires2FA)
+		assert.True(t, tempPwd, "a pending-credential login must be reported as tempPwd=true")
+	})
+
+	t.Run("Rejects with a generic error when neither matches", func(t *testing.T) {
+		svc, userRepo, _, pendingCredsRepo := newAuthServiceForTest()
+		hash, err := bcrypt.GenerateFromPassword([]byte("the-real-password"), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		userRepo.On("GetByEmail", ctx, email).Return(&domain.User{ID: userID, Email: email, PasswordHash: string(hash)}, nil)
+		pendingCredsRepo.On("GetByUserID", ctx, userID).Return(nil, nil)
+
+		_, _, _, err = svc.Login(ctx, email, "wrong-password")
+		require.Error(t, err)
+	})
+}
+
+// TestAuthService_RefreshToken covers FR-004's L1 tier: RefreshToken must require a valid,
+// non-expired refresh-type token and issue a new access/refresh pair preserving identity claims.
+// Prior to this test, this FR's only evidence was folded into an e2e Login subtest (deliberately,
+// to respect the shared rate limiter — see sbr/remediation-plan.md). RefreshToken has no
+// repository dependency at all (pure JWT validate/regenerate via the token manager), so this
+// test constructs a real security.TokenManager directly rather than mocking anything.
+func TestAuthService_RefreshToken(t *testing.T) {
+	ctx := context.Background()
+	const secret = "secret" // must match newAuthServiceForTest's JWT secret
+	tm := security.NewTokenManager(secret)
+	svc, _, _, _ := newAuthServiceForTest()
+
+	t.Run("Issues a new access/refresh pair preserving identity claims", func(t *testing.T) {
+		refreshToken, err := tm.GenerateRefreshToken(int32(90), "refresh-unit@example.com")
+		require.NoError(t, err)
+
+		access, refresh, err := svc.RefreshToken(ctx, refreshToken)
+		require.NoError(t, err)
+		require.NotEmpty(t, access)
+		require.NotEmpty(t, refresh)
+
+		claims, err := tm.ValidateToken(access)
+		require.NoError(t, err)
+		assert.Equal(t, int32(90), claims.UserID)
+		assert.Equal(t, "refresh-unit@example.com", claims.Email)
+		assert.Equal(t, security.TokenTypeAccess, claims.Type)
+	})
+
+	t.Run("Rejects a token that is not of type refresh", func(t *testing.T) {
+		accessToken, err := tm.GenerateAccessToken(int32(90), "refresh-unit@example.com", []string{"user"})
+		require.NoError(t, err)
+
+		_, _, err = svc.RefreshToken(ctx, accessToken)
+		require.Error(t, err)
+	})
+
+	t.Run("Rejects an invalid/malformed token", func(t *testing.T) {
+		_, _, err := svc.RefreshToken(ctx, "not-a-real-token")
+		require.Error(t, err)
+	})
 }
 
 // TestAuthService_ChangePassword covers FR-008: ChangePassword must accept either the
