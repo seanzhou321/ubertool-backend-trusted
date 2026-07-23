@@ -96,10 +96,11 @@ type pushNotificationService struct {
 	fcmBatchDryRunClient FCMBatchDryRunSender
 	// fcmMulticastClient is used by SendMulticastToUsers (SendEachForMulticast).
 	// nil when FCM is not configured.
-	fcmMulticastClient FCMMulticastSender
-	fcmRepo            repository.FcmTokenRepository
-	retryDelays        []time.Duration
-	isUnregisteredFn   func(error) bool
+	fcmMulticastClient  FCMMulticastSender
+	fcmRepo             repository.FcmTokenRepository
+	retryDelays         []time.Duration
+	isUnregisteredFn    func(error) bool
+	isInvalidArgumentFn func(error) bool
 
 	// jobs is the bounded work queue; nil in test mode (runs synchronously).
 	jobs         chan fcmJob
@@ -166,12 +167,22 @@ func (s *pushNotificationService) SetMulticastClientForTest(sender FCMMulticastS
 	s.fcmMulticastClient = sender
 }
 
+// SetInvalidArgumentFnForTest injects a synthetic-error-recognizing predicate for the
+// InvalidArgument branch, mirroring isUnregisteredFn's existing injectability. Production code
+// otherwise calls the real messaging.IsInvalidArgument, which only recognizes a genuine
+// *internal.FirebaseError from the Firebase SDK — a type unit tests cannot construct (it lives
+// under an internal/ package outside this module's import tree).
+func (s *pushNotificationService) SetInvalidArgumentFnForTest(fn func(error) bool) {
+	s.isInvalidArgumentFn = fn
+}
+
 func newPushSvc(sender FCMSender, fcmRepo repository.FcmTokenRepository, delays []time.Duration) *pushNotificationService {
 	return &pushNotificationService{
-		fcmClient:        sender,
-		fcmRepo:          fcmRepo,
-		retryDelays:      delays,
-		isUnregisteredFn: messaging.IsUnregistered,
+		fcmClient:           sender,
+		fcmRepo:             fcmRepo,
+		retryDelays:         delays,
+		isUnregisteredFn:    messaging.IsUnregistered,
+		isInvalidArgumentFn: messaging.IsInvalidArgument,
 	}
 }
 
@@ -312,7 +323,7 @@ func (s *pushNotificationService) sendBatchGroup(ctx context.Context, batch []fc
 		}
 
 		// Permanent: syntactically invalid token.
-		if messaging.IsInvalidArgument(sendErr) {
+		if s.isInvalidArgumentFn(sendErr) {
 			logger.Info("FCM token invalid argument, marking obsolete",
 				"token_prefix", tokenPrefix(job.token.Token), "error", sendErr)
 			if obsErr := s.fcmRepo.MarkObsolete(context.Background(), job.token.Token); obsErr != nil {
@@ -600,7 +611,7 @@ func (s *pushNotificationService) sendOne(ctx context.Context, job fcmJob) {
 			return
 		}
 
-		if messaging.IsInvalidArgument(lastErr) {
+		if s.isInvalidArgumentFn(lastErr) {
 			logger.Info("FCM token invalid argument, marking obsolete",
 				"token_prefix", tokenPrefix(t.Token), "error", lastErr)
 			if obsErr := s.fcmRepo.MarkObsolete(context.Background(), t.Token); obsErr != nil {

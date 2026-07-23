@@ -422,3 +422,43 @@ func TestPushSvc_SendMulticastToUsers_NoActiveTokens_NoOp(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	multicast.AssertNotCalled(t, "SendEachForMulticast", mock.Anything, mock.Anything)
 }
+
+// --------------------------------------------------------------------------
+// SendToUser: InvalidArgument branch (FR-005, specs/004-notifications)
+// --------------------------------------------------------------------------
+
+// invalidArgumentInjectable exposes the test-only setter added to pushNotificationService so
+// the InvalidArgument branch can be exercised with a synthetic error. Production code otherwise
+// calls the real messaging.IsInvalidArgument, which only recognizes a genuine
+// *internal.FirebaseError that unit tests cannot construct (it lives under an internal/ package
+// this module cannot import).
+type invalidArgumentInjectable interface {
+	SetInvalidArgumentFnForTest(func(error) bool)
+}
+
+// errInvalidArgument simulates a Firebase INVALID_ARGUMENT error for testing.
+var errInvalidArgument = errors.New("invalid-argument: bad registration token")
+
+func isInvalidArgumentByMarker(err error) bool {
+	return err != nil && err.Error() == "invalid-argument: bad registration token"
+}
+
+func TestPushSvc_SendToUser_InvalidArgumentError_MarksObsolete_NoRetry(t *testing.T) {
+	// The InvalidArgument branch must behave like the Unregistered branch: mark the token
+	// obsolete and do not retry — this is FR-005's other permanent-failure classification,
+	// previously untestable because messaging.IsInvalidArgument was hardcoded.
+	sender := new(MockFCMSender)
+	fcmRepo := new(MockFcmTokenRepo)
+	svc := newPushSvc(sender, fcmRepo, threeZeroDelays)
+	svc.(invalidArgumentInjectable).SetInvalidArgumentFnForTest(isInvalidArgumentByMarker)
+
+	token := domain.FcmToken{UserID: 40, Token: "tok-bad-arg"}
+	fcmRepo.On("GetActiveByUserID", mock.Anything, int32(40)).Return([]domain.FcmToken{token}, nil)
+	sender.On("Send", mock.Anything, mock.Anything).Return("", errInvalidArgument).Once()
+	fcmRepo.On("MarkObsolete", mock.Anything, "tok-bad-arg").Return(nil).Once()
+
+	_ = svc.SendToUser(context.Background(), 40, "T", "B", 9, nil)
+
+	sender.AssertExpectations(t)
+	fcmRepo.AssertExpectations(t)
+}

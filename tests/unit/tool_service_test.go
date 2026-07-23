@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToolService_AddTool(t *testing.T) {
@@ -170,6 +171,33 @@ func TestToolService_SearchTools(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, int32(0), total, "Should return 0 tools since users don't share org")
 		assert.Len(t, res, 0, "Tool should be filtered out")
+	})
+
+	// FR-003 (specs/006-tools-image-storage): SearchTools must require a non-empty query, and
+	// must require an explicit metro when organization_id is not specified. Neither reject
+	// clause had any test coverage at any tier prior to this.
+	t.Run("Rejects an empty query", func(t *testing.T) {
+		repo3 := new(MockToolRepo)
+		userRepo3 := new(MockUserRepo)
+		orgRepo3 := new(MockOrganizationRepo)
+		svc3 := service.NewToolService(repo3, userRepo3, orgRepo3)
+
+		_, _, err := svc3.SearchTools(ctx, 301, 1, "San Jose", "", nil, 0, "", 1, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "query parameter is required")
+		repo3.AssertNotCalled(t, "Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects an empty metro when organization_id is not specified", func(t *testing.T) {
+		repo3 := new(MockToolRepo)
+		userRepo3 := new(MockUserRepo)
+		orgRepo3 := new(MockOrganizationRepo)
+		svc3 := service.NewToolService(repo3, userRepo3, orgRepo3)
+
+		_, _, err := svc3.SearchTools(ctx, 301, 0, "", "drill", nil, 0, "", 1, 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "metro parameter is required")
+		repo3.AssertNotCalled(t, "Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 

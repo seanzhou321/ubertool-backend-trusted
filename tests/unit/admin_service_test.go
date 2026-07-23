@@ -298,3 +298,69 @@ func TestAdminService_RequiresAdminRole(t *testing.T) {
 		}
 	})
 }
+
+// TestAdminService_RejectJoinRequest_ExpiresLinkedInvitation covers FR-006
+// (specs/003-organizations-administration): RejectRequestToJoin must expire any invitation
+// already linked to the rejected join request. Prior to this test, the only
+// RejectJoinRequest-adjacent test verified the FR-005 authorization gate, not this clause.
+func TestAdminService_RejectJoinRequest_ExpiresLinkedInvitation(t *testing.T) {
+	const adminID = int32(999)
+	const orgID = int32(1)
+	joinRequestID := int32(42)
+	ctx := context.Background()
+
+	t.Run("Expires a linked, not-yet-used invitation", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		mockJoinRepo := new(MockJoinRequestRepo)
+		mockOrgRepo := new(MockOrganizationRepo)
+		mockInviteRepo := new(MockInviteRepo)
+		mockEmailSvc := new(MockEmailService)
+		svc := service.NewAdminService(mockJoinRepo, mockUserRepo, nil, mockOrgRepo, mockInviteRepo, mockEmailSvc)
+
+		mockUserRepo.On("GetUserOrg", ctx, adminID, orgID).Return(&domain.UserOrg{UserID: adminID, OrgID: orgID, Role: domain.UserOrgRoleAdmin}, nil)
+		joinReq := &domain.JoinRequest{ID: joinRequestID, OrgID: orgID, Email: "applicant@test.com", Name: "Applicant", Status: domain.JoinRequestStatusPending}
+		mockJoinRepo.On("GetByID", ctx, joinRequestID).Return(joinReq, nil)
+		mockJoinRepo.On("Update", ctx, mock.MatchedBy(func(r *domain.JoinRequest) bool {
+			return r.Status == domain.JoinRequestStatusRejected
+		})).Return(nil)
+
+		invite := &domain.Invitation{ID: 7, JoinRequestID: &joinRequestID, ExpiresOn: "2027-01-01"}
+		mockInviteRepo.On("GetByJoinRequestID", ctx, joinRequestID).Return(invite, nil)
+		mockInviteRepo.On("ExpireInvitation", ctx, int32(7), mock.MatchedBy(func(expiresOn string) bool {
+			return expiresOn < time.Now().Format("2006-01-02")
+		})).Return(nil)
+
+		mockOrgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Org"}, nil)
+		mockEmailSvc.On("SendAccountStatusNotification", ctx, "applicant@test.com", "Applicant", "Org", "REJECTED", "not a fit").Return(nil)
+
+		err := svc.RejectJoinRequest(ctx, adminID, orgID, joinRequestID, "not a fit")
+		assert.NoError(t, err)
+		mockInviteRepo.AssertCalled(t, "ExpireInvitation", ctx, int32(7), mock.Anything)
+	})
+
+	t.Run("Does not touch an invitation that has already been used", func(t *testing.T) {
+		mockUserRepo := new(MockUserRepo)
+		mockJoinRepo := new(MockJoinRequestRepo)
+		mockOrgRepo := new(MockOrganizationRepo)
+		mockInviteRepo := new(MockInviteRepo)
+		mockEmailSvc := new(MockEmailService)
+		svc := service.NewAdminService(mockJoinRepo, mockUserRepo, nil, mockOrgRepo, mockInviteRepo, mockEmailSvc)
+
+		mockUserRepo.On("GetUserOrg", ctx, adminID, orgID).Return(&domain.UserOrg{UserID: adminID, OrgID: orgID, Role: domain.UserOrgRoleAdmin}, nil)
+		joinReq := &domain.JoinRequest{ID: joinRequestID, OrgID: orgID, Email: "applicant@test.com", Name: "Applicant", Status: domain.JoinRequestStatusPending}
+		mockJoinRepo.On("GetByID", ctx, joinRequestID).Return(joinReq, nil)
+		mockJoinRepo.On("Update", ctx, mock.Anything).Return(nil)
+
+		usedOn := "2026-01-01"
+		usedByUserID := int32(55)
+		invite := &domain.Invitation{ID: 8, JoinRequestID: &joinRequestID, ExpiresOn: "2027-01-01", UsedOn: &usedOn, UsedByUserID: &usedByUserID}
+		mockInviteRepo.On("GetByJoinRequestID", ctx, joinRequestID).Return(invite, nil)
+
+		mockOrgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Org"}, nil)
+		mockEmailSvc.On("SendAccountStatusNotification", ctx, "applicant@test.com", "Applicant", "Org", "REJECTED", "not a fit").Return(nil)
+
+		err := svc.RejectJoinRequest(ctx, adminID, orgID, joinRequestID, "not a fit")
+		assert.NoError(t, err)
+		mockInviteRepo.AssertNotCalled(t, "ExpireInvitation", mock.Anything, mock.Anything, mock.Anything)
+	})
+}

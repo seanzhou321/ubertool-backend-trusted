@@ -607,6 +607,96 @@ func TestBillSplitService_UnauthorizedAccess(t *testing.T) {
 	}
 }
 
+// TestBillSplitService_ResolveDispute_RejectionPaths covers FR-008 (specs/008-bill-split):
+// ResolveDispute must be restricted to ADMIN/SUPER_ADMIN who are not the debtor/creditor, and
+// must only operate on DISPUTED bills. L1 already proves both reject clauses against the real
+// service interface; this closes the one genuinely separate gap — the contract-level (e2e)
+// surface never exercised either rejection path before this test.
+func TestBillSplitService_ResolveDispute_RejectionPaths(t *testing.T) {
+	db := PrepareDB(t)
+	defer db.Cleanup()
+	client := NewGRPCClient(t, "")
+	defer client.Close()
+	billClient := pb.NewBillSplitServiceClient(client.Conn())
+
+	orgID := db.CreateTestOrg("E2E-Test-ResolveRejectOrg-" + t.Name())
+
+	debtorEmail := "e2e-test-debtor-reject-" + t.Name() + "@test.com"
+	creditorEmail := "e2e-test-creditor-reject-" + t.Name() + "@test.com"
+	adminEmail := "e2e-test-admin-reject-" + t.Name() + "@test.com"
+	memberEmail := "e2e-test-member-reject-" + t.Name() + "@test.com"
+
+	debtorID := db.CreateTestUser(debtorEmail, "Debtor")
+	creditorID := db.CreateTestUser(creditorEmail, "Creditor")
+	adminID := db.CreateTestUser(adminEmail, "Admin")
+	memberID := db.CreateTestUser(memberEmail, "Plain Member")
+
+	db.AddUserToOrg(debtorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(creditorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
+	db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+
+	t.Run("Rejects a non-admin caller", func(t *testing.T) {
+		billID := db.CreateTestBill(debtorID, creditorID, orgID, 5000, "2024-05", "DISPUTED")
+		_, err := db.Exec("UPDATE bills SET disputed_at = NOW(), dispute_reason = 'test' WHERE id = $1", billID)
+		require.NoError(t, err)
+
+		memberCtx, cancel := ContextWithUserIDAndTimeout(memberID, 5*time.Second)
+		defer cancel()
+
+		resp, err := billClient.ResolveDispute(memberCtx, &pb.ResolveDisputeRequest{
+			PaymentId:  billID,
+			Resolution: pb.DisputeResolution_DEBTOR_AT_FAULT,
+			Notes:      "should be rejected",
+		})
+		// The handler reports authorization/validation failures as Success=false rather than a
+		// gRPC error (same pattern as AcknowledgePayment — see TestBillSplitService_UnauthorizedAccess).
+		require.NoError(t, err)
+		assert.False(t, resp.Success, "a plain member must not be able to resolve disputes")
+
+		bill := db.GetBillByID(billID)
+		assert.Equal(t, "DISPUTED", bill["status"], "bill must remain DISPUTED after a rejected attempt")
+	})
+
+	t.Run("Rejects an admin who is a party to the bill", func(t *testing.T) {
+		billID := db.CreateTestBill(adminID, creditorID, orgID, 5000, "2024-06", "DISPUTED")
+		_, err := db.Exec("UPDATE bills SET disputed_at = NOW(), dispute_reason = 'test' WHERE id = $1", billID)
+		require.NoError(t, err)
+
+		adminCtx, cancel := ContextWithUserIDAndTimeout(adminID, 5*time.Second)
+		defer cancel()
+
+		resp, err := billClient.ResolveDispute(adminCtx, &pb.ResolveDisputeRequest{
+			PaymentId:  billID,
+			Resolution: pb.DisputeResolution_DEBTOR_AT_FAULT,
+			Notes:      "should be rejected — admin is the debtor",
+		})
+		require.NoError(t, err)
+		assert.False(t, resp.Success, "an admin who is a party to the bill must not resolve it")
+
+		bill := db.GetBillByID(billID)
+		assert.Equal(t, "DISPUTED", bill["status"], "bill must remain DISPUTED after a rejected attempt")
+	})
+
+	t.Run("Rejects a bill that is not DISPUTED", func(t *testing.T) {
+		billID := db.CreateTestBill(debtorID, creditorID, orgID, 5000, "2024-07", "PENDING")
+
+		adminCtx, cancel := ContextWithUserIDAndTimeout(adminID, 5*time.Second)
+		defer cancel()
+
+		resp, err := billClient.ResolveDispute(adminCtx, &pb.ResolveDisputeRequest{
+			PaymentId:  billID,
+			Resolution: pb.DisputeResolution_DEBTOR_AT_FAULT,
+			Notes:      "should be rejected — not disputed",
+		})
+		require.NoError(t, err)
+		assert.False(t, resp.Success, "a non-DISPUTED bill must not be resolvable")
+
+		bill := db.GetBillByID(billID)
+		assert.Equal(t, "PENDING", bill["status"], "bill status must be untouched after a rejected attempt")
+	})
+}
+
 func TestBillSplitAlgorithm_E2E(t *testing.T) {
 	// Setup DB
 	testDB := PrepareDB(t)

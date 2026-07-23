@@ -97,7 +97,10 @@ type LedgerService interface {
 }
 
 type NotificationService interface {
-	GetNotifications(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Notification, int32, error)
+	// GetNotifications takes a true limit/offset pair (matching the proto's documented
+	// semantics) rather than page/pageSize, so a non-page-aligned offset (e.g. offset=5 with
+	// limit=10) is honored exactly instead of being silently rounded to the nearest page boundary.
+	GetNotifications(ctx context.Context, userID int32, limit, offset int32) ([]domain.Notification, int32, error)
 	MarkAsRead(ctx context.Context, userID int32, notificationID int64) error
 	SyncDeviceToken(ctx context.Context, userID int32, fcmToken, androidDeviceID, deviceName string) error
 	ReportMessageEvent(ctx context.Context, userID int32, notificationID int64, eventType string, eventTime time.Time) error

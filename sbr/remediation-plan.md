@@ -126,7 +126,10 @@ any real bugs found and fixed.
   and fixed (a corrupt test fixture, not production code — see 006/FR-006 below), 16 genuine
   zero/thin-coverage gaps closed with no bug found. Full suite (unit + integration + e2e)
   re-verified green afterward, no regressions. Details below.
-- [ ] Phase 3 (MEDIUM, 20 items) — not started
+- [x] **Phase 3 (MEDIUM, 20 items) — completed 2026-07-23.** All 20 items closed: 1 real bug
+  found and fixed (004/FR-001's non-page-aligned `GetNotifications` offset — production code),
+  19 genuine coverage gaps closed with no bug found. Full suite (unit + integration + e2e)
+  re-verified green afterward, no regressions. Details below.
 - [ ] Phase 4 (LOW, 9 items) — not started
 
 ## Phase 1 results (2026-07-22)
@@ -188,3 +191,34 @@ thumbnail on disk.
 (`NotRegistered`), reproducing identically on a stash of the pre-Phase-2 codebase. Not a
 regression; out of scope for a test-coverage remediation (would require re-registering real
 devices).
+
+## Phase 3 results (2026-07-23)
+
+| Spec | FR | Outcome |
+|---|---|---|
+| 001 | FR-003 | 2FA code reuse-after-consumption rejection unit-tested (Login → Verify2FA once succeeds, a second call with the same code fails `ErrInvalid2FACode`). No bug found. |
+| 001 | FR-005 | `Logout`'s FCM-token-obsolete-marking unit-tested (2 subtests). No bug found. |
+| 001 | FR-007 | `RequestToJoinOrganization`'s org-existence check and persists-on-notify-failure clause (join_requests row survives a subsequent admin-verification failure) unit-tested. No bug found. |
+| 002 | FR-001 | `GetUser`'s per-org role field closed at both L1 (new `userService` unit test) and L3 (e2e assertion strengthened). No bug found. |
+| 002 | FR-002 | `GetUser`'s partial-org-lookup resilience (one failed org lookup among several must not fail the whole call) unit-tested — first-ever unit test for `userService.GetUserProfile`. No bug found. |
+| 002 | FR-003 | `UpdateProfile`'s no-partial-update semantics (blanking a field clears it) unit-tested — first-ever unit test for `userService.UpdateProfile`. No bug found. |
+| 003 | FR-001 | `CreateOrganization`'s no-pre-authorization + SUPER_ADMIN-assignment guarantee unit-tested. No bug found. |
+| 003 | FR-006 | `RejectRequestToJoin`'s invitation-expiry side effect unit-tested (2 subtests). No bug found. |
+| 004 | FR-001 | **Real bug found and fixed**: `GetNotifications`'s gRPC handler computed `page := (offset/limit)+1` via integer division, silently rounding any non-page-aligned offset down to the nearest page boundary (spec.md's own Known Discrepancy 1 / SC-001). Fixed in `internal/service/notification.go` and `internal/api/grpc/notification.go` — the service now accepts a true `limit`/`offset` pair instead of round-tripping through page/pageSize. Regression-locked by a unit test and a new e2e subtest. |
+| 004 | FR-002 | `MarkNotificationRead`'s idempotency (first-write-wins on `read_at`) closed with a real-DB integration test. No bug found. |
+| 004 | FR-005 | The `InvalidArgument` branch (previously a hardcoded, untestable `messaging.IsInvalidArgument` call) closed by adding an injectable `isInvalidArgumentFn`, mirroring the existing `isUnregisteredFn` pattern — a testability fix, no behavior change. No bug found. |
+| 004 | FR-007 | `ReportMessageEvent` unit-tested (3 subtests) — first real invocation anywhere in the suite. No bug found. |
+| 005 | FR-001 | `CreateRentalRequest`'s date-order rejection unit-tested. No bug found. |
+| 005 | FR-005 | `AcknowledgeReturnDateRejection` and `CancelReturnDateChange` (previously zero coverage at any tier) unit-tested, including their recompute-cost assertions. No bug found. |
+| 005 | FR-006 | `GetRental`'s access control (renter/owner grant, third-party reject) unit-tested — previously only a mock-interface stub. No bug found. |
+| 006 | FR-003 | `SearchTools`'s empty-query and empty-metro reject clauses unit-tested. No bug found. |
+| 008 | FR-002 | `SendBillSplittingNotices` (notice email to both parties + `notice_sent_at` recording) closed with a real-DB integration test. No bug found. |
+| 008 | FR-003 | `SendBillReminders` (72-hour-aged reminder to both parties, fresh bills excluded) closed with a real-DB integration test. No bug found. |
+| 008 | FR-008 | `ResolveDispute`'s contract-level (e2e) rejection paths closed — confirmed the handler reports rejections via `Success=false` responses, not gRPC errors, matching `AcknowledgePayment`'s existing pattern. No bug found. |
+| 008 | FR-011 | `GetPaymentDetail`'s org-admin (non-party) authorized-caller class and all `can_acknowledge=false` branches unit-tested. No bug found. |
+
+**New files**: `tests/unit/user_service_test.go`, `tests/integration/notification_test.go`,
+`tests/integration/notification_jobs_test.go`.
+**Production code changed**: `internal/service/notification.go` + `internal/api/grpc/notification.go`
+(`GetNotifications` offset-rounding bug fix — FR-001); `internal/service/push_notification.go`
+(`isInvalidArgumentFn` injectable-predicate addition — testability only, no behavior change).

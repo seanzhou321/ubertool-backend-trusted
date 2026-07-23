@@ -128,6 +128,58 @@ func TestAuthService_RequestToJoin(t *testing.T) {
 		err := svc.RequestToJoin(ctx, orgID, "Name", email, "Note", adminEmail)
 		assert.NoError(t, err)
 	})
+
+	// FR-007: RequestToJoinOrganization must verify the org exists before doing anything else.
+	t.Run("Rejects when the organization does not exist", func(t *testing.T) {
+		userRepo := new(MockUserRepo)
+		inviteRepo := new(MockInviteRepo)
+		reqRepo := new(MockJoinRequestRepo)
+		orgRepo := new(MockOrganizationRepo)
+		noteRepo := new(MockNotificationRepo)
+		emailSvc := new(MockEmailService)
+		fcmRepo := new(MockFcmTokenRepo)
+		pendingCredsRepo := new(MockPendingCredentialsRepo)
+		legalConsentRepo := new(MockLegalConsentRepo)
+		svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+			config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
+
+		orgID := int32(999)
+		orgRepo.On("GetByID", ctx, orgID).Return(nil, assert.AnError)
+
+		err := svc.RequestToJoin(ctx, orgID, "Name", "email@test.com", "Note", "admin@test.com")
+		require.Error(t, err)
+		reqRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	})
+
+	// FR-007's most distinctive clause (spec.md Edge Cases / US3 Scenario 6): the join_requests
+	// row must persist even when the subsequent admin-verification step fails.
+	t.Run("Persists the join request even when admin verification subsequently fails", func(t *testing.T) {
+		userRepo := new(MockUserRepo)
+		inviteRepo := new(MockInviteRepo)
+		reqRepo := new(MockJoinRequestRepo)
+		orgRepo := new(MockOrganizationRepo)
+		noteRepo := new(MockNotificationRepo)
+		emailSvc := new(MockEmailService)
+		fcmRepo := new(MockFcmTokenRepo)
+		pendingCredsRepo := new(MockPendingCredentialsRepo)
+		legalConsentRepo := new(MockLegalConsentRepo)
+		svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+			config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
+
+		orgID := int32(1)
+		email := "applicant@test.com"
+		adminEmail := "not-an-admin@test.com"
+		orgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Org"}, nil)
+		userRepo.On("GetByEmail", ctx, email).Return(nil, nil)
+		reqRepo.On("Create", ctx, mock.AnythingOfType("*domain.JoinRequest")).Return(nil)
+		// The admin-email lookup fails (not found) — RequestToJoin must still have persisted
+		// the join request created above before reaching this step.
+		userRepo.On("GetByEmail", ctx, adminEmail).Return(nil, assert.AnError)
+
+		err := svc.RequestToJoin(ctx, orgID, "Name", email, "Note", adminEmail)
+		require.Error(t, err)
+		reqRepo.AssertCalled(t, "Create", ctx, mock.AnythingOfType("*domain.JoinRequest"))
+	})
 }
 
 // TestAuthService_Login_TwoFA_ProductionPath covers FR-001's spec.md requirement that when
@@ -400,5 +452,85 @@ func TestAuthService_Signup(t *testing.T) {
 		reqRepo.AssertCalled(t, "Update", ctx, mock.MatchedBy(func(r *domain.JoinRequest) bool {
 			return r.Status == domain.JoinRequestStatusJoined
 		}))
+	})
+}
+
+// TestAuthService_Verify2FA_CodeReuse covers FR-003: a 2FA code MUST be deleted immediately
+// after successful use, so a second Verify2FA call with the same (now-consumed) code must fail
+// even though it was valid moments earlier.
+func TestAuthService_Verify2FA_CodeReuse(t *testing.T) {
+	svc, userRepo, _, _ := newAuthServiceForTest()
+	ctx := context.Background()
+	const userID = int32(55)
+	const email = "reuse-2fa@example.com"
+	const password = "correct-horse-battery-staple"
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	require.NoError(t, err)
+	user := &domain.User{ID: userID, Email: email, PasswordHash: string(hash)}
+	userRepo.On("GetByEmail", ctx, email).Return(user, nil)
+	userRepo.On("GetByID", ctx, userID).Return(user, nil)
+
+	_, requires2FA, tempPwd, err := svc.Login(ctx, email, password)
+	require.NoError(t, err)
+	require.True(t, requires2FA)
+
+	// The fixed test passcode ("00000") is used since this service was constructed with
+	// TwoFAConfig{Enabled: false}.
+	accessToken, refreshToken, verifiedUser, _, err := svc.Verify2FA(ctx, userID, "00000", tempPwd)
+	require.NoError(t, err, "the first use of a valid code must succeed")
+	assert.NotEmpty(t, accessToken)
+	assert.NotEmpty(t, refreshToken)
+	assert.Equal(t, userID, verifiedUser.ID)
+
+	_, _, _, _, err = svc.Verify2FA(ctx, userID, "00000", tempPwd)
+	require.Error(t, err, "re-submitting an already-consumed code must fail")
+	assert.Equal(t, service.ErrInvalid2FACode, err)
+}
+
+// TestAuthService_Logout covers FR-005: Logout must mark the caller's FCM token(s) OBSOLETE
+// for the given device. Prior to this test, `grep -ri Logout tests/` returned zero matches.
+func TestAuthService_Logout(t *testing.T) {
+	ctx := context.Background()
+	const userID = int32(60)
+	const androidDeviceID = "device-abc-123"
+
+	t.Run("Marks the device's FCM tokens obsolete", func(t *testing.T) {
+		userRepo := new(MockUserRepo)
+		inviteRepo := new(MockInviteRepo)
+		reqRepo := new(MockJoinRequestRepo)
+		orgRepo := new(MockOrganizationRepo)
+		noteRepo := new(MockNotificationRepo)
+		emailSvc := new(MockEmailService)
+		fcmRepo := new(MockFcmTokenRepo)
+		pendingCredsRepo := new(MockPendingCredentialsRepo)
+		legalConsentRepo := new(MockLegalConsentRepo)
+		svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+			config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
+
+		fcmRepo.On("MarkObsoleteByDevice", ctx, userID, androidDeviceID).Return(nil)
+
+		err := svc.Logout(ctx, userID, "some-refresh-token", androidDeviceID)
+		require.NoError(t, err)
+		fcmRepo.AssertCalled(t, "MarkObsoleteByDevice", ctx, userID, androidDeviceID)
+	})
+
+	t.Run("A failure to mark tokens obsolete does not fail the logout", func(t *testing.T) {
+		userRepo := new(MockUserRepo)
+		inviteRepo := new(MockInviteRepo)
+		reqRepo := new(MockJoinRequestRepo)
+		orgRepo := new(MockOrganizationRepo)
+		noteRepo := new(MockNotificationRepo)
+		emailSvc := new(MockEmailService)
+		fcmRepo := new(MockFcmTokenRepo)
+		pendingCredsRepo := new(MockPendingCredentialsRepo)
+		legalConsentRepo := new(MockLegalConsentRepo)
+		svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+			config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
+
+		fcmRepo.On("MarkObsoleteByDevice", ctx, userID, androidDeviceID).Return(assert.AnError)
+
+		err := svc.Logout(ctx, userID, "some-refresh-token", androidDeviceID)
+		require.NoError(t, err, "logout must succeed even if marking FCM tokens obsolete fails")
 	})
 }

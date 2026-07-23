@@ -25,9 +25,8 @@ func (s *notificationService) SetPushService(pushSvc PushNotificationService) {
 	s.pushSvc = pushSvc
 }
 
-func (s *notificationService) GetNotifications(ctx context.Context, userID int32, page, pageSize int32) ([]domain.Notification, int32, error) {
-	offset := (page - 1) * pageSize
-	return s.noteRepo.List(ctx, userID, pageSize, offset)
+func (s *notificationService) GetNotifications(ctx context.Context, userID int32, limit, offset int32) ([]domain.Notification, int32, error) {
+	return s.noteRepo.List(ctx, userID, limit, offset)
 }
 
 func (s *notificationService) MarkAsRead(ctx context.Context, userID int32, notificationID int64) error {

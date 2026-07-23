@@ -189,6 +189,58 @@ func TestBillSplitService_GetPaymentDetail(t *testing.T) {
 		assert.Error(t, err)
 		mockBillRepo.AssertExpectations(t)
 	})
+
+	// FR-011: an org admin who is NOT a party to the bill is a third authorized-caller class
+	// distinct from debtor/creditor — previously untested (only debtor/creditor success and a
+	// non-member/non-admin rejection were covered).
+	t.Run("Success_AsOrgAdmin_NotAParty", func(t *testing.T) {
+		bill := &domain.Bill{ID: 2, DebtorUserID: 20, CreditorUserID: 21, OrgID: 1, AmountCents: 1000, Status: domain.BillStatusPending}
+		actions := []domain.BillAction{{ID: 1, BillID: 2, ActionType: domain.BillActionTypeNoticeSent}}
+
+		mockBillRepo.On("GetByID", ctx, int32(2)).Return(bill, nil).Once()
+		mockUserRepo.On("GetUserOrg", ctx, int32(99), int32(1)).Return(&domain.UserOrg{UserID: 99, OrgID: 1, Role: domain.UserOrgRoleAdmin}, nil).Once()
+		mockBillRepo.On("ListActionsByBill", ctx, int32(2)).Return(actions, nil).Once()
+
+		retBill, retActions, canAcknowledge, err := svc.GetPaymentDetail(ctx, 99, 2)
+		require.NoError(t, err)
+		assert.NotNil(t, retBill)
+		assert.Equal(t, 1, len(retActions))
+		assert.False(t, canAcknowledge, "an admin who is not a party can never acknowledge")
+		mockBillRepo.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	// FR-011's can_acknowledge=false branches — only the two `true` cases were ever asserted.
+	t.Run("CanAcknowledge_False_DebtorAlreadyAcknowledged", func(t *testing.T) {
+		now := time.Now()
+		bill := &domain.Bill{ID: 3, DebtorUserID: 30, CreditorUserID: 31, OrgID: 1, AmountCents: 1000, Status: domain.BillStatusPending, DebtorAcknowledgedAt: &now}
+		mockBillRepo.On("GetByID", ctx, int32(3)).Return(bill, nil).Once()
+		mockBillRepo.On("ListActionsByBill", ctx, int32(3)).Return([]domain.BillAction{}, nil).Once()
+
+		_, _, canAcknowledge, err := svc.GetPaymentDetail(ctx, 30, 3)
+		require.NoError(t, err)
+		assert.False(t, canAcknowledge, "a debtor who already acknowledged cannot acknowledge again")
+	})
+
+	t.Run("CanAcknowledge_False_CreditorBeforeDebtorAcknowledges", func(t *testing.T) {
+		bill := &domain.Bill{ID: 4, DebtorUserID: 40, CreditorUserID: 41, OrgID: 1, AmountCents: 1000, Status: domain.BillStatusPending}
+		mockBillRepo.On("GetByID", ctx, int32(4)).Return(bill, nil).Once()
+		mockBillRepo.On("ListActionsByBill", ctx, int32(4)).Return([]domain.BillAction{}, nil).Once()
+
+		_, _, canAcknowledge, err := svc.GetPaymentDetail(ctx, 41, 4)
+		require.NoError(t, err)
+		assert.False(t, canAcknowledge, "the creditor cannot acknowledge before the debtor has")
+	})
+
+	t.Run("CanAcknowledge_False_WrongStatus", func(t *testing.T) {
+		bill := &domain.Bill{ID: 5, DebtorUserID: 50, CreditorUserID: 51, OrgID: 1, AmountCents: 1000, Status: domain.BillStatusPaid}
+		mockBillRepo.On("GetByID", ctx, int32(5)).Return(bill, nil).Once()
+		mockBillRepo.On("ListActionsByBill", ctx, int32(5)).Return([]domain.BillAction{}, nil).Once()
+
+		_, _, canAcknowledge, err := svc.GetPaymentDetail(ctx, 50, 5)
+		require.NoError(t, err)
+		assert.False(t, canAcknowledge, "a PAID bill can no longer be acknowledged by either party")
+	})
 }
 
 // TestBillSplitService_AcknowledgePayment covers FR-006 and FR-009's GRACEFUL outcome

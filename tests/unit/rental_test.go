@@ -73,6 +73,28 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 	// 	assert.Nil(t, res)
 	// 	assert.Contains(t, err.Error(), "insufficient balance")
 	// })
+
+	// FR-001 (specs/005-rentals): CreateRentalRequest must reject end_date <= start_date
+	// (Acceptance Scenario 2). Prior to this test, `grep -r "end date must be after start date"`
+	// under tests/ returned nothing.
+	t.Run("Rejects an end date that is not after the start date", func(t *testing.T) {
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		rentalRepo := new(MockRentalRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+
+		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
+		sameDay := time.Now().Add(24 * time.Hour).Format("2006-01-02")
+
+		res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, sameDay, sameDay)
+		require.Error(t, err)
+		assert.Nil(t, res)
+		assert.Contains(t, err.Error(), "end date must be after start date")
+		rentalRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	})
 }
 
 func TestRentalService_CompleteRental(t *testing.T) {
@@ -820,5 +842,193 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		assert.NoError(t, err) // Email error is ignored
 		assert.NotNil(t, result)
 		assert.Equal(t, domain.RentalStatusReturnDateChangeRejected, result.Status)
+	})
+}
+
+// TestRentalService_AcknowledgeReturnDateRejection covers FR-005 (specs/005-rentals): this RPC
+// had zero test evidence at any tier — the only occurrence anywhere was a mock-interface stub.
+func TestRentalService_AcknowledgeReturnDateRejection(t *testing.T) {
+	ctx := context.Background()
+	const renterID = int32(1)
+	const ownerID = int32(10)
+	const rentalID = int32(100)
+	const toolID = int32(200)
+
+	newSvc := func() (service.RentalService, *MockRentalRepo, *MockUserRepo, *MockNotificationRepo) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		return svc, rentalRepo, userRepo, noteRepo
+	}
+
+	lastAgreed := time.Now().Add(48 * time.Hour).Format("2006-01-02")
+
+	t.Run("Success rolls back to the last agreed end date and recomputes cost", func(t *testing.T) {
+		svc, rentalRepo, userRepo, noteRepo := newSvc()
+		rt := &domain.Rental{
+			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
+			Status: domain.RentalStatusReturnDateChangeRejected,
+			StartDate: time.Now().Add(-24 * time.Hour).Format("2006-01-02"),
+			EndDate: time.Now().Add(96 * time.Hour).Format("2006-01-02"), // the rejected counter-proposal
+			LastAgreedEndDate: &lastAgreed,
+			DurationUnit: string(domain.ToolDurationUnitDay), DailyPriceCents: 1000, WeeklyPriceCents: 6000, MonthlyPriceCents: 20000,
+			RejectionReason: "owner countered",
+		}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		rentalRepo.On("Update", ctx, mock.MatchedBy(func(r *domain.Rental) bool {
+			return r.EndDate == lastAgreed && r.RejectionReason == "" && r.Status == domain.RentalStatusActive
+		})).Return(nil)
+		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{ID: ownerID, Name: "Owner"}, nil)
+		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
+
+		res, err := svc.AcknowledgeReturnDateRejection(ctx, renterID, rentalID)
+		require.NoError(t, err)
+		assert.Equal(t, lastAgreed, res.EndDate)
+		assert.Empty(t, res.RejectionReason)
+	})
+
+	t.Run("Rejects a caller who is not the renter", func(t *testing.T) {
+		svc, rentalRepo, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, OwnerID: ownerID, Status: domain.RentalStatusReturnDateChangeRejected}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.AcknowledgeReturnDateRejection(ctx, int32(999), rentalID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unauthorized")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a rental that is not in RETURN_DATE_CHANGE_REJECTED status", func(t *testing.T) {
+		svc, rentalRepo, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, OwnerID: ownerID, Status: domain.RentalStatusActive}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.AcknowledgeReturnDateRejection(ctx, renterID, rentalID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid status")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+}
+
+// TestRentalService_CancelReturnDateChange covers FR-005 (specs/005-rentals): this RPC
+// had zero test evidence at any tier — the only occurrence anywhere was a mock-interface stub.
+func TestRentalService_CancelReturnDateChange(t *testing.T) {
+	ctx := context.Background()
+	const renterID = int32(1)
+	const ownerID = int32(10)
+	const rentalID = int32(100)
+	const toolID = int32(200)
+
+	newSvc := func() (service.RentalService, *MockRentalRepo, *MockUserRepo, *MockNotificationRepo) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		return svc, rentalRepo, userRepo, noteRepo
+	}
+
+	lastAgreed := time.Now().Add(48 * time.Hour).Format("2006-01-02")
+
+	t.Run("Success rolls back to the last agreed end date and recomputes cost", func(t *testing.T) {
+		svc, rentalRepo, userRepo, noteRepo := newSvc()
+		rt := &domain.Rental{
+			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
+			Status: domain.RentalStatusReturnDateChanged,
+			StartDate: time.Now().Add(-24 * time.Hour).Format("2006-01-02"),
+			EndDate: time.Now().Add(96 * time.Hour).Format("2006-01-02"), // the pending extension request
+			LastAgreedEndDate: &lastAgreed,
+			DurationUnit: string(domain.ToolDurationUnitDay), DailyPriceCents: 1000, WeeklyPriceCents: 6000, MonthlyPriceCents: 20000,
+		}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		rentalRepo.On("Update", ctx, mock.MatchedBy(func(r *domain.Rental) bool {
+			return r.EndDate == lastAgreed && r.Status == domain.RentalStatusActive
+		})).Return(nil)
+		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{ID: ownerID, Name: "Owner"}, nil)
+		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
+
+		res, err := svc.CancelReturnDateChange(ctx, renterID, rentalID)
+		require.NoError(t, err)
+		assert.Equal(t, lastAgreed, res.EndDate)
+	})
+
+	t.Run("Rejects a caller who is not the renter", func(t *testing.T) {
+		svc, rentalRepo, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, OwnerID: ownerID, Status: domain.RentalStatusReturnDateChanged}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.CancelReturnDateChange(ctx, int32(999), rentalID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unauthorized")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a rental that is not in RETURN_DATE_CHANGED status", func(t *testing.T) {
+		svc, rentalRepo, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, OwnerID: ownerID, Status: domain.RentalStatusActive}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.CancelReturnDateChange(ctx, renterID, rentalID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid status")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+}
+
+// TestRentalService_GetRental covers FR-006 (specs/005-rentals): GetRental must grant access to
+// the rental's renter and owner, and reject any other caller (admin access is explicitly NOT
+// required — Known Discrepancy 4). Prior to this test, the only occurrence of GetRental in
+// tests/ was a mock-interface stub, never invoked or asserted against.
+func TestRentalService_GetRental(t *testing.T) {
+	ctx := context.Background()
+	const renterID = int32(1)
+	const ownerID = int32(10)
+	const otherUserID = int32(999)
+	const rentalID = int32(100)
+
+	newSvc := func() (service.RentalService, *MockRentalRepo) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		return svc, rentalRepo
+	}
+
+	rt := &domain.Rental{ID: rentalID, RenterID: renterID, OwnerID: ownerID}
+
+	t.Run("Grants access to the renter", func(t *testing.T) {
+		svc, rentalRepo := newSvc()
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		res, err := svc.GetRental(ctx, renterID, rentalID)
+		require.NoError(t, err)
+		assert.Equal(t, rentalID, res.ID)
+	})
+
+	t.Run("Grants access to the owner", func(t *testing.T) {
+		svc, rentalRepo := newSvc()
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		res, err := svc.GetRental(ctx, ownerID, rentalID)
+		require.NoError(t, err)
+		assert.Equal(t, rentalID, res.ID)
+	})
+
+	t.Run("Rejects a caller who is neither the renter nor the owner", func(t *testing.T) {
+		svc, rentalRepo := newSvc()
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.GetRental(ctx, otherUserID, rentalID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unauthorized")
 	})
 }

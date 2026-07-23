@@ -138,6 +138,17 @@ func TestNotificationService_E2E(t *testing.T) {
 		resp2, err := notificationClient.GetNotifications(ctx2, req2)
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(resp2.Notifications), 5)
+
+		// FR-001 / Known Discrepancy 1: a non-page-aligned offset must be honored exactly, not
+		// silently rounded to the nearest page boundary. With exactly 15 rows for this user,
+		// offset=12/limit=10 must return exactly 3 rows; the prior buggy `page := (offset/limit)+1`
+		// integer-division round-trip would have rounded offset=12 down to offset=10, returning 5.
+		ctx3, cancel3 := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+		defer cancel3()
+		req3 := &pb.GetNotificationsRequest{Limit: 10, Offset: 12}
+		resp3, err := notificationClient.GetNotifications(ctx3, req3)
+		require.NoError(t, err)
+		assert.Equal(t, 3, len(resp3.Notifications), "non-page-aligned offset=12 must return exactly the 3 remaining rows, not be rounded to a page boundary")
 	})
 
 	t.Run("MarkNotificationRead - Wrong User", func(t *testing.T) {

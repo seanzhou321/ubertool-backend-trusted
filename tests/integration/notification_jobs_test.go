@@ -1,0 +1,139 @@
+package integration
+
+import (
+	"context"
+	"database/sql"
+	"sync"
+	"testing"
+	"time"
+
+	"ubertool-backend-trusted/internal/config"
+	"ubertool-backend-trusted/internal/jobs"
+	"ubertool-backend-trusted/internal/repository/postgres"
+
+	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// adminNotificationCall records one SendAdminNotification invocation.
+type adminNotificationCall struct {
+	Email, Subject, Message string
+}
+
+// capturingEmailService wraps the package's plain no-op MockEmailService (already satisfying
+// service.EmailService for every other method) and records SendAdminNotification calls, which
+// is the one method both notification jobs actually use.
+type capturingEmailService struct {
+	MockEmailService
+	mu    sync.Mutex
+	calls []adminNotificationCall
+}
+
+func (m *capturingEmailService) SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calls = append(m.calls, adminNotificationCall{Email: adminEmail, Subject: subject, Message: message})
+	return nil
+}
+
+func (m *capturingEmailService) callCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.calls)
+}
+
+func (m *capturingEmailService) emailedTo(email string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, c := range m.calls {
+		if c.Email == email {
+			return true
+		}
+	}
+	return false
+}
+
+// TestSendBillSplittingNotices covers FR-002 (specs/008-bill-split): the system must email both
+// debtor and creditor when a bill is created, and must record notice_sent_at only once the
+// debtor's email succeeds. Prior to this test, `grep -r SendBillSplittingNotices tests/`
+// returned nothing.
+func TestSendBillSplittingNotices(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	emailSvc := &capturingEmailService{}
+	jr := jobs.NewJobRunner(db, postgres.NewStore(db), &jobs.Services{Email: emailSvc}, &config.Config{})
+
+	orgID := createTestOrgForLedger(t, db)
+	debtor := createTestUserForLedger(t, db, "notice-debtor")
+	creditor := createTestUserForLedger(t, db, "notice-creditor")
+	defer func() {
+		db.Exec("DELETE FROM bills WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2)", debtor, creditor)
+		db.Exec("DELETE FROM orgs WHERE id = $1", orgID)
+	}()
+
+	billID := createTestBill(t, db, orgID, debtor, creditor, "2026-03", "PENDING")
+
+	jr.SendBillSplittingNotices()
+
+	debtorEmail := getUserEmail(t, db, debtor)
+	creditorEmail := getUserEmail(t, db, creditor)
+	assert.True(t, emailSvc.emailedTo(debtorEmail), "debtor must be emailed")
+	assert.True(t, emailSvc.emailedTo(creditorEmail), "creditor must be emailed")
+
+	var noticeSentAt *time.Time
+	require.NoError(t, db.QueryRow("SELECT notice_sent_at FROM bills WHERE id = $1", billID).Scan(&noticeSentAt))
+	assert.NotNil(t, noticeSentAt, "notice_sent_at must be recorded once the notice is sent")
+}
+
+// TestSendBillReminders covers FR-003 (specs/008-bill-split): the system must send a reminder
+// email to both parties of a PENDING bill once notice_sent_at is more than 72 hours in the past
+// — and must NOT remind a bill whose notice was sent recently. Prior to this test,
+// `grep -r SendBillReminders tests/` returned nothing.
+func TestSendBillReminders(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	emailSvc := &capturingEmailService{}
+	jr := jobs.NewJobRunner(db, postgres.NewStore(db), &jobs.Services{Email: emailSvc}, &config.Config{})
+
+	orgID := createTestOrgForLedger(t, db)
+	oldDebtor := createTestUserForLedger(t, db, "reminder-old-debtor")
+	oldCreditor := createTestUserForLedger(t, db, "reminder-old-creditor")
+	freshDebtor := createTestUserForLedger(t, db, "reminder-fresh-debtor")
+	freshCreditor := createTestUserForLedger(t, db, "reminder-fresh-creditor")
+	defer func() {
+		db.Exec("DELETE FROM bills WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2, $3, $4)", oldDebtor, oldCreditor, freshDebtor, freshCreditor)
+		db.Exec("DELETE FROM orgs WHERE id = $1", orgID)
+	}()
+
+	oldBillID := createTestBill(t, db, orgID, oldDebtor, oldCreditor, "2026-03", "PENDING")
+	_, err := db.Exec("UPDATE bills SET notice_sent_at = NOW() - INTERVAL '4 days' WHERE id = $1", oldBillID)
+	require.NoError(t, err)
+
+	freshBillID := createTestBill(t, db, orgID, freshDebtor, freshCreditor, "2026-04", "PENDING")
+	_, err = db.Exec("UPDATE bills SET notice_sent_at = NOW() - INTERVAL '1 hour' WHERE id = $1", freshBillID)
+	require.NoError(t, err)
+
+	jr.SendBillReminders()
+
+	oldDebtorEmail := getUserEmail(t, db, oldDebtor)
+	oldCreditorEmail := getUserEmail(t, db, oldCreditor)
+	freshDebtorEmail := getUserEmail(t, db, freshDebtor)
+	freshCreditorEmail := getUserEmail(t, db, freshCreditor)
+
+	assert.True(t, emailSvc.emailedTo(oldDebtorEmail), "a bill overdue by more than 72 hours must remind the debtor")
+	assert.True(t, emailSvc.emailedTo(oldCreditorEmail), "a bill overdue by more than 72 hours must remind the creditor")
+	assert.False(t, emailSvc.emailedTo(freshDebtorEmail), "a bill whose notice was sent recently must not be reminded")
+	assert.False(t, emailSvc.emailedTo(freshCreditorEmail), "a bill whose notice was sent recently must not be reminded")
+}
+
+func getUserEmail(t *testing.T, db *sql.DB, userID int32) string {
+	t.Helper()
+	var email string
+	require.NoError(t, db.QueryRow("SELECT email FROM users WHERE id = $1", userID).Scan(&email))
+	return email
+}

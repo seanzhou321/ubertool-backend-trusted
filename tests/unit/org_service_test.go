@@ -34,6 +34,30 @@ func newOrgServiceWithBroadcastMocksForTest() (service.OrganizationService, *Moc
 	return svc, mockRepo, mockUserRepo, mockInviteRepo, mockNoteRepo, mockEmailSvc, mockPushSvc
 }
 
+// TestOrganizationService_CreateOrganization covers FR-001 (specs/003-organizations-administration):
+// CreateOrganization requires no pre-existing authorization, and the creating caller becomes
+// SUPER_ADMIN of the newly-created org. Prior to this test, the only evidence was a single e2e
+// happy-path exercise — no unit test regression-locked this authorization guarantee.
+func TestOrganizationService_CreateOrganization(t *testing.T) {
+	svc, mockRepo, mockUserRepo := newOrgServiceForTest()
+	ctx := context.Background()
+	const callerID = int32(42)
+
+	org := &domain.Organization{Name: "New Org", Metro: "San Jose"}
+	mockRepo.On("Create", ctx, org).Run(func(args mock.Arguments) {
+		args.Get(1).(*domain.Organization).ID = 100
+	}).Return(nil)
+	mockUserRepo.On("AddUserToOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
+		return uo.UserID == callerID && uo.OrgID == 100 && uo.Role == domain.UserOrgRoleSuperAdmin && uo.Status == domain.UserOrgStatusActive
+	})).Return(nil)
+
+	err := svc.CreateOrganization(ctx, callerID, org)
+	require.NoError(t, err, "no pre-existing authorization should be required to create an organization")
+	mockUserRepo.AssertCalled(t, "AddUserToOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
+		return uo.Role == domain.UserOrgRoleSuperAdmin
+	}))
+}
+
 // TestOrganizationService_UpdateOrganization covers FR-002 (specs/003-organizations-administration):
 // UpdateOrganization must reject non-members, require ADMIN/SUPER_ADMIN for any change, and
 // additionally require SUPER_ADMIN specifically to change either price threshold field,

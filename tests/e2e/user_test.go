@@ -52,10 +52,12 @@ func TestUserService_E2E(t *testing.T) {
 			if org.Id == org1ID {
 				foundOrg1 = true
 				assert.Equal(t, int32(1000), org.UserBalance)
+				assert.Equal(t, "MEMBER", org.UserRole, "FR-001: per-org role must be included")
 			}
 			if org.Id == org2ID {
 				foundOrg2 = true
 				assert.Equal(t, int32(2500), org.UserBalance)
+				assert.Equal(t, "ADMIN", org.UserRole, "FR-001: per-org role must be included")
 			}
 		}
 		assert.True(t, foundOrg1, "Organization 1 should be in user's organizations")

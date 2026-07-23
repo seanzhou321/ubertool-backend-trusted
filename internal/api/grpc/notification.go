@@ -24,15 +24,16 @@ func (h *NotificationHandler) GetNotifications(ctx context.Context, req *pb.GetN
 	if err != nil {
 		return nil, err
 	}
-	// Map limit/offset to page/pageSize if needed, or update service
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 10
 	}
-	page := (req.Offset / limit) + 1
-	pageSize := limit
+	offset := req.Offset
+	if offset < 0 {
+		offset = 0
+	}
 
-	notes, count, err := h.noteSvc.GetNotifications(ctx, userID, page, pageSize)
+	notes, count, err := h.noteSvc.GetNotifications(ctx, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
