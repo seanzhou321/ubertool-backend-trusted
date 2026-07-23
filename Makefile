@@ -1,4 +1,4 @@
-.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-smoke-ec2 podman-build podman-push deploy-services deploy-cronjob deploy-all db-deploy db-teardown db-schema-install db-schema-teardown setup-data-local wipe-db-local reset-db-local ec2-deploy ec2-reinstall-schema ec2-setup-data ec2-wipe-data ec2-reset-data ec2-use-prod ec2-use-uitest my-ip help
+.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-e2e-rate-limit test-smoke-ec2 podman-build podman-push deploy-services deploy-cronjob deploy-all db-deploy db-teardown db-schema-install db-schema-teardown setup-data-local wipe-db-local reset-db-local ec2-deploy ec2-reinstall-schema ec2-setup-data ec2-wipe-data ec2-reset-data ec2-use-prod ec2-use-uitest my-ip help
 
 DATAFILE ?= tests\data-setup\user_org.test.yaml
 
@@ -72,6 +72,13 @@ test-e2e-admin-retrieve:
 
 test-e2e-fcm:
 	go test -v ./tests/e2e -run "TestPushNotificationService_E2E"
+
+# Deliberately exhausts the shared per-IP Login/Verify2FA rate limiter (FR-012 in
+# specs/001-authentication-legal-consent) — gated behind the "ratelimit" build tag and run in
+# isolation so it doesn't starve other Login/Verify2FA e2e tests. Restart the server
+# (run-precommit) first so the in-memory buckets start empty.
+test-e2e-rate-limit:
+	go test -tags ratelimit -v ./tests/e2e -run "TestAuthService_RateLimit_E2E" -config=config/config.precommit.yaml
 
 test-precommit:
 	@echo "Running full pre-commit test suite (unit + integration + e2e) — Scenario A1..."

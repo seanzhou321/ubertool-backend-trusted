@@ -174,6 +174,138 @@ func TestRentalAndLedger_Integration(t *testing.T) {
 	})
 }
 
+// TestRentalService_CompleteRental_Integration covers FR-004 (specs/005-rentals):
+// CompleteRental must require a participant caller and ACTIVE/SCHEDULED/OVERDUE status, must
+// recompute cost from the rental's own price snapshot (never the tool's current prices), and
+// must only create ledger transactions / update balances when charge_billsplit=true. Regression
+// test for a spec-vs-test discrepancy found during SBR remediation: the only prior "integration"
+// coverage of this behavior bypassed service.CompleteRental entirely (direct repo writes),
+// while spec.md's own Coverage Baseline claimed the ledger/balance effects were integration-tested.
+func TestRentalService_CompleteRental_Integration(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	userRepo := postgres.NewUserRepository(db)
+	toolRepo := postgres.NewToolRepository(db)
+	rentalRepo := postgres.NewRentalRepository(db)
+	ledgerRepo := postgres.NewLedgerRepository(db)
+	emailSvc := new(MockEmailService)
+	noteRepo := new(MockNotificationRepo)
+	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+	ctx := context.Background()
+
+	orgName := fmt.Sprintf("Org-Complete-%d", time.Now().UnixNano())
+	_, err := db.Exec("INSERT INTO orgs (name, metro, address, admin_email, admin_phone_number) VALUES ($1, 'San Jose', '123 Test St', 'admin@test.com', '555-0000')", orgName)
+	require.NoError(t, err)
+	var orgID int32
+	require.NoError(t, db.QueryRow("SELECT id FROM orgs WHERE name = $1", orgName).Scan(&orgID))
+
+	newUser := func(prefix string) *domain.User {
+		u := &domain.User{
+			Email:        fmt.Sprintf("%s-%d@t.com", prefix, time.Now().UnixNano()),
+			PhoneNumber:  fmt.Sprintf("+1555%d", time.Now().UnixNano()%10000000),
+			PasswordHash: "h", Name: prefix,
+		}
+		require.NoError(t, userRepo.Create(ctx, u))
+		require.NoError(t, userRepo.AddUserToOrg(ctx, &domain.UserOrg{UserID: u.ID, OrgID: orgID, BalanceCents: 0, Status: domain.UserOrgStatusActive, Role: domain.UserOrgRoleMember}))
+		return u
+	}
+
+	// Tool's CURRENT price is set deliberately different from the rental's own price
+	// snapshot below, so a test that (incorrectly) recomputed cost from the tool's live
+	// price instead of the snapshot would be caught.
+	newTool := func(owner *domain.User) *domain.Tool {
+		tl := &domain.Tool{
+			OwnerID: owner.ID, Name: "Drill", PricePerDayCents: 9999, PricePerWeekCents: 60000, PricePerMonthCents: 200000,
+			DurationUnit: domain.ToolDurationUnitDay, Condition: domain.ToolConditionExcellent, Metro: "San Jose", Status: domain.ToolStatusRented,
+		}
+		require.NoError(t, toolRepo.Create(ctx, tl))
+		return tl
+	}
+
+	newActiveRental := func(owner, renter *domain.User, tool *domain.Tool, status domain.RentalStatus) *domain.Rental {
+		rt := &domain.Rental{
+			OrgID: orgID, ToolID: tool.ID, RenterID: renter.ID, OwnerID: owner.ID,
+			StartDate: time.Now().Add(-48 * time.Hour).Format("2006-01-02"), EndDate: time.Now().Format("2006-01-02"),
+			// Price snapshot deliberately differs from the tool's current price (9999/day) above.
+			DurationUnit: string(domain.ToolDurationUnitDay), DailyPriceCents: 1000, WeeklyPriceCents: 6000, MonthlyPriceCents: 20000,
+			TotalCostCents: 2000, Status: domain.RentalStatusPending,
+		}
+		require.NoError(t, rentalRepo.Create(ctx, rt))
+		rt.Status = status
+		require.NoError(t, rentalRepo.Update(ctx, rt))
+		return rt
+	}
+
+	getBalance := func(userID int32) int32 {
+		var balance int32
+		require.NoError(t, db.QueryRow("SELECT balance_cents FROM users_orgs WHERE user_id = $1 AND org_id = $2", userID, orgID).Scan(&balance))
+		return balance
+	}
+
+	t.Run("Recomputes cost from the rental's own price snapshot, not the tool's current price", func(t *testing.T) {
+		owner, renter := newUser("owner-cr"), newUser("renter-cr")
+		tool := newTool(owner)
+		rt := newActiveRental(owner, renter, tool, domain.RentalStatusActive)
+
+		completed, err := svc.CompleteRental(ctx, owner.ID, rt.ID, "Good", 0, "", true)
+		require.NoError(t, err)
+		// 2 days at the snapshot's 1000/day = 2000, NOT 2 * 9999 (the tool's live price).
+		assert.Equal(t, int32(2000), completed.TotalCostCents)
+	})
+
+	t.Run("charge_billsplit=true creates ledger transactions and updates balances", func(t *testing.T) {
+		owner, renter := newUser("owner-cb-true"), newUser("renter-cb-true")
+		tool := newTool(owner)
+		rt := newActiveRental(owner, renter, tool, domain.RentalStatusActive)
+
+		ownerBefore, renterBefore := getBalance(owner.ID), getBalance(renter.ID)
+		_, err := svc.CompleteRental(ctx, renter.ID, rt.ID, "Good", 0, "", true)
+		require.NoError(t, err)
+
+		assert.Equal(t, ownerBefore+2000, getBalance(owner.ID), "owner should be credited the settlement")
+		assert.Equal(t, renterBefore-2000, getBalance(renter.ID), "renter should be debited the settlement")
+
+		_, total, err := ledgerRepo.ListTransactions(ctx, owner.ID, orgID, 1, 10)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, total, int32(1))
+	})
+
+	t.Run("charge_billsplit=false does not create ledger transactions or change balances", func(t *testing.T) {
+		owner, renter := newUser("owner-cb-false"), newUser("renter-cb-false")
+		tool := newTool(owner)
+		rt := newActiveRental(owner, renter, tool, domain.RentalStatusActive)
+
+		ownerBefore, renterBefore := getBalance(owner.ID), getBalance(renter.ID)
+		_, err := svc.CompleteRental(ctx, owner.ID, rt.ID, "Good", 0, "", false)
+		require.NoError(t, err)
+
+		assert.Equal(t, ownerBefore, getBalance(owner.ID), "balance must not change when charge_billsplit=false")
+		assert.Equal(t, renterBefore, getBalance(renter.ID), "balance must not change when charge_billsplit=false")
+	})
+
+	t.Run("Rejects a non-participant caller", func(t *testing.T) {
+		owner, renter := newUser("owner-np"), newUser("renter-np")
+		outsider := newUser("outsider-np")
+		tool := newTool(owner)
+		rt := newActiveRental(owner, renter, tool, domain.RentalStatusActive)
+
+		_, err := svc.CompleteRental(ctx, outsider.ID, rt.ID, "Good", 0, "", true)
+		require.Error(t, err)
+	})
+
+	t.Run("Rejects a rental that is not ACTIVE/SCHEDULED/OVERDUE", func(t *testing.T) {
+		owner, renter := newUser("owner-status"), newUser("renter-status")
+		tool := newTool(owner)
+		// Left in PENDING — never transitioned to a completable status.
+		rt := newActiveRental(owner, renter, tool, domain.RentalStatusPending)
+
+		_, err := svc.CompleteRental(ctx, owner.ID, rt.ID, "Good", 0, "", true)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot be completed")
+	})
+}
+
 func TestRentalDateChange_Integration(t *testing.T) {
 	db := prepareDB(t)
 	defer db.Close()

@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBillSplitService_GetGlobalBillSplitSummary verification of bill summary aggregation.
@@ -190,8 +191,163 @@ func TestBillSplitService_GetPaymentDetail(t *testing.T) {
 	})
 }
 
-// Note: AcknowledgePayment has complex balance update logic that is better tested in E2E tests.
-// See tests/e2e/bill_split_test.go for comprehensive payment acknowledgment scenarios.
+// TestBillSplitService_AcknowledgePayment covers FR-006 and FR-009's GRACEFUL outcome
+// (specs/008-bill-split): AcknowledgePayment must accept debtor/creditor calls while status is
+// PENDING or DISPUTED, reject any other status, reject double-acknowledgment, and reject
+// creditor-before-debtor. On the creditor's acknowledgment (completing the pair), the bill must
+// resolve to PAID with resolution_outcome=GRACEFUL and the balance transfer applied. Previously
+// deferred entirely to e2e (see git history) — replaced here because the e2e/integration
+// coverage that was supposed to fulfill that deferral only ever exercised the happy path.
+func TestBillSplitService_AcknowledgePayment(t *testing.T) {
+	const debtorID = int32(1)
+	const creditorID = int32(2)
+	const billID = int32(50)
+	const orgID = int32(9)
+	const amountCents = int32(2500)
+
+	newSvc := func() (service.BillSplitService, *MockBillRepo, *MockUserRepo) {
+		billRepo := new(MockBillRepo)
+		userRepo := new(MockUserRepo)
+		orgRepo := new(MockOrganizationRepo)
+		orgRepo.On("GetByID", mock.Anything, mock.Anything).Return(&domain.Organization{ID: orgID, Name: "Test Org"}, nil).Maybe()
+		emailSvc := new(MockEmailService)
+		emailSvc.On("SendBillPaymentAcknowledgment", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		emailSvc.On("SendBillReceiptConfirmation", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+		noteRepo := new(MockNotificationRepo)
+		noteRepo.On("Dispatch", mock.Anything, mock.Anything).Return(nil).Maybe()
+		svc := service.NewBillSplitService(billRepo, userRepo, orgRepo, noteRepo, emailSvc)
+		return svc, billRepo, userRepo
+	}
+
+	t.Run("Debtor acknowledgment succeeds from PENDING", func(t *testing.T) {
+		svc, billRepo, userRepo := newSvc()
+		ctx := context.Background()
+		bill := &domain.Bill{ID: billID, OrgID: orgID, DebtorUserID: debtorID, CreditorUserID: creditorID, AmountCents: amountCents, Status: domain.BillStatusPending}
+		billRepo.On("GetByID", ctx, billID).Return(bill, nil)
+		userRepo.On("GetByID", ctx, debtorID).Return(&domain.User{ID: debtorID, Name: "Debtor"}, nil)
+		userRepo.On("GetByID", ctx, creditorID).Return(&domain.User{ID: creditorID, Name: "Creditor", Email: "creditor@test.com"}, nil)
+		billRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool { return b.DebtorAcknowledgedAt != nil })).Return(nil)
+		billRepo.On("CreateAction", ctx, mock.Anything).Return(nil)
+
+		err := svc.AcknowledgePayment(ctx, debtorID, billID)
+		require.NoError(t, err)
+	})
+
+	t.Run("Creditor acknowledgment after debtor resolves to PAID/GRACEFUL with balance transfer", func(t *testing.T) {
+		svc, billRepo, userRepo := newSvc()
+		ctx := context.Background()
+		debtorAckAt := time.Now().Add(-1 * time.Hour)
+		bill := &domain.Bill{ID: billID, OrgID: orgID, DebtorUserID: debtorID, CreditorUserID: creditorID, AmountCents: amountCents, Status: domain.BillStatusPending, DebtorAcknowledgedAt: &debtorAckAt}
+		billRepo.On("GetByID", ctx, billID).Return(bill, nil)
+		userRepo.On("GetByID", ctx, creditorID).Return(&domain.User{ID: creditorID, Name: "Creditor"}, nil)
+		userRepo.On("GetByID", ctx, debtorID).Return(&domain.User{ID: debtorID, Name: "Debtor", Email: "debtor@test.com"}, nil)
+
+		var updatedBill *domain.Bill
+		billRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool { return true })).
+			Run(func(args mock.Arguments) { updatedBill = args.Get(1).(*domain.Bill) }).Return(nil)
+		billRepo.On("CreateAction", ctx, mock.Anything).Return(nil)
+
+		creditorOrg := &domain.UserOrg{UserID: creditorID, OrgID: orgID, BalanceCents: 0}
+		debtorOrg := &domain.UserOrg{UserID: debtorID, OrgID: orgID, BalanceCents: 0}
+		userRepo.On("GetUserOrg", ctx, creditorID, orgID).Return(creditorOrg, nil)
+		userRepo.On("GetUserOrg", ctx, debtorID, orgID).Return(debtorOrg, nil)
+		userRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool { return uo.UserID == creditorID && uo.BalanceCents == amountCents })).Return(nil)
+		userRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool { return uo.UserID == debtorID && uo.BalanceCents == -amountCents })).Return(nil)
+
+		err := svc.AcknowledgePayment(ctx, creditorID, billID)
+		require.NoError(t, err)
+		require.NotNil(t, updatedBill)
+		assert.Equal(t, domain.BillStatusPaid, updatedBill.Status)
+		assert.Equal(t, string(domain.ResolutionOutcomeGraceful), updatedBill.ResolutionOutcome, "FR-009: completing the pair must resolve to GRACEFUL")
+		assert.NotNil(t, updatedBill.ResolvedAt)
+		userRepo.AssertExpectations(t)
+	})
+
+	t.Run("Creditor acknowledgment succeeds from DISPUTED (not just PENDING)", func(t *testing.T) {
+		svc, billRepo, userRepo := newSvc()
+		ctx := context.Background()
+		debtorAckAt := time.Now().Add(-1 * time.Hour)
+		bill := &domain.Bill{ID: billID, OrgID: orgID, DebtorUserID: debtorID, CreditorUserID: creditorID, AmountCents: amountCents, Status: domain.BillStatusDisputed, DebtorAcknowledgedAt: &debtorAckAt}
+		billRepo.On("GetByID", ctx, billID).Return(bill, nil)
+		userRepo.On("GetByID", ctx, creditorID).Return(&domain.User{ID: creditorID, Name: "Creditor"}, nil)
+		userRepo.On("GetByID", ctx, debtorID).Return(&domain.User{ID: debtorID, Name: "Debtor", Email: "debtor@test.com"}, nil)
+		billRepo.On("Update", ctx, mock.Anything).Return(nil)
+		billRepo.On("CreateAction", ctx, mock.Anything).Return(nil)
+		userRepo.On("GetUserOrg", ctx, creditorID, orgID).Return(&domain.UserOrg{UserID: creditorID, OrgID: orgID}, nil)
+		userRepo.On("GetUserOrg", ctx, debtorID, orgID).Return(&domain.UserOrg{UserID: debtorID, OrgID: orgID}, nil)
+		userRepo.On("UpdateUserOrg", ctx, mock.Anything).Return(nil)
+
+		err := svc.AcknowledgePayment(ctx, creditorID, billID)
+		require.NoError(t, err, "DISPUTED-origin acknowledgment must resolve the same as PENDING-origin (FR-007)")
+	})
+
+	t.Run("Rejects a caller uninvolved in the bill", func(t *testing.T) {
+		svc, billRepo, userRepo := newSvc()
+		ctx := context.Background()
+		bill := &domain.Bill{ID: billID, OrgID: orgID, DebtorUserID: debtorID, CreditorUserID: creditorID, Status: domain.BillStatusPending}
+		billRepo.On("GetByID", ctx, billID).Return(bill, nil)
+		userRepo.On("GetByID", ctx, int32(999)).Return(&domain.User{ID: 999}, nil)
+
+		err := svc.AcknowledgePayment(ctx, int32(999), billID)
+		require.Error(t, err)
+		billRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a status other than PENDING/DISPUTED", func(t *testing.T) {
+		svc, billRepo, userRepo := newSvc()
+		ctx := context.Background()
+		bill := &domain.Bill{ID: billID, OrgID: orgID, DebtorUserID: debtorID, CreditorUserID: creditorID, Status: domain.BillStatusPaid}
+		billRepo.On("GetByID", ctx, billID).Return(bill, nil)
+		userRepo.On("GetByID", ctx, debtorID).Return(&domain.User{ID: debtorID}, nil)
+
+		err := svc.AcknowledgePayment(ctx, debtorID, billID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not in pending or disputed status")
+		billRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects double-acknowledgment by the debtor", func(t *testing.T) {
+		svc, billRepo, userRepo := newSvc()
+		ctx := context.Background()
+		alreadyAckedAt := time.Now().Add(-1 * time.Hour)
+		bill := &domain.Bill{ID: billID, OrgID: orgID, DebtorUserID: debtorID, CreditorUserID: creditorID, Status: domain.BillStatusPending, DebtorAcknowledgedAt: &alreadyAckedAt}
+		billRepo.On("GetByID", ctx, billID).Return(bill, nil)
+		userRepo.On("GetByID", ctx, debtorID).Return(&domain.User{ID: debtorID}, nil)
+
+		err := svc.AcknowledgePayment(ctx, debtorID, billID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already acknowledged by debtor")
+		billRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects double-acknowledgment by the creditor", func(t *testing.T) {
+		svc, billRepo, userRepo := newSvc()
+		ctx := context.Background()
+		debtorAckAt := time.Now().Add(-2 * time.Hour)
+		creditorAckAt := time.Now().Add(-1 * time.Hour)
+		bill := &domain.Bill{ID: billID, OrgID: orgID, DebtorUserID: debtorID, CreditorUserID: creditorID, Status: domain.BillStatusPending, DebtorAcknowledgedAt: &debtorAckAt, CreditorAcknowledgedAt: &creditorAckAt}
+		billRepo.On("GetByID", ctx, billID).Return(bill, nil)
+		userRepo.On("GetByID", ctx, creditorID).Return(&domain.User{ID: creditorID}, nil)
+
+		err := svc.AcknowledgePayment(ctx, creditorID, billID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already acknowledged by creditor")
+		billRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects the creditor acknowledging before the debtor", func(t *testing.T) {
+		svc, billRepo, userRepo := newSvc()
+		ctx := context.Background()
+		bill := &domain.Bill{ID: billID, OrgID: orgID, DebtorUserID: debtorID, CreditorUserID: creditorID, Status: domain.BillStatusPending}
+		billRepo.On("GetByID", ctx, billID).Return(bill, nil)
+		userRepo.On("GetByID", ctx, creditorID).Return(&domain.User{ID: creditorID}, nil)
+
+		err := svc.AcknowledgePayment(ctx, creditorID, billID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "debtor has not acknowledged")
+		billRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+}
 
 // TestBillSplitService_ListDisputedPayments verifies admin access to disputed bills.
 // Goal: Verify that:
@@ -438,6 +594,61 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "creditor@test.com", "Creditor", int32(1000), "BOTH_FAULT", "Admin resolved: Both parties blocked from renting/lending", "Test Org").Return(nil).Once()
 
 		err := svc.ResolveDispute(ctx, 1, 1, "BOTH_FAULT", "Admin resolved: Both parties blocked from renting/lending")
+		assert.NoError(t, err)
+		mockBillRepo.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+		mockOrgRepo.AssertExpectations(t)
+		mockNotifRepo.AssertExpectations(t)
+		mockEmailSvc.AssertExpectations(t)
+	})
+
+	// TestBillSplitService_ResolveDispute/Success_Graceful covers FR-009 (specs/008-bill-split):
+	// GRACEFUL is one of exactly four resolution outcomes SC-001 requires to be tested — it was
+	// previously the only one of the four with zero coverage. Unlike AcknowledgePayment's own
+	// GRACEFUL path (mutual acknowledgment, resolves to PAID), ResolveDispute's GRACEFUL
+	// resolution is admin-driven: it transfers the balance in full with no penalty and resolves
+	// to ADMIN_RESOLVED, not PAID — a distinct code path that needs its own test.
+	t.Run("Success_Graceful", func(t *testing.T) {
+		svc, mockBillRepo, mockUserRepo, mockOrgRepo, mockNotifRepo, mockEmailSvc := setup()
+
+		bill := &domain.Bill{
+			ID: 1, DebtorUserID: 2, CreditorUserID: 3, OrgID: 1,
+			AmountCents: 1000, Status: domain.BillStatusDisputed,
+			SettlementMonth: "2024-01",
+		}
+		org := &domain.Organization{ID: 1, Name: "Test Org"}
+		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleAdmin}
+		debtor := &domain.User{ID: 2, Name: "Debtor", Email: "debtor@test.com"}
+		creditor := &domain.User{ID: 3, Name: "Creditor", Email: "creditor@test.com"}
+		debtorUO := &domain.UserOrg{UserID: 2, OrgID: 1, BalanceCents: 500}
+		creditorUO := &domain.UserOrg{UserID: 3, OrgID: 1, BalanceCents: -500}
+
+		mockBillRepo.On("GetByID", ctx, int32(1)).Return(bill, nil).Once()
+		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
+		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
+		mockUserRepo.On("GetByID", ctx, int32(2)).Return(debtor, nil).Once()
+		mockUserRepo.On("GetByID", ctx, int32(3)).Return(creditor, nil).Once()
+
+		// GRACEFUL only transfers the balance — no blocking, no penalty.
+		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil).Once()
+		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
+			return uo.UserID == 3 && uo.BalanceCents == 500 && !uo.LendingBlocked // -500 + 1000
+		})).Return(nil).Once()
+		mockUserRepo.On("GetUserOrg", ctx, int32(2), int32(1)).Return(debtorUO, nil).Once()
+		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
+			return uo.UserID == 2 && uo.BalanceCents == -500 && !uo.RentingBlocked // 500 - 1000
+		})).Return(nil).Once()
+
+		mockBillRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool {
+			return b.Status == domain.BillStatusAdminResolved && b.ResolutionOutcome == string(domain.ResolutionOutcomeGraceful)
+		})).Return(nil).Once()
+		mockBillRepo.On("CreateAction", ctx, mock.Anything).Return(nil).Once()
+
+		mockNotifRepo.On("Dispatch", ctx, mock.Anything).Return(nil).Times(2)
+		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "GRACEFUL", "Admin resolved gracefully, no fault found", "Test Org").Return(nil).Once()
+		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "creditor@test.com", "Creditor", int32(1000), "GRACEFUL", "Admin resolved gracefully, no fault found", "Test Org").Return(nil).Once()
+
+		err := svc.ResolveDispute(ctx, 1, 1, "GRACEFUL", "Admin resolved gracefully, no fault found")
 		assert.NoError(t, err)
 		mockBillRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)

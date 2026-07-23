@@ -450,9 +450,13 @@ func (s *authService) ResetPassword(ctx context.Context, email string) error {
 	// Validate the email exists in users table.
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil || user == nil {
-		// Return a generic error to avoid leaking user existence information.
+		// Return nil, not an error: the caller (AuthHandler.ResetPassword) always responds
+		// with the same generic success message regardless of the return value here. Returning
+		// a non-nil error would make this branch distinguishable from the found-user path at
+		// the gRPC level (success vs. error), defeating the account-enumeration protection
+		// this generic response exists to provide.
 		logger.Warn("ResetPassword: user not found", "email", email)
-		return errors.New("if an account with that email exists, a temporary password has been sent")
+		return nil
 	}
 
 	// Generate a secure random temporary password (16 hex chars = 8 bytes).

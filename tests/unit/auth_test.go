@@ -2,6 +2,7 @@ package unit
 
 import (
 	"context"
+	"regexp"
 	"testing"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestAuthService_ValidateInvite(t *testing.T) {
@@ -124,5 +127,167 @@ func TestAuthService_RequestToJoin(t *testing.T) {
 
 		err := svc.RequestToJoin(ctx, orgID, "Name", email, "Note", adminEmail)
 		assert.NoError(t, err)
+	})
+}
+
+// TestAuthService_Login_TwoFA_ProductionPath covers FR-001's spec.md requirement that when
+// two_fa.enabled=true, Login must take the random-code+email path (not the fixed-passcode
+// path used only for automated tests) — the production 2FA behavior real users experience.
+func TestAuthService_Login_TwoFA_ProductionPath(t *testing.T) {
+	userRepo := new(MockUserRepo)
+	inviteRepo := new(MockInviteRepo)
+	reqRepo := new(MockJoinRequestRepo)
+	orgRepo := new(MockOrganizationRepo)
+	noteRepo := new(MockNotificationRepo)
+	emailSvc := new(MockEmailService)
+	fcmRepo := new(MockFcmTokenRepo)
+	pendingCredsRepo := new(MockPendingCredentialsRepo)
+	legalConsentRepo := new(MockLegalConsentRepo)
+
+	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+		config.TwoFAConfig{Enabled: true, FixedPasscode: "00000"})
+
+	ctx := context.Background()
+	const userID = int32(7)
+	const email = "prod-2fa-user@example.com"
+	const password = "correct-horse-battery-staple"
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	require.NoError(t, err)
+	user := &domain.User{ID: userID, Email: email, PasswordHash: string(hash)}
+	userRepo.On("GetByEmail", ctx, email).Return(user, nil)
+	userRepo.On("GetByID", ctx, userID).Return(user, nil)
+
+	codeRe := regexp.MustCompile(`Your login code is: (\d{5})`)
+	var emailedCode string
+	emailSvc.On("SendAdminNotification", ctx, email, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			message := args.Get(3).(string)
+			matches := codeRe.FindStringSubmatch(message)
+			require.Len(t, matches, 2, "email body must contain a 5-digit login code: %q", message)
+			emailedCode = matches[1]
+		}).Return(nil)
+
+	sessionToken, requires2FA, tempPwd, err := svc.Login(ctx, email, password)
+	require.NoError(t, err)
+	assert.True(t, requires2FA)
+	assert.False(t, tempPwd)
+	assert.NotEmpty(t, sessionToken)
+	emailSvc.AssertCalled(t, "SendAdminNotification", ctx, email, mock.Anything, mock.Anything)
+	require.NotEmpty(t, emailedCode, "a random 5-digit code must have been emailed")
+	require.Len(t, emailedCode, 5)
+	assert.NotEqual(t, "00000", emailedCode, "must not fall back to the fixed test passcode when enabled=true")
+
+	// The emailed code — not the configured FixedPasscode — must be the one Verify2FA accepts.
+	accessToken, refreshToken, verifiedUser, verifiedTempPwd, err := svc.Verify2FA(ctx, userID, emailedCode, tempPwd)
+	require.NoError(t, err, "Verify2FA must accept the code that was actually emailed")
+	assert.NotEmpty(t, accessToken)
+	assert.NotEmpty(t, refreshToken)
+	assert.Equal(t, userID, verifiedUser.ID)
+	assert.False(t, verifiedTempPwd)
+}
+
+func newAuthServiceForTest() (service.AuthService, *MockUserRepo, *MockEmailService, *MockPendingCredentialsRepo) {
+	userRepo := new(MockUserRepo)
+	inviteRepo := new(MockInviteRepo)
+	reqRepo := new(MockJoinRequestRepo)
+	orgRepo := new(MockOrganizationRepo)
+	noteRepo := new(MockNotificationRepo)
+	emailSvc := new(MockEmailService)
+	fcmRepo := new(MockFcmTokenRepo)
+	pendingCredsRepo := new(MockPendingCredentialsRepo)
+	legalConsentRepo := new(MockLegalConsentRepo)
+	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+		config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
+	return svc, userRepo, emailSvc, pendingCredsRepo
+}
+
+// TestAuthService_ChangePassword covers FR-008: ChangePassword must accept either the
+// canonical password or a valid pending (temporary) credential as proof of the old password,
+// and on success must update the canonical hash and stamp any outstanding temp credential used.
+func TestAuthService_ChangePassword(t *testing.T) {
+	ctx := context.Background()
+	const userID = int32(11)
+	const oldPassword = "old-password-1"
+	const newPassword = "new-password-2"
+
+	t.Run("Success via canonical password", func(t *testing.T) {
+		svc, userRepo, _, pendingCredsRepo := newAuthServiceForTest()
+		hash, err := bcrypt.GenerateFromPassword([]byte(oldPassword), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		userRepo.On("GetByID", ctx, userID).Return(&domain.User{ID: userID, PasswordHash: string(hash)}, nil)
+		userRepo.On("UpdatePassword", ctx, userID, mock.MatchedBy(func(newHash string) bool {
+			return bcrypt.CompareHashAndPassword([]byte(newHash), []byte(newPassword)) == nil
+		})).Return(nil)
+		pendingCredsRepo.On("StampUsedAt", ctx, userID).Return(nil)
+
+		err = svc.ChangePassword(ctx, userID, oldPassword, newPassword)
+		require.NoError(t, err)
+		userRepo.AssertCalled(t, "UpdatePassword", ctx, userID, mock.Anything)
+		pendingCredsRepo.AssertCalled(t, "StampUsedAt", ctx, userID)
+	})
+
+	t.Run("Success via valid pending credential", func(t *testing.T) {
+		svc, userRepo, _, pendingCredsRepo := newAuthServiceForTest()
+		// Canonical hash deliberately does not match oldPassword — only the pending credential does.
+		canonicalHash, err := bcrypt.GenerateFromPassword([]byte("unrelated-password"), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		tempHash, err := bcrypt.GenerateFromPassword([]byte(oldPassword), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		userRepo.On("GetByID", ctx, userID).Return(&domain.User{ID: userID, PasswordHash: string(canonicalHash)}, nil)
+		pendingCredsRepo.On("GetByUserID", ctx, userID).Return(&domain.PendingCredential{
+			UserID: userID, TempPasswordHash: string(tempHash), ExpiresAt: time.Now().Add(20 * time.Minute),
+		}, nil)
+		userRepo.On("UpdatePassword", ctx, userID, mock.Anything).Return(nil)
+		pendingCredsRepo.On("StampUsedAt", ctx, userID).Return(nil)
+
+		err = svc.ChangePassword(ctx, userID, oldPassword, newPassword)
+		require.NoError(t, err, "must fall back to the pending credential when the canonical password doesn't match")
+	})
+
+	t.Run("Rejects a wrong old password", func(t *testing.T) {
+		svc, userRepo, _, pendingCredsRepo := newAuthServiceForTest()
+		hash, err := bcrypt.GenerateFromPassword([]byte(oldPassword), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		userRepo.On("GetByID", ctx, userID).Return(&domain.User{ID: userID, PasswordHash: string(hash)}, nil)
+		pendingCredsRepo.On("GetByUserID", ctx, userID).Return(nil, nil)
+
+		err = svc.ChangePassword(ctx, userID, "totally-wrong-password", newPassword)
+		require.Error(t, err)
+		userRepo.AssertNotCalled(t, "UpdatePassword", mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+// TestAuthService_ResetPassword covers FR-009: ResetPassword must return an identical generic
+// outcome (no error) regardless of whether the account exists, only creating/emailing a
+// temporary credential when it does. This is a regression test for a real bug found during
+// SBR remediation: the not-found branch previously returned a non-nil error, which the gRPC
+// handler propagated as a distinguishable error response — a user-enumeration vulnerability.
+func TestAuthService_ResetPassword(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Non-existent email returns no error", func(t *testing.T) {
+		svc, userRepo, emailSvc, _ := newAuthServiceForTest()
+		userRepo.On("GetByEmail", ctx, "nobody@example.com").Return(nil, nil)
+
+		err := svc.ResetPassword(ctx, "nobody@example.com")
+		require.NoError(t, err, "must not be distinguishable from the found-user case at the caller")
+		emailSvc.AssertNotCalled(t, "SendAdminNotification", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Existing email creates and emails a temporary credential", func(t *testing.T) {
+		svc, userRepo, emailSvc, pendingCredsRepo := newAuthServiceForTest()
+		user := &domain.User{ID: 22, Email: "real-user@example.com"}
+		userRepo.On("GetByEmail", ctx, "real-user@example.com").Return(user, nil)
+		pendingCredsRepo.On("Upsert", ctx, mock.MatchedBy(func(cred *domain.PendingCredential) bool {
+			return cred.UserID == user.ID && cred.TempPasswordHash != "" && cred.UsedAt == nil &&
+				cred.ExpiresAt.After(time.Now())
+		})).Return(nil)
+		emailSvc.On("SendAdminNotification", ctx, user.Email, mock.Anything, mock.Anything).Return(nil)
+
+		err := svc.ResetPassword(ctx, "real-user@example.com")
+		require.NoError(t, err)
+		pendingCredsRepo.AssertCalled(t, "Upsert", ctx, mock.Anything)
+		emailSvc.AssertCalled(t, "SendAdminNotification", ctx, user.Email, mock.Anything, mock.Anything)
 	})
 }

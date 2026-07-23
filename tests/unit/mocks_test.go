@@ -2,6 +2,7 @@ package unit
 
 import (
 	"context"
+	"io"
 	"time"
 
 	fcmmessaging "firebase.google.com/go/v4/messaging"
@@ -574,4 +575,37 @@ func (m *MockLegalConsentRepo) ListByUser(ctx context.Context, userID int32) ([]
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]domain.LegalConsent), args.Error(1)
+}
+
+// MockStorage mocks storage.StorageInterface.
+type MockStorage struct {
+	mock.Mock
+}
+
+func (m *MockStorage) GeneratePresignedUploadURL(ctx context.Context, key, contentType string, expiresIn time.Duration) (string, error) {
+	args := m.Called(ctx, key, contentType, expiresIn)
+	return args.String(0), args.Error(1)
+}
+func (m *MockStorage) GeneratePresignedDownloadURL(ctx context.Context, key string, expiresIn time.Duration) (string, error) {
+	args := m.Called(ctx, key, expiresIn)
+	return args.String(0), args.Error(1)
+}
+func (m *MockStorage) FileExists(ctx context.Context, key string) (bool, int64, error) {
+	args := m.Called(ctx, key)
+	return args.Bool(0), args.Get(1).(int64), args.Error(2)
+}
+func (m *MockStorage) DeleteFile(ctx context.Context, key string) error {
+	args := m.Called(ctx, key)
+	return args.Error(0)
+}
+func (m *MockStorage) SaveFile(key string, reader io.Reader) error {
+	args := m.Called(key, reader)
+	return args.Error(0)
+}
+func (m *MockStorage) ReadFile(key string) (io.ReadCloser, error) {
+	args := m.Called(key)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(io.ReadCloser), args.Error(1)
 }

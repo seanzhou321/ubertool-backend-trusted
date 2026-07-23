@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(go test ./tests/unit/... -run \"TestToolService\" -v 2>&1)",
+      "Bash(mkdir -p \"/c/Users/yixio/ubertool/ubertool-backend-trusted/.claude/skills/speckit-sbr-audit\" \"/c/Users/yixio/ubertool/ubertool-backend-trusted/sbr/rtm\")",
+      "Edit(/.claude/skills/speckit-sbr-audit/**)",
+      "Bash(go test *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\yixio\\ubertool\\ubertool-backend-trusted\\.claude\\skills"
+    ]
+  }
+}
