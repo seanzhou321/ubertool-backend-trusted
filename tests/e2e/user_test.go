@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -132,6 +133,38 @@ func TestUserService_E2E(t *testing.T) {
 		_, err := userClient.UpdateProfile(ctx, req)
 		// Should fail due to unique constraint on email
 		assert.Error(t, err)
+	})
+
+	// FR-005 (specs/002-users): as-built, UpdateProfile does not validate email format or reject
+	// empty name/phone/email beyond the DB's NOT NULL constraints (which an empty string "" still
+	// satisfies). This is a regression-lock on the as-built lenient behavior documented in
+	// spec.md's Coverage Baseline as "Not covered anywhere" — if input validation is ever added,
+	// this test will fail, correctly signaling the documented behavior changed on purpose.
+	t.Run("UpdateProfile accepts malformed/empty input (documents absence of validation)", func(t *testing.T) {
+		userID := db.CreateTestUser("e2e-test-novalidation@test.com", "Original Name")
+
+		ctx, cancel := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+		defer cancel()
+
+		malformedEmail := fmt.Sprintf("not-a-valid-email-%d", time.Now().UnixNano())
+		req := &pb.UpdateProfileRequest{
+			Name:  "", // empty name
+			Email: malformedEmail,
+			Phone: "", // empty phone
+		}
+
+		resp, err := userClient.UpdateProfile(ctx, req)
+		require.NoError(t, err, "as-built, UpdateProfile must not reject empty name/phone or a malformed email")
+		assert.Equal(t, "", resp.User.Name)
+		assert.Equal(t, malformedEmail, resp.User.Email)
+		assert.Equal(t, "", resp.User.Phone)
+
+		var name, email, phone string
+		err = db.QueryRow("SELECT name, email, phone_number FROM users WHERE id = $1", userID).Scan(&name, &email, &phone)
+		require.NoError(t, err)
+		assert.Equal(t, "", name)
+		assert.Equal(t, malformedEmail, email)
+		assert.Equal(t, "", phone)
 	})
 }
 

@@ -8,11 +8,14 @@ import (
 	"time"
 
 	pb "ubertool-backend-trusted/api/gen/v1"
+	"ubertool-backend-trusted/internal/domain"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // JWTClaims represents the decoded JWT claims used to verify Login/Verify2FA/RefreshToken
@@ -281,5 +284,77 @@ func TestAuthService_E2E(t *testing.T) {
 		resp, err := authClient.Login(ctx, req)
 		require.Error(t, err, "Login must reject a password that matches neither canonical nor pending credentials")
 		assert.Nil(t, resp)
+	})
+
+	// FR-010/FR-011 (specs/001-authentication-legal-consent): prior to this test, no test
+	// anywhere called RecordLegalConsent or GetUserConsentStatus.
+	t.Run("RecordLegalConsent and GetUserConsentStatus", func(t *testing.T) {
+		userID := db.CreateTestUser("e2e-test-legal-consent@test.com", "Consent User")
+		const version = "2026-01"
+
+		t.Run("RecordLegalConsent rejects empty doc_names", func(t *testing.T) {
+			ctx, cancel := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+			defer cancel()
+			_, err := authClient.RecordLegalConsent(ctx, &pb.RecordLegalConsentRequest{Version: version})
+			require.Error(t, err)
+			assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+
+		t.Run("RecordLegalConsent rejects empty version", func(t *testing.T) {
+			ctx, cancel := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+			defer cancel()
+			_, err := authClient.RecordLegalConsent(ctx, &pb.RecordLegalConsentRequest{DocNames: []string{domain.KnownLegalDocs[0]}})
+			require.Error(t, err)
+			assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+
+		t.Run("GetUserConsentStatus rejects empty current_version", func(t *testing.T) {
+			ctx, cancel := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+			defer cancel()
+			_, err := authClient.GetUserConsentStatus(ctx, &pb.GetUserConsentStatusRequest{})
+			require.Error(t, err)
+			assert.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+
+		t.Run("GetUserConsentStatus reports every known doc pending before any consent is recorded", func(t *testing.T) {
+			freshUserID := db.CreateTestUser("e2e-test-legal-consent-fresh@test.com", "Fresh Consent User")
+			ctx, cancel := ContextWithUserIDAndTimeout(freshUserID, 5*time.Second)
+			defer cancel()
+			resp, err := authClient.GetUserConsentStatus(ctx, &pb.GetUserConsentStatusRequest{CurrentVersion: version})
+			require.NoError(t, err)
+			assert.False(t, resp.AllCurrent)
+			assert.ElementsMatch(t, domain.KnownLegalDocs, resp.PendingDocs)
+		})
+
+		t.Run("RecordLegalConsent is idempotent and GetUserConsentStatus reflects it", func(t *testing.T) {
+			ctx, cancel := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+			defer cancel()
+
+			_, err := authClient.RecordLegalConsent(ctx, &pb.RecordLegalConsentRequest{
+				DocNames: domain.KnownLegalDocs,
+				Version:  version,
+			})
+			require.NoError(t, err)
+
+			// A repeat call for the same (user, doc, version) tuples must not error or duplicate rows.
+			_, err = authClient.RecordLegalConsent(ctx, &pb.RecordLegalConsentRequest{
+				DocNames: domain.KnownLegalDocs,
+				Version:  version,
+			})
+			require.NoError(t, err, "repeat consent for the same docs/version must be idempotent")
+
+			var rowCount int
+			err = db.QueryRow(
+				"SELECT COUNT(*) FROM user_legal_consents WHERE user_id = $1 AND version = $2",
+				userID, version,
+			).Scan(&rowCount)
+			require.NoError(t, err)
+			assert.Equal(t, len(domain.KnownLegalDocs), rowCount, "repeat RecordLegalConsent calls must not duplicate rows")
+
+			statusResp, err := authClient.GetUserConsentStatus(ctx, &pb.GetUserConsentStatusRequest{CurrentVersion: version})
+			require.NoError(t, err)
+			assert.True(t, statusResp.AllCurrent)
+			assert.Empty(t, statusResp.PendingDocs)
+		})
 	})
 }

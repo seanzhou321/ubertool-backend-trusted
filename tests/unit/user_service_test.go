@@ -101,4 +101,21 @@ func TestUserService_UpdateProfile(t *testing.T) {
 		require.NoError(t, err)
 		userRepo.AssertExpectations(t)
 	})
+
+	// FR-004 (specs/002-users): UpdateProfile must reject a write that would violate the
+	// users.email UNIQUE constraint. The constraint is enforced by Postgres (see the real-DB
+	// repository test in tests/integration/user_test.go); this isolates that the service layer
+	// propagates the repository's rejection rather than swallowing it.
+	t.Run("Propagates a repository rejection (e.g. duplicate email)", func(t *testing.T) {
+		userRepo := new(MockUserRepo)
+		orgRepo := new(MockOrganizationRepo)
+		svc := service.NewUserService(userRepo, orgRepo)
+
+		existing := &domain.User{ID: userID, Name: "Old Name", Email: "old@test.com"}
+		userRepo.On("GetByID", ctx, userID).Return(existing, nil)
+		userRepo.On("Update", ctx, mock.Anything).Return(assert.AnError)
+
+		err := svc.UpdateProfile(ctx, userID, "Old Name", "taken@test.com", "", "")
+		require.Error(t, err, "a repository-level rejection (e.g. UNIQUE violation) must surface to the caller")
+	})
 }

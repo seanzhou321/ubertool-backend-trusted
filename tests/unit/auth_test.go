@@ -534,3 +534,99 @@ func TestAuthService_Logout(t *testing.T) {
 		require.NoError(t, err, "logout must succeed even if marking FCM tokens obsolete fails")
 	})
 }
+
+// TestAuthService_RecordLegalConsent covers FR-010: RecordLegalConsent must forward the given
+// doc names and version to the legal consent repository and propagate any repository error.
+// (INVALID_ARGUMENT validation on empty doc_names/version happens at the gRPC handler layer —
+// see internal/api/grpc/auth.go — and is exercised at e2e in tests/e2e/auth_test.go.) Prior to
+// this test, `grep -r RecordLegalConsent tests/` returned zero calls to the method.
+func TestAuthService_RecordLegalConsent(t *testing.T) {
+	ctx := context.Background()
+	const userID = int32(70)
+	docNames := []string{"01_terms_of_service", "02_privacy_policy"}
+	const version = "2026-01"
+
+	t.Run("Forwards to the repository and succeeds", func(t *testing.T) {
+		svc, _, _, _, legalConsentRepo := newAuthServiceForTestWithLegalConsent()
+		legalConsentRepo.On("Record", ctx, userID, docNames, version).Return(nil)
+
+		err := svc.RecordLegalConsent(ctx, userID, docNames, version)
+		require.NoError(t, err)
+		legalConsentRepo.AssertCalled(t, "Record", ctx, userID, docNames, version)
+	})
+
+	t.Run("Propagates a repository error", func(t *testing.T) {
+		svc, _, _, _, legalConsentRepo := newAuthServiceForTestWithLegalConsent()
+		legalConsentRepo.On("Record", ctx, userID, docNames, version).Return(assert.AnError)
+
+		err := svc.RecordLegalConsent(ctx, userID, docNames, version)
+		require.Error(t, err)
+	})
+}
+
+// TestAuthService_GetUserConsentStatus covers FR-011: GetUserConsentStatus must compute
+// pending_docs against the fixed domain.KnownLegalDocs list, considering only consent rows
+// matching currentVersion. (INVALID_ARGUMENT validation on empty current_version happens at the
+// gRPC handler layer and is exercised at e2e.) Prior to this test, no test anywhere called
+// GetUserConsentStatus.
+func TestAuthService_GetUserConsentStatus(t *testing.T) {
+	ctx := context.Background()
+	const userID = int32(71)
+	const currentVersion = "2026-01"
+
+	t.Run("All current when every known doc is consented at the current version", func(t *testing.T) {
+		svc, _, _, _, legalConsentRepo := newAuthServiceForTestWithLegalConsent()
+		var existing []domain.LegalConsent
+		for _, doc := range domain.KnownLegalDocs {
+			existing = append(existing, domain.LegalConsent{UserID: userID, DocName: doc, Version: currentVersion})
+		}
+		legalConsentRepo.On("ListByUser", ctx, userID).Return(existing, nil)
+
+		allCurrent, pending, err := svc.GetUserConsentStatus(ctx, userID, currentVersion)
+		require.NoError(t, err)
+		assert.True(t, allCurrent)
+		assert.Empty(t, pending)
+	})
+
+	t.Run("Returns docs not yet consented at the current version", func(t *testing.T) {
+		svc, _, _, _, legalConsentRepo := newAuthServiceForTestWithLegalConsent()
+		// Consented to the first known doc only, and at a stale version for a second.
+		existing := []domain.LegalConsent{
+			{UserID: userID, DocName: domain.KnownLegalDocs[0], Version: currentVersion},
+			{UserID: userID, DocName: domain.KnownLegalDocs[1], Version: "2025-06"},
+		}
+		legalConsentRepo.On("ListByUser", ctx, userID).Return(existing, nil)
+
+		allCurrent, pending, err := svc.GetUserConsentStatus(ctx, userID, currentVersion)
+		require.NoError(t, err)
+		assert.False(t, allCurrent)
+		assert.Contains(t, pending, domain.KnownLegalDocs[1], "stale-version consent must not count as current")
+		for _, doc := range domain.KnownLegalDocs[2:] {
+			assert.Contains(t, pending, doc)
+		}
+		assert.NotContains(t, pending, domain.KnownLegalDocs[0])
+	})
+
+	t.Run("Propagates a repository error", func(t *testing.T) {
+		svc, _, _, _, legalConsentRepo := newAuthServiceForTestWithLegalConsent()
+		legalConsentRepo.On("ListByUser", ctx, userID).Return(nil, assert.AnError)
+
+		_, _, err := svc.GetUserConsentStatus(ctx, userID, currentVersion)
+		require.Error(t, err)
+	})
+}
+
+func newAuthServiceForTestWithLegalConsent() (service.AuthService, *MockUserRepo, *MockEmailService, *MockPendingCredentialsRepo, *MockLegalConsentRepo) {
+	userRepo := new(MockUserRepo)
+	inviteRepo := new(MockInviteRepo)
+	reqRepo := new(MockJoinRequestRepo)
+	orgRepo := new(MockOrganizationRepo)
+	noteRepo := new(MockNotificationRepo)
+	emailSvc := new(MockEmailService)
+	fcmRepo := new(MockFcmTokenRepo)
+	pendingCredsRepo := new(MockPendingCredentialsRepo)
+	legalConsentRepo := new(MockLegalConsentRepo)
+	svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+		config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
+	return svc, userRepo, emailSvc, pendingCredsRepo, legalConsentRepo
+}

@@ -183,6 +183,39 @@ func TestImageStorageService_E2E(t *testing.T) {
 		assert.Equal(t, "image1.jpg", resp.Images[0].FileName)
 	})
 
+	// FR-007 (specs/006-tools-image-storage): GetToolImages does not enforce the same
+	// owner-or-AVAILABLE access rule as GetDownloadUrl — internal/service/image_storage.go's
+	// GetToolImages takes no userID parameter at all. This documents the current (lack of)
+	// access boundary as a regression baseline: if access control is ever added here, this test
+	// will fail, correctly signaling the as-built behavior changed on purpose (see FR-007's own
+	// wording — it explicitly describes a target-not-current state, not a required fix).
+	t.Run("GetToolImages does not restrict access to the owner (documents current non-enforcement)", func(t *testing.T) {
+		ownerID := db.CreateTestUser("e2e-test-getimages-owner@test.com", "Images Owner")
+		nonOwnerID := db.CreateTestUser("e2e-test-getimages-nonowner@test.com", "Non Owner Viewer")
+		toolID := db.CreateTestTool(ownerID, "Non-Owner-Viewable Tool", 1000)
+
+		cfg := loadConfig(t)
+		uploadDir := cfg.Storage.UploadDir
+		if !filepath.IsAbs(uploadDir) {
+			uploadDir = filepath.Join("..", "..", uploadDir)
+			uploadDir, _ = filepath.Abs(uploadDir)
+		}
+
+		_, err := db.Exec(`
+			INSERT INTO tool_images (tool_id, file_name, file_path, thumbnail_path, file_size, mime_type, is_primary, display_order, status, user_id)
+			VALUES ($1, 'restricted.jpg', $2, $3, 1024, 'image/jpeg', true, 0, 'CONFIRMED', $4)
+		`, toolID, filepath.Join(uploadDir, "restricted.jpg"), filepath.Join(uploadDir, "thumb_restricted.jpg"), ownerID)
+		require.NoError(t, err)
+
+		// nonOwnerID shares no org with ownerID and is not the tool's owner.
+		ctx, cancel := ContextWithUserIDAndTimeout(nonOwnerID, 5*time.Second)
+		defer cancel()
+
+		resp, err := imageClient.GetToolImages(ctx, &pb.GetToolImagesRequest{ToolId: toolID})
+		require.NoError(t, err, "as-built, GetToolImages currently has no access restriction to document/lock in")
+		assert.Equal(t, 1, len(resp.Images))
+	})
+
 	t.Run("SetPrimaryImage", func(t *testing.T) {
 		// Setup: Create user, tool, and images
 		userID := db.CreateTestUser("e2e-test-setprimary@test.com", "Set Primary User")

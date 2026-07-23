@@ -3,7 +3,7 @@
 - **Source spec**: `specs/001-authentication-legal-consent/spec.md`
 - **Tier mapping in effect**: `sbr/README.md` → "This repo's adapter" (L1=`tests/unit`,
   L2=`tests/integration`, L3=`tests/e2e`, Grounding=`tests/smoke`+`tests/e2e` journeys)
-- **Generated**: 2026-07-22 by `speckit-sbr-audit`
+- **Generated**: 2026-07-22 by `speckit-sbr-audit`; updated 2026-07-23 (Phase 4 re-audit)
 - **Mode**: retrofit audit (as-built) — see project constitution Principle I
 
 | FR-ID | Requirement Summary | L1 Unit | L2 Integration | L3 E2E | Grounding (Smoke) | Boundary Status | Notes |
@@ -17,17 +17,17 @@
 | FR-007 | `RequestToJoinOrganization` MUST create the `join_requests` row before notifying the admin, verify the org exists, and verify `admin_email` holds `ADMIN`/`SUPER_ADMIN` before notifying. | `TestAuthService_RequestToJoin` (`tests/unit/auth_test.go`) — 3 subtests: success, rejects a non-existent org, persists the join request even when admin verification subsequently fails | — | `TestAuthService_E2E > "RequestToJoin Organization"` (`tests/e2e/auth_test.go:70`) | — | **Complete** | **Fixed 2026-07-23 (SBR remediation Phase 3).** The FR's most distinctive clause — the `join_requests` row persisting even when admin verification subsequently fails (spec.md Edge Cases / US3 Scenario 6) — is now regression-locked. No bug found. |
 | FR-008 | `ChangePassword` MUST verify the old password (canonical or valid temporary credential) and on success update the canonical hash and stamp any outstanding temporary credential used. | `TestAuthService_ChangePassword` (`tests/unit/auth_test.go:208`) — 3 subtests: canonical-password success, pending-credential-fallback success, wrong-old-password reject | — | — | — | **Complete** | Fixed 2026-07-22. No bug found — production behavior matched the spec exactly; this was purely a coverage gap. |
 | FR-009 | `ResetPassword` MUST return an identical generic success response regardless of account existence, and only create/email a temporary credential when the account exists. | `TestAuthService_ResetPassword` (`tests/unit/auth_test.go:266`) — 2 subtests | — | — | — | **Complete** | **Fixed 2026-07-22 — real bug found and fixed.** `authService.ResetPassword`'s not-found branch returned a non-nil `error`, which the gRPC handler propagated as a distinguishable error response instead of the same generic success the found-user path returns — a user-enumeration vulnerability defeating this FR's entire purpose. Fixed in `internal/service/auth.go` (not-found branch now returns `nil`); regression-locked by `TestAuthService_ResetPassword/Non-existent_email_returns_no_error`. |
-| FR-010 | `RecordLegalConsent` MUST reject empty `doc_names`/`version` with `INVALID_ARGUMENT` and MUST be idempotent under repeat calls. | — | — | — | — | **Gap — all tiers** | `MockLegalConsentRepo` exists (`tests/unit/mocks_test.go:561`) and is wired into two `AuthService` constructors in `tests/unit/auth_test.go`, but only for dependency injection into unrelated `ValidateInvite`/`RequestToJoin` tests — no test ever sets an expectation on it or calls `RecordLegalConsent`. |
-| FR-011 | `GetUserConsentStatus` MUST reject empty `current_version` with `INVALID_ARGUMENT` and MUST compute `pending_docs` against the fixed `domain.KnownLegalDocs` list. | — | — | — | — | **Gap — all tiers** | No test anywhere calls `GetUserConsentStatus`. |
+| FR-010 | `RecordLegalConsent` MUST reject empty `doc_names`/`version` with `INVALID_ARGUMENT` and MUST be idempotent under repeat calls. | `TestAuthService_RecordLegalConsent` (`tests/unit/auth_test.go`) — forwards to the repository, propagates a repository error | — | `TestAuthService_E2E > "RecordLegalConsent and GetUserConsentStatus" > "RecordLegalConsent rejects empty doc_names"`, `> "... rejects empty version"`, `> "RecordLegalConsent is idempotent and GetUserConsentStatus reflects it"` (`tests/e2e/auth_test.go`) — the `INVALID_ARGUMENT` validation (handler-layer, `internal/api/grpc/auth.go`) and the `ON CONFLICT DO NOTHING` idempotency (DB-level, `internal/repository/postgres/legal_consent.go`) are both real-DB/contract-level guarantees not meaningfully mockable, so e2e is the tier that actually exercises them | — | **Complete** | **Fixed 2026-07-23 (SBR remediation Phase 4).** No bug found. |
+| FR-011 | `GetUserConsentStatus` MUST reject empty `current_version` with `INVALID_ARGUMENT` and MUST compute `pending_docs` against the fixed `domain.KnownLegalDocs` list. | `TestAuthService_GetUserConsentStatus` (`tests/unit/auth_test.go`) — 3 subtests: all-current when every known doc is consented at the current version, returns docs not yet consented (including a stale-version consent not counting as current), propagates a repository error | — | `TestAuthService_E2E > "RecordLegalConsent and GetUserConsentStatus" > "GetUserConsentStatus rejects empty current_version"`, `> "GetUserConsentStatus reports every known doc pending before any consent is recorded"` (`tests/e2e/auth_test.go`) | — | **Complete** | **Fixed 2026-07-23 (SBR remediation Phase 4).** No bug found. |
 | FR-012 | `Login` and `Verify2FA` MUST be rate-limited per client IP (3-attempt burst, 1 refill/3 min). | — | — | `TestAuthService_RateLimit_E2E` (`tests/e2e/rate_limit_test.go:30`) — isolated via the `ratelimit` build tag, run via `make test-e2e-rate-limit` | — | **Complete** | Fixed 2026-07-22. Confirmed real and correctly implemented (`internal/security/rate_limiter.go`): both Login and Verify2FA independently throttle after exactly 3 attempts. Isolated behind a build tag because it deliberately exhausts the shared, process-lifetime, per-IP limiter that this file's other Login/Verify2FA-calling tests also depend on — see `sbr/remediation-plan.md` for why. |
 
 ## Summary
 
-- **12 FR-IDs audited, 10 fully `Complete`** (FR-001, FR-002, FR-004, FR-006, FR-008, FR-009,
-  FR-012 — FR-006 closed 2026-07-23 as SBR remediation Phase 2, rest closed 2026-07-22 as Phase
-  1; FR-003, FR-005, FR-007 closed 2026-07-23 as Phase 3).
-- **Remaining gaps**: FR-010 (`RecordLegalConsent`), FR-011 (`GetUserConsentStatus`) — tracked
-  in `sbr/remediation-plan.md` Phase 4.
+- **12 FR-IDs audited, all 12 fully `Complete`** (FR-001, FR-002, FR-004, FR-006, FR-008,
+  FR-009, FR-012 — FR-006 closed 2026-07-23 as SBR remediation Phase 2, rest closed 2026-07-22
+  as Phase 1; FR-003, FR-005, FR-007 closed 2026-07-23 as Phase 3; FR-010, FR-011 closed
+  2026-07-23 as Phase 4).
+- **Remaining gaps**: none.
 - **Phase 1 outcome**: 1 real bug found and fixed (FR-009 `ResetPassword` user-enumeration —
   see Notes above), 1 accidental-pass test replaced with 3 real subtests (FR-001), 1
   excluded-from-build file re-included with a stale-value fix and redundancy removed (FR-004),
@@ -39,5 +39,9 @@
 - **Phase 3 outcome**: FR-003's 2FA code-reuse-after-consumption rejection, FR-005's `Logout`
   FCM-obsolete-marking, and FR-007's org-existence check + persists-on-notify-failure clause all
   unit-tested. No bugs found in any of the three.
+- **Phase 4 outcome**: FR-010's `RecordLegalConsent` (repository forwarding at L1;
+  `INVALID_ARGUMENT` validation and real-DB idempotency at e2e) and FR-011's
+  `GetUserConsentStatus` (pending-docs computation at L1; validation at e2e) both closed. No
+  bugs found in either.
 - **Unclassified**: none — every row above was resolved to either cited evidence (including
   citing why it's insufficient) or an explicit, named gap.

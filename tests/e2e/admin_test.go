@@ -191,4 +191,36 @@ func TestAdminService_E2E(t *testing.T) {
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(resp.Requests), 2)
 	})
+
+	// FR-005 (specs/003-organizations-administration): every AdminService RPC must require
+	// ADMIN/SUPER_ADMIN membership in the target org. The L1 unit suite
+	// (TestAdminService_RequiresAdminRole) already regression-locks this per-RPC at the service
+	// layer — this is a reinforcement of that guarantee at the contract level, previously absent
+	// (spec.md's own SC-001 self-documents this as a known, accepted gap).
+	t.Run("AdminBlockUserAccount rejects a non-admin caller", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		memberID := db.CreateTestUser("e2e-test-nonadmin-block@test.com", "Plain Member")
+		targetID := db.CreateTestUser("e2e-test-blocktarget@test.com", "Target User")
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+		db.AddUserToOrg(targetID, orgID, "MEMBER", "ACTIVE", 0)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(memberID, 5*time.Second)
+		defer cancel()
+
+		req := &pb.AdminBlockUserAccountRequest{
+			BlockedUserId:  targetID,
+			OrganizationId: orgID,
+			BlockRenting:   true,
+			BlockLending:   true,
+			Reason:         "should never apply",
+		}
+
+		_, err := adminClient.AdminBlockUserAccount(ctx, req)
+		require.Error(t, err, "a plain MEMBER caller must be rejected")
+
+		var status string
+		err2 := db.QueryRow("SELECT status FROM users_orgs WHERE user_id = $1 AND org_id = $2", targetID, orgID).Scan(&status)
+		require.NoError(t, err2)
+		assert.Equal(t, "ACTIVE", status, "the rejected caller's request must not have applied any block")
+	})
 }

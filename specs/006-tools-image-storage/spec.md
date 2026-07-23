@@ -310,9 +310,10 @@ rejection and acceptance, both RPCs, via `TestToolService_UpdateDelete_RequiresO
 - **SC-002**: `ListToolCategories` either queries `DISTINCT categories` from `tools` as
   documented, or the documentation is corrected to describe the static list — Known
   Discrepancy 4 does not remain silently contradictory.
-- **SC-003**: An e2e-level test confirms a non-owner caller is rejected by `UpdateTool` and
-  `DeleteTool` through the real gRPC handler and interceptor stack, not just at the service
-  layer.
+- **SC-003 — MET 2026-07-23**: An e2e-level test confirms a non-owner caller is rejected by
+  `UpdateTool` and `DeleteTool` through the real gRPC handler and interceptor stack, not just
+  at the service layer (`TestToolService_E2E > "UpdateTool and DeleteTool reject a non-owner
+  caller"`).
 - **SC-004**: A developer reading only this spec can correctly state which of the eleven
   RPCs across both services require tool ownership, which allow any authenticated caller,
   and which are effectively public.

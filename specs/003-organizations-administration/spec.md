@@ -288,13 +288,14 @@ test that closes Known Discrepancy 1 at the unit level.
 
 ### Measurable Outcomes
 
-- **SC-001 (highest priority in this spec) — MET at the unit-test level 2026-07-22**: Every
-  one of the eight `AdminService` RPCs rejects a caller who does not hold
+- **SC-001 (highest priority in this spec) — MET 2026-07-22 (unit), reinforced at e2e
+  2026-07-23**: Every one of the eight `AdminService` RPCs rejects a caller who does not hold
   `ADMIN`/`SUPER_ADMIN` in the target org, verified by a dedicated automated test per
-  method (`TestAdminService_RequiresAdminRole`). Remaining: an equivalent e2e-level
-  assertion (non-admin caller through the real gRPC handler against a live DB) — the
-  existing e2e suite only ever exercised admin callers, so it never would have caught this
-  and still can't prove the rejection path end-to-end.
+  method (`TestAdminService_RequiresAdminRole`). An e2e-level assertion (non-admin caller
+  through the real gRPC handler against a live DB) was added 2026-07-23
+  (`TestAdminService_E2E > "AdminBlockUserAccount rejects a non-admin caller"`), confirming
+  the rejection path end-to-end for at least one representative RPC; the existing e2e suite
+  previously only ever exercised admin callers.
 - **SC-002 — MET at the unit-test level 2026-07-22**: `UpdateOrganization`'s membership/
   role/price-field gating (already correct) has explicit regression tests locking in its
   current correct behavior (`TestOrganizationService_UpdateOrganization`, 7 subtests

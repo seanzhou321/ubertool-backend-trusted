@@ -93,6 +93,41 @@ func TestLedgerRepository_GetTransactions_IsolationOrderingPagination(t *testing
 	})
 }
 
+// TestLedgerRepository_GetBalance covers FR-001 (specs/007-ledger): GetBalance must return the
+// caller's balance_cents for the given org. Prior to this test, the only real-DB ledger
+// integration test (TestRentalAndLedger_Integration) never called GetBalance directly — the
+// happy path was only proven via a mocked repo (L1) and a before/after-settlement e2e comparison
+// (L3), with no test exercising ledgerRepo.GetBalance against a real Postgres instance.
+func TestLedgerRepository_GetBalance(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	repo := postgres.NewLedgerRepository(db)
+	ctx := context.Background()
+
+	orgID := createTestOrgForLedger(t, db)
+	user := createTestUserForLedger(t, db, "ledger-balance-user")
+	otherOrgUser := createTestUserForLedger(t, db, "ledger-balance-other")
+	addUserToOrgForLedgerWithBalance(t, db, user, orgID, 7500)
+
+	defer func() {
+		db.Exec("DELETE FROM users_orgs WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2)", user, otherOrgUser)
+		db.Exec("DELETE FROM orgs WHERE id = $1", orgID)
+	}()
+
+	t.Run("Returns the caller's balance_cents for the given org", func(t *testing.T) {
+		balance, err := repo.GetBalance(ctx, user, orgID)
+		require.NoError(t, err)
+		assert.EqualValues(t, 7500, balance)
+	})
+
+	t.Run("Errors for a user with no membership in the org", func(t *testing.T) {
+		_, err := repo.GetBalance(ctx, otherOrgUser, orgID)
+		require.Error(t, err)
+	})
+}
+
 // TestLedgerRepository_GetSummary covers FR-003 (specs/007-ledger): GetLedgerSummary must
 // return the caller's balance and a per-status count of their rentals (as renter OR owner) in
 // the given org. Prior to this test, GetLedgerSummary had zero unit or integration coverage —

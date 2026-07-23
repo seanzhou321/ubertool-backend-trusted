@@ -556,6 +556,78 @@ func TestBillSplitService_ListResolvedDisputes(t *testing.T) {
 	assert.Equal(t, "DEBTOR_FAULT", resolvedResp.Disputes[0].Resolution, "Resolution should be DEBTOR_FAULT")
 }
 
+// TestBillSplitService_IgnoredPaginationAndFilters covers FR-013 (specs/008-bill-split):
+// as-built, ListPayments/ListDisputedPayments/ListResolvedDisputes accept pagination and
+// settlement_month/resolution_outcome filter fields but ignore them, always returning the full
+// unfiltered/unpaginated result set (Known Discrepancy 1 / SC-005). Prior to this test, no test
+// anywhere populated these fields and asserted they have no effect — this regression-locks the
+// as-built "ignored" behavior: if real filtering/pagination is ever implemented, this test will
+// fail, correctly signaling the behavior changed on purpose.
+func TestBillSplitService_IgnoredPaginationAndFilters(t *testing.T) {
+	db := PrepareDB(t)
+	defer db.Cleanup()
+	client := NewGRPCClient(t, "")
+	defer client.Close()
+	billClient := pb.NewBillSplitServiceClient(client.Conn())
+
+	orgID := db.CreateTestOrg("E2E-Test-IgnoredFilters-" + t.Name())
+	adminID := db.CreateTestUser("e2e-test-admin-ignoredfilters-"+t.Name()+"@test.com", "Admin User")
+	debtorID := db.CreateTestUser("e2e-test-debtor-ignoredfilters-"+t.Name()+"@test.com", "Debtor User")
+	creditorID := db.CreateTestUser("e2e-test-creditor-ignoredfilters-"+t.Name()+"@test.com", "Creditor User")
+
+	db.AddUserToOrg(adminID, orgID, "ADMIN", "ACTIVE", 0)
+	db.AddUserToOrg(debtorID, orgID, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(creditorID, orgID, "MEMBER", "ACTIVE", 0)
+
+	// Bills across distinct settlement months (the (org, debtor, creditor, settlement_month)
+	// tuple is unique) — none in the "2099-12" month the request below will (ineffectively)
+	// filter for.
+	db.CreateTestBill(debtorID, creditorID, orgID, 1000, "2024-01", "PENDING")
+	db.CreateTestBill(debtorID, creditorID, orgID, 2000, "2024-02", "PENDING")
+	disputedBillID := db.CreateTestBill(debtorID, creditorID, orgID, 3000, "2024-03", "DISPUTED")
+	_, err := db.Exec(`UPDATE bills SET disputed_at = NOW() WHERE id = $1`, disputedBillID)
+	require.NoError(t, err)
+
+	resolvedBillID := db.CreateTestBill(debtorID, creditorID, orgID, 4000, "2024-04", "ADMIN_RESOLVED")
+	_, err = db.Exec(`
+		UPDATE bills SET disputed_at = NOW() - INTERVAL '1 day', resolved_at = NOW(),
+		    dispute_reason = 'Test', resolution_outcome = 'DEBTOR_FAULT', resolution_notes = 'n/a'
+		WHERE id = $1
+	`, resolvedBillID)
+	require.NoError(t, err)
+
+	debtorCtx, cancelDebtor := ContextWithUserIDAndTimeout(debtorID, 5*time.Second)
+	defer cancelDebtor()
+	adminCtx, cancelAdmin := ContextWithUserIDAndTimeout(adminID, 5*time.Second)
+	defer cancelAdmin()
+
+	// A page_size:1/page:1 pagination request and a settlement_month that matches nothing must
+	// not shrink or empty the result set — both are accepted but ignored as-built.
+	listResp, err := billClient.ListPayments(debtorCtx, &pb.ListPaymentsRequest{
+		OrganizationId:  orgID,
+		ShowHistory:     false,
+		SettlementMonth: "2099-12",
+		Pagination:      &pb.PaginationRequest{Page: 1, PageSize: 1},
+	})
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, len(listResp.Payments), 2, "ListPayments must ignore settlement_month and pagination, returning the full active set")
+
+	disputedResp, err := billClient.ListDisputedPayments(adminCtx, &pb.ListDisputedPaymentsRequest{
+		OrganizationId: orgID,
+		Pagination:     &pb.PaginationRequest{Page: 1, PageSize: 1},
+	})
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, len(disputedResp.Disputes), 1, "ListDisputedPayments must ignore pagination, returning the full disputed set")
+
+	resolvedResp, err := billClient.ListResolvedDisputes(adminCtx, &pb.ListResolvedDisputesRequest{
+		OrganizationId:    orgID,
+		ResolutionOutcome: "CREDITOR_FAULT", // does not match the seeded DEBTOR_FAULT resolution
+		Pagination:        &pb.PaginationRequest{Page: 1, PageSize: 1},
+	})
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, len(resolvedResp.Disputes), 1, "ListResolvedDisputes must ignore resolution_outcome and pagination, returning the full resolved set")
+}
+
 // TestBillSplitService_UnauthorizedAccess tests that users cannot access other users' bills
 func TestBillSplitService_UnauthorizedAccess(t *testing.T) {
 	// Setup

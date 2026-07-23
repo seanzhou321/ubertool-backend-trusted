@@ -3,7 +3,7 @@
 - **Source spec**: `specs/008-bill-split/spec.md`
 - **Tier mapping in effect**: `sbr/README.md` → "This repo's adapter" (L1=`tests/unit`,
   L2=`tests/integration`, L3=`tests/e2e`, Grounding=`tests/smoke`+`tests/e2e` journeys)
-- **Generated**: 2026-07-22 by `speckit-sbr-audit`
+- **Generated**: 2026-07-22 by `speckit-sbr-audit`; updated 2026-07-23 (Phase 4 re-audit)
 - **Mode**: retrofit audit (as-built) — see project constitution Principle I
 
 | FR-ID | Requirement Summary | L1 Unit | L2 Integration | L3 E2E | Grounding (Smoke) | Boundary Status | Notes |
@@ -20,15 +20,15 @@
 | FR-010 | `ListPayments` MUST filter to the caller's own bills in the given org, using `show_history` to toggle active vs. completed statuses. | `TestBillSplitService_ListPayments > "Success_ShowHistory"` (`tests/unit/bill_split_service_test.go:80`), `> "Success_NoHistory"` (`:99`), `> "Error_NotMember"` (`:115`) | — | `TestBillSplitService_ListPayments` (`tests/e2e/bill_split_test.go:443`) — asserts active list (`PENDING`+`DISPUTED`) vs. history list (`PAID`) counts against a real DB | — | **Complete** | No L2 test exercises this RPC directly, but the FR's core clause (own-bills scoping + `show_history` toggle) is proven both against the real service interface (L1, including the not-a-member rejection) and end-to-end through the real gRPC/DB stack (L3) — per `sbr/README.md`, not every requirement needs every tier, and L3 here already subsumes what an L2 test would add. |
 | FR-011 | `GetPaymentDetail` MUST be restricted to the bill's debtor, creditor, or an org admin, and MUST compute `can_acknowledge` per User Story 2's rules. | `TestBillSplitService_GetPaymentDetail` (`tests/unit/bill_split_service_test.go:135`) — 7 subtests: `Success_AsDebtor`, `Success_AsCreditor`, `Error_NotInvolved`, `Error_BillNotFound`, `Success_AsOrgAdmin_NotAParty` (the third authorized-caller class), and 3 `CanAcknowledge_False_*` subtests (debtor already acknowledged, creditor-before-debtor, wrong status) | — | Within `TestBillSplitService_PaymentAcknowledgment` (`tests/e2e/bill_split_test.go:52-58`); within `TestBillSplitService_UnauthorizedAccess` (`:592-595`) | — | **Complete** | **Fixed 2026-07-23 (SBR remediation Phase 3).** The org-admin (non-party) authorized-caller class and all `can_acknowledge=false` branches are now exercised — previously only the two `true` cases were ever asserted. No bug found. |
 | FR-012 | `ListDisputedPayments`/`ListResolvedDisputes` MUST be restricted to org admins; `ListDisputedPayments` MUST exclude bills the calling admin is a party to. | `TestBillSplitService_ListDisputedPayments > "Success"` (`tests/unit/bill_split_service_test.go:207`), `> "Error_NotAdmin"` (`:222`); `TestBillSplitService_ListResolvedDisputes > "Success"` (`:243`, no rejection subtest) | `"Dispute Lifecycle"` (`tests/integration/bill_split_test.go:139`); `TestBillRepository_ListDisputedByOrg_ExcludesAdminParty` (`tests/integration/bill_repository_test.go`) — real DB adversarial fixture: a disputed bill where the admin IS the debtor, one where the admin IS the creditor, and one where the admin is uninvolved; asserts the first two are excluded and the third is included | `TestBillSplitService_DebtorDisputesPayment` (`tests/e2e/bill_split_test.go:108`) for `ListDisputedPayments`; `TestBillSplitService_ListResolvedDisputes` (`:507`) — admin-caller happy paths only | — | **Complete** | **Fixed 2026-07-23 (SBR remediation Phase 2).** The exclusion clause is a real SQL `WHERE debtor_user_id != $3 AND creditor_user_id != $3` condition, so it needed a real-DB adversarial fixture rather than a mocked pass-through assertion. No bug found — the exclusion worked correctly in both directions (admin-as-debtor, admin-as-creditor). `ListResolvedDisputes`'s missing rejection test remains a minor, lower-severity gap not tracked as part of this FR's core clause. |
-| FR-013 | As-built, `ListPayments`/`ListDisputedPayments`/`ListResolvedDisputes` MUST return the full unfiltered/unpaginated result set — pagination and `settlement_month`/`resolution_outcome` filters are accepted but ignored. | — | — | — | — | **Gap — all tiers** | `grep -i pagination tests/e2e/bill_split_test.go` and equivalent searches for `SettlementMonth`/`ResolutionOutcome` filter usage return nothing. No test ever populates these request fields and asserts they have no effect — the as-built "ignored" behavior that Known Discrepancy 1 and SC-005 hinge on is entirely unverified by regression test, so a future accidental implementation of real filtering would not be caught as a behavior change. |
+| FR-013 | As-built, `ListPayments`/`ListDisputedPayments`/`ListResolvedDisputes` MUST return the full unfiltered/unpaginated result set — pagination and `settlement_month`/`resolution_outcome` filters are accepted but ignored. | — | — | `TestBillSplitService_IgnoredPaginationAndFilters` (`tests/e2e/bill_split_test.go`) — populates `Pagination{Page:1, PageSize:1}` on all 3 RPCs, plus a non-matching `settlement_month` on `ListPayments` and a non-matching `resolution_outcome` on `ListResolvedDisputes`, and asserts the full result set is still returned | — | **Complete** | **Fixed 2026-07-23 (SBR remediation Phase 4).** The as-built "ignored" behavior that Known Discrepancy 1 and SC-005 hinge on is now regression-locked — a future accidental implementation of real filtering/pagination would be caught as a test failure, correctly signaling the behavior changed on purpose. No bug found. |
 
 ## Summary
 
-- **13 FR-IDs audited, 12 fully `Complete`** (FR-006, FR-009, FR-010 closed 2026-07-22 as SBR
-  remediation Phase 1; FR-001, FR-004, FR-005, FR-007, FR-012 closed 2026-07-23 as Phase 2;
-  FR-002, FR-003, FR-008, FR-011 closed 2026-07-23 as Phase 3).
-- **Remaining gaps**: FR-013 (as-built ignored pagination/filter fields) — tracked in
-  `sbr/remediation-plan.md` Phase 4.
+- **13 FR-IDs audited, all 13 fully `Complete`** (FR-006, FR-009, FR-010 closed 2026-07-22 as
+  SBR remediation Phase 1; FR-001, FR-004, FR-005, FR-007, FR-012 closed 2026-07-23 as Phase 2;
+  FR-002, FR-003, FR-008, FR-011 closed 2026-07-23 as Phase 3; FR-013 closed 2026-07-23 as
+  Phase 4).
+- **Remaining gaps**: none.
 - **Phase 1 outcome**: FR-006's zero-coverage reject clauses closed (8 new subtests, no bug
   found — the deferral-to-e2e comment's implicit promise was never actually fulfilled by the
   e2e file it pointed to). FR-009's SC-001 spec-vs-test contradiction resolved — the `GRACEFUL`
@@ -49,5 +49,7 @@
   `Success=false` responses, not gRPC errors, matching `AcknowledgePayment`'s existing pattern.
   FR-011's org-admin (non-party) authorized-caller class and all `can_acknowledge=false`
   branches closed. No bugs found in any of the four.
+- **Phase 4 outcome**: FR-013's as-built ignored pagination/filter fields regression-locked with
+  an e2e test across all 3 affected RPCs. No bug found.
 - **Unclassified**: none — every row above was resolved to either cited evidence or an
   explicit, named gap.

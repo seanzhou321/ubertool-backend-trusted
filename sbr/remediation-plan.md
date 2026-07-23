@@ -130,7 +130,12 @@ any real bugs found and fixed.
   found and fixed (004/FR-001's non-page-aligned `GetNotifications` offset — production code),
   19 genuine coverage gaps closed with no bug found. Full suite (unit + integration + e2e)
   re-verified green afterward, no regressions. Details below.
-- [ ] Phase 4 (LOW, 9 items) — not started
+- [x] **Phase 4 (LOW, 9 items) — completed 2026-07-23.** All 9 items closed: 0 real bugs found
+  (every item was either a genuine zero-coverage gap or an already-known, self-documented L3
+  gap needing reinforcement). Full suite (unit + integration + e2e) re-verified green
+  afterward, no regressions (the pre-existing `TestPushNotificationService_E2E` environment
+  failure from stale real Firebase tokens, noted in Phase 2, reproduces identically and is
+  unrelated to this remediation). Details below.
 
 ## Phase 1 results (2026-07-22)
 
@@ -222,3 +227,28 @@ devices).
 **Production code changed**: `internal/service/notification.go` + `internal/api/grpc/notification.go`
 (`GetNotifications` offset-rounding bug fix — FR-001); `internal/service/push_notification.go`
 (`isInvalidArgumentFn` injectable-predicate addition — testability only, no behavior change).
+
+## Phase 4 results (2026-07-23)
+
+| Spec | FR | Outcome |
+|---|---|---|
+| 001 | FR-010 | `RecordLegalConsent` closed at L1 (repository-forwarding + error propagation) and e2e (`INVALID_ARGUMENT` on empty `doc_names`/`version`; real-DB idempotency — a repeat call for the same docs/version does not duplicate rows). No bug found. |
+| 001 | FR-011 | `GetUserConsentStatus` closed at L1 (`pending_docs` computed against `domain.KnownLegalDocs`, including a stale-version consent correctly not counting as current) and e2e (`INVALID_ARGUMENT` on empty `current_version`). No bug found. |
+| 002 | FR-004 | Email-uniqueness rejection closed at L1 (service propagates a repository-level rejection) and L2 (a real Postgres `UNIQUE` violation exercised directly against `userRepository.Update`, replacing the previous generic e2e-only `assert.Error`). No bug found. |
+| 002 | FR-005 | `UpdateProfile`'s documented absence of input validation regression-locked with an e2e test proving empty `name`/`phone` and a malformed `email` are currently accepted and stored as-is. No bug found (behavior matched spec.md's own Coverage Baseline exactly). |
+| 003 | FR-005 | The already-known, self-documented L3 gap (spec.md's own SC-001) on `AdminService`'s authorization gate reinforced with a real e2e non-admin-rejection test (`AdminBlockUserAccount`) against a live gRPC handler and DB. No bug found. |
+| 006 | FR-001 | The already-known, self-documented L3 gap (spec.md's own SC-003) on `UpdateTool`/`DeleteTool` ownership reinforced with a real e2e non-owner-rejection test for both RPCs. No bug found. |
+| 006 | FR-007 | `GetToolImages`'s lack of a regression baseline closed with an e2e test documenting and locking in the current unrestricted (non-owner-accessible) behavior, per this FR's own target-not-current framing — not a required fix. No bug found; no fix applied. |
+| 007 | FR-001 | `GetBalance`'s L2 gap closed with a dedicated real-DB integration test (the only prior real-DB ledger test never called `GetBalance` directly). No bug found. |
+| 008 | FR-013 | The as-built ignored pagination/`settlement_month`/`resolution_outcome` filter fields (Known Discrepancy 1 / SC-005) regression-locked with an e2e test across `ListPayments`, `ListDisputedPayments`, and `ListResolvedDisputes`. No bug found. |
+
+**New files**: none (all Phase 4 tests were added to existing test files).
+**Production code changed**: none.
+**spec.md corrections**: `specs/003-organizations-administration/spec.md` SC-001 and
+`specs/006-tools-image-storage/spec.md` SC-003 updated to record the newly-added e2e
+reinforcement coverage (both were self-documented, known gaps — not spec-vs-test
+contradictions — so this is a coverage-status update, not the false-confidence correction
+pattern from Phases 1/2).
+**Environment note**: `TestPushNotificationService_E2E` still fails independently of this
+remediation, for the same reason documented in Phase 2 (stale real Firebase device tokens) —
+reproduced identically before and after Phase 4's changes; not a regression.

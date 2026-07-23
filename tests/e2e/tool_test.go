@@ -184,5 +184,36 @@ func TestToolService_E2E(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, deletedOn)
 	})
+
+	// FR-001 (specs/006-tools-image-storage): UpdateTool/DeleteTool must require the caller to
+	// be owner_id. The L1 unit suite (TestToolService_UpdateDelete_RequiresOwnership) already
+	// regression-locks this at the service layer (it's the fix for Known Discrepancy 1) — this is
+	// a reinforcement of that guarantee at the contract level, previously absent (spec.md's own
+	// SC-003 self-documents this as a known, accepted gap).
+	t.Run("UpdateTool and DeleteTool reject a non-owner caller", func(t *testing.T) {
+		ownerID := db.CreateTestUser("e2e-test-toolowner5@test.com", "Tool Owner 5")
+		nonOwnerID := db.CreateTestUser("e2e-test-nonowner@test.com", "Non Owner")
+		toolID := db.CreateTestTool(ownerID, "Not Yours", 1000)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(nonOwnerID, 5*time.Second)
+		defer cancel()
+
+		_, err := toolClient.UpdateTool(ctx, &pb.UpdateToolRequest{
+			ToolId: toolID,
+			Name:   "Hijacked Name",
+		})
+		require.Error(t, err, "a non-owner caller must be rejected by UpdateTool")
+
+		_, err = toolClient.DeleteTool(ctx, &pb.DeleteToolRequest{ToolId: toolID})
+		require.Error(t, err, "a non-owner caller must be rejected by DeleteTool")
+
+		// Verify: neither rejected call had any effect.
+		var name string
+		var deletedOn *time.Time
+		err2 := db.QueryRow("SELECT name, deleted_on FROM tools WHERE id = $1", toolID).Scan(&name, &deletedOn)
+		require.NoError(t, err2)
+		assert.Equal(t, "Not Yours", name)
+		assert.Nil(t, deletedOn)
+	})
 }
 
