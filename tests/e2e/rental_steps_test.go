@@ -118,6 +118,42 @@ func doApproveReturnDateChange(t *testing.T, client pb.RentalServiceClient, owne
 	require.NoError(t, err)
 }
 
+// doRejectReturnDateChange calls RejectReturnDateChange as the owner with a counter-proposal end
+// date, and asserts the rental enters RETURN_DATE_CHANGE_REJECTED status.
+func doRejectReturnDateChange(t *testing.T, client pb.RentalServiceClient, ownerID, rentalID int32, reason string, counterEndDate time.Time) *pb.RentalRequest {
+	t.Helper()
+	ctx, cancel := ContextWithUserIDAndTimeout(ownerID, 5*time.Second)
+	defer cancel()
+	resp, err := client.RejectReturnDateChange(ctx, &pb.RejectReturnDateChangeRequest{
+		RequestId:  rentalID,
+		Reason:     reason,
+		NewEndDate: counterEndDate.Format("2006-01-02"),
+	})
+	require.NoError(t, err)
+	require.Equal(t, pb.RentalStatus_RENTAL_STATUS_RETURN_DATE_CHANGE_REJECTED, resp.RentalRequest.Status)
+	return resp.RentalRequest
+}
+
+// doAcknowledgeReturnDateRejection calls AcknowledgeReturnDateRejection as the renter.
+func doAcknowledgeReturnDateRejection(t *testing.T, client pb.RentalServiceClient, renterID, rentalID int32) *pb.RentalRequest {
+	t.Helper()
+	ctx, cancel := ContextWithUserIDAndTimeout(renterID, 5*time.Second)
+	defer cancel()
+	resp, err := client.AcknowledgeReturnDateRejection(ctx, &pb.AcknowledgeReturnDateRejectionRequest{RequestId: rentalID})
+	require.NoError(t, err)
+	return resp.RentalRequest
+}
+
+// doCancelReturnDateChange calls CancelReturnDateChange as the renter.
+func doCancelReturnDateChange(t *testing.T, client pb.RentalServiceClient, renterID, rentalID int32) *pb.RentalRequest {
+	t.Helper()
+	ctx, cancel := ContextWithUserIDAndTimeout(renterID, 5*time.Second)
+	defer cancel()
+	resp, err := client.CancelReturnDateChange(ctx, &pb.CancelReturnDateChangeRequest{RequestId: rentalID})
+	require.NoError(t, err)
+	return resp.RentalRequest
+}
+
 // ── Assertion helpers ──────────────────────────────────────────────────────────
 
 // assertBalance verifies a user's balance_cents in the given org.

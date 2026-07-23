@@ -981,6 +981,80 @@ func TestRentalService_CancelReturnDateChange(t *testing.T) {
 	})
 }
 
+// TestRentalService_ApproveReturnDateChange covers FR-005 (specs/005-rentals): this RPC had zero
+// unit test evidence — the only prior evidence was e2e/integration happy-path coverage. Unlike
+// its sibling RPCs, ApproveReturnDateChange does not itself change end_date (the extension's new
+// end_date was already applied, and total_cost_cents already recomputed, by the preceding
+// ChangeRentalDates call) — it only confirms the pending extension by setting
+// last_agreed_end_date and transitioning status, so no further recompute is expected here.
+func TestRentalService_ApproveReturnDateChange(t *testing.T) {
+	ctx := context.Background()
+	const renterID = int32(1)
+	const ownerID = int32(10)
+	const rentalID = int32(100)
+	const toolID = int32(200)
+
+	newSvc := func() (service.RentalService, *MockRentalRepo, *MockToolRepo, *MockUserRepo, *MockNotificationRepo) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		return svc, rentalRepo, toolRepo, userRepo, noteRepo
+	}
+
+	t.Run("Success as owner sets last_agreed_end_date and activates", func(t *testing.T) {
+		svc, rentalRepo, toolRepo, userRepo, noteRepo := newSvc()
+		requestedEnd := time.Now().Add(72 * time.Hour).Format("2006-01-02")
+		rt := &domain.Rental{
+			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
+			Status:    domain.RentalStatusReturnDateChanged,
+			StartDate: time.Now().Add(-24 * time.Hour).Format("2006-01-02"),
+			EndDate:   requestedEnd,
+			TotalCostCents: 3000,
+		}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		rentalRepo.On("Update", ctx, mock.MatchedBy(func(r *domain.Rental) bool {
+			return r.Status == domain.RentalStatusActive &&
+				r.LastAgreedEndDate != nil && *r.LastAgreedEndDate == requestedEnd &&
+				r.TotalCostCents == 3000 // unchanged — Approve does not recompute cost
+		})).Return(nil)
+		toolRepo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, Name: "Drill"}, nil)
+		userRepo.On("GetByID", ctx, renterID).Return(&domain.User{ID: renterID, Name: "Renter"}, nil)
+		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
+
+		res, err := svc.ApproveReturnDateChange(ctx, ownerID, rentalID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.RentalStatusActive, res.Status)
+		require.NotNil(t, res.LastAgreedEndDate)
+		assert.Equal(t, requestedEnd, *res.LastAgreedEndDate)
+	})
+
+	t.Run("Rejects a caller who is not the owner", func(t *testing.T) {
+		svc, rentalRepo, _, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, OwnerID: ownerID, Status: domain.RentalStatusReturnDateChanged}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.ApproveReturnDateChange(ctx, int32(999), rentalID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unauthorized")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a rental that is not in RETURN_DATE_CHANGED status", func(t *testing.T) {
+		svc, rentalRepo, _, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, OwnerID: ownerID, Status: domain.RentalStatusActive}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.ApproveReturnDateChange(ctx, ownerID, rentalID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid status")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+}
+
 // TestRentalService_GetRental covers FR-006 (specs/005-rentals): GetRental must grant access to
 // the rental's renter and owner, and reject any other caller (admin access is explicitly NOT
 // required — Known Discrepancy 4). Prior to this test, the only occurrence of GetRental in

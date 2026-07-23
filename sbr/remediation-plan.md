@@ -81,13 +81,20 @@ rejection), 005/FR-005 (2 of 5 return-date-change RPCs), 005/FR-006 (`GetRental`
 008/FR-008 (`ResolveDispute` L3 reject paths), 008/FR-011 (admin-caller class + `can_acknowledge`
 false branches).
 
-## Phase 4 — LOW (9 items)
+## Phase 4 — LOW (10 items)
 
 001/FR-010 (RecordLegalConsent), 001/FR-011 (GetUserConsentStatus), 002/FR-004
 (email-uniqueness isolation), 002/FR-005 (documented absence of input validation), 003/FR-005
-(already-tracked L3 gap — reinforcement only), 006/FR-001 (already-tracked L3 gap —
+(already-tracked L3 gap — reinforcement only), 005/FR-005 (`ApproveReturnDateChange` unit gap +
+L2/L3 gap for 3 sub-RPCs — see correction note below), 006/FR-001 (already-tracked L3 gap —
 reinforcement only), 006/FR-007 (documents current non-enforcement, not a required fix),
 007/FR-001 (`GetBalance` L2 only), 008/FR-013 (as-built ignored pagination/filter fields).
+
+**Correction (2026-07-23):** the original version of this list omitted 005/FR-005, even though
+`sbr/rtm/005-rentals.rtm.md`'s own Phase 3 entry explicitly said its remaining gap was "tracked
+in Phase 4" — an item the RTM promised but the master plan never carried forward. Caught during
+Phase 4 execution when cross-checking RTM cells against this list; added to the count and
+closed in the same pass (see Phase 4 results below).
 
 ## How each item gets closed (SBR Appendix B discipline, applied per item)
 
@@ -130,12 +137,14 @@ any real bugs found and fixed.
   found and fixed (004/FR-001's non-page-aligned `GetNotifications` offset — production code),
   19 genuine coverage gaps closed with no bug found. Full suite (unit + integration + e2e)
   re-verified green afterward, no regressions. Details below.
-- [x] **Phase 4 (LOW, 9 items) — completed 2026-07-23.** All 9 items closed: 0 real bugs found
-  (every item was either a genuine zero-coverage gap or an already-known, self-documented L3
-  gap needing reinforcement). Full suite (unit + integration + e2e) re-verified green
-  afterward, no regressions (the pre-existing `TestPushNotificationService_E2E` environment
-  failure from stale real Firebase tokens, noted in Phase 2, reproduces identically and is
-  unrelated to this remediation). Details below.
+- [x] **Phase 4 (LOW, 10 items) — completed 2026-07-23.** All 10 items closed (including
+  005/FR-005, added mid-phase after a cross-check against the RTM caught it missing from the
+  original 9-item list — see correction note above): 0 real bugs found (every item was either a
+  genuine zero-coverage gap or an already-known, self-documented L3 gap needing reinforcement).
+  Full suite (unit + integration + e2e) re-verified green afterward, no regressions (the
+  pre-existing `TestPushNotificationService_E2E` environment failure from stale real Firebase
+  tokens, noted in Phase 2, reproduces identically and is unrelated to this remediation).
+  Details below.
 
 ## Phase 1 results (2026-07-22)
 
@@ -237,6 +246,7 @@ devices).
 | 002 | FR-004 | Email-uniqueness rejection closed at L1 (service propagates a repository-level rejection) and L2 (a real Postgres `UNIQUE` violation exercised directly against `userRepository.Update`, replacing the previous generic e2e-only `assert.Error`). No bug found. |
 | 002 | FR-005 | `UpdateProfile`'s documented absence of input validation regression-locked with an e2e test proving empty `name`/`phone` and a malformed `email` are currently accepted and stored as-is. No bug found (behavior matched spec.md's own Coverage Baseline exactly). |
 | 003 | FR-005 | The already-known, self-documented L3 gap (spec.md's own SC-001) on `AdminService`'s authorization gate reinforced with a real e2e non-admin-rejection test (`AdminBlockUserAccount`) against a live gRPC handler and DB. No bug found. |
+| 005 | FR-005 | `ApproveReturnDateChange`'s missing unit test added (3 subtests) — confirmed it doesn't itself mutate `end_date`/`total_cost_cents` (already applied by the preceding `ChangeRentalDates` call), so the test asserts cost is left unchanged. The L2/L3 gap for `RejectReturnDateChange`/`AcknowledgeReturnDateRejection`/`CancelReturnDateChange` closed with 2 new e2e subtests (reject-with-counter-proposal → acknowledge; cancel), each confirming the rollback-to-`last_agreed_end_date` cost recompute against a real DB. No bug found. |
 | 006 | FR-001 | The already-known, self-documented L3 gap (spec.md's own SC-003) on `UpdateTool`/`DeleteTool` ownership reinforced with a real e2e non-owner-rejection test for both RPCs. No bug found. |
 | 006 | FR-007 | `GetToolImages`'s lack of a regression baseline closed with an e2e test documenting and locking in the current unrestricted (non-owner-accessible) behavior, per this FR's own target-not-current framing — not a required fix. No bug found; no fix applied. |
 | 007 | FR-001 | `GetBalance`'s L2 gap closed with a dedicated real-DB integration test (the only prior real-DB ledger test never called `GetBalance` directly). No bug found. |

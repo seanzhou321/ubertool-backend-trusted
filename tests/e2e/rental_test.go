@@ -96,6 +96,60 @@ func TestRentalService_E2E(t *testing.T) {
 		assert.Equal(t, ext2.Format("2006-01-02"), lastAgreed.Format("2006-01-02"))
 	})
 
+	// FR-005 (specs/005-rentals): RejectReturnDateChange and AcknowledgeReturnDateRejection are
+	// exercised end-to-end for the first time here — prior to this test, neither RPC was ever
+	// called from an integration or e2e test (only unit-tested with mocks).
+	t.Run("Reject Extension Request with Counter-Proposal, Renter Acknowledges", func(t *testing.T) {
+		env := setupRentalTestEnv(t, db, "rejectext", 10000)
+		start := time.Now().Add(24 * time.Hour)
+		end := start.Add(24 * time.Hour) // initial: 1-day rental (1000 cents)
+
+		rentalID := doCreateRentalRequest(t, rentalClient, env, start, end)
+		doApproveRentalRequest(t, rentalClient, env.ownerID, rentalID, "Pick up location")
+		doFinalizeRentalRequest(t, rentalClient, env.renterID, rentalID)
+		doActivateRental(t, rentalClient, env.ownerID, rentalID)
+
+		// Renter requests a 3-day extension (3000 cents).
+		requested := start.Add(72 * time.Hour)
+		doChangeRentalDates(t, rentalClient, env.renterID, rentalID, requested)
+		assertExtensionDatesInDB(t, db, rentalID, requested, 3000)
+
+		// Owner rejects with a 2-day counter-proposal (2000 cents) instead.
+		counter := start.Add(48 * time.Hour)
+		doRejectReturnDateChange(t, rentalClient, env.ownerID, rentalID, "Tool needed sooner", counter)
+		assertExtensionDatesInDB(t, db, rentalID, counter, 2000)
+		assertNotifiedAtLeastOnce(t, db, env.renterID, env.orgID)
+
+		// Renter acknowledges the rejection — rolls back to the last-agreed end date (the
+		// original 1-day rental, since no extension was ever approved) and recomputes cost.
+		rt := doAcknowledgeReturnDateRejection(t, rentalClient, env.renterID, rentalID)
+		assert.Equal(t, pb.RentalStatus_RENTAL_STATUS_ACTIVE, rt.Status)
+		assertExtensionDatesInDB(t, db, rentalID, start.Add(24*time.Hour), 1000)
+	})
+
+	// FR-005 (specs/005-rentals): CancelReturnDateChange is exercised end-to-end for the first
+	// time here — prior to this test, no integration or e2e test ever called this RPC.
+	t.Run("Cancel Extension Request Before Owner Acts", func(t *testing.T) {
+		env := setupRentalTestEnv(t, db, "cancelext", 10000)
+		start := time.Now().Add(24 * time.Hour)
+		end := start.Add(24 * time.Hour) // initial: 1-day rental (1000 cents)
+
+		rentalID := doCreateRentalRequest(t, rentalClient, env, start, end)
+		doApproveRentalRequest(t, rentalClient, env.ownerID, rentalID, "Pick up location")
+		doFinalizeRentalRequest(t, rentalClient, env.renterID, rentalID)
+		doActivateRental(t, rentalClient, env.ownerID, rentalID)
+
+		// Renter requests a 2-day extension (2000 cents), then changes their mind.
+		requested := start.Add(48 * time.Hour)
+		doChangeRentalDates(t, rentalClient, env.renterID, rentalID, requested)
+		assertExtensionDatesInDB(t, db, rentalID, requested, 2000)
+
+		// Cancelling rolls back to the last-agreed (original) end date and cost.
+		rt := doCancelReturnDateChange(t, rentalClient, env.renterID, rentalID)
+		assert.Equal(t, pb.RentalStatus_RENTAL_STATUS_ACTIVE, rt.Status)
+		assertExtensionDatesInDB(t, db, rentalID, start.Add(24*time.Hour), 1000)
+	})
+
 	t.Run("Cancel Rental Request", func(t *testing.T) {
 		env := setupRentalTestEnv(t, db, "cancel", 5000)
 		start := time.Now().Add(24 * time.Hour)
