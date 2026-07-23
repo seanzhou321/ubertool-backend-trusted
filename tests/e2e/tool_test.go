@@ -55,6 +55,13 @@ func TestToolService_E2E(t *testing.T) {
 		err = db.QueryRow("SELECT name FROM tools WHERE id = $1", resp.Tool.Id).Scan(&toolName)
 		assert.NoError(t, err)
 		assert.Equal(t, "E2E Test Drill", toolName)
+
+		// Verify FR-002: owner_id is set from the caller's JWT-derived identity, never from the
+		// request body (AddToolRequest has no owner_id field at all).
+		var ownerID int32
+		err = db.QueryRow("SELECT owner_id FROM tools WHERE id = $1", resp.Tool.Id).Scan(&ownerID)
+		assert.NoError(t, err)
+		assert.Equal(t, userID, ownerID, "owner_id must match the authenticated caller")
 	})
 
 	t.Run("SearchTools with Org Membership Verification", func(t *testing.T) {

@@ -220,6 +220,69 @@ func TestRentalService_CompleteRental(t *testing.T) {
 	})
 }
 
+// TestRentalService_ApproveRentalRequest covers FR-002 (specs/005-rentals): ApproveRentalRequest
+// must require the caller to be the tool's owner and the rental to be PENDING. Prior to this
+// test, every occurrence of ApproveRentalRequest anywhere in the test suite either mocked the
+// service directly (handler test) or exercised only the owner-on-a-fresh-PENDING-rental happy
+// path (e2e) — neither reject clause had any coverage.
+func TestRentalService_ApproveRentalRequest(t *testing.T) {
+	ctx := context.Background()
+	const ownerID = int32(10)
+	const rentalID = int32(100)
+	const toolID = int32(200)
+
+	newSvc := func() (service.RentalService, *MockRentalRepo, *MockToolRepo, *MockUserRepo, *MockEmailService, *MockNotificationRepo) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		return svc, rentalRepo, toolRepo, userRepo, emailSvc, noteRepo
+	}
+
+	t.Run("Success as the tool's owner on a PENDING rental", func(t *testing.T) {
+		svc, rentalRepo, toolRepo, userRepo, emailSvc, noteRepo := newSvc()
+		rt := &domain.Rental{ID: rentalID, OwnerID: ownerID, RenterID: 1, ToolID: toolID, Status: domain.RentalStatusPending}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		rentalRepo.On("Update", ctx, mock.MatchedBy(func(r *domain.Rental) bool {
+			return r.Status == domain.RentalStatusApproved && r.PickupNote == "Under the mat"
+		})).Return(nil)
+		userRepo.On("GetByID", ctx, int32(1)).Return(&domain.User{ID: 1, Name: "Renter", Email: "r@test.com"}, nil)
+		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{ID: ownerID, Name: "Owner", Email: "o@test.com"}, nil)
+		toolRepo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, Name: "Drill"}, nil)
+		emailSvc.On("SendRentalApprovalNotification", ctx, "r@test.com", "Drill", "Owner", "Under the mat", "o@test.com").Return(nil)
+		noteRepo.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
+
+		res, err := svc.ApproveRentalRequest(ctx, ownerID, rentalID, "Under the mat")
+		require.NoError(t, err)
+		assert.Equal(t, domain.RentalStatusApproved, res.Status)
+	})
+
+	t.Run("Rejects a caller who is not the tool's owner", func(t *testing.T) {
+		svc, rentalRepo, _, _, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, OwnerID: ownerID, RenterID: 1, ToolID: toolID, Status: domain.RentalStatusPending}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.ApproveRentalRequest(ctx, int32(999), rentalID, "note")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unauthorized")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a rental that is not PENDING", func(t *testing.T) {
+		svc, rentalRepo, _, _, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, OwnerID: ownerID, RenterID: 1, ToolID: toolID, Status: domain.RentalStatusApproved}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.ApproveRentalRequest(ctx, ownerID, rentalID, "note")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not pending")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+}
+
 func TestRentalService_FinalizeRentalRequest(t *testing.T) {
 	rentalRepo := new(MockRentalRepo)
 	toolRepo := new(MockToolRepo)
@@ -286,6 +349,48 @@ func TestRentalService_FinalizeRentalRequest(t *testing.T) {
 		assert.Len(t, pending, 1)
 		assert.Equal(t, approvedRental.ID, approved[0].ID)
 		assert.Equal(t, pendingRental.ID, pending[0].ID)
+	})
+
+	// FR-003: FinalizeRentalRequest must reject a non-renter caller and a rental that is not
+	// APPROVED. Neither reject clause had any test coverage prior to this (Acceptance Scenario 6
+	// documents the latter explicitly). Each subtest uses its own fresh mocks/service instance
+	// so call-history assertions aren't polluted by the shared "Success" subtest above.
+	t.Run("Rejects a caller who is not the renter", func(t *testing.T) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+
+		rentalRepo.On("GetByID", ctx, rentalID).Return(requestRental, nil)
+
+		_, _, _, err := svc.FinalizeRentalRequest(ctx, int32(999), rentalID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unauthorized")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a rental that is not APPROVED", func(t *testing.T) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+
+		notApproved := &domain.Rental{
+			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
+			Status: domain.RentalStatusPending, OrgID: 99,
+		}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(notApproved, nil)
+
+		_, _, _, err := svc.FinalizeRentalRequest(ctx, renterID, rentalID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not approved")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
 	})
 }
 

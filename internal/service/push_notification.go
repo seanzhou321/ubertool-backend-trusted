@@ -159,6 +159,13 @@ func NewPushNotificationServiceForTest(sender FCMSender, fcmRepo repository.FcmT
 	return svc
 }
 
+// SetMulticastClientForTest injects a multicast sender so unit tests can exercise
+// SendMulticastToUsers, which is otherwise a no-op when fcmMulticastClient is nil
+// (the case for every service built via NewPushNotificationServiceForTest).
+func (s *pushNotificationService) SetMulticastClientForTest(sender FCMMulticastSender) {
+	s.fcmMulticastClient = sender
+}
+
 func newPushSvc(sender FCMSender, fcmRepo repository.FcmTokenRepository, delays []time.Duration) *pushNotificationService {
 	return &pushNotificationService{
 		fcmClient:        sender,
@@ -499,7 +506,7 @@ func (s *pushNotificationService) SendMulticastToUsers(ctx context.Context, user
 				if sr.Success {
 					continue
 				}
-				if messaging.IsUnregistered(sr.Error) {
+				if s.isUnregisteredFn(sr.Error) {
 					if obsErr := s.fcmRepo.MarkObsolete(context.Background(), batchMeta[i].Token); obsErr != nil {
 						logger.Error("Failed to mark FCM token obsolete", "error", obsErr)
 					}

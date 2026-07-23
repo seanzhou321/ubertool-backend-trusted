@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // noRetryDelays removes all back-off so tests complete instantly.
@@ -296,4 +298,127 @@ func TestPushSvc_RetryAttemptOrder(t *testing.T) {
 
 	// 1 initial + 2 retries = 3 calls
 	assert.Equal(t, 3, callCount)
+}
+
+// --------------------------------------------------------------------------
+// SendMulticastToUsers: batching + obsolete-marking (FR-008, specs/004-notifications)
+// --------------------------------------------------------------------------
+
+// multicastInjectable exposes the test-only setter added to pushNotificationService so
+// SendMulticastToUsers (otherwise a no-op with a nil fcmMulticastClient in test mode) can be
+// exercised.
+type multicastInjectable interface {
+	SetMulticastClientForTest(service.FCMMulticastSender)
+}
+
+func newPushSvcWithMulticast(fcmRepo *MockFcmTokenRepo, multicast *MockFCMMulticastSender) service.PushNotificationService {
+	svc := newPushSvc(nil, fcmRepo, noRetryDelays)
+	svc.(multicastInjectable).SetMulticastClientForTest(multicast)
+	return svc
+}
+
+func fakeToken(userID int32, token string) domain.FcmToken {
+	return domain.FcmToken{UserID: userID, Token: token, Status: "ACTIVE"}
+}
+
+// waitForMulticastCalls blocks until n SendEachForMulticast calls have been observed or the
+// timeout elapses (SendMulticastToUsers dispatches its work in a background goroutine).
+func waitForMulticastCalls(t *testing.T, calls <-chan struct{}, n int) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		select {
+		case <-calls:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timed out waiting for SendEachForMulticast call %d/%d", i+1, n)
+		}
+	}
+}
+
+func TestPushSvc_SendMulticastToUsers_BatchesAt500(t *testing.T) {
+	// 600 active tokens must be split into 2 batches: 500 then 100 (Firebase's hard limit).
+	fcmRepo := new(MockFcmTokenRepo)
+	multicast := new(MockFCMMulticastSender)
+	svc := newPushSvcWithMulticast(fcmRepo, multicast)
+
+	const totalTokens = 600
+	tokens := make([]domain.FcmToken, totalTokens)
+	for i := range tokens {
+		tokens[i] = fakeToken(int32(i), fmt.Sprintf("tok-%d", i))
+	}
+	userIDs := make([]int32, totalTokens)
+	for i := range userIDs {
+		userIDs[i] = int32(i)
+	}
+	fcmRepo.On("GetActiveByUserIDs", mock.Anything, mock.Anything).Return(tokens, nil)
+
+	var batchSizes []int
+	var mu sync.Mutex
+	calls := make(chan struct{}, 2)
+	multicast.On("SendEachForMulticast", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			msg := args.Get(1).(*fcmmessaging.MulticastMessage)
+			mu.Lock()
+			batchSizes = append(batchSizes, len(msg.Tokens))
+			mu.Unlock()
+			calls <- struct{}{}
+		}).
+		Return(&fcmmessaging.BatchResponse{SuccessCount: 1}, nil).Twice()
+
+	err := svc.SendMulticastToUsers(context.Background(), userIDs, "Title", "Body", map[string]string{})
+	require.NoError(t, err)
+
+	waitForMulticastCalls(t, calls, 2)
+	mu.Lock()
+	defer mu.Unlock()
+	assert.ElementsMatch(t, []int{500, 100}, batchSizes, "600 tokens must be split into a 500 batch and a 100 batch")
+}
+
+func TestPushSvc_SendMulticastToUsers_MarksUnregisteredTokensObsolete(t *testing.T) {
+	// A token reported as unregistered in the batch response must be marked OBSOLETE;
+	// a successfully-delivered token in the same batch must not be touched.
+	fcmRepo := new(MockFcmTokenRepo)
+	multicast := new(MockFCMMulticastSender)
+	svc := newPushSvcWithMulticast(fcmRepo, multicast)
+
+	tokens := []domain.FcmToken{
+		fakeToken(1, "tok-alive"),
+		fakeToken(2, "tok-dead"),
+	}
+	fcmRepo.On("GetActiveByUserIDs", mock.Anything, []int32{1, 2}).Return(tokens, nil)
+	fcmRepo.On("MarkObsolete", mock.Anything, "tok-dead").Return(nil).Once()
+
+	calls := make(chan struct{}, 1)
+	multicast.On("SendEachForMulticast", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { calls <- struct{}{} }).
+		Return(&fcmmessaging.BatchResponse{
+			SuccessCount: 1,
+			FailureCount: 1,
+			Responses: []*fcmmessaging.SendResponse{
+				{Success: true, MessageID: "msg-1"},
+				{Success: false, Error: errUnregistered},
+			},
+		}, nil).Once()
+
+	err := svc.SendMulticastToUsers(context.Background(), []int32{1, 2}, "Title", "Body", map[string]string{})
+	require.NoError(t, err)
+
+	waitForMulticastCalls(t, calls, 1)
+	// Give the obsolete-marking call (immediately after the multicast call, same goroutine)
+	// a moment to land before asserting.
+	fcmRepo.AssertExpectations(t)
+	fcmRepo.AssertNotCalled(t, "MarkObsolete", mock.Anything, "tok-alive")
+}
+
+func TestPushSvc_SendMulticastToUsers_NoActiveTokens_NoOp(t *testing.T) {
+	fcmRepo := new(MockFcmTokenRepo)
+	multicast := new(MockFCMMulticastSender)
+	svc := newPushSvcWithMulticast(fcmRepo, multicast)
+
+	fcmRepo.On("GetActiveByUserIDs", mock.Anything, []int32{9}).Return([]domain.FcmToken{}, nil)
+
+	err := svc.SendMulticastToUsers(context.Background(), []int32{9}, "Title", "Body", map[string]string{})
+	require.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+	multicast.AssertNotCalled(t, "SendEachForMulticast", mock.Anything, mock.Anything)
 }

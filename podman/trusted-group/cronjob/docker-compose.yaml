@@ -4,7 +4,7 @@ services:
   cronjob:
     build:
       context: ../../..
-      dockerfile: podman/trusted-group/Dockerfile_services_cronjobs
+      dockerfile: podman/trusted-group/cronjob/Dockerfile_services_cronjobs
     image: ubertool-backend:latest
     container_name: ubertool-cronjob
     command: ["/app/cronjob", "--config=/config/config.yaml"]

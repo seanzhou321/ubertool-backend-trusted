@@ -500,6 +500,19 @@ func (m *MockFCMSender) Send(ctx context.Context, msg *fcmmessaging.Message) (st
 	return args.String(0), args.Error(1)
 }
 
+// MockFCMMulticastSender mocks service.FCMMulticastSender.
+type MockFCMMulticastSender struct {
+	mock.Mock
+}
+
+func (m *MockFCMMulticastSender) SendEachForMulticast(ctx context.Context, msg *fcmmessaging.MulticastMessage) (*fcmmessaging.BatchResponse, error) {
+	args := m.Called(ctx, msg)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*fcmmessaging.BatchResponse), args.Error(1)
+}
+
 // MockFcmTokenRepo mocks repository.FcmTokenRepository.
 type MockFcmTokenRepo struct {
 	mock.Mock
@@ -608,4 +621,61 @@ func (m *MockStorage) ReadFile(key string) (io.ReadCloser, error) {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+// MockPushNotificationService implements service.PushNotificationService.
+type MockPushNotificationService struct {
+	mock.Mock
+}
+
+func (m *MockPushNotificationService) SendToUser(ctx context.Context, userID int32, title, body string, notificationID int64, data map[string]string) error {
+	args := m.Called(ctx, userID, title, body, notificationID, data)
+	return args.Error(0)
+}
+
+func (m *MockPushNotificationService) SendMulticastToUsers(ctx context.Context, userIDs []int32, title, body string, data map[string]string) error {
+	args := m.Called(ctx, userIDs, title, body, data)
+	return args.Error(0)
+}
+
+func (m *MockPushNotificationService) Shutdown(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+var _ service.PushNotificationService = (*MockPushNotificationService)(nil)
+
+// MockNotificationDBRepo mocks repository.NotificationRepository (the DB-layer repo consumed by
+// service.notificationService), as distinct from MockNotificationRepo above (which mocks the
+// higher-level service.NotificationService interface for callers like organizationService).
+type MockNotificationDBRepo struct {
+	mock.Mock
+}
+
+func (m *MockNotificationDBRepo) Create(ctx context.Context, note *domain.Notification) error {
+	args := m.Called(ctx, note)
+	return args.Error(0)
+}
+
+func (m *MockNotificationDBRepo) List(ctx context.Context, userID int32, limit, offset int32) ([]domain.Notification, int32, error) {
+	args := m.Called(ctx, userID, limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Get(1).(int32), args.Error(2)
+	}
+	return args.Get(0).([]domain.Notification), args.Get(1).(int32), args.Error(2)
+}
+
+func (m *MockNotificationDBRepo) MarkAsRead(ctx context.Context, id int64, userID int32) error {
+	args := m.Called(ctx, id, userID)
+	return args.Error(0)
+}
+
+func (m *MockNotificationDBRepo) MarkDelivered(ctx context.Context, id int64, userID int32, t time.Time) error {
+	args := m.Called(ctx, id, userID, t)
+	return args.Error(0)
+}
+
+func (m *MockNotificationDBRepo) MarkClicked(ctx context.Context, id int64, userID int32, t time.Time) error {
+	args := m.Called(ctx, id, userID, t)
+	return args.Error(0)
 }

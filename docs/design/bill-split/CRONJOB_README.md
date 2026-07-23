@@ -39,7 +39,7 @@ ubertool-backend-trusted/
 │       └── postgres/
 ├── podman/
 │   └── trusted-group/
-│       └── Dockerfile_services_cronjobs  # Multi-stage build (NEW)
+│       └── cronjob/Dockerfile_services_cronjobs  # Multi-stage build (NEW)
 ├── .dockerignore         # Optimized Docker build at repo root (NEW)
 └── Makefile              # Build and deployment commands (UPDATED)
 ```

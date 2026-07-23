@@ -291,3 +291,114 @@ func TestAuthService_ResetPassword(t *testing.T) {
 		emailSvc.AssertCalled(t, "SendAdminNotification", ctx, user.Email, mock.Anything, mock.Anything)
 	})
 }
+
+// TestAuthService_Signup covers FR-006: UserSignup must reject an already-registered email,
+// reject an expired/used/invalid invitation, and on success create the user, mark the
+// invitation used, link any originating join request JOINED, and add the user as MEMBER.
+func TestAuthService_Signup(t *testing.T) {
+	ctx := context.Background()
+	const orgID = int32(5)
+	const email = "signup-target@example.com"
+	const token = "SIG-NUP-TOK"
+
+	newSvc := func() (service.AuthService, *MockUserRepo, *MockInviteRepo, *MockJoinRequestRepo) {
+		userRepo := new(MockUserRepo)
+		inviteRepo := new(MockInviteRepo)
+		reqRepo := new(MockJoinRequestRepo)
+		orgRepo := new(MockOrganizationRepo)
+		noteRepo := new(MockNotificationRepo)
+		emailSvc := new(MockEmailService)
+		fcmRepo := new(MockFcmTokenRepo)
+		pendingCredsRepo := new(MockPendingCredentialsRepo)
+		legalConsentRepo := new(MockLegalConsentRepo)
+		svc := service.NewAuthService(userRepo, inviteRepo, reqRepo, orgRepo, noteRepo, emailSvc, "secret", fcmRepo, pendingCredsRepo, legalConsentRepo,
+			config.TwoFAConfig{Enabled: false, FixedPasscode: "00000"})
+		return svc, userRepo, inviteRepo, reqRepo
+	}
+
+	t.Run("Rejects when the user already exists", func(t *testing.T) {
+		svc, userRepo, inviteRepo, _ := newSvc()
+		invite := &domain.Invitation{
+			InvitationCode: token, Email: email, OrgID: orgID,
+			ExpiresOn: time.Now().Add(48 * time.Hour).Format("2006-01-02"),
+		}
+		inviteRepo.On("GetByInvitationCodeAndEmail", ctx, token, email).Return(invite, nil)
+		userRepo.On("GetByEmail", ctx, email).Return(&domain.User{ID: 99, Email: email}, nil)
+
+		err := svc.Signup(ctx, token, "New User", email, "555-1234", "password123")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "already registered")
+		userRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects an expired invitation", func(t *testing.T) {
+		svc, userRepo, inviteRepo, _ := newSvc()
+		invite := &domain.Invitation{
+			InvitationCode: token, Email: email, OrgID: orgID,
+			ExpiresOn: time.Now().Add(-24 * time.Hour).Format("2006-01-02"),
+		}
+		inviteRepo.On("GetByInvitationCodeAndEmail", ctx, token, email).Return(invite, nil)
+
+		err := svc.Signup(ctx, token, "New User", email, "555-1234", "password123")
+		require.Error(t, err)
+		assert.Equal(t, service.ErrInviteExpired, err)
+		userRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects an already-used invitation", func(t *testing.T) {
+		svc, userRepo, inviteRepo, _ := newSvc()
+		usedOn := time.Now().Format("2006-01-02")
+		invite := &domain.Invitation{
+			InvitationCode: token, Email: email, OrgID: orgID,
+			ExpiresOn: time.Now().Add(48 * time.Hour).Format("2006-01-02"),
+			UsedOn:    &usedOn,
+		}
+		inviteRepo.On("GetByInvitationCodeAndEmail", ctx, token, email).Return(invite, nil)
+
+		err := svc.Signup(ctx, token, "New User", email, "555-1234", "password123")
+		require.Error(t, err)
+		assert.Equal(t, service.ErrInviteUsed, err)
+		userRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects an invalid invitation code", func(t *testing.T) {
+		svc, userRepo, inviteRepo, _ := newSvc()
+		inviteRepo.On("GetByInvitationCodeAndEmail", ctx, "bogus-token", email).Return(nil, assert.AnError)
+
+		err := svc.Signup(ctx, "bogus-token", "New User", email, "555-1234", "password123")
+		require.Error(t, err)
+		userRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Success links an originating join request as JOINED", func(t *testing.T) {
+		svc, userRepo, inviteRepo, reqRepo := newSvc()
+		joinReqID := int32(42)
+		invite := &domain.Invitation{
+			InvitationCode: token, Email: email, OrgID: orgID, JoinRequestID: &joinReqID,
+			ExpiresOn: time.Now().Add(48 * time.Hour).Format("2006-01-02"),
+		}
+		inviteRepo.On("GetByInvitationCodeAndEmail", ctx, token, email).Return(invite, nil)
+		userRepo.On("GetByEmail", ctx, email).Return(nil, assert.AnError)
+		userRepo.On("Create", ctx, mock.MatchedBy(func(u *domain.User) bool {
+			u.ID = 101 // simulate DB-assigned ID, as the real repo would on insert
+			return u.Email == email
+		})).Return(nil)
+		inviteRepo.On("Update", ctx, mock.MatchedBy(func(inv *domain.Invitation) bool {
+			return inv.UsedOn != nil && inv.UsedByUserID != nil && *inv.UsedByUserID == 101
+		})).Return(nil)
+		joinReq := &domain.JoinRequest{ID: joinReqID, OrgID: orgID, Email: email, Status: domain.JoinRequestStatusPending}
+		reqRepo.On("GetByID", ctx, joinReqID).Return(joinReq, nil)
+		reqRepo.On("Update", ctx, mock.MatchedBy(func(r *domain.JoinRequest) bool {
+			return r.Status == domain.JoinRequestStatusJoined
+		})).Return(nil)
+		userRepo.On("AddUserToOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
+			return uo.OrgID == orgID && uo.Role == domain.UserOrgRoleMember
+		})).Return(nil)
+
+		err := svc.Signup(ctx, token, "New User", email, "555-1234", "password123")
+		require.NoError(t, err)
+		reqRepo.AssertCalled(t, "Update", ctx, mock.MatchedBy(func(r *domain.JoinRequest) bool {
+			return r.Status == domain.JoinRequestStatusJoined
+		}))
+	})
+}

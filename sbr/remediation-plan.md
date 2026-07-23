@@ -122,7 +122,10 @@ any real bugs found and fixed.
   found and fixed, 3 "false confidence" spec-vs-test contradictions resolved (fake/misleading
   tests replaced with real ones), 6 zero-coverage gaps closed with no bug found. Full suite
   (unit + integration + e2e) re-verified green afterward, no regressions. Details below.
-- [ ] Phase 2 (HIGH, 17 items) — not started
+- [x] **Phase 2 (HIGH, 17 items) — completed 2026-07-23.** All 17 items closed: 1 real bug found
+  and fixed (a corrupt test fixture, not production code — see 006/FR-006 below), 16 genuine
+  zero/thin-coverage gaps closed with no bug found. Full suite (unit + integration + e2e)
+  re-verified green afterward, no regressions. Details below.
 - [ ] Phase 3 (MEDIUM, 20 items) — not started
 - [ ] Phase 4 (LOW, 9 items) — not started
 
@@ -147,3 +150,41 @@ any real bugs found and fixed.
 **Deleted**: `tests/e2e/jwt_verification_test.go_` (content merged into `tests/e2e/auth_test.go`).
 **New Makefile target**: `test-e2e-rate-limit` (isolated, deliberately exhausts the shared rate limiter).
 **Production code changed**: `internal/service/auth.go` (`ResetPassword` bug fix only).
+
+## Phase 2 results (2026-07-23)
+
+| Spec | FR | Outcome |
+|---|---|---|
+| 001 | FR-006 | `UserSignup` abuse paths (already-registered email, expired/used/invalid invitation) and the join-request-linked-as-JOINED clause unit-tested (5 subtests). No bug found. |
+| 003 | FR-003 | Threshold-change broadcast (in-app notification + email + FCM multicast, fired from a background goroutine) unit-tested, synchronized via a channel on the multicast call. No bug found. |
+| 003 | FR-004 | `JoinOrganizationWithInvite` unit-tested (success + 3 reject clauses). No bug found. |
+| 004 | FR-003 | `Dispatch`'s error-containment guarantee unit-tested — first-ever unit test for `notificationService`. No bug found. |
+| 004 | FR-006 | `SyncDeviceToken`'s `user_id`-reassignment clause closed with a real-DB integration test (DB-level `ON CONFLICT` semantic, not mockable). No bug found. |
+| 004 | FR-008 | `SendMulticastToUsers` batching (500+100 split) and obsolete-marking unit-tested; added test-mode multicast-client injection and refactored the obsolete check to use the already-injectable `isUnregisteredFn` (testability fix, no behavior change). No bug found. |
+| 005 | FR-002 | `ApproveRentalRequest`'s owner/PENDING reject clauses unit-tested. No bug found. |
+| 005 | FR-003 | `FinalizeRentalRequest`'s renter/APPROVED reject clauses unit-tested. No bug found. |
+| 006 | FR-002 | `AddTool`'s owner_id-from-JWT guarantee closed at L1 (handler asserts persisted value for 2 callers) and L3 (real DB column assertion). No bug found. |
+| 006 | FR-006 | **Real bug found and fixed (test suite, not production code)**: letting the real `generateThumbnail` goroutine run for the first time revealed the shared 1×1 PNG e2e fixture had an invalid CRC checksum, so `image.Decode` had been silently failing on every run. Replaced with a PNG genuinely encoded at test time. Production pipeline was already correct. |
+| 007 | FR-002 | `GetTransactions`'s isolation, ordering, and pagination MUST-clauses closed with a real-DB integration test. No bug found. |
+| 007 | FR-003 | `GetLedgerSummary`'s renter-OR-owner `StatusCount` union closed with a real-DB integration test. No bug found. |
+| 008 | FR-001 | `TakeBalanceSnapshots` and the skip-already-settled-pairing clause closed with a real-DB integration test. No bug found. |
+| 008 | FR-004 | Auto `PENDING→DISPUTED` job (`check_overdue_bills()`) closed with a real-DB integration test. No bug found. |
+| 008 | FR-005 | Auto `DISPUTED→SYSTEM_DEFAULT_ACTION` job (`auto_resolve_disputed_bills()`) closed with a real-DB integration test, explicitly confirming the no-balance-penalty distinction from FR-009's admin-driven path. No bug found. |
+| 008 | FR-007 | `DISPUTED`-origin graceful-acknowledgment path's existing subtest expanded from an `err == nil`-only check to assert every clause the FR names, including the previously-unasserted notify-debtor clause. No bug found. |
+| 008 | FR-012 | Admin-is-a-party exclusion on `ListDisputedPayments` closed with a real adversarial fixture (admin as debtor, admin as creditor, admin uninvolved). No bug found. |
+
+**New files**: `tests/unit/notification_service_test.go`, `tests/integration/fcm_token_test.go`,
+`tests/integration/ledger_test.go`, `tests/integration/billing_jobs_realdb_test.go`,
+`tests/integration/bill_repository_test.go`.
+**Production code changed**: `internal/service/push_notification.go` (test-mode multicast-client
+injection + `isUnregisteredFn` refactor for the multicast obsolete-marking check — both
+testability changes, no behavior change to the production default path).
+**Test fixture bug fixed**: `tests/e2e/image_storage_test.go`'s hand-rolled 1×1 PNG byte literal
+(invalid CRC checksum) replaced with a genuinely-encoded PNG generated at test time; the same
+file's thumbnail-pipeline e2e subtest extended to poll for and verify the real generated
+thumbnail on disk.
+**Environment note**: `TestPushNotificationService_E2E` fails independently of this remediation
+— its real Firebase device tokens (tied to two live Gmail test accounts) have gone stale
+(`NotRegistered`), reproducing identically on a stash of the pre-Phase-2 codebase. Not a
+regression; out of scope for a test-coverage remediation (would require re-registering real
+devices).

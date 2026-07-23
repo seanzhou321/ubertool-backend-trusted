@@ -105,7 +105,7 @@ test-smoke-ec2:
 # Docker commands
 podman-build:
 	@echo "Building Docker image with both server and cronjob binaries..."
-	podman build -f podman/trusted-group/Dockerfile_services_cronjobs -t ubertool-backend:latest .
+	podman build -f podman/trusted-group/cronjob/Dockerfile_services_cronjobs -t ubertool-backend:latest .
 
 podman-push:
 	@echo "Pushing Docker image to registry..."
