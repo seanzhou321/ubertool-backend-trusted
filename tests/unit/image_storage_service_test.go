@@ -70,6 +70,26 @@ func TestImageStorageService_OwnershipChecks(t *testing.T) {
 		toolRepo.AssertNotCalled(t, "DeleteImage", mock.Anything, mock.Anything)
 	})
 
+	// SEC-IMG-004 (sbr/rtm/009-security.rtm.md): DeleteImage verifies the caller owns toolID but
+	// never checks that the fetched image actually belongs to toolID — unlike SetPrimaryImage
+	// two functions below, which performs exactly this check (image.ToolID != toolID,
+	// internal/service/image_storage.go:388). Any tool owner can delete any image on the
+	// platform by pairing their own tool as the ownership anchor with a foreign image_id.
+	t.Run("DeleteImage rejects an image that belongs to a different tool than toolID (SEC-IMG-004)", func(t *testing.T) {
+		svc, toolRepo, storageMock := newImageStorageServiceForTest()
+		const otherToolID = int32(20) // owned by the same caller, but the image below belongs to toolID, not otherToolID
+		toolRepo.On("GetImageByID", ctx, imageID).Return(&domain.ToolImage{ID: imageID, ToolID: toolID}, nil)
+		toolRepo.On("GetByID", ctx, otherToolID).Return(&domain.Tool{ID: otherToolID, OwnerID: ownerID}, nil)
+		// These are only reached along the current (buggy) path, which proceeds straight to
+		// deletion with no image.ToolID/toolID cross-check — allow them so the vulnerability
+		// surfaces as a clean assertion failure below instead of an unrelated mock panic.
+		storageMock.On("DeleteFile", ctx, mock.Anything).Maybe().Return(nil)
+		toolRepo.On("DeleteImage", ctx, imageID).Maybe().Return(nil)
+
+		err := svc.DeleteImage(ctx, ownerID, imageID, otherToolID)
+		require.Error(t, err, "DeleteImage must reject when image.ToolID does not match the supplied toolID, the same way SetPrimaryImage already does")
+	})
+
 	t.Run("DeleteImage accepts the actual tool owner", func(t *testing.T) {
 		svc, toolRepo, storageMock := newImageStorageServiceForTest()
 		toolRepo.On("GetImageByID", ctx, imageID).Return(&domain.ToolImage{ID: imageID, ToolID: toolID, FilePath: "f.jpg"}, nil)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAdminService_BlockUser(t *testing.T) {
@@ -60,6 +61,97 @@ func TestAdminService_BlockUser(t *testing.T) {
 
 	mockUserRepo.AssertExpectations(t)
 	mockEmailSvc.AssertExpectations(t)
+}
+
+// TestAdminService_BlockUser_RankCheck fixes SEC-ADMIN-002 (sbr/rtm/009-security.rtm.md):
+// BlockUser (internal/service/admin.go) previously verified only that the caller held
+// ADMIN/SUPER_ADMIN in the org (verifyAdminRights), never comparing the caller's rank to the
+// target's — a plain ADMIN could block renting/lending for the org's SUPER_ADMIN or a fellow
+// ADMIN. Product decision confirmed: a plain ADMIN may only act on a MEMBER; blocking an
+// ADMIN/SUPER_ADMIN requires the caller to be SUPER_ADMIN.
+func TestAdminService_BlockUser_RankCheck(t *testing.T) {
+	const orgID = int32(1)
+	const plainAdminID = int32(50)
+	const superAdminID = int32(60)
+	const memberTargetID = int32(70)
+	const adminTargetID = int32(1)
+
+	newSvc := func() (service.AdminService, *MockUserRepo, *MockOrganizationRepo, *MockEmailService) {
+		mockUserRepo := new(MockUserRepo)
+		mockJoinRepo := new(MockJoinRequestRepo)
+		mockLedgerRepo := new(MockLedgerRepo)
+		mockOrgRepo := new(MockOrganizationRepo)
+		mockInviteRepo := new(MockInviteRepo)
+		mockEmailSvc := new(MockEmailService)
+		svc := service.NewAdminService(mockJoinRepo, mockUserRepo, mockLedgerRepo, mockOrgRepo, mockInviteRepo, mockEmailSvc)
+		return svc, mockUserRepo, mockOrgRepo, mockEmailSvc
+	}
+
+	t.Run("Rejects a plain ADMIN blocking a SUPER_ADMIN", func(t *testing.T) {
+		svc, mockUserRepo, _, _ := newSvc()
+		ctx := context.Background()
+
+		callerUo := &domain.UserOrg{UserID: plainAdminID, OrgID: orgID, Role: domain.UserOrgRoleAdmin, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, plainAdminID, orgID).Return(callerUo, nil)
+		targetUo := &domain.UserOrg{UserID: adminTargetID, OrgID: orgID, Role: domain.UserOrgRoleSuperAdmin, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, adminTargetID, orgID).Return(targetUo, nil).Once()
+
+		err := svc.BlockUser(ctx, plainAdminID, adminTargetID, orgID, true, true, "testing lateral escalation")
+		require.Error(t, err, "a plain ADMIN must not be able to block the org's SUPER_ADMIN")
+		mockUserRepo.AssertNotCalled(t, "UpdateUserOrg", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a plain ADMIN blocking a fellow ADMIN", func(t *testing.T) {
+		svc, mockUserRepo, _, _ := newSvc()
+		ctx := context.Background()
+
+		callerUo := &domain.UserOrg{UserID: plainAdminID, OrgID: orgID, Role: domain.UserOrgRoleAdmin, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, plainAdminID, orgID).Return(callerUo, nil)
+		targetUo := &domain.UserOrg{UserID: adminTargetID, OrgID: orgID, Role: domain.UserOrgRoleAdmin, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, adminTargetID, orgID).Return(targetUo, nil).Once()
+
+		err := svc.BlockUser(ctx, plainAdminID, adminTargetID, orgID, true, true, "testing lateral escalation")
+		require.Error(t, err, "a plain ADMIN must not be able to block a fellow ADMIN")
+		mockUserRepo.AssertNotCalled(t, "UpdateUserOrg", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Accepts a plain ADMIN blocking a MEMBER", func(t *testing.T) {
+		svc, mockUserRepo, mockOrgRepo, mockEmailSvc := newSvc()
+		ctx := context.Background()
+
+		callerUo := &domain.UserOrg{UserID: plainAdminID, OrgID: orgID, Role: domain.UserOrgRoleAdmin, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, plainAdminID, orgID).Return(callerUo, nil)
+		targetUo := &domain.UserOrg{UserID: memberTargetID, OrgID: orgID, Role: domain.UserOrgRoleMember, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, memberTargetID, orgID).Return(targetUo, nil).Once()
+		mockUserRepo.On("GetByID", ctx, memberTargetID).Return(&domain.User{ID: memberTargetID, Name: "Member", Email: "m@test.com"}, nil)
+		mockOrgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Test Org"}, nil)
+		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(u *domain.UserOrg) bool {
+			return u.UserID == memberTargetID && u.Status == domain.UserOrgStatusBlock
+		})).Return(nil)
+		mockEmailSvc.On("SendAccountStatusNotification", ctx, "m@test.com", "Member", "Test Org", "BLOCK", "ordinary block").Return(nil)
+
+		err := svc.BlockUser(ctx, plainAdminID, memberTargetID, orgID, true, true, "ordinary block")
+		require.NoError(t, err, "an ADMIN blocking an ordinary MEMBER is unaffected by the rank check")
+	})
+
+	t.Run("Accepts a SUPER_ADMIN blocking a fellow SUPER_ADMIN", func(t *testing.T) {
+		svc, mockUserRepo, mockOrgRepo, mockEmailSvc := newSvc()
+		ctx := context.Background()
+
+		callerUo := &domain.UserOrg{UserID: superAdminID, OrgID: orgID, Role: domain.UserOrgRoleSuperAdmin, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, superAdminID, orgID).Return(callerUo, nil)
+		targetUo := &domain.UserOrg{UserID: adminTargetID, OrgID: orgID, Role: domain.UserOrgRoleSuperAdmin, Status: domain.UserOrgStatusActive}
+		mockUserRepo.On("GetUserOrg", ctx, adminTargetID, orgID).Return(targetUo, nil).Once()
+		mockUserRepo.On("GetByID", ctx, adminTargetID).Return(&domain.User{ID: adminTargetID, Name: "Super Admin", Email: "sa@test.com"}, nil)
+		mockOrgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Test Org"}, nil)
+		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(u *domain.UserOrg) bool {
+			return u.UserID == adminTargetID && u.Status == domain.UserOrgStatusBlock
+		})).Return(nil)
+		mockEmailSvc.On("SendAccountStatusNotification", ctx, "sa@test.com", "Super Admin", "Test Org", "BLOCK", "top of hierarchy").Return(nil)
+
+		err := svc.BlockUser(ctx, superAdminID, adminTargetID, orgID, true, true, "top of hierarchy")
+		require.NoError(t, err, "a SUPER_ADMIN must still be able to block another SUPER_ADMIN")
+	})
 }
 
 func TestAdminService_ListMembers(t *testing.T) {

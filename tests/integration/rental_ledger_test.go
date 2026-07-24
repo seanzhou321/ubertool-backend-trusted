@@ -260,7 +260,11 @@ func TestRentalService_CompleteRental_Integration(t *testing.T) {
 		rt := newActiveRental(owner, renter, tool, domain.RentalStatusActive)
 
 		ownerBefore, renterBefore := getBalance(owner.ID), getBalance(renter.ID)
-		_, err := svc.CompleteRental(ctx, renter.ID, rt.ID, "Good", 0, "", true)
+		// CompleteRental is owner-only (SEC-RENTAL-005, sbr/rtm/009-security.rtm.md) — this
+		// subtest is about the ledger/balance side effects of a completion, not about who may
+		// call it (see "Rejects a caller who is the renter, not the owner" below for that), so
+		// it calls as the owner like its sibling subtest above.
+		_, err := svc.CompleteRental(ctx, owner.ID, rt.ID, "Good", 0, "", true)
 		require.NoError(t, err)
 
 		assert.Equal(t, ownerBefore+2000, getBalance(owner.ID), "owner should be credited the settlement")
@@ -292,6 +296,23 @@ func TestRentalService_CompleteRental_Integration(t *testing.T) {
 
 		_, err := svc.CompleteRental(ctx, outsider.ID, rt.ID, "Good", 0, "", true)
 		require.Error(t, err)
+	})
+
+	// SEC-RENTAL-005 (sbr/rtm/009-security.rtm.md): CompleteRental is documented owner-only
+	// ("Complete rental (mark as returned, owner only)", rental_service.proto) — the renter is a
+	// participant but must not be able to self-complete their own rental against the real DB
+	// (balance must be left untouched, matching the unit-level regression test in
+	// tests/unit/rental_test.go).
+	t.Run("Rejects the renter — CompleteRental is owner-only", func(t *testing.T) {
+		owner, renter := newUser("owner-renter-reject"), newUser("renter-renter-reject")
+		tool := newTool(owner)
+		rt := newActiveRental(owner, renter, tool, domain.RentalStatusActive)
+
+		ownerBefore, renterBefore := getBalance(owner.ID), getBalance(renter.ID)
+		_, err := svc.CompleteRental(ctx, renter.ID, rt.ID, "Good", 0, "", true)
+		require.Error(t, err)
+		assert.Equal(t, ownerBefore, getBalance(owner.ID), "a rejected completion must not touch balances")
+		assert.Equal(t, renterBefore, getBalance(renter.ID), "a rejected completion must not touch balances")
 	})
 
 	t.Run("Rejects a rental that is not ACTIVE/SCHEDULED/OVERDUE", func(t *testing.T) {

@@ -34,6 +34,42 @@ func newOrgServiceWithBroadcastMocksForTest() (service.OrganizationService, *Moc
 	return svc, mockRepo, mockUserRepo, mockInviteRepo, mockNoteRepo, mockEmailSvc, mockPushSvc
 }
 
+// TestOrganizationService_GetOrganization_NoMembershipCheck_DocumentsCurrentBehavior documents
+// SEC-ORG-002 (sbr/rtm/009-security.rtm.md): GetOrganization (internal/service/org.go:38-63)
+// performs no membership check at all before returning the full organization record — the only
+// thing gated on membership is the cosmetic user_role return value. Any authenticated user, from
+// any org, can read another org's admin_email, admin_phone_number, and billsplit threshold
+// configuration by ID. Whether this should be membership-gated (like UpdateOrganization) or is
+// intentionally broad the way SearchOrganizations explicitly is stays a product decision this
+// suite does not make unilaterally — this test documents the current behavior, matching the
+// "documents current non-enforcement" convention already used for
+// TestImageStorageService_E2E > "GetToolImages does not restrict access to the owner". If a
+// membership check is added, update this test to assert rejection instead.
+func TestOrganizationService_GetOrganization_NoMembershipCheck_DocumentsCurrentBehavior(t *testing.T) {
+	svc, mockRepo, mockUserRepo := newOrgServiceForTest()
+	ctx := context.Background()
+	const orgID = int32(1)
+	const nonMemberID = int32(999)
+
+	org := &domain.Organization{
+		ID: orgID, Name: "Acme Tools",
+		AdminEmail:                  "admin@acme.test",
+		AdminPhoneNumber:            "555-1234",
+		SettlementThresholdCents:    5000,
+		MaxBillsplitRentalCostCents: 100000,
+	}
+	mockRepo.On("GetByID", ctx, orgID).Return(org, nil)
+	mockUserRepo.On("CountMembersByOrg", ctx, orgID).Return(int32(5), nil)
+	mockUserRepo.On("GetUserOrg", ctx, nonMemberID, orgID).Return(nil, errors.New("not a member"))
+
+	got, userOrg, err := svc.GetOrganization(ctx, orgID, nonMemberID)
+	require.NoError(t, err, "current behavior: a non-member's call succeeds rather than being rejected")
+	assert.Nil(t, userOrg)
+	assert.Equal(t, "admin@acme.test", got.AdminEmail, "current behavior: sensitive admin contact info is returned to a non-member")
+	assert.Equal(t, "555-1234", got.AdminPhoneNumber)
+	assert.Equal(t, int32(5000), got.SettlementThresholdCents)
+}
+
 // TestOrganizationService_CreateOrganization covers FR-001 (specs/003-organizations-administration):
 // CreateOrganization requires no pre-existing authorization, and the creating caller becomes
 // SUPER_ADMIN of the newly-created org. Prior to this test, the only evidence was a single e2e

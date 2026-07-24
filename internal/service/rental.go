@@ -39,6 +39,14 @@ func NewRentalService(
 }
 
 func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolID, orgID int32, startDateStr, endDateStr string) (*domain.Rental, error) {
+	// SEC-RENTAL-001 (sbr/rtm/009-security.rtm.md): the renter must belong to the org they claim
+	// to be renting under — mirrors the membership check ToolService.SearchTools already
+	// performs (internal/service/tool.go:118-122). Without it, a caller could rent any tool
+	// under any organization context by simply naming a foreign org_id.
+	if _, err := s.userRepo.GetUserOrg(ctx, renterID, orgID); err != nil {
+		return nil, fmt.Errorf("user is not a member of this organization")
+	}
+
 	tool, err := s.toolRepo.GetByID(ctx, toolID)
 	if err != nil {
 		return nil, err
@@ -858,14 +866,18 @@ func (s *rentalService) CompleteRental(ctx context.Context, userID, rentalID int
 	return rt, nil
 }
 
-// loadAndValidateRental fetches the rental and checks that the caller is a participant and the
-// rental is in a state that allows completion (steps 1-2).
+// loadAndValidateRental fetches the rental and checks that the caller is the tool's owner and
+// the rental is in a state that allows completion (steps 1-2). CompleteRental is documented
+// owner-only (rental_service.proto: "Complete rental (mark as returned, owner only)") — a
+// renter must not be able to self-complete their own rental and single-handedly set
+// surcharge_or_credit_cents, which feeds directly into the settlement math with no owner
+// approval step. See sbr/rtm/009-security.rtm.md SEC-RENTAL-005.
 func (s *rentalService) loadAndValidateRental(ctx context.Context, userID, rentalID int32) (*domain.Rental, error) {
 	rt, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
 		return nil, err
 	}
-	if rt.OwnerID != userID && rt.RenterID != userID {
+	if rt.OwnerID != userID {
 		return nil, errors.New("unauthorized")
 	}
 	if rt.Status != domain.RentalStatusActive && rt.Status != domain.RentalStatusScheduled && rt.Status != domain.RentalStatusOverdue {

@@ -157,6 +157,41 @@ func (r *userRepository) UpdateUserOrg(ctx context.Context, uo *domain.UserOrg) 
 	return err
 }
 
+// AdjustBalance atomically applies deltaCents via a single "balance_cents = balance_cents + $1"
+// UPDATE — see repository.UserRepository's doc comment for why this exists instead of a
+// GetUserOrg-then-UpdateUserOrg sequence (sbr/rtm/009-security.rtm.md SEC-BILL-004/006).
+func (r *userRepository) AdjustBalance(ctx context.Context, userID, orgID, deltaCents int32) error {
+	query := `UPDATE users_orgs SET balance_cents = balance_cents + $1, last_balance_updated_on = $2 WHERE user_id = $3 AND org_id = $4`
+	nowDate := time.Now().Format("2006-01-02")
+	result, err := r.db.ExecContext(ctx, query, deltaCents, nowDate, userID, orgID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// SetRentingBlocked updates only the renting-blocked columns — never balance_cents — so it
+// cannot race with a concurrent AdjustBalance on the same row.
+func (r *userRepository) SetRentingBlocked(ctx context.Context, userID, orgID int32, blocked bool, reason string, billID int32) error {
+	query := `UPDATE users_orgs SET renting_blocked = $1, blocked_reason = $2, blocked_due_to_bill_id = $3 WHERE user_id = $4 AND org_id = $5`
+	_, err := r.db.ExecContext(ctx, query, blocked, reason, billID, userID, orgID)
+	return err
+}
+
+// SetLendingBlocked is the lending-side counterpart of SetRentingBlocked.
+func (r *userRepository) SetLendingBlocked(ctx context.Context, userID, orgID int32, blocked bool, reason string, billID int32) error {
+	query := `UPDATE users_orgs SET lending_blocked = $1, blocked_reason = $2, blocked_due_to_bill_id = $3 WHERE user_id = $4 AND org_id = $5`
+	_, err := r.db.ExecContext(ctx, query, blocked, reason, billID, userID, orgID)
+	return err
+}
+
 func (r *userRepository) ListMembersByOrg(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error) {
 	logger.EnterMethod("userRepository.ListMembersByOrg", "orgID", orgID)
 

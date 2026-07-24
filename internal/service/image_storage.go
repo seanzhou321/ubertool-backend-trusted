@@ -335,6 +335,13 @@ func (s *imageStorageService) DeleteImage(
 	if tool.OwnerID != userID {
 		return fmt.Errorf("unauthorized: you do not own this tool")
 	}
+	// SEC-IMG-004 (sbr/rtm/009-security.rtm.md): the image fetched above must actually belong to
+	// toolID — otherwise a caller who owns any tool could delete any image on the platform by
+	// pairing their own tool with a foreign image_id. Mirrors the check SetPrimaryImage already
+	// performs below.
+	if image.ToolID != toolID {
+		return fmt.Errorf("unauthorized: image does not belong to this tool")
+	}
 
 	// Delete files from storage
 	if err := s.storage.DeleteFile(ctx, image.FilePath); err != nil {

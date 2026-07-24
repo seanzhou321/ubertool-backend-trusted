@@ -21,7 +21,43 @@ func NewToolService(toolRepo repository.ToolRepository, userRepo repository.User
 	}
 }
 
+// maxToolPriceCents is the proto contract's documented requirement: "Prices stored as cents
+// (int32 max = $21M, requirement max = $1000)" — see api/proto/.../tool_service.proto:67,90,143.
+// Enforced server-side here since none of AddTool/UpdateTool previously validated it at all (see
+// sbr/rtm/009-security.rtm.md SEC-TOOL-004): a malicious owner could set a negative or
+// arbitrarily large price, which flows directly into rental cost and settlement math.
+const maxToolPriceCents = 100_000 // $1000.00
+
+// validateToolPrices rejects a negative or above-max price on any of the 4 fields, and
+// additionally requires the 3 rental-rate fields to be strictly positive — CalculateRentalCost
+// (internal/utils) caps each shorter tier's cost at the next tier's price (e.g. day cost capped
+// at week price), so a zero week/month price would silently zero out rental costs regardless of
+// the rental's actual duration unit. replacement_cost_cents has no such dependency and 0 is a
+// legitimate "not specified" value for it, so it is only bounds-checked, not required positive.
+func validateToolPrices(tool *domain.Tool) error {
+	rentalRates := map[string]int32{
+		"price_per_day_cents":   tool.PricePerDayCents,
+		"price_per_week_cents":  tool.PricePerWeekCents,
+		"price_per_month_cents": tool.PricePerMonthCents,
+	}
+	for name, cents := range rentalRates {
+		if cents <= 0 {
+			return fmt.Errorf("%s must be a positive amount", name)
+		}
+		if cents > maxToolPriceCents {
+			return fmt.Errorf("%s exceeds the maximum allowed value of %d cents ($1000)", name, maxToolPriceCents)
+		}
+	}
+	if tool.ReplacementCostCents < 0 || tool.ReplacementCostCents > maxToolPriceCents {
+		return fmt.Errorf("replacement_cost_cents must be between 0 and %d cents ($1000)", maxToolPriceCents)
+	}
+	return nil
+}
+
 func (s *toolService) AddTool(ctx context.Context, tool *domain.Tool, images []string) error {
+	if err := validateToolPrices(tool); err != nil {
+		return err
+	}
 	if err := s.toolRepo.Create(ctx, tool); err != nil {
 		return err
 	}
@@ -45,6 +81,21 @@ func (s *toolService) GetTool(ctx context.Context, id, requestingUserID int32) (
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// SEC-TOOL-002 (sbr/rtm/009-security.rtm.md): GetTool must be scoped like its siblings
+	// SearchTools/ListTools — reject a caller who neither owns the tool nor shares an org with
+	// its owner, rather than returning full tool detail (including the owner's email/phone) to
+	// any authenticated user platform-wide.
+	if requestingUserID != tool.OwnerID {
+		sharedOrgs, err := s.getSharedOrganizations(ctx, tool.OwnerID, requestingUserID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(sharedOrgs) == 0 {
+			return nil, nil, fmt.Errorf("unauthorized: you do not share an organization with this tool's owner")
+		}
+	}
+
 	images, err := s.toolRepo.GetImages(ctx, id)
 	if err != nil {
 		return nil, nil, err
@@ -65,6 +116,9 @@ func (s *toolService) UpdateTool(ctx context.Context, callerID int32, tool *doma
 	}
 	if existing.OwnerID != callerID {
 		return fmt.Errorf("unauthorized: only the tool owner may update this tool")
+	}
+	if err := validateToolPrices(tool); err != nil {
+		return err
 	}
 	return s.toolRepo.Update(ctx, tool)
 }

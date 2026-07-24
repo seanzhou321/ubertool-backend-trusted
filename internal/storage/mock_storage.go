@@ -2,12 +2,12 @@ package storage
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,6 +20,22 @@ type MockStorageService struct {
 	uploadsDir   string // Local directory for uploads (e.g., "./uploads")
 	imagesDir    string // Subdirectory for images
 	thumbnailDir string // Subdirectory for thumbnails
+
+	// uploadTokens/downloadTokens back the presigned-URL contract for the local HTTP endpoints
+	// registered by internal/api/http/image_upload_handler.go, which sit outside the gRPC auth
+	// interceptor chain: a token minted here is the *only* access control those endpoints have
+	// (see sbr/rtm/009-security.rtm.md SEC-HTTP-001). Each token authorizes exactly one key,
+	// mirroring real S3 presigned URLs, which stay valid for repeated use throughout their
+	// expiry window rather than being single-use.
+	uploadTokens   sync.Map // map[string]tokenRecord
+	downloadTokens sync.Map // map[string]tokenRecord
+}
+
+// tokenRecord binds an issued presigned-URL token to the one storage key it authorizes and the
+// time it stops being valid.
+type tokenRecord struct {
+	key       string
+	expiresAt time.Time
 }
 
 // NewMockStorageService creates a new mock storage service
@@ -35,12 +51,37 @@ func NewMockStorageService(baseURL, uploadsDir string) (*MockStorageService, err
 		return nil, fmt.Errorf("failed to create thumbnails directory: %w", err)
 	}
 
-	return &MockStorageService{
+	m := &MockStorageService{
 		baseURL:      baseURL,
 		uploadsDir:   uploadsDir,
 		imagesDir:    imagesDir,
 		thumbnailDir: thumbnailDir,
-	}, nil
+	}
+	go m.cleanupExpiredTokensLoop()
+	return m, nil
+}
+
+// cleanupExpiredTokensLoop evicts expired upload/download tokens so the token maps don't grow
+// unbounded over the process lifetime. Mirrors internal/security/rate_limiter.go's cleanup
+// pattern.
+func (m *MockStorageService) cleanupExpiredTokensLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		now := time.Now()
+		m.uploadTokens.Range(func(k, v any) bool {
+			if now.After(v.(tokenRecord).expiresAt) {
+				m.uploadTokens.Delete(k)
+			}
+			return true
+		})
+		m.downloadTokens.Range(func(k, v any) bool {
+			if now.After(v.(tokenRecord).expiresAt) {
+				m.downloadTokens.Delete(k)
+			}
+			return true
+		})
+	}
 }
 
 // GeneratePresignedUploadURL generates a mock upload URL pointing to the server
@@ -50,8 +91,8 @@ func (m *MockStorageService) GeneratePresignedUploadURL(
 	contentType string,
 	expiresIn time.Duration,
 ) (string, error) {
-	// Generate unique upload token
 	uploadToken := uuid.New().String()
+	m.uploadTokens.Store(uploadToken, tokenRecord{key: key, expiresAt: time.Now().Add(expiresIn)})
 
 	// Create mock presigned URL pointing to server
 	// The key is encoded in the query parameter so the upload handler knows where to save
@@ -60,49 +101,83 @@ func (m *MockStorageService) GeneratePresignedUploadURL(
 	return uploadURL, nil
 }
 
+// ValidateUploadToken reports whether token was issued by GeneratePresignedUploadURL for
+// exactly this key and has not yet expired.
+func (m *MockStorageService) ValidateUploadToken(token, key string) bool {
+	v, ok := m.uploadTokens.Load(token)
+	if !ok {
+		return false
+	}
+	rec := v.(tokenRecord)
+	return rec.key == key && time.Now().Before(rec.expiresAt)
+}
+
 // GeneratePresignedDownloadURL generates a mock download URL
 func (m *MockStorageService) GeneratePresignedDownloadURL(
 	ctx context.Context,
 	key string,
 	expiresIn time.Duration,
 ) (string, error) {
-	// Encode the key for URL safety
-	encodedKey := encodeKey(key)
+	downloadToken := uuid.New().String()
+	m.downloadTokens.Store(downloadToken, tokenRecord{key: key, expiresAt: time.Now().Add(expiresIn)})
 
 	// Generate download URL pointing to server
 	// The actual key is in query parameter
-	downloadURL := fmt.Sprintf("%s/api/v1/download/%s?key=%s", m.baseURL, encodedKey, key)
+	downloadURL := fmt.Sprintf("%s/api/v1/download/%s?key=%s", m.baseURL, downloadToken, key)
 
 	return downloadURL, nil
 }
 
+// ValidateDownloadToken reports whether token was issued by GeneratePresignedDownloadURL for
+// exactly this key and has not yet expired.
+func (m *MockStorageService) ValidateDownloadToken(token, key string) bool {
+	v, ok := m.downloadTokens.Load(token)
+	if !ok {
+		return false
+	}
+	rec := v.(tokenRecord)
+	return rec.key == key && time.Now().Before(rec.expiresAt)
+}
+
+// safeJoin resolves key against baseDir and rejects any result that would escape baseDir (e.g.
+// key="../../etc/passwd") — see sbr/rtm/009-security.rtm.md SEC-HTTP-002. filepath.Join alone
+// does not provide this guarantee: it happily normalizes ".." segments right out of the base
+// directory.
+func safeJoin(baseDir, key string) (string, error) {
+	baseDir = filepath.Clean(baseDir)
+	full := filepath.Clean(filepath.Join(baseDir, key))
+	if full != baseDir && !strings.HasPrefix(full, baseDir+string(os.PathSeparator)) {
+		return "", fmt.Errorf("invalid key %q: resolves outside the storage directory", key)
+	}
+	return full, nil
+}
+
 // FileExists checks if file exists in local filesystem
 func (m *MockStorageService) FileExists(ctx context.Context, key string) (bool, int64, error) {
-	fullPath := filepath.Join(m.imagesDir, key)
-
-	// Debug logging
-	fmt.Printf("[DEBUG FileExists] key=%s, fullPath=%s\n", key, fullPath)
+	fullPath, err := safeJoin(m.imagesDir, key)
+	if err != nil {
+		return false, 0, err
+	}
 
 	info, err := os.Stat(fullPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Printf("[DEBUG FileExists] File does not exist: %s\n", fullPath)
 			return false, 0, nil
 		}
-		fmt.Printf("[DEBUG FileExists] Stat error: %v\n", err)
 		return false, 0, err
 	}
 
-	fmt.Printf("[DEBUG FileExists] File found, size=%d\n", info.Size())
 	return true, info.Size(), nil
 }
 
 // DeleteFile deletes file from local filesystem
 func (m *MockStorageService) DeleteFile(ctx context.Context, key string) error {
-	fullPath := filepath.Join(m.imagesDir, key)
+	fullPath, err := safeJoin(m.imagesDir, key)
+	if err != nil {
+		return err
+	}
 
-	err := os.Remove(fullPath)
-	if err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
 
@@ -111,8 +186,10 @@ func (m *MockStorageService) DeleteFile(ctx context.Context, key string) error {
 
 // SaveFile saves uploaded file to local filesystem
 func (m *MockStorageService) SaveFile(key string, reader io.Reader) error {
-	// Determine full path
-	fullPath := filepath.Join(m.imagesDir, key)
+	fullPath, err := safeJoin(m.imagesDir, key)
+	if err != nil {
+		return err
+	}
 
 	// Create parent directories
 	dir := filepath.Dir(fullPath)
@@ -138,7 +215,10 @@ func (m *MockStorageService) SaveFile(key string, reader io.Reader) error {
 
 // ReadFile reads file from local filesystem
 func (m *MockStorageService) ReadFile(key string) (io.ReadCloser, error) {
-	fullPath := filepath.Join(m.imagesDir, key)
+	fullPath, err := safeJoin(m.imagesDir, key)
+	if err != nil {
+		return nil, err
+	}
 
 	file, err := os.Open(fullPath)
 	if err != nil {
@@ -150,11 +230,9 @@ func (m *MockStorageService) ReadFile(key string) (io.ReadCloser, error) {
 
 // GetLocalPath returns the filesystem path for a key
 func (m *MockStorageService) GetLocalPath(key string) string {
-	return filepath.Join(m.imagesDir, key)
-}
-
-// encodeKey creates a URL-safe hash of the key
-func encodeKey(key string) string {
-	hash := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(hash[:16]) // Use first 16 bytes
+	fullPath, err := safeJoin(m.imagesDir, key)
+	if err != nil {
+		return ""
+	}
+	return fullPath
 }

@@ -63,6 +63,18 @@ func (m *MockUserRepo) UpdateUserOrg(ctx context.Context, userOrg *domain.UserOr
 	args := m.Called(ctx, userOrg)
 	return args.Error(0)
 }
+func (m *MockUserRepo) AdjustBalance(ctx context.Context, userID, orgID, deltaCents int32) error {
+	args := m.Called(ctx, userID, orgID, deltaCents)
+	return args.Error(0)
+}
+func (m *MockUserRepo) SetRentingBlocked(ctx context.Context, userID, orgID int32, blocked bool, reason string, billID int32) error {
+	args := m.Called(ctx, userID, orgID, blocked, reason, billID)
+	return args.Error(0)
+}
+func (m *MockUserRepo) SetLendingBlocked(ctx context.Context, userID, orgID int32, blocked bool, reason string, billID int32) error {
+	args := m.Called(ctx, userID, orgID, blocked, reason, billID)
+	return args.Error(0)
+}
 func (m *MockUserRepo) ListMembersByOrg(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error) {
 	args := m.Called(ctx, orgID)
 	return args.Get(0).([]domain.User), args.Get(1).([]domain.UserOrg), args.Error(2)

@@ -22,6 +22,21 @@ type UserRepository interface {
 	ListMembersByOrg(ctx context.Context, orgID int32) ([]domain.User, []domain.UserOrg, error)
 	CountMembersByOrg(ctx context.Context, orgID int32) (int32, error)
 	SearchMembersByOrg(ctx context.Context, orgID int32, query string) ([]domain.User, []domain.UserOrg, error)
+
+	// AdjustBalance atomically applies deltaCents to a user's balance in an org via a single
+	// "balance_cents = balance_cents + $1" UPDATE, instead of the GetUserOrg-then-UpdateUserOrg
+	// read-modify-write pattern, which is vulnerable to a lost update when two callers touch the
+	// same row concurrently (see sbr/rtm/009-security.rtm.md SEC-BILL-004/006). Callers that also
+	// need to change renting/lending-blocked status alongside a balance change should call
+	// SetRentingBlocked/SetLendingBlocked separately (they never touch balance_cents), rather
+	// than reading the row into memory and writing it back whole.
+	AdjustBalance(ctx context.Context, userID, orgID, deltaCents int32) error
+	// SetRentingBlocked atomically updates only the renting-blocked columns for a user in an
+	// org — never balance_cents — so it cannot race with a concurrent AdjustBalance on the same
+	// row.
+	SetRentingBlocked(ctx context.Context, userID, orgID int32, blocked bool, reason string, billID int32) error
+	// SetLendingBlocked is the lending-side counterpart of SetRentingBlocked.
+	SetLendingBlocked(ctx context.Context, userID, orgID int32, blocked bool, reason string, billID int32) error
 }
 
 type OrganizationRepository interface {

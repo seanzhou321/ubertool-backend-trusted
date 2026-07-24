@@ -43,6 +43,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 	}
 
 	t.Run("Success", func(t *testing.T) {
+		userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID}, nil)
 		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
 		ledgerRepo.On("GetBalance", ctx, renterID, orgID).Return(int32(5000), nil)
 		rentalRepo.On("Create", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
@@ -59,6 +60,33 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		assert.Equal(t, toolID, res.ToolID)
 		assert.Equal(t, renterID, res.RenterID)
 		assert.Equal(t, int32(2000), res.TotalCostCents) // 2 days (end-exclusive: +24h to +72h) * 1000
+	})
+
+	// SEC-RENTAL-001 (sbr/rtm/009-security.rtm.md): CreateRentalRequest must reject an
+	// organization_id the caller does not belong to — mirrors the membership check
+	// ToolService.SearchTools already performs (internal/service/tool.go:118-122). Regression
+	// test for a real gap found during the security audit: since domain.Tool has no OrgID field
+	// at all, without this check any tool could be rented under any organization context the
+	// caller names.
+	t.Run("Rejects an organization the caller is not a member of (SEC-RENTAL-001)", func(t *testing.T) {
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		rentalRepo := new(MockRentalRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+
+		foreignOrgID := int32(999)
+		// The renter does not belong to foreignOrgID — matches the pattern SearchTools already
+		// uses to detect non-membership.
+		userRepo.On("GetUserOrg", ctx, renterID, foreignOrgID).Return(nil, fmt.Errorf("no rows in result set"))
+
+		res, err := svc.CreateRentalRequest(ctx, renterID, toolID, foreignOrgID, startDate, endDate)
+		require.Error(t, err, "CreateRentalRequest must reject an organization_id the caller does not belong to")
+		assert.Nil(t, res)
+		toolRepo.AssertNotCalled(t, "GetByID", mock.Anything, mock.Anything)
+		rentalRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
 	})
 
 	// Balance check is disabled for now
@@ -86,6 +114,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		rentalRepo := new(MockRentalRepo)
 		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
 
+		userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID}, nil)
 		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
 		sameDay := time.Now().Add(24 * time.Hour).Format("2006-01-02")
 
@@ -193,6 +222,35 @@ func TestRentalService_CompleteRental(t *testing.T) {
 		ledgerRepo.AssertNumberOfCalls(t, "CreateTransaction", 0)
 		userRepo.AssertNotCalled(t, "GetUserOrg")
 		userRepo.AssertNotCalled(t, "UpdateUserOrg")
+	})
+
+	// SEC-RENTAL-005 (sbr/rtm/009-security.rtm.md): rental_service.proto documents CompleteRental
+	// as "Complete rental (mark as returned, owner only)", but loadAndValidateRental
+	// (internal/service/rental.go:868) currently accepts either the owner OR the renter. A
+	// renter can therefore self-complete their own active rental and fully control
+	// surcharge_or_credit_cents (an unbounded, client-supplied field that feeds directly into
+	// the settlement math), with no owner approval step at all.
+	t.Run("Rejects a caller who is the renter, not the owner (SEC-RENTAL-005)", func(t *testing.T) {
+		rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo := newMocks()
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+
+		rt := *baseRental
+		rentalRepo.On("GetByID", ctx, rentalID).Return(&rt, nil)
+		// Only reached along the current (buggy) path, which lets the renter complete the
+		// rental exactly like an owner would — allow them with .Maybe() so the vulnerability
+		// surfaces as a clean assertion failure below instead of an unrelated mock panic.
+		rentalRepo.On("Update", ctx, mock.AnythingOfType("*domain.Rental")).Maybe().Return(nil)
+		rentalRepo.On("ListByTool", ctx, toolID, orgID, mock.Anything, int32(1), int32(1)).Maybe().Return([]domain.Rental{}, int32(0), nil)
+		userRepo.On("GetByID", ctx, renterID).Maybe().Return(&domain.User{Email: "renter@test.com"}, nil)
+		userRepo.On("GetByID", ctx, ownerID).Maybe().Return(&domain.User{Email: "owner@test.com"}, nil)
+		ledgerRepo.On("CreateTransaction", ctx, mock.AnythingOfType("*domain.LedgerTransaction")).Maybe().Return(nil)
+		toolRepo.On("GetByID", ctx, toolID).Maybe().Return(&domain.Tool{Name: "Tool"}, nil)
+		toolRepo.On("Update", ctx, mock.AnythingOfType("*domain.Tool")).Maybe().Return(nil)
+		emailSvc.On("SendRentalCompletionNotification", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Maybe().Return(nil)
+		noteRepo.On("Dispatch", mock.Anything, mock.AnythingOfType("*domain.Notification")).Maybe().Return(nil)
+
+		_, err := svc.CompleteRental(ctx, renterID, rentalID, "Good condition", -100000, "", true)
+		require.Error(t, err, "CompleteRental is documented owner-only; a renter-initiated call (here also attempting a large negative surcharge) must be rejected")
 	})
 
 	t.Run("Settlement notification reminder text when charge_billsplit=false", func(t *testing.T) {

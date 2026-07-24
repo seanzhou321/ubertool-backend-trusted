@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -9,6 +10,13 @@ import (
 
 	"github.com/gorilla/mux"
 )
+
+// maxUploadBytes bounds how much a single PUT to the mock upload endpoint may write, so an
+// unauthenticated (pre-token-check) or malicious client cannot exhaust local disk space — see
+// sbr/rtm/009-security.rtm.md SEC-HTTP-004. No spec/proto documents an exact limit for tool
+// image uploads; 25 MB is a generous defensive ceiling for a photo upload (real photos are
+// almost always well under this) and can be revisited if a tighter product limit is defined.
+const maxUploadBytes = 25 << 20 // 25 MB
 
 // ImageUploadHandler handles HTTP uploads for mock storage
 type ImageUploadHandler struct {
@@ -36,6 +44,16 @@ func (h *ImageUploadHandler) HandleMockUpload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// The {token} path segment is this endpoint's only access control (it sits outside the
+	// gRPC auth interceptor chain entirely) — validate it was actually issued by
+	// GeneratePresignedUploadURL for this exact key and hasn't expired. See
+	// sbr/rtm/009-security.rtm.md SEC-HTTP-001.
+	token := mux.Vars(r)["token"]
+	if !h.mockStorage.ValidateUploadToken(token, key) {
+		http.Error(w, "Invalid or expired upload token", http.StatusForbidden)
+		return
+	}
+
 	// Validate content type
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "image/jpeg" && contentType != "image/png" && contentType != "image/gif" {
@@ -43,9 +61,15 @@ func (h *ImageUploadHandler) HandleMockUpload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Save file
+	// Save file, capped at maxUploadBytes (SEC-HTTP-004).
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
 	err := h.mockStorage.SaveFile(key, r.Body)
 	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			http.Error(w, "Upload exceeds maximum allowed size", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
@@ -66,6 +90,13 @@ func (h *ImageUploadHandler) HandleMockDownload(w http.ResponseWriter, r *http.R
 	key := r.URL.Query().Get("key")
 	if key == "" {
 		http.Error(w, "Missing key parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Same access-control requirement as HandleMockUpload (SEC-HTTP-001).
+	token := mux.Vars(r)["token"]
+	if !h.mockStorage.ValidateDownloadToken(token, key) {
+		http.Error(w, "Invalid or expired download token", http.StatusForbidden)
 		return
 	}
 
@@ -101,5 +132,5 @@ func (h *ImageUploadHandler) HandleMockDownload(w http.ResponseWriter, r *http.R
 func RegisterMockStorageRoutes(router *mux.Router, mockStorage *storage.MockStorageService) {
 	handler := NewImageUploadHandler(mockStorage)
 	router.HandleFunc("/api/v1/upload/{token}", handler.HandleMockUpload).Methods("PUT")
-	router.HandleFunc("/api/v1/download/{key}", handler.HandleMockDownload).Methods("GET")
+	router.HandleFunc("/api/v1/download/{token}", handler.HandleMockDownload).Methods("GET")
 }

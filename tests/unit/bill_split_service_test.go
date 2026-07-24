@@ -299,12 +299,8 @@ func TestBillSplitService_AcknowledgePayment(t *testing.T) {
 			Run(func(args mock.Arguments) { updatedBill = args.Get(1).(*domain.Bill) }).Return(nil)
 		billRepo.On("CreateAction", ctx, mock.Anything).Return(nil)
 
-		creditorOrg := &domain.UserOrg{UserID: creditorID, OrgID: orgID, BalanceCents: 0}
-		debtorOrg := &domain.UserOrg{UserID: debtorID, OrgID: orgID, BalanceCents: 0}
-		userRepo.On("GetUserOrg", ctx, creditorID, orgID).Return(creditorOrg, nil)
-		userRepo.On("GetUserOrg", ctx, debtorID, orgID).Return(debtorOrg, nil)
-		userRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool { return uo.UserID == creditorID && uo.BalanceCents == amountCents })).Return(nil)
-		userRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool { return uo.UserID == debtorID && uo.BalanceCents == -amountCents })).Return(nil)
+		userRepo.On("AdjustBalance", ctx, creditorID, orgID, amountCents).Return(nil)
+		userRepo.On("AdjustBalance", ctx, debtorID, orgID, -amountCents).Return(nil)
 
 		err := svc.AcknowledgePayment(ctx, creditorID, billID)
 		require.NoError(t, err)
@@ -338,12 +334,8 @@ func TestBillSplitService_AcknowledgePayment(t *testing.T) {
 		billRepo.On("Update", ctx, mock.Anything).
 			Run(func(args mock.Arguments) { updatedBill = args.Get(1).(*domain.Bill) }).Return(nil)
 		billRepo.On("CreateAction", ctx, mock.Anything).Return(nil)
-		creditorOrg := &domain.UserOrg{UserID: creditorID, OrgID: orgID, BalanceCents: 0}
-		debtorOrg := &domain.UserOrg{UserID: debtorID, OrgID: orgID, BalanceCents: 0}
-		userRepo.On("GetUserOrg", ctx, creditorID, orgID).Return(creditorOrg, nil)
-		userRepo.On("GetUserOrg", ctx, debtorID, orgID).Return(debtorOrg, nil)
-		userRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool { return uo.UserID == creditorID && uo.BalanceCents == amountCents })).Return(nil)
-		userRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool { return uo.UserID == debtorID && uo.BalanceCents == -amountCents })).Return(nil)
+		userRepo.On("AdjustBalance", ctx, creditorID, orgID, amountCents).Return(nil)
+		userRepo.On("AdjustBalance", ctx, debtorID, orgID, -amountCents).Return(nil)
 		noteRepo.On("Dispatch", ctx, mock.MatchedBy(func(n *domain.Notification) bool { return n.UserID == debtorID })).Return(nil)
 		emailSvc.On("SendBillReceiptConfirmation", ctx, "debtor@test.com", "Debtor", "Creditor", amountCents, mock.Anything, "Test Org").Return(nil)
 
@@ -522,29 +514,18 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleAdmin}
 		debtor := &domain.User{ID: 2, Name: "Debtor", Email: "debtor@test.com"}
 		creditor := &domain.User{ID: 3, Name: "Creditor", Email: "creditor@test.com"}
-		debtorUO := &domain.UserOrg{UserID: 2, OrgID: 1, BalanceCents: 500}
-		creditorUO := &domain.UserOrg{UserID: 3, OrgID: 1, BalanceCents: 500}
-		
+
 		mockBillRepo.On("GetByID", ctx, int32(1)).Return(bill, nil).Once()
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(2)).Return(debtor, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(3)).Return(creditor, nil).Once()
-		
-		// updateBalances expectations (enforce payment)
-		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil).Once() // Creditor
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 3 && uo.BalanceCents == 1500 // 500 + 1000
-		})).Return(nil).Once()
-		
-		mockUserRepo.On("GetUserOrg", ctx, int32(2), int32(1)).Return(debtorUO, nil).Twice() // Once for balance, once for blocking
 
-		// Update Debtor Balance
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			// First update: Balance changed to -500 (500-1000)
-			return uo.UserID == 2 && uo.BalanceCents == -500 && !uo.RentingBlocked
-		})).Return(nil).Once()
-		
+		// updateBalances expectations (enforce payment) — atomic deltas, not read-modify-write
+		// (SEC-BILL-004/006, sbr/rtm/009-security.rtm.md).
+		mockUserRepo.On("AdjustBalance", ctx, int32(3), int32(1), int32(1000)).Return(nil).Once() // Creditor credited
+		mockUserRepo.On("AdjustBalance", ctx, int32(2), int32(1), int32(-1000)).Return(nil).Once() // Debtor debited
+
 		// Update bill
 		mockBillRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool {
 			return b.Status == domain.BillStatusAdminResolved && b.ResolutionOutcome == string(domain.ResolutionOutcomeDebtorFault)
@@ -555,11 +536,10 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 			return a.ActionType == domain.BillActionTypeAdminResolution && a.ActorUserID != nil && *a.ActorUserID == 1
 		})).Return(nil).Once()
 
-		// Block Debtor
-		blockDueTo := int32(1)
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 2 && uo.RentingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
-		})).Return(nil).Once()
+		// Block Debtor — column-scoped, does not touch balance_cents. Reason is the fixed
+		// string ResolveDispute passes for this branch (internal/service/bill_split.go:337),
+		// not the caller-supplied notes.
+		mockUserRepo.On("SetRentingBlocked", ctx, int32(2), int32(1), true, "Blocked due to unresolved payment dispute (debtor at fault)", int32(1)).Return(nil).Once()
 
 		// Notifications
 		mockNotifRepo.On("Dispatch", ctx, mock.Anything).Return(nil).Times(2)
@@ -587,15 +567,12 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleAdmin}
 		debtor := &domain.User{ID: 2, Name: "Debtor", Email: "debtor@test.com"}
 		creditor := &domain.User{ID: 3, Name: "Creditor", Email: "creditor@test.com"}
-		creditorUO := &domain.UserOrg{UserID: 3, OrgID: 1, BalanceCents: -500}
 
 		mockBillRepo.On("GetByID", ctx, int32(1)).Return(bill, nil).Once()
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(2)).Return(debtor, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(3)).Return(creditor, nil).Once()
-		// Get Creditor for penalty application
-		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil).Once()
 
 		mockBillRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool {
 			return b.Status == domain.BillStatusAdminResolved && b.ResolutionOutcome == string(domain.ResolutionOutcomeCreditorFault)
@@ -603,12 +580,11 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 
 		mockBillRepo.On("CreateAction", ctx, mock.Anything).Return(nil).Once()
 
-		// Creditor at fault: Penalty applied (Balance reduced), and Lending blocked.
-		// Balance check: Creditor started at -500. Penalty -1000. New Balance -1500.
-		blockDueTo := int32(1)
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 3 && uo.BalanceCents == -1500 && uo.LendingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
-		})).Return(nil).Once()
+		// Creditor at fault: penalty applied (atomic -1000 delta) and lending blocked
+		// (column-scoped, does not touch balance_cents) — SEC-BILL-004/006. Reason is the fixed
+		// string ResolveDispute passes for this branch (internal/service/bill_split.go:340).
+		mockUserRepo.On("AdjustBalance", ctx, int32(3), int32(1), int32(-1000)).Return(nil).Once()
+		mockUserRepo.On("SetLendingBlocked", ctx, int32(3), int32(1), true, "Blocked due to dispute resolution (creditor at fault)", int32(1)).Return(nil).Once()
 
 		mockNotifRepo.On("Dispatch", ctx, mock.Anything).Return(nil).Times(2)
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "CREDITOR_FAULT", "Admin resolved: Creditor at fault, payment marked valid", "Test Org").Return(nil).Once()
@@ -635,18 +611,12 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleAdmin}
 		debtor := &domain.User{ID: 2, Name: "Debtor", Email: "debtor@test.com"}
 		creditor := &domain.User{ID: 3, Name: "Creditor", Email: "creditor@test.com"}
-		debtorUO := &domain.UserOrg{UserID: 2, OrgID: 1, BalanceCents: 500}
-		creditorUO := &domain.UserOrg{UserID: 3, OrgID: 1, BalanceCents: -500}
 
 		mockBillRepo.On("GetByID", ctx, int32(1)).Return(bill, nil).Once()
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
 		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(2)).Return(debtor, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(3)).Return(creditor, nil).Once()
-		
-		// GetUserOrg calls for penalties
-		mockUserRepo.On("GetUserOrg", ctx, int32(2), int32(1)).Return(debtorUO, nil).Once()
-		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil).Once()
 
 		mockBillRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool {
 			return b.Status == domain.BillStatusAdminResolved && b.ResolutionOutcome == string(domain.ResolutionOutcomeBothFault)
@@ -654,17 +624,13 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 
 		mockBillRepo.On("CreateAction", ctx, mock.Anything).Return(nil).Once()
 
-		blockDueTo := int32(1)
-		// Both blocked and penalized
-		// Debtor: Balance 500 -> -500. Blocked.
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 2 && uo.BalanceCents == -500 && uo.RentingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
-		})).Return(nil).Once()
-		
-		// Creditor: Balance -500 -> -1500. Blocked.
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 3 && uo.BalanceCents == -1500 && uo.LendingBlocked == true && uo.BlockedDueToBillID != nil && *uo.BlockedDueToBillID == blockDueTo
-		})).Return(nil).Once()
+		// Both blocked and penalized — atomic deltas + column-scoped blocking writes
+		// (SEC-BILL-004/006). Reason is the fixed string ResolveDispute passes for this branch
+		// (internal/service/bill_split.go:343-344).
+		mockUserRepo.On("AdjustBalance", ctx, int32(2), int32(1), int32(-1000)).Return(nil).Once() // Debtor penalty
+		mockUserRepo.On("SetRentingBlocked", ctx, int32(2), int32(1), true, "Blocked due to unresolved payment dispute (both at fault)", int32(1)).Return(nil).Once()
+		mockUserRepo.On("AdjustBalance", ctx, int32(3), int32(1), int32(-1000)).Return(nil).Once() // Creditor penalty
+		mockUserRepo.On("SetLendingBlocked", ctx, int32(3), int32(1), true, "Blocked due to unresolved payment dispute (both at fault)", int32(1)).Return(nil).Once()
 
 		mockNotifRepo.On("Dispatch", ctx, mock.Anything).Return(nil).Times(2)
 		mockEmailSvc.On("SendBillDisputeResolutionNotification", ctx, "debtor@test.com", "Debtor", int32(1000), "BOTH_FAULT", "Admin resolved: Both parties blocked from renting/lending", "Test Org").Return(nil).Once()
@@ -697,8 +663,6 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleAdmin}
 		debtor := &domain.User{ID: 2, Name: "Debtor", Email: "debtor@test.com"}
 		creditor := &domain.User{ID: 3, Name: "Creditor", Email: "creditor@test.com"}
-		debtorUO := &domain.UserOrg{UserID: 2, OrgID: 1, BalanceCents: 500}
-		creditorUO := &domain.UserOrg{UserID: 3, OrgID: 1, BalanceCents: -500}
 
 		mockBillRepo.On("GetByID", ctx, int32(1)).Return(bill, nil).Once()
 		mockOrgRepo.On("GetByID", ctx, int32(1)).Return(org, nil).Once()
@@ -706,15 +670,9 @@ func TestBillSplitService_ResolveDispute(t *testing.T) {
 		mockUserRepo.On("GetByID", ctx, int32(2)).Return(debtor, nil).Once()
 		mockUserRepo.On("GetByID", ctx, int32(3)).Return(creditor, nil).Once()
 
-		// GRACEFUL only transfers the balance — no blocking, no penalty.
-		mockUserRepo.On("GetUserOrg", ctx, int32(3), int32(1)).Return(creditorUO, nil).Once()
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 3 && uo.BalanceCents == 500 && !uo.LendingBlocked // -500 + 1000
-		})).Return(nil).Once()
-		mockUserRepo.On("GetUserOrg", ctx, int32(2), int32(1)).Return(debtorUO, nil).Once()
-		mockUserRepo.On("UpdateUserOrg", ctx, mock.MatchedBy(func(uo *domain.UserOrg) bool {
-			return uo.UserID == 2 && uo.BalanceCents == -500 && !uo.RentingBlocked // 500 - 1000
-		})).Return(nil).Once()
+		// GRACEFUL only transfers the balance (atomic deltas) — no blocking, no penalty.
+		mockUserRepo.On("AdjustBalance", ctx, int32(3), int32(1), int32(1000)).Return(nil).Once()  // Creditor credited
+		mockUserRepo.On("AdjustBalance", ctx, int32(2), int32(1), int32(-1000)).Return(nil).Once() // Debtor debited
 
 		mockBillRepo.On("Update", ctx, mock.MatchedBy(func(b *domain.Bill) bool {
 			return b.Status == domain.BillStatusAdminResolved && b.ResolutionOutcome == string(domain.ResolutionOutcomeGraceful)

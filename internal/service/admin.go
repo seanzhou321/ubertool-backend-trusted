@@ -139,6 +139,20 @@ func (s *adminService) BlockUser(ctx context.Context, adminID, userID, orgID int
 		return err
 	}
 
+	// SEC-ADMIN-002 (sbr/rtm/009-security.rtm.md): a plain ADMIN may only block a MEMBER —
+	// blocking an ADMIN or SUPER_ADMIN requires the caller to be SUPER_ADMIN. verifyAdminRights
+	// above only confirms the caller holds *some* admin role in the org, not that they outrank
+	// the target.
+	if uo.Role == domain.UserOrgRoleAdmin || uo.Role == domain.UserOrgRoleSuperAdmin {
+		adminUo, err := s.userRepo.GetUserOrg(ctx, adminID, orgID)
+		if err != nil {
+			return err
+		}
+		if adminUo.Role != domain.UserOrgRoleSuperAdmin {
+			return fmt.Errorf("unauthorized: only a SUPER_ADMIN may block an ADMIN or SUPER_ADMIN")
+		}
+	}
+
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return err

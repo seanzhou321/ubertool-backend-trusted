@@ -249,30 +249,19 @@ func (s *billSplitService) AcknowledgePayment(ctx context.Context, userID, payme
 	return nil
 }
 
+// updateBalances credits the creditor and debits the debtor by bill.AmountCents. Each leg is a
+// single atomic AdjustBalance UPDATE, not a GetUserOrg-then-UpdateUserOrg read-modify-write —
+// the latter is vulnerable to a lost update when a concurrent settlement (another
+// AcknowledgePayment or ResolveDispute call) touches the same user's balance in the same org
+// between the read and the write. See sbr/rtm/009-security.rtm.md SEC-BILL-004/006, and
+// tests/integration/bill_split_balance_race_test.go for a reproduction of the race this closes.
 func (s *billSplitService) updateBalances(ctx context.Context, bill *domain.Bill) error {
-	// Update creditor's balance (add amount)
-	creditorUserOrg, err := s.userRepo.GetUserOrg(ctx, bill.CreditorUserID, bill.OrgID)
-	if err != nil {
+	if err := s.userRepo.AdjustBalance(ctx, bill.CreditorUserID, bill.OrgID, bill.AmountCents); err != nil {
 		return err
 	}
-	creditorUserOrg.BalanceCents += bill.AmountCents
-	nowDate := time.Now().Format("2006-01-02")
-	creditorUserOrg.LastBalanceUpdateOn = &nowDate
-	if err := s.userRepo.UpdateUserOrg(ctx, creditorUserOrg); err != nil {
+	if err := s.userRepo.AdjustBalance(ctx, bill.DebtorUserID, bill.OrgID, -bill.AmountCents); err != nil {
 		return err
 	}
-
-	// Update debtor's balance (subtract amount)
-	debtorUserOrg, err := s.userRepo.GetUserOrg(ctx, bill.DebtorUserID, bill.OrgID)
-	if err != nil {
-		return err
-	}
-	debtorUserOrg.BalanceCents -= bill.AmountCents
-	debtorUserOrg.LastBalanceUpdateOn = &nowDate
-	if err := s.userRepo.UpdateUserOrg(ctx, debtorUserOrg); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -410,40 +399,26 @@ func (s *billSplitService) verifyAdminRights(ctx context.Context, adminID, orgID
 	return nil
 }
 
+// blockDebtorFromRenting and its two siblings below previously did a
+// GetUserOrg-then-UpdateUserOrg read-modify-write, which (for the two "penalize" variants)
+// could clobber a concurrent balance change on the same row, and (for all three) could itself
+// be clobbered by one — since UpdateUserOrg always writes the whole row's balance_cents from
+// whatever was read into memory. They now use column-scoped atomic writes (AdjustBalance,
+// SetRentingBlocked/SetLendingBlocked) that never touch a column that isn't part of this call's
+// own concern, so they cannot race with each other on balance_cents. See
+// sbr/rtm/009-security.rtm.md SEC-BILL-004/006.
 func (s *billSplitService) blockDebtorFromRenting(ctx context.Context, debtorID, orgID int32, bill *domain.Bill, reason string) {
-	userOrg, err := s.userRepo.GetUserOrg(ctx, debtorID, orgID)
-	if err == nil {
-		userOrg.RentingBlocked = true
-		userOrg.BlockedDueToBillID = &bill.ID
-		userOrg.BlockedReason = reason
-		_ = s.userRepo.UpdateUserOrg(ctx, userOrg)
-	}
+	_ = s.userRepo.SetRentingBlocked(ctx, debtorID, orgID, true, reason, bill.ID)
 }
 
 func (s *billSplitService) penalizeAndBlockDebtorFromRenting(ctx context.Context, debtorID, orgID int32, bill *domain.Bill, reason string) {
-	userOrg, err := s.userRepo.GetUserOrg(ctx, debtorID, orgID)
-	if err == nil {
-		userOrg.BalanceCents -= bill.AmountCents
-		nowDate := time.Now().Format("2006-01-02")
-		userOrg.LastBalanceUpdateOn = &nowDate
-		userOrg.RentingBlocked = true
-		userOrg.BlockedDueToBillID = &bill.ID
-		userOrg.BlockedReason = reason
-		_ = s.userRepo.UpdateUserOrg(ctx, userOrg)
-	}
+	_ = s.userRepo.AdjustBalance(ctx, debtorID, orgID, -bill.AmountCents)
+	_ = s.userRepo.SetRentingBlocked(ctx, debtorID, orgID, true, reason, bill.ID)
 }
 
 func (s *billSplitService) penalizeAndBlockCreditorFromLending(ctx context.Context, creditorID, orgID int32, bill *domain.Bill, reason string) {
-	userOrg, err := s.userRepo.GetUserOrg(ctx, creditorID, orgID)
-	if err == nil {
-		userOrg.BalanceCents -= bill.AmountCents
-		nowDate := time.Now().Format("2006-01-02")
-		userOrg.LastBalanceUpdateOn = &nowDate
-		userOrg.LendingBlocked = true
-		userOrg.BlockedDueToBillID = &bill.ID
-		userOrg.BlockedReason = reason
-		_ = s.userRepo.UpdateUserOrg(ctx, userOrg)
-	}
+	_ = s.userRepo.AdjustBalance(ctx, creditorID, orgID, -bill.AmountCents)
+	_ = s.userRepo.SetLendingBlocked(ctx, creditorID, orgID, true, reason, bill.ID)
 }
 
 func (s *billSplitService) sendDisputeResolutionNotification(ctx context.Context, user *domain.User, bill *domain.Bill, resolution, notes, orgName string) {

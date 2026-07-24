@@ -79,6 +79,38 @@ as-built specs against existing code, before any RTM tooling existed (see git hi
 `da3d301`, `4d32757`). That is the audit-mode value proposition happening by accident, once.
 The RTM exists to make that discovery systematic instead of lucky.
 
+### Adversarial (security) audit mode
+
+The audit mode described above is FR-driven: it assumes each requirement is correctly
+implemented and only asks "is there a test?" A security audit cannot make that assumption —
+the first question is "does a defense exist at all?" — so it runs against **endpoints**, not
+`FR-XXX` IDs, and is scoped by the API surface (every RPC/route in the project's proto/route
+definitions), not by any single feature's `spec.md`. It still produces an RTM and still uses
+`sbr/README.md`'s tier mapping, but with two additions:
+
+- **Unit of audit is the endpoint**, evaluated against a fixed, portable checklist of attack
+  categories (OWASP API Security Top 10, or an equivalent industry-standard list named in the
+  adapter) rather than requirement prose. The same endpoint is checked for every category that
+  plausibly applies to what it does — not every category applies to every endpoint (e.g. a
+  static-lookup endpoint with no resource ID has no BOLA surface).
+- **Extended boundary-status vocabulary**, layered on top of `Complete`/`Gap`/`Unclassified`:
+  - **`Vulnerable`** — the attack **succeeds against current code**. This is a live defect, not
+    a test gap: the audit must never silently fold this into `Gap` (which implies the defense
+    exists and only the test is missing). Tag with a severity (Critical/High/Medium/Low) and
+    cite the exact missing check, ideally by contrasting with a sibling endpoint that gets it
+    right (the strongest evidence a gap is a bug, not a design choice).
+  - **`Accepted Risk`** — the "attack" succeeds, but an existing test already locks the
+    behavior in as intended (its name or an adjacent code comment says so). Listed for a human
+    to re-confirm the tradeoff still holds, not as a new discovery.
+  - A finding must never be marked `Vulnerable` on pattern-matching alone (e.g. "no `WHERE
+    user_id = $1` clause visible in a grep") — read the actual code path handling that request
+    before asserting the defense is absent, the same discipline `sbr/README.md`'s "never
+    fabricate a trace" rule already requires of FR-based audits.
+
+Because the audit is endpoint-scoped rather than feature-scoped, its RTM does not follow the
+"one file per feature" convention below — see the adapter's "Security audit inputs" for where
+this project's single, unified security RTM lives and what it covers.
+
 ## This repo's adapter
 
 Rewrite this section, and only this section, when porting SBR to a different spec-kit
@@ -127,6 +159,22 @@ mapping FR-IDs to test functions per level, kept separate from the RTM. That was
 tier evidence lives directly in the RTM's columns (see schema above) so there is a single
 source of truth instead of two files that can drift. `sbr/scratchpad/` remains available for
 temporary working files during analysis.
+
+### Security audit inputs
+
+Inputs the adversarial audit mode (see Portable section above) needs to locate this project's
+API surface and its cross-cutting security machinery, so the audit skill never has to
+re-derive them by ad hoc searching on every run:
+
+| What | Where |
+|---|---|
+| Endpoint inventory | `api/proto/ubertool_trusted_backend/v1/*.proto` (one `rpc` per gRPC endpoint) plus any route registered outside the gRPC server — currently only `internal/api/http/image_upload_handler.go`'s `RegisterMockStorageRoutes` |
+| Per-endpoint auth requirement | `internal/config/security_config.go` (`EndpointSecurityConfig` map — Public/2FA/Refresh/Access; unmapped methods fail closed to Access, see `GetSecurityLevel`) |
+| Auth enforcement point | `internal/api/grpc/interceptor/auth_interceptor.go` (JWT validation, security-level gate, injects `user-id` into gRPC metadata as a hard overwrite) |
+| Token issuance/validation | `internal/security/token.go` (HS256 JWT, `TokenManager`) |
+| Rate limiting | `internal/security/rate_limiter.go` + `internal/api/grpc/interceptor/rate_limit_interceptor.go` (as of this writing, covers only `AuthService/Login` and `/Verify2FA` — every other endpoint is unthrottled; the audit must re-verify this scope each run rather than assume it) |
+| Attack-category checklist | OWASP API Security Top 10 (2023): API1 Broken Object Level Authorization, API2 Broken Authentication, API3 Broken Object Property Level Authorization, API4 Unrestricted Resource Consumption, API5 Broken Function Level Authorization, API6 Unrestricted Access to Sensitive Business Flows, API7 Server Side Request Forgery, API8 Security Misconfiguration, API9 Improper Inventory Management, API10 Unsafe Consumption of APIs |
+| Output RTM | `sbr/rtm/009-security.rtm.md` — a single unified file covering all services (unlike the per-feature `001`-`008` RTMs), organized into one section per gRPC service plus a "Global / Cross-Cutting" section and an HTTP-endpoints section |
 
 ### Constitution cross-reference
 

@@ -20,7 +20,7 @@ func TestToolService_AddTool(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
-		tool := &domain.Tool{Name: "Tool"}
+		tool := &domain.Tool{Name: "Tool", PricePerDayCents: 1000, PricePerWeekCents: 6000, PricePerMonthCents: 20000}
 		repo.On("Create", ctx, tool).Return(nil)
 
 		err := svc.AddTool(ctx, tool, []string{})
@@ -56,7 +56,7 @@ func TestToolService_UpdateDelete_RequiresOwnership(t *testing.T) {
 		svc := service.NewToolService(repo, new(MockUserRepo), new(MockOrganizationRepo))
 		ctx := context.Background()
 
-		tool := &domain.Tool{ID: toolID, Name: "Updated"}
+		tool := &domain.Tool{ID: toolID, Name: "Updated", PricePerDayCents: 1000, PricePerWeekCents: 6000, PricePerMonthCents: 20000}
 		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID}, nil).Once()
 		repo.On("Update", ctx, tool).Return(nil).Once()
 
@@ -89,6 +89,115 @@ func TestToolService_UpdateDelete_RequiresOwnership(t *testing.T) {
 		err := svc.DeleteTool(ctx, ownerID, toolID)
 		assert.NoError(t, err)
 		repo.AssertExpectations(t)
+	})
+}
+
+// TestToolService_GetTool_RequiresSharedOrg fixes SEC-TOOL-002 (sbr/rtm/009-security.rtm.md):
+// GetTool (internal/service/tool.go) previously had no org/membership scoping at all, unlike its
+// siblings SearchTools (explicit shared-org filtering, internal/service/tool.go:118-181) and
+// ListTools (org-scoped) — any authenticated user could read another org's tool, including the
+// owner's email/phone, by ID. Product decision confirmed: GetTool should be scoped like its
+// siblings. A caller who neither owns the tool nor shares an org with its owner is now rejected;
+// the owner themselves and any org-mate can still view it.
+func TestToolService_GetTool_RequiresSharedOrg(t *testing.T) {
+	ctx := context.Background()
+	const toolID = int32(5)
+	const ownerID = int32(1)
+
+	t.Run("Rejects a caller who shares no org with the owner", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		userRepo := new(MockUserRepo)
+		orgRepo := new(MockOrganizationRepo)
+		svc := service.NewToolService(repo, userRepo, orgRepo)
+		const strangerID = int32(999)
+
+		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID, Name: "Drill"}, nil)
+		userRepo.On("ListUserOrgs", ctx, ownerID).Return([]domain.UserOrg{{UserID: ownerID, OrgID: 1}}, nil)
+		userRepo.On("ListUserOrgs", ctx, strangerID).Return([]domain.UserOrg{{UserID: strangerID, OrgID: 2}}, nil) // no overlap with org 1
+
+		_, _, err := svc.GetTool(ctx, toolID, strangerID)
+		require.Error(t, err, "a caller sharing no org with the tool's owner must be rejected")
+		repo.AssertNotCalled(t, "GetImages", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Accepts a caller who shares an org with the owner", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		userRepo := new(MockUserRepo)
+		orgRepo := new(MockOrganizationRepo)
+		svc := service.NewToolService(repo, userRepo, orgRepo)
+		const orgMateID = int32(2)
+
+		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID, Name: "Drill"}, nil)
+		repo.On("GetImages", ctx, toolID).Return([]domain.ToolImage{}, nil)
+		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{ID: ownerID, Name: "Owner", Email: "owner@test.com"}, nil)
+		userRepo.On("ListUserOrgs", ctx, ownerID).Return([]domain.UserOrg{{UserID: ownerID, OrgID: 1}}, nil)
+		userRepo.On("ListUserOrgs", ctx, orgMateID).Return([]domain.UserOrg{{UserID: orgMateID, OrgID: 1}}, nil)
+		orgRepo.On("GetByID", ctx, int32(1)).Return(&domain.Organization{ID: 1, Name: "Shared Org"}, nil)
+
+		tool, _, err := svc.GetTool(ctx, toolID, orgMateID)
+		require.NoError(t, err, "a caller sharing an org with the tool's owner must be accepted")
+		require.NotNil(t, tool.Owner)
+	})
+
+	t.Run("Accepts the tool's own owner regardless of org membership data", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		userRepo := new(MockUserRepo)
+		orgRepo := new(MockOrganizationRepo)
+		svc := service.NewToolService(repo, userRepo, orgRepo)
+
+		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID, Name: "Drill"}, nil)
+		repo.On("GetImages", ctx, toolID).Return([]domain.ToolImage{}, nil)
+		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{ID: ownerID, Name: "Owner", Email: "owner@test.com"}, nil)
+		userRepo.On("ListUserOrgs", ctx, ownerID).Return([]domain.UserOrg{}, nil).Maybe()
+
+		_, _, err := svc.GetTool(ctx, toolID, ownerID)
+		require.NoError(t, err, "the tool's own owner must always be able to view it")
+	})
+}
+
+// TestToolService_AddTool_RejectsInvalidPrice exposes SEC-TOOL-004 (sbr/rtm/009-security.rtm.md):
+// the proto contract documents "requirement max = $1000" for every price field
+// (api/proto/.../tool_service.proto:67,90,143), but AddTool/UpdateTool
+// (internal/service/tool.go:24-70) perform no server-side bounds check at all — a malicious
+// owner can set a negative or arbitrarily large price, which flows directly into rental cost and
+// settlement math (CompleteRental, ledger transactions).
+func TestToolService_AddTool_RejectsInvalidPrice(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("AddTool rejects a price above the documented $1000/day requirement max", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		svc := service.NewToolService(repo, new(MockUserRepo), new(MockOrganizationRepo))
+
+		tool := &domain.Tool{Name: "Tool", PricePerDayCents: 100_001} // $1000.01/day — one cent over the documented max
+		// Only reached along the current (buggy) path, which has no bounds check at all.
+		repo.On("Create", ctx, tool).Maybe().Return(nil)
+
+		err := svc.AddTool(ctx, tool, []string{})
+		require.Error(t, err, "price_per_day_cents above the documented $1000 requirement max must be rejected")
+	})
+
+	t.Run("AddTool rejects a negative price", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		svc := service.NewToolService(repo, new(MockUserRepo), new(MockOrganizationRepo))
+
+		tool := &domain.Tool{Name: "Tool", PricePerDayCents: -500}
+		repo.On("Create", ctx, tool).Maybe().Return(nil)
+
+		err := svc.AddTool(ctx, tool, []string{})
+		require.Error(t, err, "a negative price_per_day_cents must be rejected")
+	})
+
+	t.Run("UpdateTool rejects a price above the documented max even from the actual owner", func(t *testing.T) {
+		repo := new(MockToolRepo)
+		svc := service.NewToolService(repo, new(MockUserRepo), new(MockOrganizationRepo))
+		const toolID = int32(5)
+		const ownerID = int32(1)
+
+		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID}, nil)
+		repo.On("Update", ctx, mock.AnythingOfType("*domain.Tool")).Maybe().Return(nil)
+
+		err := svc.UpdateTool(ctx, ownerID, &domain.Tool{ID: toolID, OwnerID: ownerID, PricePerDayCents: 999_999})
+		require.Error(t, err, "UpdateTool must also reject a price above the documented $1000 requirement max")
 	})
 }
 
