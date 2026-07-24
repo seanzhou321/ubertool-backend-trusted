@@ -1,49 +1,38 @@
 version: '3.8'
 
+# Assumes `make db-deploy` has already started the standalone ubertool-postgres container
+# (podman/trusted-group/postgres/install.ps1, localhost:5454, user ubertool_trusted /
+# password ubertool123 / db ubertool_db). That container is NOT managed by this compose file —
+# it previously was, as a second "postgres" service here, but that container_name collided with
+# the real one and used different (wrong) credentials, so it never actually worked. The cronjob
+# container reaches the real one via Podman's host-gateway alias instead, the same way
+# podman/trusted-group/grpc_service does.
 services:
   cronjob:
     build:
       context: ../../..
-      dockerfile: podman/trusted-group/cronjob/Dockerfile_services_cronjobs
-    image: ubertool-backend:latest
+      dockerfile: podman/trusted-group/cronjob/Dockerfile
+    image: ubertool-cronjob:latest
     container_name: ubertool-cronjob
-    command: ["/app/cronjob", "--config=/config/config.yaml"]
+    command: ["-config=/app/config/config.yaml"]
     volumes:
-      - ../../../config:/config:ro
+      - ../../../config:/app/config:ro
       - ../../../logs:/app/logs
     environment:
       - TZ=UTC
+      - DB_HOST=host.containers.internal
+      - DB_PORT=5454
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
     networks:
       - ubertool-network
     restart: unless-stopped
-    depends_on:
-      - postgres
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
 
-  # Reference to postgres from services compose
-  postgres:
-    image: postgres:15
-    container_name: ubertool-postgres
-    environment:
-      POSTGRES_USER: ubertool
-      POSTGRES_PASSWORD: ubertool_password
-      POSTGRES_DB: ubertool_trusted
-    volumes:
-      - ../postgres/ubertool_schema_trusted.sql:/docker-entrypoint-initdb.d/init.sql
-      - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    networks:
-      - ubertool-network
-    restart: unless-stopped
-
 networks:
   ubertool-network:
     driver: bridge
-
-volumes:
-  postgres-data:

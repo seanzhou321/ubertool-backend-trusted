@@ -1,4 +1,4 @@
-.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-e2e-rate-limit test-smoke-ec2 podman-build podman-push deploy-services deploy-cronjob deploy-all db-deploy db-teardown db-schema-install db-schema-teardown setup-data-local wipe-db-local reset-db-local ec2-deploy ec2-reinstall-schema ec2-setup-data ec2-wipe-data ec2-reset-data ec2-use-prod ec2-use-uitest my-ip help
+.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-e2e-rate-limit test-smoke-ec2 cronjob-build cronjob-push deploy-cronjob cronjob-logs cronjob-status cronjob-restart grpc-start grpc-stop grpc-use-precommit grpc-use-uitest grpc-use-manual db-deploy db-teardown db-schema-install db-schema-teardown setup-data-local wipe-db-local reset-db-local ec2-deploy ec2-reinstall-schema ec2-setup-data ec2-wipe-data ec2-reset-data ec2-use-prod ec2-use-uitest my-ip help
 
 DATAFILE ?= tests\data-setup\user_org.test.yaml
 
@@ -103,27 +103,23 @@ test-smoke-ec2:
 
 
 # Docker commands
-podman-build:
-	@echo "Building Docker image with both server and cronjob binaries..."
-	podman build -f podman/trusted-group/cronjob/Dockerfile_services_cronjobs -t ubertool-backend:latest .
+# NOTE: the server has its own image/build path — see grpc-start below
+# (podman/trusted-group/grpc_service/). These two build the cronjob image only.
+cronjob-build:
+	@echo "Building the cronjob image..."
+	podman build -f podman/trusted-group/cronjob/Dockerfile -t ubertool-cronjob:latest .
 
-podman-push:
-	@echo "Pushing Docker image to registry..."
-	podman tag ubertool-backend:latest registry.example.com/ubertool:latest
-	podman push registry.example.com/ubertool:latest
+cronjob-push:
+	@echo "Pushing cronjob image to registry..."
+	podman tag ubertool-cronjob:latest registry.example.com/ubertool-cronjob:latest
+	podman push registry.example.com/ubertool-cronjob:latest
 
 # Deployment commands
-deploy-services:
-	@echo "Deploying backend services..."
-	cd podman/trusted-group/services && podman-compose up -d
-
+# NOTE: deploy-cronjob assumes `make db-deploy` has already started ubertool-postgres —
+# the cronjob container reaches it externally via host.containers.internal, same as
+# grpc-start below (see cronjob/docker-compose.yaml).
 deploy-cronjob:
 	@echo "Deploying cronjob scheduler..."
-	cd podman/trusted-group/cronjob && podman-compose up -d
-
-deploy-all: podman-build
-	@echo "Deploying all services..."
-	cd podman/trusted-group/services && podman-compose up -d
 	cd podman/trusted-group/cronjob && podman-compose up -d
 
 # Cronjob management
@@ -138,6 +134,29 @@ cronjob-status:
 cronjob-restart:
 	@echo "Restarting cronjob container..."
 	cd podman/trusted-group/cronjob && podman-compose restart cronjob
+
+# Local Podman deployment of the backend server (podman/trusted-group/grpc_service/)
+grpc-start:
+	@echo "Building and starting the Ubertool backend server container..."
+	powershell -NoProfile -ExecutionPolicy Bypass -File podman\trusted-group\grpc_service\install.ps1
+
+grpc-stop:
+	@echo "Stopping and removing the Ubertool backend server container..."
+	powershell -NoProfile -ExecutionPolicy Bypass -File podman\trusted-group\grpc_service\teardown.ps1
+
+# Switch the already-running grpc-service container to a different config scenario
+# (recreates the container from the existing image — no rebuild).
+grpc-use-precommit:
+	@echo "Switching grpc-service to precommit config (no TLS, no FCM, 2FA bypassed)..."
+	powershell -NoProfile -ExecutionPolicy Bypass -File podman\trusted-group\grpc_service\switch-config.ps1 -Mode precommit
+
+grpc-use-uitest:
+	@echo "Switching grpc-service to desktop UI-test config (FCM on, 2FA bypassed)..."
+	powershell -NoProfile -ExecutionPolicy Bypass -File podman\trusted-group\grpc_service\switch-config.ps1 -Mode uitest
+
+grpc-use-manual:
+	@echo "Switching grpc-service to desktop manual-test config (FCM on, live 2FA email)..."
+	powershell -NoProfile -ExecutionPolicy Bypass -File podman\trusted-group\grpc_service\switch-config.ps1 -Mode manual
 
 # Local Podman database lifecycle
 db-deploy:
@@ -236,15 +255,18 @@ help:
 	@echo --- Tests (EC2) ---
 	@echo   test-smoke-ec2            Run smoke tests against live EC2 deployment (TLS and FCM enabled, real 2FA)
 	@echo.
-	@echo --- Local Podman Deployment (in progress)---
-	@echo   podman-build              Build the Podman image (server + cronjob)
-	@echo   podman-push               Tag and push the image to the registry
-	@echo   deploy-services           Start backend services via podman-compose
-	@echo   deploy-cronjob            Start cronjob scheduler via podman-compose
-	@echo   deploy-all                Build image and start all services
+	@echo --- Local Podman Deployment ---
+	@echo   cronjob-build             Build the cronjob image (podman/trusted-group/cronjob/Dockerfile)
+	@echo   cronjob-push              Tag and push the cronjob image to the registry
+	@echo   deploy-cronjob            Start cronjob scheduler via podman-compose (needs db-deploy first)
 	@echo   cronjob-logs              Tail logs from the running cronjob container
 	@echo   cronjob-status            Show status of the cronjob container
 	@echo   cronjob-restart           Restart the cronjob container
+	@echo   grpc-start            Build image and start the backend server container (localhost:50052)
+	@echo   grpc-stop             Stop and remove the backend server container and image
+	@echo   grpc-use-precommit      Switch grpc-service to precommit config (no rebuild)
+	@echo   grpc-use-uitest         Switch grpc-service to desktop UI-test config (no rebuild)
+	@echo   grpc-use-manual         Switch grpc-service to desktop manual-test config (no rebuild)
 	@echo.
 	@echo --- Podman Database Lifecycle ---
 	@echo   db-deploy                 Build Postgres image and start container on localhost:5454

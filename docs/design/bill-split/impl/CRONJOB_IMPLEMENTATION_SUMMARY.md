@@ -26,7 +26,7 @@ The cronjob scheduler system has been fully implemented for Milestone 2 of the U
 
 ### 2. **Infrastructure**
 
-- `podman/trusted-group/cronjob/Dockerfile_services_cronjobs` - Multi-stage build for both server and cronjob binaries
+- `podman/trusted-group/cronjob/Dockerfile` - Multi-stage build for both server and cronjob binaries
 - `.dockerignore` - Optimized Docker build context (at repo root)
 - `podman/trusted-group/cronjob/` - Cronjob deployment configuration
   - `docker-compose.yaml` - Container orchestration
@@ -120,7 +120,7 @@ ubertool-backend-trusted/
 │       └── README.md                     [NEW - 155 lines]
 ├── podman/
 │   └── trusted-group/
-│       └── cronjob/Dockerfile_services_cronjobs  [NEW - 47 lines]
+│       └── cronjob/Dockerfile  [NEW - 47 lines]
 ├── .dockerignore                         [NEW - 40 lines]
 ├── Makefile                              [UPDATED - added 35 lines]
 ├── go.mod                                [UPDATED - added robfig/cron]

@@ -71,10 +71,13 @@ func main() {
 
 	// Initialize Notification + Push services (created first so other services can depend on noteSvc)
 	fcmClient, fcmErr := config.InitFirebase(cfg.FirebaseKeyPath)
-	if fcmErr != nil {
+	switch {
+	case cfg.FirebaseKeyPath == "":
+		logger.Info("FCM disabled (firebase_key_path not configured)")
+	case fcmErr != nil:
 		logger.Warn("FCM client unavailable — push notifications disabled", "error", fcmErr)
 		fcmClient = nil
-	} else {
+	default:
 		logger.Info("Firebase Messaging Service connection established")
 	}
 	noteSvc := service.NewNotificationService(store.NotificationRepository, store.FcmTokenRepository)

@@ -14,7 +14,9 @@ import (
 // so callers can treat a missing file as "push disabled" rather than a fatal error.
 func InitFirebase(keyPath string) (*messaging.Client, error) {
 	if keyPath == "" {
-		keyPath = "config/firebase-admin-key.json"
+		// FCM is intentionally disabled — no fallback path. Callers must treat a nil
+		// client (with a nil error) as "disabled", not as an initialization failure.
+		return nil, nil
 	}
 	opt := option.WithCredentialsFile(keyPath)
 	app, err := firebase.NewApp(context.Background(), nil, opt)

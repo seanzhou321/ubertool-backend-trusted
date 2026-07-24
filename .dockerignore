@@ -48,5 +48,4 @@ docker-compose*.yaml
 .dockerignore
 
 # Go specific
-go.sum
 vendor/

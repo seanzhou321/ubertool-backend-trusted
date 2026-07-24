@@ -18,10 +18,10 @@ The cronjob container runs scheduled tasks including:
 
 ## Architecture
 
-- Same Docker image as the backend server (`ubertool-backend:latest`)
-- Different command: `/app/cronjob` instead of `/app/server`
+- Dedicated image (`ubertool-cronjob:latest`, built from `Dockerfile` in this directory) —
+  the server has its own separate image, see `podman/trusted-group/grpc_service/`
 - Singleton container (do not scale)
-- Shares configuration and database with backend
+- Shares configuration and database with the backend server
 
 ## Deployment
 
@@ -71,7 +71,12 @@ Available job names:
 
 The cronjob uses the same configuration file as the backend server:
 - Located at: `config/config.yaml`
-- Mounted as: `/config/config.yaml` in the container
+- Mounted as: `/app/config/config.yaml` in the container
+
+**Prerequisite**: `make db-deploy` must already be running (`ubertool-postgres` on
+`localhost:5454`) — this compose file does not start its own Postgres. The cronjob container
+reaches it via `host.containers.internal:5454` (`DB_HOST`/`DB_PORT` env overrides in
+`docker-compose.yaml`), the same pattern used by `podman/trusted-group/grpc_service/`.
 
 ## Monitoring
 
@@ -95,7 +100,7 @@ podman logs ubertool-cronjob 2>&1 | grep ERROR
 ### Container keeps restarting
 - Check logs: `podman-compose logs cronjob`
 - Verify database connection in config
-- Ensure postgres container is running
+- Ensure `ubertool-postgres` is running (`make db-deploy`, not part of this compose file)
 
 ### Jobs not executing
 - Verify timezone is UTC: `podman exec ubertool-cronjob date`
@@ -103,16 +108,19 @@ podman logs ubertool-cronjob 2>&1 | grep ERROR
 - Test job manually: `podman exec ubertool-cronjob /app/cronjob --run-once <job-name>`
 
 ### Database connection errors
-- Ensure cronjob container can reach postgres
-- Check network: `podman network inspect ubertool-network`
-- Verify database credentials in config
+- Ensure `ubertool-postgres` is running: `podman ps --filter name=ubertool-postgres`
+- Confirm the container can reach the host: `podman exec ubertool-cronjob getent hosts host.containers.internal`
+- `DB_HOST`/`DB_PORT` are overridden via environment variables in `docker-compose.yaml` —
+  they take precedence over `config/config.yaml`'s `database.host: localhost` (see
+  `internal/config/config.go`'s env-var overrides)
 
 ## Development
 
 ### Build the image:
 ```bash
-cd ../../../  # Back to repo root
-podman build -t ubertool-backend:latest .
+make cronjob-build
+# equivalent to:
+#   podman build -f podman/trusted-group/cronjob/Dockerfile -t ubertool-cronjob:latest .
 ```
 
 ### Test locally:
