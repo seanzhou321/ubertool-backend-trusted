@@ -1164,3 +1164,78 @@ func TestRentalService_GetRental(t *testing.T) {
 		assert.Contains(t, err.Error(), "unauthorized")
 	})
 }
+
+// FR-007 (specs/005-rentals): ListMyRentals/ListMyLendings MUST OR-combine a given status
+// array and MUST return all statuses when the array is empty. rentalService.ListRentals/
+// ListLendings are thin pass-throughs to rentalRepo.ListByRenter/ListByOwner — the actual
+// OR-combination is a SQL `status IN (...)` clause in the repository
+// (internal/repository/postgres/rental.go:58-83,113-138), not service-layer logic, so this L1
+// test's job is to lock in that the service forwards the caller's exact arguments unchanged
+// (mirroring the "thin pass-through" pattern already used for GetLedgerSummary,
+// sbr/rtm/007-ledger.rtm.md FR-003). Confirming the SQL's OR-semantics themselves needs a
+// real-DB (L2) test, not exercised in this pass — no local Postgres reachable in this sandbox
+// (see sbr/rtm/005-rentals.rtm.md FR-007's Notes).
+func TestRentalService_ListMyRentalsAndLendings(t *testing.T) {
+	ctx := context.Background()
+	const callerID = int32(1)
+	const orgID = int32(5)
+
+	newSvc := func() (service.RentalService, *MockRentalRepo) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		return svc, rentalRepo
+	}
+
+	t.Run("ListMyRentals forwards the caller as renterID with the given status filter and pagination", func(t *testing.T) {
+		svc, rentalRepo := newSvc()
+		statuses := []string{"PENDING", "ACTIVE"}
+		expected := []domain.Rental{{ID: 1, RenterID: callerID, Status: domain.RentalStatusPending}}
+		rentalRepo.On("ListByRenter", ctx, callerID, orgID, statuses, int32(2), int32(20)).Return(expected, int32(1), nil)
+
+		rentals, count, err := svc.ListRentals(ctx, callerID, orgID, statuses, 2, 20)
+		require.NoError(t, err)
+		assert.Equal(t, expected, rentals)
+		assert.Equal(t, int32(1), count)
+		rentalRepo.AssertCalled(t, "ListByRenter", ctx, callerID, orgID, statuses, int32(2), int32(20))
+	})
+
+	t.Run("ListMyRentals forwards an empty status filter unchanged (repository returns all statuses)", func(t *testing.T) {
+		svc, rentalRepo := newSvc()
+		rentalRepo.On("ListByRenter", ctx, callerID, orgID, []string{}, int32(1), int32(10)).
+			Return([]domain.Rental{{ID: 1, Status: domain.RentalStatusPending}, {ID: 2, Status: domain.RentalStatusCompleted}}, int32(2), nil)
+
+		rentals, count, err := svc.ListRentals(ctx, callerID, orgID, []string{}, 1, 10)
+		require.NoError(t, err)
+		assert.Len(t, rentals, 2, "an empty status filter must not be translated into a narrowing filter by the service")
+		assert.Equal(t, int32(2), count)
+	})
+
+	t.Run("ListMyLendings forwards the caller as ownerID with the given status filter and pagination", func(t *testing.T) {
+		svc, rentalRepo := newSvc()
+		statuses := []string{"OVERDUE"}
+		expected := []domain.Rental{{ID: 3, OwnerID: callerID, Status: domain.RentalStatusOverdue}}
+		rentalRepo.On("ListByOwner", ctx, callerID, orgID, statuses, int32(1), int32(10)).Return(expected, int32(1), nil)
+
+		rentals, count, err := svc.ListLendings(ctx, callerID, orgID, statuses, 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, expected, rentals)
+		assert.Equal(t, int32(1), count)
+		rentalRepo.AssertCalled(t, "ListByOwner", ctx, callerID, orgID, statuses, int32(1), int32(10))
+	})
+
+	t.Run("ListMyLendings forwards an empty status filter unchanged (repository returns all statuses)", func(t *testing.T) {
+		svc, rentalRepo := newSvc()
+		rentalRepo.On("ListByOwner", ctx, callerID, orgID, []string{}, int32(1), int32(10)).
+			Return([]domain.Rental{{ID: 3, Status: domain.RentalStatusActive}, {ID: 4, Status: domain.RentalStatusRejected}}, int32(2), nil)
+
+		rentals, count, err := svc.ListLendings(ctx, callerID, orgID, []string{}, 1, 10)
+		require.NoError(t, err)
+		assert.Len(t, rentals, 2)
+		assert.Equal(t, int32(2), count)
+	})
+}

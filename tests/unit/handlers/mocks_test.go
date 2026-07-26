@@ -153,6 +153,64 @@ func (m *MockRentalService) Update(ctx context.Context, rental *domain.Rental) e
 	return args.Error(0)
 }
 
+// MockAuthService
+type MockAuthService struct {
+	mock.Mock
+}
+
+func (m *MockAuthService) ValidateInvite(ctx context.Context, inviteCode, email string) (bool, string, *domain.User, error) {
+	args := m.Called(ctx, inviteCode, email)
+	var user *domain.User
+	if args.Get(2) != nil {
+		user = args.Get(2).(*domain.User)
+	}
+	return args.Bool(0), args.String(1), user, args.Error(3)
+}
+func (m *MockAuthService) RequestToJoin(ctx context.Context, orgID int32, name, email, note, adminEmail string) error {
+	args := m.Called(ctx, orgID, name, email, note, adminEmail)
+	return args.Error(0)
+}
+func (m *MockAuthService) Signup(ctx context.Context, inviteToken, name, email, phone, password string) error {
+	args := m.Called(ctx, inviteToken, name, email, phone, password)
+	return args.Error(0)
+}
+func (m *MockAuthService) Login(ctx context.Context, email, password string) (string, bool, bool, error) {
+	args := m.Called(ctx, email, password)
+	return args.String(0), args.Bool(1), args.Bool(2), args.Error(3)
+}
+func (m *MockAuthService) Verify2FA(ctx context.Context, userID int32, code string, tempPwd bool) (string, string, *domain.User, bool, error) {
+	args := m.Called(ctx, userID, code, tempPwd)
+	var user *domain.User
+	if args.Get(2) != nil {
+		user = args.Get(2).(*domain.User)
+	}
+	return args.String(0), args.String(1), user, args.Bool(3), args.Error(4)
+}
+func (m *MockAuthService) RefreshToken(ctx context.Context, refresh string) (string, string, error) {
+	args := m.Called(ctx, refresh)
+	return args.String(0), args.String(1), args.Error(2)
+}
+func (m *MockAuthService) ChangePassword(ctx context.Context, userID int32, oldPassword, newPassword string) error {
+	args := m.Called(ctx, userID, oldPassword, newPassword)
+	return args.Error(0)
+}
+func (m *MockAuthService) ResetPassword(ctx context.Context, email string) error {
+	args := m.Called(ctx, email)
+	return args.Error(0)
+}
+func (m *MockAuthService) Logout(ctx context.Context, userID int32, refresh, androidDeviceID string) error {
+	args := m.Called(ctx, userID, refresh, androidDeviceID)
+	return args.Error(0)
+}
+func (m *MockAuthService) RecordLegalConsent(ctx context.Context, userID int32, docNames []string, version string) error {
+	args := m.Called(ctx, userID, docNames, version)
+	return args.Error(0)
+}
+func (m *MockAuthService) GetUserConsentStatus(ctx context.Context, userID int32, currentVersion string) (bool, []string, error) {
+	args := m.Called(ctx, userID, currentVersion)
+	return args.Bool(0), args.Get(1).([]string), args.Error(2)
+}
+
 // MockOrganizationService
 type MockOrganizationService struct {
 	mock.Mock

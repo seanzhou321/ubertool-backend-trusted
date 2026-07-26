@@ -58,10 +58,17 @@ func (r *rentalRepository) Update(ctx context.Context, rt *domain.Rental) error 
 func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
 	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(duration_unit, ''), COALESCE(daily_price_cents, 0), COALESCE(weekly_price_cents, 0), COALESCE(monthly_price_cents, 0), COALESCE(replacement_cost_cents, 0), COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), COALESCE(return_note, ''), COALESCE(charge_billsplit, true), created_on, updated_on
-	        FROM rentals WHERE renter_id = $1 AND org_id = $2`
+	        FROM rentals WHERE renter_id = $1`
 
-	args := []interface{}{renterID, orgID}
-	argIdx := 3
+	args := []interface{}{renterID}
+	argIdx := 2
+	// organization_id is an optional filter (FR-007, specs/005-rentals): 0 means "across all
+	// the caller's orgs," not "no rentals," matching docs/design/grpc_api_business_logic.md.
+	if orgID > 0 {
+		query += fmt.Sprintf(" AND org_id = $%d", argIdx)
+		args = append(args, orgID)
+		argIdx++
+	}
 	if len(statuses) > 0 {
 		placeholders := make([]string, len(statuses))
 		for i, status := range statuses {
@@ -113,10 +120,17 @@ func (r *rentalRepository) ListByRenter(ctx context.Context, renterID, orgID int
 func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
 	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(duration_unit, ''), COALESCE(daily_price_cents, 0), COALESCE(weekly_price_cents, 0), COALESCE(monthly_price_cents, 0), COALESCE(replacement_cost_cents, 0), COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), COALESCE(return_note, ''), COALESCE(charge_billsplit, true), created_on, updated_on
-	        FROM rentals WHERE owner_id = $1 AND org_id = $2`
+	        FROM rentals WHERE owner_id = $1`
 
-	args := []interface{}{ownerID, orgID}
-	argIdx := 3
+	args := []interface{}{ownerID}
+	argIdx := 2
+	// organization_id is an optional filter (FR-007, specs/005-rentals): 0 means "across all
+	// the caller's orgs," not "no rentals," matching docs/design/grpc_api_business_logic.md.
+	if orgID > 0 {
+		query += fmt.Sprintf(" AND org_id = $%d", argIdx)
+		args = append(args, orgID)
+		argIdx++
+	}
 	if len(statuses) > 0 {
 		placeholders := make([]string, len(statuses))
 		for i, status := range statuses {

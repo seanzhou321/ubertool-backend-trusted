@@ -338,6 +338,15 @@ these):
   `domain.KnownLegalDocs` list, not any caller-supplied document list.
 - **FR-012**: `Login` and `Verify2FA` MUST be rate-limited per client IP (3-attempt burst,
   1 refill per 3 minutes) as implemented in `internal/security/rate_limiter.go`.
+- **FR-013** *(added 2026-07-25 — previously described only in Acceptance Scenarios, with no
+  FR-ID or RTM row)*: `ValidateInvite` MUST return `valid = false` with an explanatory message
+  when the `(invitation_code, email)` pair does not exist, is already used, or is expired.
+  When valid, the response MUST include a `User` object only when the caller's own
+  authenticated session (JWT, resolved via `GetUserIDFromContext`) identifies the same user
+  ID as the account matching `email` — never merely because a `users` row with that email
+  exists. `AuthHandler.ValidateInvite` (`internal/api/grpc/auth.go`), not the service layer,
+  performs this identity comparison; `authService.ValidateInvite` itself returns the matched
+  user record whenever one exists by email, deferring the login-match gate to the handler.
 
 ### Key Entities
 

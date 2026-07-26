@@ -3,7 +3,9 @@
 - **Source spec**: `specs/001-authentication-legal-consent/spec.md`
 - **Tier mapping in effect**: `sbr/README.md` → "This repo's adapter" (L1=`tests/unit`,
   L2=`tests/integration`, L3=`tests/e2e`, Grounding=`tests/smoke`+`tests/e2e` journeys)
-- **Generated**: 2026-07-22 by `speckit-sbr-audit`; updated 2026-07-23 (Phase 4 re-audit)
+- **Generated**: 2026-07-22 by `speckit-sbr-audit`; updated 2026-07-23 (Phase 4 re-audit);
+  re-audited 2026-07-25 (no drift found); FR-013 added 2026-07-25 (new FR for `ValidateInvite`,
+  previously untracked — see Summary)
 - **Mode**: retrofit audit (as-built) — see project constitution Principle I
 
 | FR-ID | Requirement Summary | L1 Unit | L2 Integration | L3 E2E | Grounding (Smoke) | Boundary Status | Notes |
@@ -20,13 +22,14 @@
 | FR-010 | `RecordLegalConsent` MUST reject empty `doc_names`/`version` with `INVALID_ARGUMENT` and MUST be idempotent under repeat calls. | `TestAuthService_RecordLegalConsent` (`tests/unit/auth_test.go`) — forwards to the repository, propagates a repository error | **Intentionally not separately tested** — see Notes | `TestAuthService_E2E > "RecordLegalConsent and GetUserConsentStatus" > "RecordLegalConsent rejects empty doc_names"`, `> "... rejects empty version"`, `> "RecordLegalConsent is idempotent and GetUserConsentStatus reflects it"` (`tests/e2e/auth_test.go`) — the `INVALID_ARGUMENT` validation (handler-layer, `internal/api/grpc/auth.go`) and the `ON CONFLICT DO NOTHING` idempotency (DB-level, `internal/repository/postgres/legal_consent.go`) are both real-DB/contract-level guarantees not meaningfully mockable, so e2e is the tier that actually exercises them | — | **Complete** | **Fixed 2026-07-23 (SBR remediation Phase 4).** No bug found. L2 not added: the e2e idempotency subtest already asserts the real `user_legal_consents` row count against Postgres directly (the exact same `ON CONFLICT DO NOTHING` semantic an L2 repo test would check) — L3 subsumes L2 here. |
 | FR-011 | `GetUserConsentStatus` MUST reject empty `current_version` with `INVALID_ARGUMENT` and MUST compute `pending_docs` against the fixed `domain.KnownLegalDocs` list. | `TestAuthService_GetUserConsentStatus` (`tests/unit/auth_test.go`) — 3 subtests: all-current when every known doc is consented at the current version, returns docs not yet consented (including a stale-version consent not counting as current), propagates a repository error | **N/A** — this FR's only DB-adjacent behavior is `ListByUser` (a plain read, already exercised via the L1 mock and the L3 real-DB path); the `pending_docs` computation itself is pure in-memory logic against `domain.KnownLegalDocs`, with no distinct real-DB boundary for an L2 test to add | `TestAuthService_E2E > "RecordLegalConsent and GetUserConsentStatus" > "GetUserConsentStatus rejects empty current_version"`, `> "GetUserConsentStatus reports every known doc pending before any consent is recorded"` (`tests/e2e/auth_test.go`) | — | **Complete** | **Fixed 2026-07-23 (SBR remediation Phase 4).** No bug found. |
 | FR-012 | `Login` and `Verify2FA` MUST be rate-limited per client IP (3-attempt burst, 1 refill/3 min). | — | **N/A** — the rate limiter (`internal/security/rate_limiter.go`) is a purely in-memory, process-lifetime component with no repository/DB dependency at all; there is no service+real-DB boundary for an L2 test to exercise | `TestAuthService_RateLimit_E2E` (`tests/e2e/rate_limit_test.go:30`) — isolated via the `ratelimit` build tag, run via `make test-e2e-rate-limit` | — | **Complete** | Fixed 2026-07-22. Confirmed real and correctly implemented: both Login and Verify2FA independently throttle after exactly 3 attempts. Isolated behind a build tag because it deliberately exhausts the shared, process-lifetime, per-IP limiter that this file's other Login/Verify2FA-calling tests also depend on — see `sbr/remediation-plan.md` for why. |
+| FR-013 | `ValidateInvite` MUST return `valid=false` with a message for a nonexistent/used/expired invitation, and MUST only include a `User` object when the caller's own JWT identifies the same user as the one matching `email` — never merely because that email has an account. | `TestAuthService_ValidateInvite` (`tests/unit/auth_test.go:20`) — 3 subtests: `"Valid Token"`, `"Expired Token"`, `"Used Token"` — covers the invitation-validity clause; `TestAuthHandler_ValidateInvite` (`tests/unit/handlers/auth_handler_test.go`) — 4 subtests covering the login-match gate: no `User` when unauthenticated, no `User` when authenticated as a different user, `User` returned when authenticated as the matching user, no `User` when the email matches no account regardless of caller identity | **N/A** — see Notes | `TestAuthService_E2E > "ValidateInvite - login-match User gating"` (`tests/e2e/auth_test.go`) — 3 subtests through the real gRPC interceptor + JWT stack against a live server and DB: unauthenticated caller gets no `User`, caller authenticated as a different user gets no `User`, caller authenticated as the matching user gets their own profile | `TestDatabaseConnectivity > "InvitationsTableReachable_via_ValidateInvite"` (`tests/smoke/smoke_test.go:160`) — liveness probe only (asserts `valid=false` for a nonexistent code against a live DB, not the login-match clause) | **Complete** | **Added 2026-07-25** (new FR — this RPC was previously described only in Acceptance Scenarios/Coverage Baseline prose, with no `FR-XXX` entry or RTM row at all, found during a `docs/design/grpc_api_business_logic.md`-vs-RTM alignment check). **Closed same day, all tiers.** L1: added `MockAuthService` (`tests/unit/handlers/mocks_test.go`) and `TestAuthHandler_ValidateInvite` — the login-match gate lives entirely in `AuthHandler.ValidateInvite` (`internal/api/grpc/auth.go:36-42`), not the service, so this had to be a handler-level test. L3: added an e2e subtest against the real running server (real invite + real JWTs via `ContextWithUserIDAndTimeout`, backed by local Postgres per `podman/trusted-group/postgres/install.ps1`) — the only tier that exercises the real auth interceptor's context injection, which the L1 handler test necessarily mocks around. L2 marked N/A: the login-match comparison is a pure in-memory identity check (context user ID vs. the already-fetched `domain.User.ID`) with no distinct real-DB boundary beyond what L1/L3 already cover — `authService.ValidateInvite`'s own DB read (`GetByEmail`) is a plain lookup already exercised elsewhere (Login/Signup integration tests). No bug found in any tier — production behavior matched Acceptance Scenario 1 exactly. Full unit suite and this e2e subtest both re-run green. |
 
 ## Summary
 
-- **12 FR-IDs audited, all 12 fully `Complete`** (FR-001, FR-002, FR-004, FR-006, FR-008,
+- **13 FR-IDs audited, all 13 fully `Complete`** (FR-001, FR-002, FR-004, FR-006, FR-008,
   FR-009, FR-012 — FR-006 closed 2026-07-23 as SBR remediation Phase 2, rest closed 2026-07-22
   as Phase 1; FR-003, FR-005, FR-007 closed 2026-07-23 as Phase 3; FR-010, FR-011 closed
-  2026-07-23 as Phase 4).
+  2026-07-23 as Phase 4; FR-013 added and fully closed 2026-07-25).
 - **Remaining gaps**: none.
 - **Phase 1 outcome**: 1 real bug found and fixed (FR-009 `ResetPassword` user-enumeration —
   see Notes above), 1 accidental-pass test replaced with 3 real subtests (FR-001), 1
@@ -57,3 +60,26 @@
   ("intentionally not separately tested"). No bugs found in any of the 5 newly-added tests.
 - **Unclassified**: none — every row above was resolved to either cited evidence (including
   citing why it's insufficient) or an explicit, named gap.
+- **2026-07-25 test-writing pass**: closed FR-013 completely. L1: `TestAuthHandler_ValidateInvite`
+  (`tests/unit/handlers/auth_handler_test.go`, new file) and a new `MockAuthService`
+  (`tests/unit/handlers/mocks_test.go`) — 4 subtests. L3: a new `TestAuthService_E2E` subtest
+  (`tests/e2e/auth_test.go`) — 3 subtests against the real running server and local Postgres
+  (`podman/trusted-group/postgres/install.ps1`). L2 judged N/A (pure in-memory identity check,
+  no distinct real-DB boundary). All 7 new subtests pass, no bug found in either pass. Full
+  unit suite and the new e2e subtest both re-run green.
+- **2026-07-25 re-audit**: re-verified all 12 FR-IDs against the current codebase. No commit
+  since the 2026-07-23 hardening pass touched `internal/service/auth.go`,
+  `tests/unit/auth_test.go`, `tests/integration/auth_test.go`, or `specs/001-...`'s FR text
+  (`git log --since=2026-07-23 -- internal/service/auth.go tests/unit/auth_test.go
+  tests/integration/auth_test.go specs/001-authentication-legal-consent/spec.md` returns
+  nothing after this file's own last update). All previously-cited test functions confirmed to
+  still exist by name. No drift, no new gaps.
+- **FR-013 added 2026-07-25**: `ValidateInvite` was previously described only in Acceptance
+  Scenarios/Coverage Baseline prose with no `FR-XXX` entry or RTM row at all (found during a
+  `docs/design/grpc_api_business_logic.md`-vs-RTM alignment check). Added FR-013 to `spec.md`
+  and this row. The invitation-validity clause is well covered at L1
+  (`TestAuthService_ValidateInvite`); the login-match `User`-object gating clause — implemented
+  in `AuthHandler.ValidateInvite`, not the service layer — has zero coverage at any tier despite
+  being named in Acceptance Scenario 1. Classified `Gap — L1 (handler-level), L2, L3`, not
+  `Complete`; not fixed in this pass (no test was written — this is a spec-completeness pass,
+  not a bug fix). See FR-013's Notes for the specific test recommended to close it.

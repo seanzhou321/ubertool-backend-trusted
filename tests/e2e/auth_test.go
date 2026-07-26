@@ -357,4 +357,56 @@ func TestAuthService_E2E(t *testing.T) {
 			assert.Empty(t, statusResp.PendingDocs)
 		})
 	})
+
+	// FR-013 (specs/001-authentication-legal-consent): ValidateInvite must only include a User
+	// object in the response when the caller's own authenticated session identifies the same
+	// user as the one matching the invite's email. The login-match gate is implemented in
+	// AuthHandler.ValidateInvite via the real auth interceptor (GetUserIDFromContext reading a
+	// validated JWT), so it can only be proven end-to-end through the real gRPC stack — this is
+	// the one tier tests/unit/handlers/auth_handler_test.go's mocked-service test cannot reach.
+	t.Run("ValidateInvite - login-match User gating", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		adminID := db.CreateTestUser("e2e-test-vi-admin@test.com", "Admin User")
+		db.AddUserToOrg(adminID, orgID, "SUPER_ADMIN", "ACTIVE", 0)
+
+		inviteeEmail := "e2e-test-vi-invitee@test.com"
+		inviteeID := db.CreateTestUser(inviteeEmail, "Invitee User")
+		token := db.CreateTestInvitation(orgID, inviteeEmail, adminID)
+
+		otherUserID := db.CreateTestUser("e2e-test-vi-other@test.com", "Other User")
+
+		req := &pb.ValidateInviteRequest{InvitationCode: token, Email: inviteeEmail}
+
+		t.Run("Unauthenticated caller never receives the matched user's profile", func(t *testing.T) {
+			ctx, cancel := ContextWithTimeout(5 * time.Second)
+			defer cancel()
+
+			resp, err := authClient.ValidateInvite(ctx, req)
+			require.NoError(t, err)
+			assert.True(t, resp.Valid)
+			assert.Nil(t, resp.User)
+		})
+
+		t.Run("Caller authenticated as a different user never receives someone else's profile", func(t *testing.T) {
+			ctx, cancel := ContextWithUserIDAndTimeout(otherUserID, 5*time.Second)
+			defer cancel()
+
+			resp, err := authClient.ValidateInvite(ctx, req)
+			require.NoError(t, err)
+			assert.True(t, resp.Valid)
+			assert.Nil(t, resp.User)
+		})
+
+		t.Run("Caller authenticated as the matching user receives their own profile", func(t *testing.T) {
+			ctx, cancel := ContextWithUserIDAndTimeout(inviteeID, 5*time.Second)
+			defer cancel()
+
+			resp, err := authClient.ValidateInvite(ctx, req)
+			require.NoError(t, err)
+			assert.True(t, resp.Valid)
+			require.NotNil(t, resp.User)
+			assert.Equal(t, inviteeID, resp.User.Id)
+			assert.Equal(t, inviteeEmail, resp.User.Email)
+		})
+	})
 }

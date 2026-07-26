@@ -165,9 +165,10 @@ existing tests, plus the run commands to actually execute them.
 
 ### 2. Step 1 (Appendix B) — Root cause analysis
 
-Diagnostic only — no code changes in this step. Read the implicated code path end to end
-(handler → service → repository, or whatever the target's actual call chain is) and map the
-defect to exactly one category:
+Diagnostic only — no code changes in this step. Read the implicated code path end to end, from
+the entry point down through whatever layers actually handle it in this codebase (e.g. handler
+→ service → repository for a backend endpoint; UI/ViewModel → repository/storage for a client),
+and map the defect to exactly one category:
 
 - **Missing requirements** — the behavior was never specified anywhere (no Acceptance Scenario in
   the owning `spec.md` covers it). The system was never told what to do here. Additionally judge:
@@ -243,10 +244,11 @@ adapter's combined command when the fix touches shared code) and confirm nothing
 before now fails. Any newly-failing existing test is a regression — stop and resolve it (by
 correcting the fix, not by touching the existing test) before proceeding.
 
-This project has no staged/production environment this skill can reach, so "verify in the live
-system" (Appendix B Step 4's deployment-verification instruction) is satisfied by the full local
-suite passing against a real Postgres instance and a running local server, per the adapter's L2/L3
-run commands — not by an actual deployment.
+Unless the adapter names a staging/production environment this skill can actually reach, "verify
+in the live system" (Appendix B Step 4's deployment-verification instruction) is satisfied by the
+full local suite passing against real local infrastructure (e.g. a local database instance and a
+running local server, per whatever the adapter's L2/L3 run commands stand up) — not by an actual
+deployment.
 
 ### 7. Step 5 (Appendix B) — Review for hidden problems
 

@@ -212,6 +212,21 @@ through the real gRPC handlers against a live DB (see Current Test Coverage Base
    instead of a friendly rejection on a double-approval (see Edge Cases). Not
    contradicted by documentation (the doc doesn't mention this case either), but worth
    recording as a rough edge found during verification.
+3. **FOUND 2026-07-25 — `ListJoinRequests` does not filter by `status = 'PENDING'`, contrary
+   to documentation.** `docs/design/grpc_api_business_logic.md`'s "List Join Requests"
+   business logic says: "Query `join_requests` where `org_id` matches and `status` is
+   `'PENDING'`." **As-built**, `joinRequestRepository.ListByOrg`
+   (`internal/repository/postgres/join_request.go:65-87`) has no `status` predicate at all —
+   it returns every join request for the org created within the last 2 months, regardless of
+   `status` (`PENDING`, `INVITED`, `JOINED`, or `REJECTED`). Confirmed by
+   `tests/integration/admin_join_request_test.go`'s
+   `TestAdminService_ListJoinRequests_UsedOnField`, which creates two join requests with
+   `status = 'APPROVED'` and asserts `ListJoinRequests` returns both. **Net effect**: an admin
+   calling `ListJoinRequests` today sees the org's full recent join-request history, not just
+   applications still awaiting a decision — a UI built against the documented "pending
+   applications" framing would show stale/already-decided entries as if they were still
+   actionable. Discovered while adding FR-008 for this previously-untracked RPC; not fixed in
+   this pass (a `speckit-sbr-audit` finding, not a `speckit-sbr-bugfix` run).
 
 ## Current Test Coverage Baseline *(informational — grounds the next /speckit-tasks pass, not a requirement)*
 
@@ -269,6 +284,20 @@ test that closes Known Discrepancy 1 at the unit level.
   `make test-integration`/`make test-e2e`.
 - **FR-006**: `RejectRequestToJoin` MUST expire any invitation already linked to the
   rejected join request.
+- **FR-007** *(added 2026-07-25 — previously described only in User Story 1 Acceptance
+  Scenario 4, with no FR-ID or RTM row)*: `ListMyOrganizations` MUST return every organization
+  the caller belongs to (via `users_orgs`), each populated with that organization's member
+  count and the caller's own role and balance in it.
+- **FR-008** *(added 2026-07-25 — previously named only as one of the eight RPCs in FR-005's
+  list, with no FR-ID of its own for its distinguishing business logic)*: `ListJoinRequests`
+  (authorization already covered by FR-005) MUST return the `join_requests` rows for the given
+  `organization_id`. **As-built, it MUST NOT be assumed to filter by `status = 'PENDING'`**
+  (Known Discrepancy 3) — `docs/design/grpc_api_business_logic.md` documents this RPC as
+  "Query `join_requests` where `org_id` matches and `status` is `'PENDING'`," but
+  `joinRequestRepository.ListByOrg` (`internal/repository/postgres/join_request.go:65-87`)
+  returns every row for the org from the last 2 months regardless of `status` — confirmed by
+  `tests/integration/admin_join_request_test.go`, which creates two join requests with
+  `status = 'APPROVED'` and asserts both are returned by `ListJoinRequests`.
 
 ### Key Entities
 

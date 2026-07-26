@@ -22,7 +22,7 @@
 
   When first adopting the speckit-sbr-bugfix skill in a project:
   1. Copy this file to sbr/rtm/bugfix-<descriptive-slug>.rtm.md — e.g. bugfix-general.rtm.md
-     for a single project-wide log, or a domain-scoped name (bugfix-rentals.rtm.md) if the
+     for a single project-wide log, or a domain-scoped name (e.g. bugfix-<area>.rtm.md) if the
      project later chooses to split it. The file MUST match the glob sbr/rtm/bugfix-*.rtm.md —
      this is how speckit-sbr-bugfix discovers it, deliberately independent of the numeric
      001/009-style prefixes used by feature and security RTMs, so it never collides with or

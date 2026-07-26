@@ -386,3 +386,90 @@ func TestOrganizationService_JoinOrganizationWithInvite(t *testing.T) {
 		mockUserRepo.AssertNotCalled(t, "AddUserToOrg", mock.Anything, mock.Anything)
 	})
 }
+
+// FR-007 (specs/003-organizations-administration): ListMyOrganizations MUST return every org
+// the caller belongs to, each populated with that org's member count and the caller's own
+// role/balance (via the parallel []domain.UserOrg return value). This RPC previously had zero
+// unit coverage — only an e2e happy-path test existed.
+func TestOrganizationService_ListMyOrganizations(t *testing.T) {
+	ctx := context.Background()
+	const callerID = int32(50)
+
+	t.Run("Returns every org with its member count and the caller's own role/balance", func(t *testing.T) {
+		svc, mockRepo, mockUserRepo := newOrgServiceForTest()
+
+		userOrgs := []domain.UserOrg{
+			{UserID: callerID, OrgID: 1, Role: domain.UserOrgRoleMember, BalanceCents: 1500},
+			{UserID: callerID, OrgID: 2, Role: domain.UserOrgRoleAdmin, BalanceCents: -300},
+		}
+		mockUserRepo.On("ListUserOrgs", ctx, callerID).Return(userOrgs, nil)
+		mockRepo.On("GetByID", ctx, int32(1)).Return(&domain.Organization{ID: 1, Name: "Org One"}, nil)
+		mockRepo.On("GetByID", ctx, int32(2)).Return(&domain.Organization{ID: 2, Name: "Org Two"}, nil)
+		mockUserRepo.On("CountMembersByOrg", ctx, int32(1)).Return(int32(5), nil)
+		mockUserRepo.On("CountMembersByOrg", ctx, int32(2)).Return(int32(9), nil)
+
+		orgs, gotUserOrgs, err := svc.ListMyOrganizations(ctx, callerID)
+		require.NoError(t, err)
+		require.Len(t, orgs, 2)
+		require.Len(t, gotUserOrgs, 2)
+
+		var org1, org2 *domain.Organization
+		for i := range orgs {
+			switch orgs[i].ID {
+			case 1:
+				org1 = &orgs[i]
+			case 2:
+				org2 = &orgs[i]
+			}
+		}
+		require.NotNil(t, org1)
+		require.NotNil(t, org2)
+		assert.Equal(t, int32(5), org1.MemberCount)
+		assert.Equal(t, int32(9), org2.MemberCount)
+
+		var uo1, uo2 *domain.UserOrg
+		for i := range gotUserOrgs {
+			switch gotUserOrgs[i].OrgID {
+			case 1:
+				uo1 = &gotUserOrgs[i]
+			case 2:
+				uo2 = &gotUserOrgs[i]
+			}
+		}
+		require.NotNil(t, uo1)
+		require.NotNil(t, uo2)
+		assert.Equal(t, domain.UserOrgRoleMember, uo1.Role)
+		assert.Equal(t, int32(1500), uo1.BalanceCents)
+		assert.Equal(t, domain.UserOrgRoleAdmin, uo2.Role)
+		assert.Equal(t, int32(-300), uo2.BalanceCents)
+	})
+
+	t.Run("Skips a membership whose org record can't be loaded, returning the rest", func(t *testing.T) {
+		svc, mockRepo, mockUserRepo := newOrgServiceForTest()
+
+		userOrgs := []domain.UserOrg{
+			{UserID: callerID, OrgID: 1, Role: domain.UserOrgRoleMember},
+			{UserID: callerID, OrgID: 2, Role: domain.UserOrgRoleMember},
+		}
+		mockUserRepo.On("ListUserOrgs", ctx, callerID).Return(userOrgs, nil)
+		mockRepo.On("GetByID", ctx, int32(1)).Return(nil, errors.New("org not found"))
+		mockRepo.On("GetByID", ctx, int32(2)).Return(&domain.Organization{ID: 2, Name: "Org Two"}, nil)
+		mockUserRepo.On("CountMembersByOrg", ctx, int32(2)).Return(int32(3), nil)
+
+		orgs, _, err := svc.ListMyOrganizations(ctx, callerID)
+		require.NoError(t, err, "a single failed org lookup must not fail the whole call")
+		require.Len(t, orgs, 1)
+		assert.Equal(t, int32(2), orgs[0].ID)
+	})
+
+	t.Run("Returns an empty list when the caller belongs to no organizations", func(t *testing.T) {
+		svc, _, mockUserRepo := newOrgServiceForTest()
+
+		mockUserRepo.On("ListUserOrgs", ctx, callerID).Return([]domain.UserOrg{}, nil)
+
+		orgs, userOrgs, err := svc.ListMyOrganizations(ctx, callerID)
+		require.NoError(t, err)
+		assert.Empty(t, orgs)
+		assert.Empty(t, userOrgs)
+	})
+}
