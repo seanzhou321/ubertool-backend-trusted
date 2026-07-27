@@ -2,7 +2,7 @@
 
 **Source Spec**: `specs/005-rentals/spec.md`
 **Adapter**: `sbr/README.md` (This repo's adapter)
-**Generated**: 2026-07-27 14:04:45
+**Generated**: 2026-07-27 14:49:54
 **Mode**: retrofit audit
 
 | FR-ID | Requirement Summary | L1 Unit | L2 Integration | L3 E2E | Grounding | Boundary Status | Notes |
