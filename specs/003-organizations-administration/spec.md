@@ -298,6 +298,28 @@ test that closes Known Discrepancy 1 at the unit level.
   returns every row for the org from the last 2 months regardless of `status` — confirmed by
   `tests/integration/admin_join_request_test.go`, which creates two join requests with
   `status = 'APPROVED'` and asserts both are returned by `ListJoinRequests`.
+- **FR-009** *(multi-org requirement from PRD 3.1)*: Users MUST be able to belong to multiple
+  organizations simultaneously. The `users_orgs` table's composite primary key `(user_id,
+  org_id)` enforces this — each row represents membership in one organization with its own
+  `role` (`MEMBER`/`ADMIN`/`SUPER_ADMIN`), `status`, `balance_cents`, and blocking flags.
+  A user's membership in one org is independent of their membership in another.
+- **FR-010** *(multi-org requirement from PRD 3.1, 3.3)*: The system MUST support an
+  organization context for the current user. When a user performs operations (search, rentals,
+  bill split, ledger), they MUST operate within a specific "current organization" context.
+  This context determines the default metro for searches, the organization scope for
+  rentals/billing, and which per-org balance is used.
+- **FR-011** *(multi-org requirement from PRD 3.3)*: Cross-organization search MUST be
+  supported. When a user searches for tools in their current organization's context, results
+  MUST include tools from ALL organizations the user belongs to that are in the same/compatible
+  metro area — not just tools from the current organization. The current organization's metro
+  is used as the primary filter, but tools owned by members of the user's other organizations
+  in that metro are also returned.
+- **FR-012** *(multi-org requirement from PRD 3.3, UI-Design 10.3)*: When a user attempts to
+  rent a tool owned by a member of a different organization (one the user also belongs to),
+  the system MUST prompt for organization context switch before proceeding. The prompt MUST
+  clearly indicate the target organization (e.g., "The owner of this tool is in [Church B].
+  To rent it, we need to switch your dashboard context to that organization."). The user's
+  last selected organization per session MUST be preserved.
 
 ### Key Entities
 

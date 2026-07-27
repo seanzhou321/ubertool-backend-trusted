@@ -343,6 +343,19 @@ outcomes), unauthorized-access rejection, the `CalculateTransactions` netting al
   `resolution_outcome` filters are accepted on the wire but not applied (see Known
   Discrepancy 1). Any future work that actually implements filtering/pagination for these
   RPCs supersedes this requirement.
+- **FR-014** *(multi-org requirement from `grpc_api_business_logic.md` Bill Split section)*:
+  `GetGlobalBillSplitSummary` MUST return aggregated bill-split counts summed across ALL
+  organizations the caller belongs to. The response MUST include: `payments_to_make` (count
+  of `PENDING` bills where caller is debtor and hasn't acknowledged), `receipts_to_verify`
+  (count of `PENDING` bills where caller is creditor and debtor has acknowledged),
+  `payments_in_dispute` (count of `DISPUTED` bills where caller is debtor), and
+  `receipts_in_dispute` (count of `DISPUTED` bills where caller is creditor). This provides
+  a cross-org dashboard view without requiring per-org calls.
+- **FR-015** *(multi-org requirement from `grpc_api_business_logic.md` Bill Split section)*:
+  `GetOrganizationBillSplitSummary` MUST return the same four count categories as
+  `GetGlobalBillSplitSummary`, but broken down PER ORGANIZATION the caller belongs to.
+  Each entry in the list MUST include the `organization_id`, `organization_name`, and the
+  four counts for that specific org. This enables per-org drill-down from the global summary.
 
 ### Key Entities
 

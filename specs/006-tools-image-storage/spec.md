@@ -288,6 +288,18 @@ rejection and acceptance, both RPCs, via `TestToolService_UpdateDelete_RequiresO
 - **FR-007**: `GetToolImages` MUST NOT be assumed to enforce the same access rule as
   `GetDownloadUrl` (Known Discrepancy 2) — this is the target correctness bar for a
   follow-up task, not current behavior.
+- **FR-008** *(multi-org requirement from PRD 3.3, Organizations FR-011)*: `SearchTools`
+  MUST include tools from ALL organizations the caller belongs to that are in the resolved
+  metro area. When `organization_id` is provided, its metro is used as the primary filter,
+  but results are NOT limited to tools owned by members of that specific organization — tools
+  owned by members of ANY organization the caller belongs to (in the same metro) MUST be
+  included. The post-processing filter (FR-003) retains only tools whose owners share at
+  least one organization with the caller, which naturally implements this cross-org search.
+- **FR-009** *(multi-org requirement from PRD 3.3)*: For each tool in search results, the
+  owner's organization information returned MUST be limited to only the organizations
+  shared between the tool owner and the caller. If the owner belongs to organizations the
+  caller does not, those orgs MUST NOT appear in the owner's organization list in the
+  response.
 
 ### Key Entities
 

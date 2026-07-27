@@ -364,6 +364,17 @@ and a `charge_billsplit=false` variant (e2e).
   that org; when omitted (`0`), results span every org the caller belongs to. **Fixed
   2026-07-25** (Known Discrepancy 6): `organization_id` was previously a mandatory exact-match
   filter, a confirmed bug, not intended behavior — see Known Discrepancy 6 for the fix.
+- **FR-008** *(multi-org requirement from PRD 3.3, Organizations FR-012)*: When a user
+  attempts to create a rental request for a tool owned by a member of a different
+  organization (one the user also belongs to), the system MUST require an organization
+  context switch to the tool owner's organization before the rental can proceed. The
+  `CreateRentalRequest` RPC MUST validate that the caller is a member of the tool's
+  `org_id`; if the caller's current context organization differs from the tool's `org_id`,
+  the call MUST be rejected with a clear error indicating the required context switch
+  (e.g., "This tool belongs to organization [Church B]. Please switch your active
+  organization to [Church B] to rent this tool."). The rental record's `org_id` MUST be
+  set to the tool's `org_id`, ensuring all rental lifecycle operations (approval, completion,
+  billing) occur within that organization's context.
 
 ### Key Entities
 

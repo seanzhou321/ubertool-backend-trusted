@@ -185,6 +185,7 @@ before/after-settlement balance comparison exercised through the Rentals complet
   to roll up across all orgs when `organization_id` is omitted, nor to apply any
   `number_of_months` filtering, nor to include recent transactions** (Known Discrepancies
   2-4) — despite all three being documented, none are implemented today.
+- **FR-004** *(multi-org requirement from PRD 3.1, `grpc_api_business_logic.md` "Get Ledger Summary" step 1)*: `GetLedgerSummary` MUST roll up balances and rental counts across ALL organizations the caller belongs to when `organization_id` is omitted (zero value). The response MUST include: (a) the sum of `balance_cents` across all the caller's `users_orgs` rows, (b) per-status rental counts aggregated across all orgs, and (c) the same `number_of_months` filtering applied per-org before aggregation. This requirement is currently a Known Discrepancy (Gap 2) — the as-built implementation returns a "no rows" error when `organization_id = 0` instead of performing the cross-org rollup.
 
 ### Key Entities
 
