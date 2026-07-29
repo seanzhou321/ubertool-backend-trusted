@@ -48,6 +48,15 @@ Write-Host "Starting container '$CONTAINER_NAME'..."
 # Config is mounted at /app/config (not /config) so configs' relative paths — e.g.
 # firebase_key_path: "config/firebase-admin-key.json" in the desktop uitest/manual configs —
 # resolve correctly against the container's /app working directory.
+#
+# uploads/ is bind-mounted too (writable): storage.upload_dir in every config is a relative
+# path ("./uploads") that resolves to /app/uploads inside the container. Without this mount
+# that directory only exists in the container's writable layer — invisible to anything
+# running on the host (e.g. tests/e2e's image_storage_test.go, which reads/writes the host
+# repo's uploads/ directly) and wiped every time the container is recreated.
+if (-not (Test-Path (Join-Path $RepoRoot "uploads"))) {
+    New-Item -ItemType Directory -Path (Join-Path $RepoRoot "uploads") | Out-Null
+}
 podman run -d `
   --name $CONTAINER_NAME `
   --add-host "host.containers.internal:host-gateway" `
@@ -56,6 +65,7 @@ podman run -d `
   -e "DB_HOST=$DB_HOST" `
   -e "DB_PORT=$DB_PORT" `
   -v "${RepoRoot}\config:/app/config:ro" `
+  -v "${RepoRoot}\uploads:/app/uploads" `
   --restart unless-stopped `
   $IMAGE_NAME "-config=/app/config/$ConfigFile"
 

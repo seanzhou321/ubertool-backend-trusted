@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
@@ -12,10 +15,13 @@ import (
 type OrganizationHandler struct {
 	pb.UnimplementedOrganizationServiceServer
 	orgSvc service.OrganizationService
+	// allowAPIOrgCreation gates CreateOrganization behind a config flag — disabled
+	// in production, where new orgs are provisioned by the backend team directly.
+	allowAPIOrgCreation bool
 }
 
-func NewOrganizationHandler(orgSvc service.OrganizationService) *OrganizationHandler {
-	return &OrganizationHandler{orgSvc: orgSvc}
+func NewOrganizationHandler(orgSvc service.OrganizationService, allowAPIOrgCreation bool) *OrganizationHandler {
+	return &OrganizationHandler{orgSvc: orgSvc, allowAPIOrgCreation: allowAPIOrgCreation}
 }
 
 func (h *OrganizationHandler) ListMyOrganizations(ctx context.Context, req *pb.ListMyOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {
@@ -98,6 +104,9 @@ func (h *OrganizationHandler) UpdateOrganization(ctx context.Context, req *pb.Up
 	return &pb.UpdateOrganizationResponse{Organization: MapDomainOrgToProto(org, "")}, nil
 }
 func (h *OrganizationHandler) CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) (*pb.CreateOrganizationResponse, error) {
+	if !h.allowAPIOrgCreation {
+		return nil, status.Error(codes.PermissionDenied, "organization creation via the API is disabled in this environment; new organizations are provisioned by the backend team directly")
+	}
 	org := &domain.Organization{
 		Name:             req.Name,
 		Description:      req.Description,

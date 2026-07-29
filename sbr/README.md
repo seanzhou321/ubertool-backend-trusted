@@ -46,12 +46,25 @@ were absent — is not evidence, regardless of what tier it's filed under. When 
 
 One RTM file per audited feature, named `sbr/rtm/<feature-slug>.rtm.md`, with this table:
 
-| FR-ID | Requirement Summary | *(one column per test tier, per the adapter's mapping)* | Boundary Status | Notes |
-|---|---|---|---|---|
+| FR-ID | Requirement Summary | *(one column per test tier, per the adapter's mapping)* | Boundary Status | Planned Tests | Notes |
+|---|---|---|---|---|---|
 
 Test-evidence cells cite the concrete unit under test — e.g. `function_name (file:line)` — or
 `—` when no plausible match exists. Never a bare "yes"/"covered" with no citation: an
 uncited claim of coverage is exactly the false confidence the RTM exists to prevent.
+
+**Planned Tests** is the forward-looking counterpart to the (backward-looking, evidence-only)
+tier columns. It is populated only on `Gap`/`Unclassified` rows, and names the specific
+not-yet-written test(s) that would close the gap — a proposed function name per tier plus a
+one-line description of what it must assert (e.g. `L1: TestFooService_Bar_RejectsX — asserts
+the repo write never happens`). This is a proposal for future work, not evidence: it must never
+be confused with, or promoted into, a tier-evidence citation until the test actually exists and
+has been re-verified by a later audit pass. If the underlying behavior isn't implemented yet
+either (the gap is a missing feature, not just a missing test), say so instead of proposing a
+test that would have nothing to assert — route it to a feature/bugfix task, not a test stub. If
+a requirement's own wording is stale or describes removed/nonexistent functionality (see
+`FR-010` in `003-organizations-administration.rtm.md` for a worked example), the right entry
+here is "N/A — requirement needs correction, not a test," not a fabricated test name.
 
 Each RTM file's header records: the source spec path, a pointer back to this document's
 adapter section for the tier mapping in effect, the generation/update date, and the audit

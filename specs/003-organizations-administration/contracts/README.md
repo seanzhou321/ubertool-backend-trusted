@@ -12,12 +12,20 @@ Per Constitution Principle VI (Proto-First), these .proto files define the exter
 > `context_switch_required` (FR-012) were never added either; see `docs/design/multi-org.md` for
 > the corrected design that was actually implemented. The sections below documenting those are
 > retained struck through for history — do not reintroduce them.
+>
+> **Correction 2026-07-29**: `CreateOrganization`'s "Any authenticated" auth column below
+> describes the token requirement only. Reachability is additionally gated by the
+> `features.allow_api_organization_creation` config flag (`internal/config/config.go`,
+> enforced in `internal/api/grpc/org.go`) — `false` in production
+> (`config/config.ec2.prod.yaml`), where new orgs are provisioned by the backend team
+> directly rather than self-service via the API. The flag is `true` in every
+> non-production config.
 
 ## OrganizationService
 
 | RPC | Request | Response | Auth | Notes |
 |-----|---------|----------|------|-------|
-| `CreateOrganization` | `{}` | `{ Organization }` | Any authenticated | Caller becomes SUPER_ADMIN |
+| `CreateOrganization` | `{}` | `{ Organization }` | Any authenticated, **and** `features.allow_api_organization_creation=true` | Caller becomes SUPER_ADMIN; disabled in production |
 | `GetOrganization` | `{ string organization_id }` | `{ Organization, member_count, my_role? }` | Member | `my_role` only if caller is member |
 | `UpdateOrganization` | `{ organization_id, name?, price_threshold_cents? }` | `{ Organization }` | ADMIN/SUPER_ADMIN in org | |
 | `ListMyOrganizations` | `{}` | `{ repeated OrgMembership }` | Authenticated | **FR-009**: includes `balance_cents`, `member_count` |

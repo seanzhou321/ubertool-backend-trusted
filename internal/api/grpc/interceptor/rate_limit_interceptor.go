@@ -21,17 +21,24 @@ const (
 // RateLimitInterceptor guards Login and Verify2FA with per-IP token buckets.
 // All other endpoints are passed through without restriction.
 type RateLimitInterceptor struct {
-	limiter *security.IPRateLimiter
+	limiter  *security.IPRateLimiter
+	disabled bool
 }
 
 // NewRateLimitInterceptor returns a RateLimitInterceptor backed by the given limiter.
-func NewRateLimitInterceptor(limiter *security.IPRateLimiter) *RateLimitInterceptor {
-	return &RateLimitInterceptor{limiter: limiter}
+// disabled comes from config.RateLimitConfig.Disabled — when true, Login and Verify2FA
+// are passed through unconditionally (see config.RateLimitConfig for when this is safe).
+func NewRateLimitInterceptor(limiter *security.IPRateLimiter, disabled bool) *RateLimitInterceptor {
+	return &RateLimitInterceptor{limiter: limiter, disabled: disabled}
 }
 
 // Unary returns a gRPC unary server interceptor that enforces rate limits.
 func (i *RateLimitInterceptor) Unary() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		if i.disabled {
+			return handler(ctx, req)
+		}
+
 		var allowed bool
 		switch info.FullMethod {
 		case methodLogin:

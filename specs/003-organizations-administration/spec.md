@@ -29,22 +29,37 @@ only as a dependency, not re-specified.
 
 ### User Story 1 - Organization Discovery, Creation & Self-Service Join (Priority: P1)
 
-Any authenticated user can browse/search organizations, create a new one (becoming its
-first `SUPER_ADMIN`), and join an existing one they've been invited to.
+Any authenticated user can browse/search organizations and join an existing one they've
+been invited to. Creating a new organization (becoming its first `SUPER_ADMIN`) is exposed
+via the `CreateOrganization` RPC, but that RPC is gated by the
+`features.allow_api_organization_creation` config flag (`internal/config/config.go`),
+which is `false` in production (`config/config.ec2.prod.yaml`) — in production, new
+organizations are provisioned by the backend team directly (e.g. via
+`tests/data-setup/setup.go`-style tooling against the database), not self-service through
+the API. The flag is `true` in every non-production config so automated/manual test flows
+can still exercise `CreateOrganization` end-to-end.
 
 **Why this priority**: The entry point into every other org-scoped capability in the
 system — without an org membership, nothing else in this domain or Bill Split/Rentals/Tools
 is reachable for a given user.
 
-**Independent Test**: Create an org as user A (verify A becomes `SUPER_ADMIN` with
-`balance_cents = 0`); have user B call `JoinOrganizationWithInvite` with a valid invitation
-for that org and confirm B becomes a `MEMBER`.
+**Independent Test**: With `features.allow_api_organization_creation: true`, create an org
+as user A (verify A becomes `SUPER_ADMIN` with `balance_cents = 0`); have user B call
+`JoinOrganizationWithInvite` with a valid invitation for that org and confirm B becomes a
+`MEMBER`. Separately, with the flag `false` (as in production), confirm `CreateOrganization`
+is rejected with `PermissionDenied` before any `orgs` row is created.
 
 **Acceptance Scenarios**:
 
-1. **Given** any authenticated user, **When** `CreateOrganization` is called, **Then** a
-   new `orgs` row is created and the caller is added to `users_orgs` as `SUPER_ADMIN` with
-   `balance_cents = 0` — no pre-authorization is required or expected to create an org.
+1. **Given** any authenticated user and `features.allow_api_organization_creation: true`,
+   **When** `CreateOrganization` is called, **Then** a new `orgs` row is created and the
+   caller is added to `users_orgs` as `SUPER_ADMIN` with `balance_cents = 0` — no
+   pre-authorization is required or expected to create an org.
+1a. **Given** `features.allow_api_organization_creation: false` (the production setting),
+    **When** `CreateOrganization` is called by any caller, **Then** it is rejected with
+    `PermissionDenied` ("organization creation via the API is disabled in this
+    environment...") before any repository read/write occurs — enforced in
+    `internal/api/grpc/org.go`'s `CreateOrganization` handler, ahead of the service call.
 2. **Given** an org ID, **When** `GetOrganization` is called, **Then** the response
    includes the org's details, its non-blocked member count, and — only if the caller is a
    member — their own role in that org.
@@ -264,8 +279,15 @@ test that closes Known Discrepancy 1 at the unit level.
 
 ### Functional Requirements
 
-- **FR-001**: `CreateOrganization` MUST require no pre-existing authorization — any
-  authenticated user may create an org and becomes its `SUPER_ADMIN`.
+- **FR-001**: `CreateOrganization` MUST require no pre-existing role/authorization beyond
+  being authenticated — any authenticated user, once the `features.allow_api_organization_creation`
+  config flag is `true`, may create an org and becomes its `SUPER_ADMIN`.
+- **FR-001a** *(added 2026-07-29)*: When `features.allow_api_organization_creation` is
+  `false` (the production default, `config/config.ec2.prod.yaml`), the
+  `OrganizationHandler.CreateOrganization` gRPC handler MUST reject every caller with
+  `codes.PermissionDenied` before invoking `OrganizationService.CreateOrganization` — in
+  production, organizations are provisioned by the backend team directly, not through the
+  API.
 - **FR-002**: `UpdateOrganization` MUST reject callers who are not members of the target
   org, MUST require `ADMIN` or `SUPER_ADMIN` for any change, and MUST additionally require
   `SUPER_ADMIN` specifically to change either bill-split price threshold field, treating a

@@ -184,7 +184,7 @@ func main() {
 	// Initialize gRPC handlers
 	authHandler := api.NewAuthHandler(authSvc)
 	userHandler := api.NewUserHandler(userSvc)
-	orgHandler := api.NewOrganizationHandler(orgSvc)
+	orgHandler := api.NewOrganizationHandler(orgSvc, cfg.Features.AllowAPIOrganizationCreation)
 	toolHandler := api.NewToolHandler(toolSvc)
 	rentalHandler := api.NewRentalHandler(rentalSvc, userSvc, toolSvc, orgSvc)
 	ledgerHandler := api.NewLedgerHandler(ledgerSvc)
@@ -200,9 +200,12 @@ func main() {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
+	if cfg.RateLimit.Disabled {
+		logger.Warn("Login/Verify2FA rate limiting is DISABLED via config — must not be used in production")
+	}
 	serverOpts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
-			interceptor.NewRateLimitInterceptor(security.NewIPRateLimiter()).Unary(),
+			interceptor.NewRateLimitInterceptor(security.NewIPRateLimiter(), cfg.RateLimit.Disabled).Unary(),
 			authInterceptor.Unary(),
 		),
 	}

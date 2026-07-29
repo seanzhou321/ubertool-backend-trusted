@@ -174,8 +174,12 @@ Using the vocabulary defined in `sbr/README.md`:
 
 Create or fully rewrite `sbr/rtm/<feature-slug>.rtm.md` per the schema in `sbr/README.md`:
 header (source spec path, pointer to the adapter section in effect, generation date, mode =
-`retrofit audit`), the FR table with one column per tier plus Boundary Status and Notes, and a
-footer summary (total FR count, gap count, explicit list of FR-IDs with gaps).
+`retrofit audit`), the FR table with one column per tier plus Boundary Status, Planned Tests,
+and Notes, and a footer summary (total FR count, gap count, explicit list of FR-IDs with gaps).
+Planned Tests is populated only on `Gap`/`Unclassified` rows — see `sbr/README.md`'s "RTM
+schema" section for exactly what belongs there and what doesn't (never a fabricated test name
+standing in for evidence; route missing-feature gaps to a feature/bugfix task instead of a test
+stub; route stale/incorrect requirement wording to a spec-correction note instead of a test).
 
 ### 7. Report
 

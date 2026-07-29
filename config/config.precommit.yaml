@@ -53,9 +53,17 @@ two_fa:
   enabled: false
   fixed_passcode: "47291"  # Used by automated tests — must match test expectations
 
+# Must stay enabled: tests/e2e/rate_limit_test.go (make test-e2e-rate-limit) runs against this
+# same config and asserts the Login/Verify2FA per-IP burst actually throttles the 4th attempt.
+rate_limit:
+  disabled: true
+
+features:
+  allow_api_organization_creation: true  # required by tests/e2e org tests; false in production
+
 storage:
   type: "mock"
-  upload_dir: "./tests/uploads"
+  upload_dir: "./uploads"
   base_url: "http://localhost:50053"
   max_file_size_mb: 10
   allowed_types:

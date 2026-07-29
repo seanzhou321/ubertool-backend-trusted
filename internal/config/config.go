@@ -22,6 +22,31 @@ type Config struct {
 	TLS             TLSConfig       `yaml:"tls"`
 	TwoFA           TwoFAConfig     `yaml:"two_fa"`
 	FirebaseKeyPath string          `yaml:"firebase_key_path"`
+	Features        FeaturesConfig  `yaml:"features"`
+	RateLimit       RateLimitConfig `yaml:"rate_limit"`
+}
+
+// RateLimitConfig controls the per-IP Login/Verify2FA rate limiter
+// (internal/security.IPRateLimiter).
+type RateLimitConfig struct {
+	// Disabled turns off the Login/Verify2FA rate limiter entirely. Zero value is
+	// false so a config file that omits this section is still protected — only
+	// automated-test environments that restart infrequently and hammer these two
+	// endpoints across many runs (e.g. desktop/EC2 UI-test scenarios) should set
+	// this to true. Must stay false wherever the limiter itself is under test
+	// (see tests/e2e/rate_limit_test.go) or in anything production-equivalent.
+	Disabled bool `yaml:"disabled"`
+}
+
+// FeaturesConfig toggles optional/high-risk API surface on or off per environment.
+type FeaturesConfig struct {
+	// AllowAPIOrganizationCreation controls whether
+	// OrganizationService.CreateOrganization is reachable via the gRPC API at all.
+	// New organizations are meant to be provisioned by the backend team directly
+	// (e.g. a DB script or admin tooling), not self-service by any authenticated
+	// user — this must be false in production. Non-production environments set it
+	// to true so automated/manual test flows can still create orgs through the API.
+	AllowAPIOrganizationCreation bool `yaml:"allow_api_organization_creation"`
 }
 
 // TwoFAConfig controls whether 2FA is enforced and provides a fixed passcode for
@@ -220,6 +245,16 @@ func (c *Config) overrideWithEnv() {
 	}
 	if val := os.Getenv("TWO_FA_FIXED_PASSCODE"); val != "" {
 		c.TwoFA.FixedPasscode = val
+	}
+
+	// Feature flags
+	if val := os.Getenv("ALLOW_API_ORGANIZATION_CREATION"); val != "" {
+		c.Features.AllowAPIOrganizationCreation = val == "true" || val == "1"
+	}
+
+	// Rate limiting
+	if val := os.Getenv("RATE_LIMIT_DISABLED"); val != "" {
+		c.RateLimit.Disabled = val == "true" || val == "1"
 	}
 
 	// Set defaults for log if not configured

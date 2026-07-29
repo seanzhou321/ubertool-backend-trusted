@@ -46,6 +46,11 @@ if ($containerExists) {
     podman rm $CONTAINER_NAME | Out-Null
 }
 
+# uploads/ is bind-mounted (writable) so files survive across container recreation and are
+# visible to host-side tests — see the matching comment in install.ps1.
+if (-not (Test-Path (Join-Path $RepoRoot "uploads"))) {
+    New-Item -ItemType Directory -Path (Join-Path $RepoRoot "uploads") | Out-Null
+}
 podman run -d `
   --name $CONTAINER_NAME `
   --add-host "host.containers.internal:host-gateway" `
@@ -54,6 +59,7 @@ podman run -d `
   -e "DB_HOST=$DB_HOST" `
   -e "DB_PORT=$DB_PORT" `
   -v "${RepoRoot}\config:/app/config:ro" `
+  -v "${RepoRoot}\uploads:/app/uploads" `
   --restart unless-stopped `
   $IMAGE_NAME "-config=/app/config/$ConfigFile"
 
