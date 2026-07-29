@@ -83,6 +83,7 @@ func (r *joinRequestRepository) ListByOrg(ctx context.Context, orgID int32) ([]d
 		) i ON true
 		LEFT JOIN users rb ON rb.id = jr.rejected_by_user_id
 		WHERE jr.org_id = $1
+		  AND jr.status = 'PENDING'
 		  AND jr.created_on >= NOW() - INTERVAL '2 months'
 	`
 	rows, err := r.db.QueryContext(ctx, query, orgID)

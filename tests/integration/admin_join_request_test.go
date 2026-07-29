@@ -63,12 +63,12 @@ func TestAdminService_ListJoinRequests_UsedOnField(t *testing.T) {
 		// Create join requests
 		var joinReqID1, joinReqID2 int32
 		err = db.QueryRow(`INSERT INTO join_requests (org_id, user_id, name, email, note, status) 
-			VALUES ($1, $2, 'Test User 1', $3, 'Please add me', 'APPROVED') RETURNING id`,
+			VALUES ($1, $2, 'Test User 1', $3, 'Please add me', 'PENDING') RETURNING id`,
 			orgID, userID1, email1).Scan(&joinReqID1)
 		require.NoError(t, err)
 
 		err = db.QueryRow(`INSERT INTO join_requests (org_id, user_id, name, email, note, status) 
-			VALUES ($1, $2, 'Test User 2', $3, 'Add me too', 'APPROVED') RETURNING id`,
+			VALUES ($1, $2, 'Test User 2', $3, 'Add me too', 'PENDING') RETURNING id`,
 			orgID, userID2, email2).Scan(&joinReqID2)
 		require.NoError(t, err)
 		t.Logf("Created join_requests: id1=%d, id2=%d", joinReqID1, joinReqID2)

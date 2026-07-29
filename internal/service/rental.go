@@ -4,7 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/repository"
@@ -16,6 +20,7 @@ type rentalService struct {
 	toolRepo   repository.ToolRepository
 	ledgerRepo repository.LedgerRepository
 	userRepo   repository.UserRepository
+	orgRepo    repository.OrganizationRepository
 	emailSvc   EmailService
 	noteSvc    NotificationService
 }
@@ -25,6 +30,7 @@ func NewRentalService(
 	toolRepo repository.ToolRepository,
 	ledgerRepo repository.LedgerRepository,
 	userRepo repository.UserRepository,
+	orgRepo repository.OrganizationRepository,
 	emailSvc EmailService,
 	noteSvc NotificationService,
 ) RentalService {
@@ -33,16 +39,14 @@ func NewRentalService(
 		toolRepo:   toolRepo,
 		ledgerRepo: ledgerRepo,
 		userRepo:   userRepo,
+		orgRepo:    orgRepo,
 		emailSvc:   emailSvc,
 		noteSvc:    noteSvc,
 	}
 }
 
 func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolID, orgID int32, startDateStr, endDateStr string) (*domain.Rental, error) {
-	// SEC-RENTAL-001 (sbr/rtm/009-security.rtm.md): the renter must belong to the org they claim
-	// to be renting under — mirrors the membership check ToolService.SearchTools already
-	// performs (internal/service/tool.go:118-122). Without it, a caller could rent any tool
-	// under any organization context by simply naming a foreign org_id.
+	// SEC-RENTAL-001: the renter must belong to the org they claim to be renting under
 	if _, err := s.userRepo.GetUserOrg(ctx, renterID, orgID); err != nil {
 		return nil, fmt.Errorf("user is not a member of this organization")
 	}
@@ -51,8 +55,23 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 	if err != nil {
 		return nil, err
 	}
-	// Verify tool availability (simplified: check status)
-	// Ideally check if tool is already rented in this period.
+
+	// Quick check: is the tool owner also an active member of this org?
+	ownerInOrg, err := s.isSharedOrganization(ctx, tool.OwnerID, renterID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if !ownerInOrg {
+		// Only fetch full list for error message when validation fails
+		sharedOrgs, _ := s.getSharedOrganizations(ctx, tool.OwnerID, renterID)
+		sharedOrgNames := make([]string, len(sharedOrgs))
+		for i, org := range sharedOrgs {
+			sharedOrgNames[i] = org.Name
+		}
+		return nil, status.Errorf(codes.FailedPrecondition,
+			"organization %d is not shared with the tool owner. Shared organizations: %v",
+			orgID, sharedOrgNames)
+	}
 
 	start, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
@@ -548,8 +567,12 @@ func (s *rentalService) notifyOwnerExtensionRequest(ctx context.Context, rt *dom
 			Title:   title,
 			Message: message,
 			Attributes: map[string]string{
-				"type": notifType, "rental_id": rentalIDStr,
-				"channel_id": string(domain.ChannelRentalRequest),
+				"type":         notifType,
+				"rental_id":    rentalIDStr,
+				"tool_id":      strconv.Itoa(int(tool.ID)),
+				"tool_name":    tool.Name,
+				"new_end_date": nEnd.Format("2006-01-02"),
+				"channel_id":   string(domain.ChannelRentalRequest),
 			},
 		})
 	}
@@ -798,6 +821,29 @@ func (s *rentalService) ListToolRentals(ctx context.Context, ownerID, toolID, or
 }
 
 func (s *rentalService) Update(ctx context.Context, rt *domain.Rental) error {
+	// Validate org_id change if it differs from existing rental
+	existing, err := s.rentalRepo.GetByID(ctx, rt.ID)
+	if err != nil {
+		return err
+	}
+	if rt.OrgID != existing.OrgID {
+		// Verify new org is shared between renter and owner (fast check)
+		shared, err := s.isSharedOrganization(ctx, existing.OwnerID, existing.RenterID, rt.OrgID)
+		if err != nil {
+			return err
+		}
+		if !shared {
+			// Only fetch full list for error message when validation fails
+			sharedOrgs, _ := s.getSharedOrganizations(ctx, existing.OwnerID, existing.RenterID)
+			sharedNames := make([]string, len(sharedOrgs))
+			for i, o := range sharedOrgs {
+				sharedNames[i] = o.Name
+			}
+			return status.Errorf(codes.FailedPrecondition,
+				"rental.org_id (%d) is not a shared active organization between renter (%d) and owner (%d). Shared: %v",
+				rt.OrgID, existing.RenterID, existing.OwnerID, sharedNames)
+		}
+	}
 	return s.rentalRepo.Update(ctx, rt)
 }
 
@@ -1067,4 +1113,71 @@ func (s *rentalService) GetRental(ctx context.Context, userID, rentalID int32) (
 		return nil, errors.New("unauthorized")
 	}
 	return rt, nil
+}
+
+// isSharedOrganization checks whether ownerID could actually lend a tool in orgID AND renterID
+// could actually rent it there: both must be ACTIVE members, ownerID must not be lending_blocked
+// in that org, and renterID must not be renting_blocked in that org. A user can be blocked from
+// one side without the other (e.g. renting_blocked due to an unpaid bill while still free to
+// lend), so each flag is checked against the matching role rather than either one disqualifying
+// both sides. Mirrors toolService.getSharedOrganizations (internal/service/tool.go) — keep both
+// in sync.
+func (s *rentalService) isSharedOrganization(ctx context.Context, ownerID, renterID, orgID int32) (bool, error) {
+	// Owner must be an active, non-lending-blocked member of orgID
+	ownerUO, err := s.userRepo.GetUserOrg(ctx, ownerID, orgID)
+	if err != nil {
+		return false, err
+	}
+	if ownerUO.Status != domain.UserOrgStatusActive || ownerUO.LendingBlocked {
+		return false, nil
+	}
+
+	// Renter must be an active, non-renting-blocked member of orgID
+	renterUO, err := s.userRepo.GetUserOrg(ctx, renterID, orgID)
+	if err != nil {
+		return false, err
+	}
+	if renterUO.Status != domain.UserOrgStatusActive || renterUO.RentingBlocked {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// getSharedOrganizations returns the orgs where ownerID could actually lend AND renterID could
+// actually rent — see isSharedOrganization for the exact role-specific rule.
+func (s *rentalService) getSharedOrganizations(ctx context.Context, ownerID, renterID int32) ([]domain.Organization, error) {
+	// Get organizations for the owner
+	ownerOrgs, err := s.userRepo.ListUserOrgs(ctx, ownerID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get organizations for the renter
+	renterOrgs, err := s.userRepo.ListUserOrgs(ctx, renterID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build map of the renter's active, non-renting-blocked org IDs
+	renterOrgMap := make(map[int32]bool)
+	for _, uo := range renterOrgs {
+		if uo.Status == domain.UserOrgStatusActive && !uo.RentingBlocked {
+			renterOrgMap[uo.OrgID] = true
+		}
+	}
+
+	// Find shared organizations where the owner is active and not lending-blocked
+	var sharedOrgs []domain.Organization
+	for _, uo := range ownerOrgs {
+		if uo.Status == domain.UserOrgStatusActive && !uo.LendingBlocked && renterOrgMap[uo.OrgID] {
+			org, err := s.orgRepo.GetByID(ctx, uo.OrgID)
+			if err != nil {
+				continue // Skip orgs we can't fetch
+			}
+			sharedOrgs = append(sharedOrgs, *org)
+		}
+	}
+
+	return sharedOrgs, nil
 }

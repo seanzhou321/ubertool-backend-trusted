@@ -70,42 +70,51 @@ grpcurl -plaintext -d '{}' \
 # Expected: Org A shows my_balance_cents: 5000, Org B shows -3000
 ```
 
-### 5. **Multi-Org FR-010**: Set/Get Current Org Context
-```bash
-# Set current org
-grpcurl -plaintext -d '{"organization_id": "<org-a-id>"}' \
-  localhost:50051 ubertool.trusted.backend.v1.OrganizationService/SetCurrentOrganization
+### 5. **REMOVED**: FR-010 "Current Org Context" (`SetCurrentOrganization`/`GetCurrentOrganization`)
+There is no server-side "current organization" — see `docs/design/multi-org.md`. A user's active
+org is a client/device-local UI preference (a user may have several devices, each focused on a
+different org), so the server never caches or persists it. Every request that needs an org
+context takes `organization_id` explicitly.
 
-# Get current org
-grpcurl -plaintext -d '{}' \
-  localhost:50051 ubertool.trusted.backend.v1.OrganizationService/GetCurrentOrganization
-# Expected: { organization_id: "<org-a-id>" }
+### 6. **Multi-Org FR-011**: Cross-Org Tool Search (metro + shared-org filter, no `include_all_my_orgs`)
+```bash
+grpcurl -plaintext -d '{"query": "drill", "metro": "NYC"}' \
+  localhost:50051 ubertool.trusted.backend.v1.ToolService/SearchTools
+# Expected: tools owned by users who share an active org with the caller in the NYC metro
+# (e.g. an Org B tool, if the caller is also in Org B) — never the caller's own tools.
+# Each returned tool's owner.orgs lists exactly the orgs shared with the caller, e.g.:
+#   tools[0].owner.orgs = [{ id: "<org-b-id>", name: "Org Two", ... }]
+# This is how the client learns which organization_id to use for CreateRentalRequest (§7).
 ```
 
-### 6. **Multi-Org FR-011**: Cross-Org Tool Search
-```bash
-# Search only current org (default)
-grpcurl -plaintext -d '{"query": "drill", "include_all_my_orgs": false}' \
-  localhost:50051 ubertool.trusted.backend.v1.ToolService/SearchTools
+### 7. **Multi-Org FR-012 / Rentals FR-008**: Shared-Org Rental Validation
 
-# Search ALL user's orgs in same metro
-grpcurl -plaintext -d '{"query": "drill", "include_all_my_orgs": true}' \
-  localhost:50051 ubertool.trusted.backend.v1.ToolService/SearchTools
-# Expected: tools from Org A AND Org B (if both in NYC metro)
-```
+Org discovery happens at search time, not here: `SearchTools`/`GetTool` on this tool already
+returned `owner.orgs = [{id: "<org-b-id>", ...}]` (§6 above shows the shared-org search that
+surfaces this), so the client already knows `<org-b-id>` is the only valid `organization_id`
+before ever calling `CreateRentalRequest`.
 
-### 7. **Multi-Org FR-012**: Rental Context Switch Prompt
 ```bash
-# User in Org A tries to rent tool owned by Org B member (user also in Org B)
+# Correct call, using the org_id learned from SearchTools/GetTool's owner.orgs:
 grpcurl -plaintext -d '{
   "tool_id": "<tool-in-org-b>",
   "start_date": "2026-08-01",
   "end_date": "2026-08-05",
-  "current_organization_id": "<org-a-id>"
+  "organization_id": "<org-b-id>"
 }' \
   localhost:50051 ubertool.trusted.backend.v1.RentalService/CreateRentalRequest
-# Expected: { context_switch_required: true, target_organization_id: "<org-b-id>", target_organization_name: "Org B" }
-# Client shows prompt, user confirms, client calls SetCurrentOrganization(org-b-id), then retries rental
+# Expected: success.
+
+# Defensive backstop — if the client (incorrectly, or due to stale data) sends a non-shared org:
+grpcurl -plaintext -d '{
+  "tool_id": "<tool-in-org-b>",
+  "start_date": "2026-08-01",
+  "end_date": "2026-08-05",
+  "organization_id": "<org-a-id>"
+}' \
+  localhost:50051 ubertool.trusted.backend.v1.RentalService/CreateRentalRequest
+# Expected: FAILED_PRECONDITION, human-readable message only (no structured shared-org list in
+# the response — the client should re-fetch owner.orgs via GetTool, not rely on this error).
 ```
 
 ### 8. Admin: Approve Join Request

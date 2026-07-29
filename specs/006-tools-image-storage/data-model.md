@@ -1,5 +1,14 @@
 # Data Model: Tools + Image Storage
 
+> **Correction 2026-07-28**: This document's `tools` table and `Tool` struct below do not match
+> the actual schema (`podman/trusted-group/postgres/ubertool_schema_trusted.sql`) — notably the ID
+> types (real schema uses `SERIAL`/`INTEGER`, not `UUID`), the `condition`/`status` enum values, and
+> most importantly **`owner_org_id` does not exist and must not be added**. A tool is owned by a
+> user (`tools.owner_id`) and scoped to a metro (`tools.metro`), never bound to a single
+> organization — see `docs/design/multi-org.md` for why. Treat the real schema file and
+> `internal/domain/tool.go` as ground truth over this table; the shape below is retained only for
+> the non-org-related design discussion elsewhere in this doc.
+
 ## Entities
 
 ### tools (existing)
@@ -7,7 +16,6 @@
 |--------|------|-------------|-------------|
 | id | UUID | PK | Tool ID |
 | owner_id | UUID | NOT NULL, FK → users.id | Owner user |
-| owner_org_id | UUID | NOT NULL, FK → orgs.id | **Owner's organization** |
 | name | TEXT | NOT NULL | Tool name |
 | description | TEXT | | |
 | categories | TEXT[] | | Category tags |
@@ -22,7 +30,7 @@
 | created_at | TIMESTAMPTZ | NOT NULL DEFAULT now() | |
 | updated_at | TIMESTAMPTZ | NOT NULL DEFAULT now() | |
 
-**Indexes**: `(owner_id)`, `(owner_org_id)`, `(metro, status)`, `(status, created_at)`
+**Indexes**: `(owner_id)`, `(metro, status)`, `(status, created_at)`
 
 ### tool_images (existing)
 | Column | Type | Constraints | Description |
@@ -54,7 +62,6 @@ const (
 type Tool struct {
     ID                     string
     OwnerID                string
-    OwnerOrgID             string
     Name                   string
     Description            string
     Categories             []string
@@ -113,17 +120,11 @@ message Tool {
   // ... existing fields ...
   string metro = 10;
   string status = 11;
-  
-  // NEW FR-009: Owner's organizations SHARED with requester
-  repeated OrganizationSummary owner_organizations = 20;
-}
-
-message OrganizationSummary {
-  string id = 1;
-  string name = 2;
-  string metro = 3;
+  User owner = 12;  // FR-009: owner.orgs (pre-existing User.orgs field) = shared orgs with requester — no new field added
 }
 ```
+No `owner_organizations`/`OrganizationSummary` field was added — see the correction note at the
+top of `contracts/README.md`.
 
 ### image_storage_service.proto (unchanged)
 
@@ -140,30 +141,35 @@ service ImageStorageService {
 
 ## Multi-Org Queries
 
-### FR-008: Cross-Org Search (include_all_my_orgs=true)
+> Corrected 2026-07-28: tools have no `owner_org_id`/org column and there is no server-side
+> "current org" to resolve a metro from (see `docs/design/multi-org.md`). Cross-org visibility is
+> metro-based plus a per-tool shared-org post-filter, implemented in Go
+> (`toolService.SearchTools`, `internal/service/tool.go`), not a single SQL join.
+
+### FR-008: Cross-Org Search (metro-scoped, not org-scoped)
 ```sql
+-- Base filter: tools in the given metro, excluding the requester's own tools
 SELECT t.*
 FROM tools t
-JOIN orgs o ON t.owner_org_id = o.id
-JOIN users_orgs uo ON o.id = uo.org_id
-WHERE uo.user_id = $1
-  AND uo.status = 'ACTIVE'
-  AND o.metro = $2  -- resolved from current org or first active org
-  AND t.status = 'AVAILABLE'
+WHERE t.metro = $1  -- explicit metro param, or the metro of an org the caller names
+  AND t.deleted_on IS NULL
+  AND t.owner_id != $2
+  AND t.status != 'UNAVAILABLE'
   AND ($3 = '' OR t.name ILIKE '%' || $3 || '%')
-ORDER BY t.created_at DESC
+ORDER BY t.price_per_day_cents ASC
 LIMIT $4 OFFSET $5;
 ```
 
-### FR-009: Shared-Org Owner Filtering
+### FR-009: Shared-Org Owner Filtering (per tool, in Go)
 ```sql
+-- For each candidate tool, exclude it unless the owner and requester share at least one active org
 SELECT DISTINCT o.id, o.name, o.metro
 FROM orgs o
 JOIN users_orgs uo_requester ON uo_requester.org_id = o.id 
     AND uo_requester.user_id = $requester_id AND uo_requester.status = 'ACTIVE'
 JOIN users_orgs uo_owner ON uo_owner.org_id = o.id 
-    AND uo_owner.user_id = $owner_id AND uo_owner.status = 'ACTIVE'
-WHERE o.id = $tool_owner_org_id;  -- or all owner's orgs
+    AND uo_owner.user_id = $owner_id AND uo_owner.status = 'ACTIVE';
+-- Empty result set => exclude the tool from search results entirely.
 ```
 
 ## Proto Regeneration

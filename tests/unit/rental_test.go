@@ -20,10 +20,11 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 	toolRepo := new(MockToolRepo)
 	ledgerRepo := new(MockLedgerRepo)
 	userRepo := new(MockUserRepo)
+	orgRepo := new(MockOrganizationRepo)
 	emailSvc := new(MockEmailService)
 	noteRepo := new(MockNotificationRepo)
 
-	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 
 	ctx := context.Background()
 	renterID := int32(1)
@@ -43,7 +44,8 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 	}
 
 	t.Run("Success", func(t *testing.T) {
-		userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID}, nil)
+		userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
+		userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
 		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
 		ledgerRepo.On("GetBalance", ctx, renterID, orgID).Return(int32(5000), nil)
 		rentalRepo.On("Create", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
@@ -75,7 +77,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
 		rentalRepo := new(MockRentalRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 
 		foreignOrgID := int32(999)
 		// The renter does not belong to foreignOrgID — matches the pattern SearchTools already
@@ -87,6 +89,93 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		assert.Nil(t, res)
 		toolRepo.AssertNotCalled(t, "GetByID", mock.Anything, mock.Anything)
 		rentalRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	})
+
+	// renting_blocked/lending_blocked are independent per-role flags on users_orgs (e.g. set by
+	// BillSplitService.SetRentingBlocked/SetLendingBlocked for an unpaid bill). Only the flag
+	// matching each side's actual role in this rental should gate org validity: the owner is
+	// lending here, so only their lending_blocked matters; the renter is renting here, so only
+	// their renting_blocked matters. Mirrors TestToolService_GetSharedOrganizations_RespectsBlockedFlags.
+	t.Run("Blocked-flag business rule (owner lends, renter rents)", func(t *testing.T) {
+		t.Run("Rejects when the owner is lending_blocked in the requested org", func(t *testing.T) {
+			userRepo := new(MockUserRepo)
+			toolRepoLocal := new(MockToolRepo)
+			svc := service.NewRentalService(new(MockRentalRepo), toolRepoLocal, new(MockLedgerRepo), userRepo, new(MockOrganizationRepo), new(MockEmailService), new(MockNotificationRepo))
+
+			toolRepoLocal.On("GetByID", ctx, toolID).Return(tool, nil)
+			userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
+			userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive, LendingBlocked: true}, nil)
+			// getSharedOrganizations is called to build the rejection error message.
+			userRepo.On("ListUserOrgs", ctx, mock.Anything).Return([]domain.UserOrg{}, nil).Maybe()
+
+			res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, startDate, endDate)
+			require.Error(t, err, "owner cannot lend in an org where they are lending_blocked")
+			assert.Nil(t, res)
+		})
+
+		t.Run("Rejects when the renter is renting_blocked in the requested org", func(t *testing.T) {
+			userRepo := new(MockUserRepo)
+			toolRepoLocal := new(MockToolRepo)
+			svc := service.NewRentalService(new(MockRentalRepo), toolRepoLocal, new(MockLedgerRepo), userRepo, new(MockOrganizationRepo), new(MockEmailService), new(MockNotificationRepo))
+
+			toolRepoLocal.On("GetByID", ctx, toolID).Return(tool, nil)
+			userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID, Status: domain.UserOrgStatusActive, RentingBlocked: true}, nil)
+			userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
+			// getSharedOrganizations is called to build the rejection error message.
+			userRepo.On("ListUserOrgs", ctx, mock.Anything).Return([]domain.UserOrg{}, nil).Maybe()
+
+			res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, startDate, endDate)
+			require.Error(t, err, "renter cannot rent in an org where they are renting_blocked")
+			assert.Nil(t, res)
+		})
+
+		t.Run("Allows when the owner is only renting_blocked (they are lending here, not renting)", func(t *testing.T) {
+			userRepo := new(MockUserRepo)
+			toolRepoLocal := new(MockToolRepo)
+			ledgerRepoLocal := new(MockLedgerRepo)
+			rentalRepoLocal := new(MockRentalRepo)
+			emailSvcLocal := new(MockEmailService)
+			noteRepoLocal := new(MockNotificationRepo)
+			svc := service.NewRentalService(rentalRepoLocal, toolRepoLocal, ledgerRepoLocal, userRepo, new(MockOrganizationRepo), emailSvcLocal, noteRepoLocal)
+
+			toolRepoLocal.On("GetByID", ctx, toolID).Return(tool, nil)
+			userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
+			userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive, RentingBlocked: true}, nil)
+			ledgerRepoLocal.On("GetBalance", ctx, renterID, orgID).Return(int32(5000), nil)
+			rentalRepoLocal.On("Create", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
+			userRepo.On("GetByID", ctx, tool.OwnerID).Return(&domain.User{ID: tool.OwnerID, Email: "owner@test.com", Name: "Owner"}, nil)
+			userRepo.On("GetByID", ctx, renterID).Return(&domain.User{ID: renterID, Email: "renter@test.com", Name: "Renter"}, nil)
+			emailSvcLocal.On("SendRentalRequestNotification", ctx, "owner@test.com", "Renter", "Tool", "renter@test.com").Return(nil)
+			noteRepoLocal.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
+
+			res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, startDate, endDate)
+			require.NoError(t, err, "owner's own renting_blocked flag must not stop them from lending")
+			assert.NotNil(t, res)
+		})
+
+		t.Run("Allows when the renter is only lending_blocked (they are renting here, not lending)", func(t *testing.T) {
+			userRepo := new(MockUserRepo)
+			toolRepoLocal := new(MockToolRepo)
+			ledgerRepoLocal := new(MockLedgerRepo)
+			rentalRepoLocal := new(MockRentalRepo)
+			emailSvcLocal := new(MockEmailService)
+			noteRepoLocal := new(MockNotificationRepo)
+			svc := service.NewRentalService(rentalRepoLocal, toolRepoLocal, ledgerRepoLocal, userRepo, new(MockOrganizationRepo), emailSvcLocal, noteRepoLocal)
+
+			toolRepoLocal.On("GetByID", ctx, toolID).Return(tool, nil)
+			userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID, Status: domain.UserOrgStatusActive, LendingBlocked: true}, nil)
+			userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
+			ledgerRepoLocal.On("GetBalance", ctx, renterID, orgID).Return(int32(5000), nil)
+			rentalRepoLocal.On("Create", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
+			userRepo.On("GetByID", ctx, tool.OwnerID).Return(&domain.User{ID: tool.OwnerID, Email: "owner@test.com", Name: "Owner"}, nil)
+			userRepo.On("GetByID", ctx, renterID).Return(&domain.User{ID: renterID, Email: "renter@test.com", Name: "Renter"}, nil)
+			emailSvcLocal.On("SendRentalRequestNotification", ctx, "owner@test.com", "Renter", "Tool", "renter@test.com").Return(nil)
+			noteRepoLocal.On("Create", ctx, mock.AnythingOfType("*domain.Notification")).Return(nil)
+
+			res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, startDate, endDate)
+			require.NoError(t, err, "renter's own lending_blocked flag must not stop them from renting")
+			assert.NotNil(t, res)
+		})
 	})
 
 	// Balance check is disabled for now
@@ -112,9 +201,10 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
 		rentalRepo := new(MockRentalRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 
-		userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID}, nil)
+		userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
+		userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
 		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
 		sameDay := time.Now().Add(24 * time.Hour).Format("2006-01-02")
 
@@ -128,6 +218,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 
 func TestRentalService_CompleteRental(t *testing.T) {
 	ctx := context.Background()
+	orgRepo := new(MockOrganizationRepo)
 	ownerID := int32(10)
 	renterID := int32(1)
 	rentalID := int32(1)
@@ -161,7 +252,7 @@ func TestRentalService_CompleteRental(t *testing.T) {
 
 	t.Run("Success with charge_billsplit=true", func(t *testing.T) {
 		rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo := newMocks()
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 
 		rt := *baseRental
 		rentalRepo.On("GetByID", ctx, rentalID).Return(&rt, nil)
@@ -194,7 +285,7 @@ func TestRentalService_CompleteRental(t *testing.T) {
 
 	t.Run("Success with charge_billsplit=false", func(t *testing.T) {
 		rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo := newMocks()
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 
 		rt := *baseRental
 		rentalRepo.On("GetByID", ctx, rentalID).Return(&rt, nil)
@@ -232,7 +323,7 @@ func TestRentalService_CompleteRental(t *testing.T) {
 	// the settlement math), with no owner approval step at all.
 	t.Run("Rejects a caller who is the renter, not the owner (SEC-RENTAL-005)", func(t *testing.T) {
 		rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo := newMocks()
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 
 		rt := *baseRental
 		rentalRepo.On("GetByID", ctx, rentalID).Return(&rt, nil)
@@ -255,7 +346,7 @@ func TestRentalService_CompleteRental(t *testing.T) {
 
 	t.Run("Settlement notification reminder text when charge_billsplit=false", func(t *testing.T) {
 		rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo := newMocks()
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 
 		rt := *baseRental
 		rentalRepo.On("GetByID", ctx, rentalID).Return(&rt, nil)
@@ -316,9 +407,10 @@ func TestRentalService_ApproveRentalRequest(t *testing.T) {
 		toolRepo := new(MockToolRepo)
 		ledgerRepo := new(MockLedgerRepo)
 		userRepo := new(MockUserRepo)
+		orgRepo := new(MockOrganizationRepo)
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 		return svc, rentalRepo, toolRepo, userRepo, emailSvc, noteRepo
 	}
 
@@ -368,10 +460,11 @@ func TestRentalService_FinalizeRentalRequest(t *testing.T) {
 	toolRepo := new(MockToolRepo)
 	ledgerRepo := new(MockLedgerRepo)
 	userRepo := new(MockUserRepo)
+	orgRepo := new(MockOrganizationRepo)
 	emailSvc := new(MockEmailService)
 	noteRepo := new(MockNotificationRepo)
 
-	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 	ctx := context.Background()
 
 	renterID := int32(1)
@@ -442,7 +535,7 @@ func TestRentalService_FinalizeRentalRequest(t *testing.T) {
 		userRepo := new(MockUserRepo)
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 
 		rentalRepo.On("GetByID", ctx, rentalID).Return(requestRental, nil)
 
@@ -459,7 +552,7 @@ func TestRentalService_FinalizeRentalRequest(t *testing.T) {
 		userRepo := new(MockUserRepo)
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 
 		notApproved := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID,
@@ -478,10 +571,11 @@ func TestRentalService_ActivateRental(t *testing.T) {
 	rentalRepo := new(MockRentalRepo)
 	toolRepo := new(MockToolRepo)
 	userRepo := new(MockUserRepo)
+	orgRepo := new(MockOrganizationRepo)
 	emailSvc := new(MockEmailService)
 	noteRepo := new(MockNotificationRepo)
 
-	svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+	svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 	ctx := context.Background()
 
 	ownerID := int32(10)
@@ -526,9 +620,10 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 	toolRepo := new(MockToolRepo)
 	emailSvc := new(MockEmailService)
 	userRepo := new(MockUserRepo)
+	orgRepo := new(MockOrganizationRepo)
 	noteRepo := new(MockNotificationRepo)
 
-	svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+	svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 	ctx := context.Background()
 
 	renterID := int32(20)
@@ -585,7 +680,7 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		userRepo := new(MockUserRepo)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 
 		requestedEndDate := time.Now().Add(48 * time.Hour).Format("2006-01-02")
 		lastAgreedEndDate := time.Now().Add(24 * time.Hour).Format("2006-01-02")
@@ -631,6 +726,7 @@ func TestRentalService_ChangeRentalDates(t *testing.T) {
 
 func TestRentalService_RejectReturnDateChange(t *testing.T) {
 	ctx := context.Background()
+	orgRepo := new(MockOrganizationRepo)
 
 	renterID := int32(20)
 	ownerID := int32(10)
@@ -658,7 +754,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		userRepo := new(MockUserRepo)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
@@ -712,7 +808,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		userRepo := new(MockUserRepo)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
@@ -739,7 +835,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		userRepo := new(MockUserRepo)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
@@ -765,7 +861,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		userRepo := new(MockUserRepo)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
@@ -790,7 +886,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		userRepo := new(MockUserRepo)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
@@ -816,7 +912,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		userRepo := new(MockUserRepo)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
@@ -842,7 +938,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		userRepo := new(MockUserRepo)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
@@ -869,7 +965,7 @@ func TestRentalService_RejectReturnDateChange(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		userRepo := new(MockUserRepo)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, nil, userRepo, orgRepo, emailSvc, noteRepo)
 
 		baseRental := &domain.Rental{
 			ID: rentalID, RenterID: renterID, OwnerID: ownerID, ToolID: toolID, OrgID: orgID,
@@ -912,6 +1008,7 @@ func TestRentalService_AcknowledgeReturnDateRejection(t *testing.T) {
 	const rentalID = int32(100)
 	const toolID = int32(200)
 
+	orgRepo := new(MockOrganizationRepo)
 	newSvc := func() (service.RentalService, *MockRentalRepo, *MockUserRepo, *MockNotificationRepo) {
 		rentalRepo := new(MockRentalRepo)
 		toolRepo := new(MockToolRepo)
@@ -919,7 +1016,7 @@ func TestRentalService_AcknowledgeReturnDateRejection(t *testing.T) {
 		userRepo := new(MockUserRepo)
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 		return svc, rentalRepo, userRepo, noteRepo
 	}
 
@@ -981,6 +1078,7 @@ func TestRentalService_CancelReturnDateChange(t *testing.T) {
 	const rentalID = int32(100)
 	const toolID = int32(200)
 
+	orgRepo := new(MockOrganizationRepo)
 	newSvc := func() (service.RentalService, *MockRentalRepo, *MockUserRepo, *MockNotificationRepo) {
 		rentalRepo := new(MockRentalRepo)
 		toolRepo := new(MockToolRepo)
@@ -988,7 +1086,7 @@ func TestRentalService_CancelReturnDateChange(t *testing.T) {
 		userRepo := new(MockUserRepo)
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 		return svc, rentalRepo, userRepo, noteRepo
 	}
 
@@ -1052,6 +1150,7 @@ func TestRentalService_ApproveReturnDateChange(t *testing.T) {
 	const rentalID = int32(100)
 	const toolID = int32(200)
 
+	orgRepo := new(MockOrganizationRepo)
 	newSvc := func() (service.RentalService, *MockRentalRepo, *MockToolRepo, *MockUserRepo, *MockNotificationRepo) {
 		rentalRepo := new(MockRentalRepo)
 		toolRepo := new(MockToolRepo)
@@ -1059,7 +1158,7 @@ func TestRentalService_ApproveReturnDateChange(t *testing.T) {
 		userRepo := new(MockUserRepo)
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 		return svc, rentalRepo, toolRepo, userRepo, noteRepo
 	}
 
@@ -1124,6 +1223,7 @@ func TestRentalService_GetRental(t *testing.T) {
 	const otherUserID = int32(999)
 	const rentalID = int32(100)
 
+	orgRepo := new(MockOrganizationRepo)
 	newSvc := func() (service.RentalService, *MockRentalRepo) {
 		rentalRepo := new(MockRentalRepo)
 		toolRepo := new(MockToolRepo)
@@ -1131,7 +1231,7 @@ func TestRentalService_GetRental(t *testing.T) {
 		userRepo := new(MockUserRepo)
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 		return svc, rentalRepo
 	}
 
@@ -1180,6 +1280,7 @@ func TestRentalService_ListMyRentalsAndLendings(t *testing.T) {
 	const callerID = int32(1)
 	const orgID = int32(5)
 
+	orgRepo := new(MockOrganizationRepo)
 	newSvc := func() (service.RentalService, *MockRentalRepo) {
 		rentalRepo := new(MockRentalRepo)
 		toolRepo := new(MockToolRepo)
@@ -1187,7 +1288,7 @@ func TestRentalService_ListMyRentalsAndLendings(t *testing.T) {
 		userRepo := new(MockUserRepo)
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
-		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 		return svc, rentalRepo
 	}
 

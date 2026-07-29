@@ -2,51 +2,62 @@
 
 Source: `api/proto/ubertool_trusted_backend/v1/tool_service.proto` + `image_storage_service.proto`
 
+> **Correction 2026-07-28**: `owner_org_id` and any server-side "current org" (Redis) were both
+> reverted — see `docs/design/multi-org.md`. `AddTool` sets `owner_id` from the JWT only; tools
+> are never bound to an org. `SearchTools`/`ListMyTools`/`GetTool` cross-org behavior is driven by
+> the caller's explicit `metro`/`organization_id` request parameters and a per-tool shared-org
+> post-filter (`getSharedOrganizations`), not an implicit cached "current org."
+>
+> **Correction 2026-07-29**: There is no `owner_organizations`/`OrganizationSummary` field on
+> `Tool`, and none was ever needed. The real `Tool` message (`api/proto/.../tool_service.proto`)
+> already has `User owner = 11`, and `User` (`ubertool_schema.proto`) already has
+> `repeated Organization orgs = 6`. FR-009 is implemented by populating that pre-existing
+> `owner.orgs` field with the shared orgs between the tool's owner and the requester
+> (`toolService.populateToolOwner`/`getSharedOrganizations`, `internal/service/tool.go`) — no
+> proto change was needed at all. `CreateRentalRequestResponse.shared_organization_ids`/
+> `shared_organization_names` (005-rentals) were removed for the same reason: this is where org
+> discovery belongs, not the rental-creation response.
+
 ## ToolService
 
 | RPC | Request | Response | Notes |
 |-----|---------|----------|-------|
-| `AddTool` | `AddToolRequest { Tool }` | `AddToolResponse { Tool }` | `owner_id` from JWT; `owner_org_id` from current org (FR-010) |
-| `GetTool` | `GetToolRequest { string id }` | `GetToolResponse { Tool }` | **FR-009**: `owner_organizations` filtered to shared orgs |
+| `AddTool` | `AddToolRequest { Tool }` | `AddToolResponse { Tool }` | `owner_id` from JWT only — no org association at all |
+| `GetTool` | `GetToolRequest { string id }` | `GetToolResponse { Tool }` | **FR-009**: `tool.owner.orgs` filtered to shared orgs (existing `User.orgs` field, not a new one) |
 | `UpdateTool` | `UpdateToolRequest { string id, Tool }` | `UpdateToolResponse { Tool }` | Requires ownership (FR-001) |
 | `DeleteTool` | `DeleteToolRequest { string id }` | `DeleteToolResponse {}` | Requires ownership |
-| `SearchTools` | `SearchToolsRequest` | `SearchToolsResponse { repeated Tool, next_page_token }` | **FR-008**: `include_all_my_orgs` flag |
-| `ListMyTools` | `ListMyToolsRequest {}` | `ListMyToolsResponse { repeated Tool }` | Owner's tools in current org |
+| `SearchTools` | `SearchToolsRequest` | `SearchToolsResponse { repeated Tool, next_page_token }` | **FR-008**: metro-scoped + per-tool shared-org filter (no `include_all_my_orgs` flag needed — there's no single-org scope to expand from) |
+| `ListMyTools` | `ListMyToolsRequest {}` | `ListMyToolsResponse { repeated Tool }` | Caller's own tools — org-independent, since tools aren't org-scoped |
 
-### Tool Message (FR-008, FR-009 extensions)
+### Tool Message (FR-009 — no new fields, reuses existing `User.orgs`)
+
+The real `Tool` message already has an `owner` field typed as the shared `User` message
+(`api/proto/.../ubertool_schema.proto`), which already has `repeated Organization orgs = 6`.
+FR-009 populates that field with the shared orgs rather than adding a parallel
+`owner_organizations`/`OrganizationSummary` field:
 
 ```protobuf
-message Tool {
-  string id = 1;
-  string owner_id = 2;
-  string owner_org_id = 3;        // Owner's primary org for this tool
-  string name = 4;
-  string description = 5;
-  repeated string categories = 6;
-  int64 daily_price_cents = 7;
-  int64 weekly_price_cents = 8;
-  int64 monthly_price_cents = 9;
-  int64 replacement_cost_cents = 10;
-  string condition = 11;
-  string metro = 12;
-  string duration_unit = 13;       // DAY, WEEK, MONTH
-  string status = 14;              // AVAILABLE, RENTED, MAINTENANCE, RETIRED
-  repeated ToolImage images = 15;
-  string created_at = 16;
-  string updated_at = 17;
-  
-  // NEW FR-009: Owner's organizations SHARED with requester
-  repeated OrganizationSummary owner_organizations = 20;
+// ubertool_schema.proto (existing, unchanged)
+message User {
+  int32 id = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+  string avatar_url = 5;
+  repeated Organization orgs = 6;  // FR-009: populated with shared orgs when owner is a Tool.owner
+  string created_on = 7;
 }
 
-message OrganizationSummary {
-  string id = 1;
-  string name = 2;
-  string metro = 3;
+// tool_service.proto (existing, unchanged)
+message Tool {
+  int32 id = 1;
+  // ...
+  User owner = 11;  // owner.orgs = shared orgs between owner and requester (FR-009)
+  // ...
 }
 ```
 
-### SearchToolsRequest (FR-008 extension)
+### SearchToolsRequest (FR-008)
 
 ```protobuf
 message SearchToolsRequest {
@@ -58,10 +69,9 @@ message SearchToolsRequest {
   bool available_only = 6;
   int32 page_size = 7;
   string page_token = 8;
-  
-  // NEW FR-008
-  bool include_all_my_orgs = 10;   // Default false: search current org only
-                                   // True: search ALL user's active orgs in same metro
+  // No include_all_my_orgs flag: search is always metro-scoped (explicit `metro`, or the metro
+  // of an `organization_id` the caller names) plus the per-tool shared-org post-filter — there is
+  // no single-org "default scope" to opt out of expanding.
 }
 ```
 
@@ -80,17 +90,15 @@ message SearchToolsRequest {
 
 | Feature | Parameter | Behavior |
 |---------|-----------|----------|
-| `AddTool` | (implicit) | `owner_org_id` = Redis `user:{id}:current_org` |
-| `SearchTools` | `include_all_my_orgs=true` | Search all ACTIVE orgs in current org's metro |
-| `GetTool` | (implicit) | `owner_organizations` = intersection of requester's orgs ∩ owner's orgs |
-| `ListMyTools` | (implicit) | Filters by `tools.owner_org_id = current_org` |
+| `AddTool` | (implicit) | `owner_id` = JWT caller only; no org is recorded at all |
+| `SearchTools` | `metro` / `organization_id` (explicit) | Metro-scoped base filter, then excludes tools whose owner shares zero active orgs with the requester; each result's `owner.orgs` = that shared-org set |
+| `GetTool` | (implicit) | `owner.orgs` = intersection of requester's orgs ∩ owner's orgs (reuses `User.orgs`, not a new field) |
+| `ListMyTools` | (implicit) | Caller's own tools by `owner_id`, independent of any org |
 
 ## Proto Changes Required
 
-1. `tool_service.proto`: Add `include_all_my_orgs` to `SearchToolsRequest`
-2. `tool_service.proto`: Add `owner_organizations` to `Tool` message
-3. Regenerate: `make proto`
+None. FR-008/FR-009 reuse existing fields (`metro`, `organization_id`, `User.orgs`).
 
 ## No Breaking Changes
 
-All new fields are optional with defaults (`false`, empty list). Existing clients work unchanged.
+No proto changes were made for FR-008/FR-009.

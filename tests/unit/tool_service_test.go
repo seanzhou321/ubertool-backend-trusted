@@ -130,8 +130,8 @@ func TestToolService_GetTool_RequiresSharedOrg(t *testing.T) {
 		repo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID, Name: "Drill"}, nil)
 		repo.On("GetImages", ctx, toolID).Return([]domain.ToolImage{}, nil)
 		userRepo.On("GetByID", ctx, ownerID).Return(&domain.User{ID: ownerID, Name: "Owner", Email: "owner@test.com"}, nil)
-		userRepo.On("ListUserOrgs", ctx, ownerID).Return([]domain.UserOrg{{UserID: ownerID, OrgID: 1}}, nil)
-		userRepo.On("ListUserOrgs", ctx, orgMateID).Return([]domain.UserOrg{{UserID: orgMateID, OrgID: 1}}, nil)
+		userRepo.On("ListUserOrgs", ctx, ownerID).Return([]domain.UserOrg{{UserID: ownerID, OrgID: 1, Status: domain.UserOrgStatusActive}}, nil)
+		userRepo.On("ListUserOrgs", ctx, orgMateID).Return([]domain.UserOrg{{UserID: orgMateID, OrgID: 1, Status: domain.UserOrgStatusActive}}, nil)
 		orgRepo.On("GetByID", ctx, int32(1)).Return(&domain.Organization{ID: 1, Name: "Shared Org"}, nil)
 
 		tool, _, err := svc.GetTool(ctx, toolID, orgMateID)
@@ -222,8 +222,8 @@ func TestToolService_SearchTools(t *testing.T) {
 		// Mock owner population calls
 		owner := &domain.User{ID: 5, Name: "Owner User"}
 		userRepo.On("GetByID", ctx, int32(5)).Return(owner, nil)
-		userRepo.On("ListUserOrgs", ctx, int32(5)).Return([]domain.UserOrg{{OrgID: 1}}, nil)
-		userRepo.On("ListUserOrgs", ctx, int32(1)).Return([]domain.UserOrg{{OrgID: 1}}, nil)
+		userRepo.On("ListUserOrgs", ctx, int32(5)).Return([]domain.UserOrg{{OrgID: 1, Status: domain.UserOrgStatusActive}}, nil)
+		userRepo.On("ListUserOrgs", ctx, int32(1)).Return([]domain.UserOrg{{OrgID: 1, Status: domain.UserOrgStatusActive}}, nil)
 		orgRepo.On("GetByID", ctx, int32(1)).Return(&domain.Organization{ID: 1, Name: "Test Org"}, nil)
 
 		res, total, err := svc.SearchTools(ctx, 1, 1, "", "query", []string{"cat"}, 100, "", 1, 10)
@@ -243,8 +243,8 @@ func TestToolService_SearchTools(t *testing.T) {
 		// Mock owner population - both users in org 1
 		owner := &domain.User{ID: 1, Name: "Owner 1"}
 		userRepo.On("GetByID", ctx, int32(1)).Return(owner, nil)
-		userRepo.On("ListUserOrgs", ctx, int32(1)).Return([]domain.UserOrg{{OrgID: 1}}, nil)
-		userRepo.On("ListUserOrgs", ctx, int32(301)).Return([]domain.UserOrg{{OrgID: 1}}, nil)
+		userRepo.On("ListUserOrgs", ctx, int32(1)).Return([]domain.UserOrg{{OrgID: 1, Status: domain.UserOrgStatusActive}}, nil)
+		userRepo.On("ListUserOrgs", ctx, int32(301)).Return([]domain.UserOrg{{OrgID: 1, Status: domain.UserOrgStatusActive}}, nil)
 		orgRepo.On("GetByID", ctx, int32(1)).Return(&domain.Organization{ID: 1, Name: "Shared Org", Metro: "San Francisco"}, nil)
 
 		res, total, err := svc.SearchTools(ctx, 301, 0, "San Francisco", "st", nil, 0, "", 1, 10)
@@ -320,8 +320,8 @@ func TestToolService_GetSharedOrganizations(t *testing.T) {
 		svc := service.NewToolService(toolRepo, userRepo, orgRepo)
 
 		// Setup: User 1 and User 301 both in org 1
-		userRepo.On("ListUserOrgs", ctx, int32(1)).Return([]domain.UserOrg{{OrgID: 1}}, nil)
-		userRepo.On("ListUserOrgs", ctx, int32(301)).Return([]domain.UserOrg{{OrgID: 1}}, nil)
+		userRepo.On("ListUserOrgs", ctx, int32(1)).Return([]domain.UserOrg{{OrgID: 1, Status: domain.UserOrgStatusActive}}, nil)
+		userRepo.On("ListUserOrgs", ctx, int32(301)).Return([]domain.UserOrg{{OrgID: 1, Status: domain.UserOrgStatusActive}}, nil)
 		orgRepo.On("GetByID", ctx, int32(1)).Return(&domain.Organization{ID: 1, Name: "Shared Org"}, nil)
 
 		// This is a workaround to test the private method getSharedOrganizations
@@ -376,13 +376,13 @@ func TestToolService_GetSharedOrganizations(t *testing.T) {
 		// Setup: Owner in orgs 1,2,3  Requester in orgs 2,4
 		// Should only return org 2
 		userRepo.On("ListUserOrgs", ctx, int32(10)).Return([]domain.UserOrg{
-			{OrgID: 1},
-			{OrgID: 2},
-			{OrgID: 3},
+			{OrgID: 1, Status: domain.UserOrgStatusActive},
+			{OrgID: 2, Status: domain.UserOrgStatusActive},
+			{OrgID: 3, Status: domain.UserOrgStatusActive},
 		}, nil)
 		userRepo.On("ListUserOrgs", ctx, int32(301)).Return([]domain.UserOrg{
-			{OrgID: 2},
-			{OrgID: 4},
+			{OrgID: 2, Status: domain.UserOrgStatusActive},
+			{OrgID: 4, Status: domain.UserOrgStatusActive},
 		}, nil)
 		orgRepo.On("GetByID", ctx, int32(2)).Return(&domain.Organization{ID: 2, Name: "Shared Org 2"}, nil)
 
@@ -399,5 +399,81 @@ func TestToolService_GetSharedOrganizations(t *testing.T) {
 		assert.NotNil(t, res[0].Owner)
 		assert.Len(t, res[0].Owner.Orgs, 1, "Should have exactly 1 shared org")
 		assert.Equal(t, int32(2), res[0].Owner.Orgs[0].ID, "Should return org 2 only")
+	})
+}
+
+// TestToolService_GetSharedOrganizations_RespectsBlockedFlags locks in a business rule clarified
+// after this feature shipped: users_orgs.renting_blocked and lending_blocked are independent
+// per-role flags (e.g. set by BillSplitService when a member has an unpaid bill — see
+// internal/service/bill_split.go's SetRentingBlocked/SetLendingBlocked). A tool owner blocked
+// only from renting (borrowing) in an org must still be able to lend there, and vice versa for
+// the requester — only the flag matching each side's actual role in a prospective rental should
+// exclude an org from the shared-org list.
+func TestToolService_GetSharedOrganizations_RespectsBlockedFlags(t *testing.T) {
+	ctx := context.Background()
+	const ownerID = int32(5)
+	const requesterID = int32(301)
+
+	newSvcForOrg := func(ownerOrg, requesterOrg domain.UserOrg) service.ToolService {
+		userRepo := new(MockUserRepo)
+		orgRepo := new(MockOrganizationRepo)
+		toolRepo := new(MockToolRepo)
+		svc := service.NewToolService(toolRepo, userRepo, orgRepo)
+
+		tool := &domain.Tool{ID: 400, OwnerID: ownerID, Name: "Ladder"}
+		owner := &domain.User{ID: ownerID, Name: "Owner"}
+		userRepo.On("GetByID", ctx, ownerID).Return(owner, nil)
+		userRepo.On("ListUserOrgs", ctx, ownerID).Return([]domain.UserOrg{ownerOrg}, nil)
+		userRepo.On("ListUserOrgs", ctx, requesterID).Return([]domain.UserOrg{requesterOrg}, nil)
+		orgRepo.On("GetByID", ctx, int32(1)).Return(&domain.Organization{ID: 1, Name: "Org 1"}, nil).Maybe()
+		toolRepo.On("Search", ctx, requesterID, "NYC", "ladder", []string(nil), int32(0), "NOT_DAMAGED", int32(1), int32(10)).
+			Return([]domain.Tool{*tool}, int32(1), nil)
+		return svc
+	}
+
+	t.Run("Owner lending_blocked in the only shared org excludes it", func(t *testing.T) {
+		svc := newSvcForOrg(
+			domain.UserOrg{OrgID: 1, Status: domain.UserOrgStatusActive, LendingBlocked: true},
+			domain.UserOrg{OrgID: 1, Status: domain.UserOrgStatusActive},
+		)
+		res, total, err := svc.SearchTools(ctx, requesterID, 0, "NYC", "ladder", nil, 0, "", 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int32(0), total, "owner cannot lend here, so the tool must not appear")
+		assert.Len(t, res, 0)
+	})
+
+	t.Run("Requester renting_blocked in the only shared org excludes it", func(t *testing.T) {
+		svc := newSvcForOrg(
+			domain.UserOrg{OrgID: 1, Status: domain.UserOrgStatusActive},
+			domain.UserOrg{OrgID: 1, Status: domain.UserOrgStatusActive, RentingBlocked: true},
+		)
+		res, total, err := svc.SearchTools(ctx, requesterID, 0, "NYC", "ladder", nil, 0, "", 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int32(0), total, "requester cannot rent here, so the tool must not appear")
+		assert.Len(t, res, 0)
+	})
+
+	t.Run("Owner renting_blocked only does not exclude the org (owner is lending here, not renting)", func(t *testing.T) {
+		svc := newSvcForOrg(
+			domain.UserOrg{OrgID: 1, Status: domain.UserOrgStatusActive, RentingBlocked: true},
+			domain.UserOrg{OrgID: 1, Status: domain.UserOrgStatusActive},
+		)
+		res, total, err := svc.SearchTools(ctx, requesterID, 0, "NYC", "ladder", nil, 0, "", 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int32(1), total, "owner's own renting_blocked flag must not stop them from lending")
+		require.Len(t, res, 1)
+		assert.Len(t, res[0].Owner.Orgs, 1)
+	})
+
+	t.Run("Requester lending_blocked only does not exclude the org (requester is renting here, not lending)", func(t *testing.T) {
+		svc := newSvcForOrg(
+			domain.UserOrg{OrgID: 1, Status: domain.UserOrgStatusActive},
+			domain.UserOrg{OrgID: 1, Status: domain.UserOrgStatusActive, LendingBlocked: true},
+		)
+		res, total, err := svc.SearchTools(ctx, requesterID, 0, "NYC", "ladder", nil, 0, "", 1, 10)
+		require.NoError(t, err)
+		assert.Equal(t, int32(1), total, "requester's own lending_blocked flag must not stop them from renting")
+		require.Len(t, res, 1)
+		assert.Len(t, res[0].Owner.Orgs, 1)
 	})
 }

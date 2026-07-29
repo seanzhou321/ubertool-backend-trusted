@@ -175,8 +175,18 @@ CREATE TABLE rentals (
     surcharge_or_credit_cents INTEGER, -- For late return or damage fees or credits for early return
     charge_billsplit BOOLEAN NOT NULL DEFAULT TRUE, -- Whether the rental cost should be included in bill splitting calculation
     created_on DATE DEFAULT CURRENT_DATE,
-    updated_on DATE DEFAULT CURRENT_DATE
-);
+    updated_on DATE DEFAULT CURRENT_DATE,
+    CONSTRAINT rentals_shared_org_check CHECK (
+        EXISTS (
+            SELECT 1 FROM users_orgs uo_renter
+            JOIN users_orgs uo_owner ON uo_renter.org_id = uo_owner.org_id
+            WHERE uo_renter.user_id = rentals.renter_id
+              AND uo_owner.user_id = rentals.owner_id
+              AND uo_renter.org_id = rentals.org_id
+              AND uo_renter.status = 'ACTIVE'
+              AND uo_owner.status = 'ACTIVE'
+        )
+    );
 
 CREATE TABLE rental_disputes (
     id SERIAL PRIMARY KEY,

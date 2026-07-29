@@ -365,16 +365,47 @@ and a `charge_billsplit=false` variant (e2e).
   2026-07-25** (Known Discrepancy 6): `organization_id` was previously a mandatory exact-match
   filter, a confirmed bug, not intended behavior — see Known Discrepancy 6 for the fix.
 - **FR-008** *(multi-org requirement from PRD 3.3, Organizations FR-012)*: When a user
-  attempts to create a rental request for a tool owned by a member of a different
-  organization (one the user also belongs to), the system MUST require an organization
-  context switch to the tool owner's organization before the rental can proceed. The
-  `CreateRentalRequest` RPC MUST validate that the caller is a member of the tool's
-  `org_id`; if the caller's current context organization differs from the tool's `org_id`,
-  the call MUST be rejected with a clear error indicating the required context switch
-  (e.g., "This tool belongs to organization [Church B]. Please switch your active
-  organization to [Church B] to rent this tool."). The rental record's `org_id` MUST be
-  set to the tool's `org_id`, ensuring all rental lifecycle operations (approval, completion,
-  billing) occur within that organization's context.
+  attempts to create a rental request, the rental's `org_id` **MUST be an organization
+  that both the renter (caller) and the tool owner are members of**. The system MUST
+  validate this at request time and reject with a clear error if the requested
+  `organization_id` is not a shared organization between renter and owner.
+
+  **Implementation approach (as built — no `owner_org_id` on tools; tools belong to users, not
+  orgs; no server-side "current org" of any kind — see `docs/design/multi-org.md`):**
+  1. **Database**: `rentals_shared_org_check` CHECK constraint on `rentals`
+     (`podman/trusted-group/postgres/ubertool_schema_trusted.sql`) verifies
+     `EXISTS (SELECT 1 FROM users_orgs uo_renter JOIN users_orgs uo_owner ON uo_renter.org_id = uo_owner.org_id
+              WHERE uo_renter.user_id = rentals.renter_id AND uo_owner.user_id = rentals.owner_id
+                AND uo_renter.org_id = rentals.org_id AND uo_renter.status = 'ACTIVE' AND uo_owner.status = 'ACTIVE')`
+  2. **Service Layer**: `rentalService.CreateRentalRequest` (`internal/service/rental.go`) takes
+     `organization_id` directly from the request — the caller's explicit choice, not anything
+     read from middleware/context/cache. It verifies the renter is an active member
+     (SEC-RENTAL-001), then verifies the tool owner is also an active member of that same org
+     (`isSharedOrganization`). If not shared, it returns `FAILED_PRECONDITION` with a
+     human-readable message listing the orgs the caller actually shares with the owner
+     (`getSharedOrganizations`) — this is a defensive backstop only (see point 4).
+  3. **Proto**: No change. `CreateRentalRequestRequest.organization_id` (already existing)
+     stays a plain, required field — there is no "current org" default to fall back to, and
+     nothing to validate it "matches" other than the shared-org check above.
+     `CreateRentalRequestResponse` carries no shared-org list field (removed 2026-07-29 — see
+     point 4).
+  4. **Org discovery happens earlier, at search time, not here**: the renter picks a tool from
+     `ToolService.SearchTools`/`GetTool`, whose `Tool.owner.orgs` (populated via
+     `getSharedOrganizations`, `internal/service/tool.go`) already tells them exactly which orgs
+     they share with that tool's owner — see 006-tools-image-storage FR-009. By the time the
+     renter calls `CreateRentalRequest`, they already know a valid `organization_id`; the
+     shared-org check here only guards against membership changing between search and request.
+     A rental-request *response* is the wrong place to carry a list of alternatives — that's a
+     discovery concern, not a write-result.
+
+  **Error response** (when requested org is not shared — rare; membership changed since search):
+  ```
+  code: FAILED_PRECONDITION
+  message: "organization [org id] is not shared with the tool owner. Shared organizations: [Church B]"
+  ```
+  No structured field carries the shared-org list. The client re-searches (or re-fetches the
+  tool via `GetTool`) to get a fresh `Tool.owner.orgs` and retries with one of those — there is
+  no `SetCurrentOrganization` call to make first.
 
 ### Key Entities
 

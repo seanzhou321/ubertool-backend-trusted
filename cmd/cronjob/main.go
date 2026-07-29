@@ -71,6 +71,7 @@ func main() {
 		store.ToolRepository,
 		store.LedgerRepository,
 		store.UserRepository,
+		store.OrganizationRepository,
 		emailService,
 		noteSvc,
 	)

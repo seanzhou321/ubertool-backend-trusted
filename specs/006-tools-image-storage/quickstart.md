@@ -1,9 +1,9 @@
 # Quickstart: Tools + Image Storage
 
 ## Prerequisites
-- Go 1.22+, PostgreSQL 16, Redis
+- Go 1.22+, PostgreSQL 16
 - `podman-compose -f podman/trusted-group/compose.yaml up -d`
-- `make proto`
+- `make proto-gen`
 
 ## Run Tests
 
@@ -25,20 +25,20 @@ go test -v ./tests/smoke/... -run Tool
 
 ## Manual Validation
 
-### 1. Cross-Org Search (FR-008)
+> No `owner_org_id`, `include_all_my_orgs` flag, or Redis "current org" exist — see
+> `docs/design/multi-org.md`. Search is always metro-scoped (explicit `metro`, or the metro of an
+> org the caller names) plus a per-tool shared-org filter.
+
+### 1. Metro + Shared-Org Search (FR-008)
 ```bash
-# User in org-1 (NYC) and org-2 (NYC), current org = org-1
-# Tools: tool-A in org-1, tool-B in org-2 (both NYC)
+# User in org-1 (NYC) and org-2 (NYC).
+# Tools: tool-A owned by u1 (in org-1 + org-2), tool-B owned by another user in org-2 only.
 
-# Default: current org only
-grpcurl -plaintext -d '{"query": "drill", "include_all_my_orgs": false}' \
+grpcurl -plaintext -d '{"query": "drill", "metro": "NYC"}' \
   localhost:50051 ubertool.trusted.backend.v1.ToolService/SearchTools
-# Returns: tool-A only
-
-# Cross-org
-grpcurl -plaintext -d '{"query": "drill", "include_all_my_orgs": true}' \
-  localhost:50051 ubertool.trusted.backend.v1.ToolService/SearchTools
-# Returns: tool-A + tool-B (both in NYC)
+# Returns tool-B (shares org-2 with the requester) but never tool-A (SearchTools excludes the
+# caller's own tools). A tool whose owner shares zero active orgs with the requester is excluded
+# even if it's in the same metro.
 ```
 
 ### 2. Shared-Org Owner Filtering (FR-009)
@@ -49,17 +49,17 @@ grpcurl -plaintext -d '{"query": "drill", "include_all_my_orgs": true}' \
 grpcurl -plaintext -d '{"tool_id": "tool-owned-by-user-in-org-2-org-3"}' \
   localhost:50051 ubertool.trusted.backend.v1.ToolService/GetTool
 
-# Response.owner_organizations: only org-2 (shared)
-# NOT org-3 (not shared with requester)
+# Response.tool.owner.orgs (the pre-existing User.orgs field): only org-2 (shared)
+# NOT org-3 (not shared with requester) — no owner_organizations field exists
 ```
 
-### 3. AddTool → Owner Org from JWT
+### 3. AddTool → Owner from JWT Only
 ```bash
 grpcurl -plaintext -H "Authorization: Bearer <JWT>" \
   -d '{"name": "New Drill", "daily_price_cents": 500, "metro": "NYC"}' \
   localhost:50051 ubertool.trusted.backend.v1.ToolService/AddTool
 # tool.owner_id = JWT user_id
-# tool.owner_org_id = current_org from Redis (FR-010)
+# No org is recorded on the tool at all.
 ```
 
 ## Test Data
@@ -73,11 +73,8 @@ INSERT INTO users_orgs (user_id, org_id, role, balance_cents, status) VALUES
   ('u1', 'org-1', 'ADMIN', 0, 'ACTIVE'),
   ('u1', 'org-2', 'MEMBER', 0, 'ACTIVE');
 
--- Tools in different orgs
-INSERT INTO tools (id, owner_id, owner_org_id, name, status, metro, daily_price_cents, replacement_cost_cents, condition, duration_unit) VALUES
-  ('tool-A', 'u1', 'org-1', 'Drill A', 'AVAILABLE', 'NYC', 500, 50000, 'GOOD', 'DAY'),
-  ('tool-B', 'other-user', 'org-2', 'Drill B', 'AVAILABLE', 'NYC', 600, 60000, 'LIKE_NEW', 'DAY');
-
--- Redis current org
-SET user:u1:current_org "org-1" EX 86400;
+-- Tools, owned by users, metro-scoped only (no org column)
+INSERT INTO tools (id, owner_id, name, status, metro, daily_price_cents, replacement_cost_cents, condition, duration_unit) VALUES
+  ('tool-A', 'u1', 'Drill A', 'AVAILABLE', 'NYC', 500, 50000, 'GOOD', 'DAY'),
+  ('tool-B', 'other-user', 'Drill B', 'AVAILABLE', 'NYC', 600, 60000, 'LIKE_NEW', 'DAY');
 ```

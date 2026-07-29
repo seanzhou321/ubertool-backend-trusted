@@ -257,6 +257,12 @@ func (s *toolService) populateToolOwner(ctx context.Context, tool *domain.Tool, 
 	return nil
 }
 
+// getSharedOrganizations returns the orgs where ownerID could actually lend this tool AND
+// requestingUserID could actually rent it: both must be ACTIVE members, ownerID must not be
+// lending_blocked in that org, and requestingUserID must not be renting_blocked in that org. A
+// user can be blocked from one side without the other (e.g. renting_blocked due to an unpaid
+// bill, while still free to lend), so the two flags are checked against the correct role rather
+// than either flag disqualifying both sides.
 func (s *toolService) getSharedOrganizations(ctx context.Context, ownerID, requestingUserID int32) ([]domain.Organization, error) {
 	// Get all organizations for the owner
 	ownerOrgs, err := s.userRepo.ListUserOrgs(ctx, ownerID)
@@ -274,16 +280,18 @@ func (s *toolService) getSharedOrganizations(ctx context.Context, ownerID, reque
 	}
 	fmt.Printf("DEBUG: Requesting user (user %d) orgs: %+v\n", requestingUserID, requestingUserOrgs)
 
-	// Create a map of requesting user's org IDs for fast lookup
+	// Create a map of the requesting user's org IDs where they're active and not renting-blocked
 	requestingOrgIDs := make(map[int32]bool)
 	for _, userOrg := range requestingUserOrgs {
-		requestingOrgIDs[userOrg.OrgID] = true
+		if userOrg.Status == domain.UserOrgStatusActive && !userOrg.RentingBlocked {
+			requestingOrgIDs[userOrg.OrgID] = true
+		}
 	}
 
-	// Find shared organizations
+	// Find shared organizations where the owner is active and not lending-blocked
 	var sharedOrgs []domain.Organization
 	for _, ownerOrg := range ownerOrgs {
-		if requestingOrgIDs[ownerOrg.OrgID] {
+		if ownerOrg.Status == domain.UserOrgStatusActive && !ownerOrg.LendingBlocked && requestingOrgIDs[ownerOrg.OrgID] {
 			// This is a shared organization, fetch its details
 			org, err := s.orgRepo.GetByID(ctx, ownerOrg.OrgID)
 			if err != nil {

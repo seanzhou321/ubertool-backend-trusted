@@ -156,39 +156,40 @@ type AdminBlockUserRequest struct {
 SELECT balance_cents FROM users_orgs WHERE user_id = $1 AND org_id = $2 AND status = 'ACTIVE';
 ```
 
-### FR-010: Current Org Context (Redis)
-```
-Key: user:{user_id}:current_org
-Value: {org_id}
-TTL: 24h (refresh on activity)
-```
+### FR-010: Current Org Context — REMOVED
+A prior attempt cached the user's "current organization" server-side in Redis
+(`user:{user_id}:current_org`, 24h TTL). This was reverted: which org a user is "focused on" is a
+client/device-local UI preference, not server state — a user may have several devices, each
+focused on a different org, so the server has no single "current org" to cache per user. Every
+request that needs an organization context passes `organization_id` explicitly instead (e.g.
+`CreateRentalRequestRequest.organization_id`). There is no Redis dependency in this service. See
+`docs/design/multi-org.md`.
 
 ### FR-011: Cross-Org Search (Tools)
+`tools` has no `org_id`/`owner_org_id` column — a tool is owned by a user (`tools.owner_id`), not
+an org, and is metro-scoped (`tools.metro`), not org-scoped. `toolService.SearchTools`
+(`internal/service/tool.go`) filters by `tools.metro` + status, then post-filters by computing the
+shared active organizations between the tool owner and the requesting user
+(`getSharedOrganizations`), excluding tools where they share zero orgs:
 ```sql
--- Tools from ALL user's active orgs in SAME metro as current org
-SELECT t.* 
-FROM tools t
-JOIN orgs o ON t.org_id = o.id
-JOIN users_orgs uo ON uo.org_id = o.id
-WHERE uo.user_id = $1 
-  AND uo.status = 'ACTIVE'
-  AND o.metro = (SELECT metro FROM orgs WHERE id = $2)  -- current org's metro
-  AND t.status = 'AVAILABLE';
+-- Base filter (metro-scoped, not org-scoped)
+SELECT * FROM tools
+WHERE metro = $1 AND deleted_on IS NULL AND owner_id != $2 AND status != 'UNAVAILABLE';
+```
+```sql
+-- Per-tool post-filter (Go, not SQL): shared active orgs between owner and requester
+SELECT o.* FROM orgs o
+JOIN users_orgs uo1 ON uo1.org_id = o.id AND uo1.user_id = $owner_id AND uo1.status = 'ACTIVE'
+JOIN users_orgs uo2 ON uo2.org_id = o.id AND uo2.user_id = $requester_id AND uo2.status = 'ACTIVE';
 ```
 
-### FR-012: Rental Context Switch Detection
-```sql
--- Check if tool owner's org is different from current org AND user is member
-SELECT t.org_id AS owner_org_id, o.name AS owner_org_name
-FROM tools t
-JOIN orgs o ON t.org_id = o.id
-WHERE t.id = $1
-  AND t.org_id != $2  -- current org
-  AND EXISTS (
-    SELECT 1 FROM users_orgs 
-    WHERE user_id = $3 AND org_id = t.org_id AND status = 'ACTIVE'
-  );
-```
+### FR-012: Rental Org-Context Validation
+No `owner_org_id` on tools, so there is no tool-to-org binding to compare against. Instead,
+`rentalService.CreateRentalRequest` (`internal/service/rental.go`) validates the caller-supplied
+`organization_id` directly: both the renter and the tool owner must be active members of that org
+(`isSharedOrganization`); on mismatch it returns `FAILED_PRECONDITION` with the caller's list of
+orgs shared with the owner (`getSharedOrganizations`). The `rentals` table also enforces this
+invariant at the DB layer via the `rentals_shared_org_check` CHECK constraint.
 
 ## gRPC Contracts
 
@@ -200,8 +201,8 @@ service OrganizationService {
     rpc GetOrganization(GetOrganizationRequest) returns (GetOrganizationResponse);
     rpc ListMyOrganizations(ListMyOrganizationsRequest) returns (ListMyOrganizationsResponse);
     rpc JoinOrganizationWithInvite(JoinOrganizationWithInviteRequest) returns (JoinOrganizationWithInviteResponse);
-    rpc SetCurrentOrganization(SetCurrentOrganizationRequest) returns (SetCurrentOrganizationResponse); // FR-010
-    rpc GetCurrentOrganization(GetCurrentOrganizationRequest) returns (GetCurrentOrganizationResponse); // FR-010
+    // FR-010 (SetCurrentOrganization/GetCurrentOrganization) was REMOVED — no server-side
+    // "current org" exists. See docs/design/multi-org.md.
 }
 
 // ADD to ListMyOrganizationsResponse.Organization:

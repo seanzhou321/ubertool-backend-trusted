@@ -59,7 +59,7 @@
 | III. Push Notification Pattern | Create/Approve/Finalize/Complete/Cancel all trigger notifications + email + push | ✅ PASS |
 | IV. Layered Testing Discipline | Tests in existing tier directories | ✅ PASS |
 | V. Deployment Parity | Schema works on Podman + EC2 PostgreSQL | ✅ PASS |
-| VI. Proto-First API Contract | FR-008 adds `current_organization_id` to CreateRentalRequest — proto change | ✅ PASS |
+| VI. Proto-First API Contract | FR-008 validates the existing `organization_id` field directly — no proto change was needed (see `docs/design/multi-org.md`) | ✅ PASS |
 
 **Gate Status**: ✅ All checks pass — proceed to Phase 0
 

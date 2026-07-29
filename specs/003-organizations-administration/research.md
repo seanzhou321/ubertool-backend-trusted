@@ -1,9 +1,17 @@
 # Research: Organizations & Administration Multi-Org Gaps
 
-**Date**: 2026-07-27  
+**Date**: 2026-07-27 (original) — **Corrected 2026-07-28**
 **Context**: Implement FR-009, FR-010, FR-011, FR-012 from `specs/003-organizations-administration/spec.md`
 
-## Decision: Current Org Context Stored in Redis (not JWT)
+> **Status**: FR-010 (server-side "current org" in Redis) and the `include_all_my_orgs`/
+> `context_switch_required` proto extensions below (FR-011/FR-012) were all implemented once and
+> then reverted 2026-07-28 — a user's active org is a client/device-local UI preference, not
+> server state (a user may have several devices, each focused on a different org), and tools were
+> never meant to be bound to a single org (`docs/design/multi-org.md`). The sections below are
+> retained for historical rationale only — do not reimplement them. See `contracts/README.md` and
+> `tasks.md` in this directory for what was actually built instead.
+
+## Decision: Current Org Context Stored in Redis (not JWT) — REVERTED, do not reimplement
 
 **Rationale**:
 - JWT is stateless; org context changes frequently (user switches orgs)

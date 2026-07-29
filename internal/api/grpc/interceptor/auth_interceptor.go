@@ -81,6 +81,7 @@ func (i *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 			}
 			md.Set("temp-pwd", tempPwdVal)
 		}
+
 		newCtx := metadata.NewIncomingContext(ctx, md)
 		logger.Debug("User ID injected into context", "method", info.FullMethod, "userID", claims.UserID)
 

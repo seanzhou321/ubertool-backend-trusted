@@ -257,7 +257,12 @@ func (s *organizationService) ListMyOrganizations(ctx context.Context, userID in
 	}
 
 	var orgs []domain.Organization
+	var activeUserOrgs []domain.UserOrg
 	for _, uo := range userOrgs {
+		// Skip BLOCKED organizations
+		if uo.Status == domain.UserOrgStatusBlock {
+			continue
+		}
 		org, err := s.orgRepo.GetByID(ctx, uo.OrgID)
 		if err != nil {
 			continue
@@ -271,9 +276,10 @@ func (s *organizationService) ListMyOrganizations(ctx context.Context, userID in
 				org.MemberCount = memberCount
 			}
 			orgs = append(orgs, *org)
+			activeUserOrgs = append(activeUserOrgs, uo)
 		}
 	}
-	return orgs, userOrgs, nil
+	return orgs, activeUserOrgs, nil
 }
 
 func (s *organizationService) JoinOrganizationWithInvite(ctx context.Context, userID int32, inviteCode string) (*domain.Organization, *domain.User, error) {

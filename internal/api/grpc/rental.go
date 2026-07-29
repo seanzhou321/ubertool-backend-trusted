@@ -30,6 +30,7 @@ func (h *RentalHandler) CreateRentalRequest(ctx context.Context, req *pb.CreateR
 	if err != nil {
 		return nil, err
 	}
+
 	rt, err := h.rentalSvc.CreateRentalRequest(ctx, userID, req.ToolId, req.OrganizationId, req.StartDate, req.EndDate)
 	if err != nil {
 		return nil, err

@@ -1,9 +1,9 @@
 # Quickstart: Rentals
 
 ## Prerequisites
-- Go 1.22+, PostgreSQL 16, Redis
+- Go 1.22+, PostgreSQL 16
 - `podman-compose -f podman/trusted-group/compose.yaml up -d`
-- `make proto`
+- `make proto-gen`
 
 ## Run Tests
 
@@ -23,7 +23,12 @@ kill %1
 go test -v ./tests/smoke/... -run Rental
 ```
 
-## Manual Validation: Multi-Org Context Switch (FR-008)
+## Manual Validation: Multi-Org Rental Context (FR-008)
+
+> There is no `owner_org_id` on tools and no server-side "current organization" (no
+> `SetCurrentOrganization`/`GetCurrentOrganization`, no Redis). The client always passes
+> `organization_id` explicitly in `CreateRentalRequest`; the server validates it against the
+> renter's and owner's shared active orgs. See `docs/design/multi-org.md`.
 
 ### Setup: User in 2 orgs, tool owned by org-2 member
 ```sql
@@ -40,44 +45,34 @@ INSERT INTO users_orgs (user_id, org_id, role, balance_cents, status) VALUES
   ('u1', 'org-2', 'MEMBER', -3000, 'ACTIVE'),
   ('u2', 'org-2', 'ADMIN',  10000, 'ACTIVE');
 
-INSERT INTO tools (id, owner_id, owner_org_id, name, status, metro, base_price_cents, duration_unit, duration_value)
-VALUES ('tool-123', 'u2', 'org-2', 'Power Drill', 'AVAILABLE', 'NYC', 2000, 'DAY', 1);
+INSERT INTO tools (id, owner_id, name, status, metro, base_price_cents, duration_unit, duration_value)
+VALUES ('tool-123', 'u2', 'Power Drill', 'AVAILABLE', 'NYC', 2000, 'DAY', 1);
 ```
 
-### Scenario 1: Context Switch Required
+### Scenario 1: Rejects a non-shared organization_id
 ```bash
-# Current org = org-1, tool owned by org-2 member
+# Renter passes org-1, but the tool owner (u2) is not a member of org-1
 grpcurl -plaintext -d '{
   "tool_id": "tool-123",
   "start_date": "2026-08-01",
   "end_date": "2026-08-05",
-  "current_organization_id": "org-1"
+  "organization_id": "org-1"
 }' localhost:50051 ubertool.trusted.backend.v1.RentalService/CreateRentalRequest
 
-# Expected: 
-# {
-#   "context_switch_required": true,
-#   "target_organization_id": "org-2",
-#   "target_organization_name": "Org Two"
-# }
+# Expected: FAILED_PRECONDITION — "organization org-1 is not shared with the tool owner.
+# Shared organizations: [Org Two]"
 ```
 
-### Scenario 2: Client Switches Context + Retries
+### Scenario 2: Succeeds with a shared organization_id
 ```bash
-# 1. Switch context
-grpcurl -plaintext -d '{"organization_id": "org-2"}' \
-  localhost:50051 ubertool.trusted.backend.v1.OrganizationService/SetCurrentOrganization
-
-# 2. Retry rental request (with same idempotency_key)
 grpcurl -plaintext -d '{
   "tool_id": "tool-123",
   "start_date": "2026-08-01",
   "end_date": "2026-08-05",
-  "current_organization_id": "org-2",
-  "idempotency_key": "same-key-as-before"
+  "organization_id": "org-2"
 }' localhost:50051 ubertool.trusted.backend.v1.RentalService/CreateRentalRequest
 
-# Expected: rental created in org-2 context
+# Expected: rental created with org_id=org-2
 ```
 
 ### Scenario 3: No Membership in Tool's Org → Reject
@@ -91,10 +86,10 @@ grpcurl -plaintext -d '{
   "tool_id": "tool-123",
   "start_date": "2026-08-01",
   "end_date": "2026-08-05",
-  "current_organization_id": "org-1"
+  "organization_id": "org-2"
 }' localhost:50051 ubertool.trusted.backend.v1.RentalService/CreateRentalRequest
 
-# Expected: PERMISSION_DENIED (not context switch)
+# Expected: rejected — renter (u1) is no longer a member of org-2 at all
 ```
 
 ## Existing Flow Validation (US1-US4)

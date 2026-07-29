@@ -189,9 +189,10 @@ func TestRentalService_CompleteRental_Integration(t *testing.T) {
 	toolRepo := postgres.NewToolRepository(db)
 	rentalRepo := postgres.NewRentalRepository(db)
 	ledgerRepo := postgres.NewLedgerRepository(db)
+	orgRepo := postgres.NewOrganizationRepository(db)
 	emailSvc := new(MockEmailService)
 	noteRepo := new(MockNotificationRepo)
-	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 	ctx := context.Background()
 
 	orgName := fmt.Sprintf("Org-Complete-%d", time.Now().UnixNano())
@@ -336,10 +337,11 @@ func TestRentalDateChange_Integration(t *testing.T) {
 	toolRepo := postgres.NewToolRepository(db)
 	rentalRepo := postgres.NewRentalRepository(db)
 	ledgerRepo := postgres.NewLedgerRepository(db)
+	orgRepo := postgres.NewOrganizationRepository(db)
 	emailSvc := new(MockEmailService)
 	noteRepo := new(MockNotificationRepo)
 
-	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, emailSvc, noteRepo)
+	svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
 	ctx := context.Background()
 
 	// 2. Setup Data

@@ -59,7 +59,7 @@
 | III. Push Notification Pattern | AddTool, UpdateTool, DeleteTool, ConfirmUpload → notifications + email + push | ✅ PASS |
 | IV. Layered Testing Discipline | Tests in existing tier directories | ✅ PASS |
 | V. Deployment Parity | Schema + S3 config work on Podman + EC2 | ✅ PASS |
-| VI. Proto-First API Contract | FR-008 adds `include_all_my_orgs` to SearchToolsRequest — proto change | ✅ PASS |
+| VI. Proto-First API Contract | FR-008 uses the existing `metro`/`organization_id` fields on SearchToolsRequest plus a per-tool shared-org filter — no proto change was needed (`include_all_my_orgs` was never added; see `docs/design/multi-org.md`) | ✅ PASS |
 
 **Gate Status**: ✅ All checks pass — proceed to Phase 0
 

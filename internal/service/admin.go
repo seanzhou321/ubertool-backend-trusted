@@ -75,6 +75,11 @@ func (s *adminService) ApproveJoinRequest(ctx context.Context, adminID, orgID, j
 	// 3. Check if user already exists
 	user, err := s.userRepo.GetByEmail(ctx, joinReq.Email)
 	if err == nil && user != nil {
+		// User exists - check if already a member
+		existingUO, err := s.userRepo.GetUserOrg(ctx, user.ID, orgID)
+		if err == nil && existingUO != nil {
+			return "", fmt.Errorf("user is already a member of this organization")
+		}
 		// User exists, add to org
 		userOrg := &domain.UserOrg{
 			UserID:       user.ID,

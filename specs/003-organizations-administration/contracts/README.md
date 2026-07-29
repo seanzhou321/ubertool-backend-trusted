@@ -4,6 +4,15 @@
 
 Per Constitution Principle VI (Proto-First), these .proto files define the external API surface. Generated code in `api/gen/v1/` is NEVER hand-edited.
 
+> **Correction 2026-07-28**: `SetCurrentOrganization`/`GetCurrentOrganization` (FR-010) and the
+> Redis-backed "current org" they depended on were both removed from the actual proto and
+> service. A user's "current organization" is a client/device-local UI preference — a user may
+> have several devices, each focused on a different org — so the server has nothing to cache per
+> user and must not persist one. `include_all_my_orgs` (FR-011) and `current_organization_id`/
+> `context_switch_required` (FR-012) were never added either; see `docs/design/multi-org.md` for
+> the corrected design that was actually implemented. The sections below documenting those are
+> retained struck through for history — do not reintroduce them.
+
 ## OrganizationService
 
 | RPC | Request | Response | Auth | Notes |
@@ -13,8 +22,8 @@ Per Constitution Principle VI (Proto-First), these .proto files define the exter
 | `UpdateOrganization` | `{ organization_id, name?, price_threshold_cents? }` | `{ Organization }` | ADMIN/SUPER_ADMIN in org | |
 | `ListMyOrganizations` | `{}` | `{ repeated OrgMembership }` | Authenticated | **FR-009**: includes `balance_cents`, `member_count` |
 | `JoinOrganizationWithInvite` | `{ string token }` | `{ OrgMembership }` | Authenticated | Validates token, adds as MEMBER |
-| `SetCurrentOrganization` | `{ string organization_id }` | `{ bool success }` | Authenticated | **FR-010 NEW**: validates membership, stores in Redis |
-| `GetCurrentOrganization` | `{}` | `{ organization_id, organization_name }` | Authenticated | **FR-010 NEW**: reads from Redis |
+| ~~`SetCurrentOrganization`~~ | — | — | — | REMOVED (FR-010) — no server-side "current org"; see correction note above |
+| ~~`GetCurrentOrganization`~~ | — | — | — | REMOVED (FR-010) — no server-side "current org"; see correction note above |
 
 ### OrgMembership (extended for FR-009)
 ```protobuf
@@ -38,32 +47,32 @@ message OrgMembership {
 | `AdminBlockUserAccount` | `{ string organization_id, string user_id, BlockAction action }` | `{}` | SUPER_ADMIN | BLOCK/UNBLOCK |
 | `ListJoinRequests` | `{ string organization_id }` | `{ repeated JoinRequest }` | ADMIN/SUPER_ADMIN | **FR-008**: returns all requests |
 
-## Cross-Domain Contracts (Multi-Org)
+## Cross-Domain Contracts (Multi-Org) — As Actually Built
 
-### ToolService.SearchTools (FR-011)
-```protobuf
-// EXTENSION to SearchToolsRequest
-bool include_all_my_orgs = 10;  // When true, search all user's active orgs in same metro
-```
+### ToolService.SearchTools / GetTool (FR-011, FR-009) — where org discovery actually lives
+No `include_all_my_orgs` field exists or was needed. `SearchToolsRequest` already carries `metro`
+(and `organization_id` to resolve one) as explicit fields; `toolService.SearchTools` filters by
+`tools.metro` (tools are never org-scoped) then post-filters per-tool by shared active orgs
+between the owner and requester (`getSharedOrganizations`, `internal/service/tool.go`). Each
+returned `Tool.owner` (a `User` message) has its pre-existing `orgs` field (`User.orgs`,
+`ubertool_schema.proto`) populated with exactly those shared orgs — this is how the client learns
+*which* `organization_id` values are valid for renting a given tool, before ever calling
+`CreateRentalRequest`. No new proto field was needed; `GetTool` does the same via `populateToolOwner`.
 
-### RentalService.CreateRentalRequest (FR-012)
-```protobuf
-// EXTENSION to CreateRentalRequest
-string current_organization_id = 20;  // Client sends for validation
+### RentalService.CreateRentalRequest (FR-012 / Rentals FR-008) — validation only, not discovery
+No `current_organization_id`/`context_switch_required`/`target_organization_id` fields exist or
+were needed. `CreateRentalRequestRequest.organization_id` (already existing) is the caller's
+explicit choice — the renter already knows a valid value from `Tool.owner.orgs` above.
+`rentalService.CreateRentalRequest` (`internal/service/rental.go`) validates it via
+`isSharedOrganization` and, on mismatch, returns a plain `FAILED_PRECONDITION` (human-readable
+message only). `CreateRentalRequestResponse.shared_organization_ids`/`shared_organization_names`
+were added, found to duplicate `Tool.owner.orgs` in the wrong layer (a write-result response, not
+a discovery surface), and removed 2026-07-29.
 
-// EXTENSION to CreateRentalResponse
-bool context_switch_required = 10;
-string target_organization_id = 11;
-string target_organization_name = 12;
-```
+## No Redis Contract
 
-## Redis Contract (FR-010 — Internal)
-```
-Key:    user:{user_id}:current_org
-Value:  {organization_id}
-TTL:    86400 (24h) — refreshed on activity
-Ops:    SET (SetCurrentOrg), GET (GetCurrentOrg), DEL (Logout)
-```
+There is no Redis dependency anywhere in this service. "Current organization" is a client/device-
+local UI preference, never cached or persisted server-side — see `docs/design/multi-org.md`.
 
 ## Change Management
 1. Edit `.proto` files

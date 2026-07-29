@@ -71,6 +71,9 @@ message CreateRentalRequestRequest {
 // Create rental request response
 message CreateRentalRequestResponse {
   RentalRequest rental_request = 1;
+  // No shared-org list here — org discovery happens earlier, at ToolService.SearchTools/GetTool
+  // time, via Tool.owner.orgs. A FAILED_PRECONDITION error here (org_id not shared) is a
+  // defensive backstop, not the client's way to discover valid orgs.
 }
 
 // Approve rental request
