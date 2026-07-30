@@ -258,46 +258,6 @@ full history for that tool, including rentals by other renters.
    != userID` — an org admin with no personal stake in the rental is rejected, unlike every
    admin-scoped read elsewhere in the codebase (e.g. Bill Split's `GetPaymentDetail`, which
    does correctly extend access to org admins).
-5. **HIGH, FIXED 2026-07-23 — `CompleteRental` accepted the renter as well as the owner,
-   contrary to its own proto documentation.** `rental_service.proto` had always documented
-   `CompleteRental` as "owner only," but `rentalService.loadAndValidateRental`
-   (`internal/service/rental.go`) checked `rt.OwnerID != userID && rt.RenterID != userID` —
-   accepting either party. This let a renter self-complete their own rental and
-   single-handedly set `surcharge_or_credit_cents` (including a negative value), which feeds
-   directly into settlement math with no owner approval step. **Found and fixed same day** as
-   part of the adversarial security audit (`SEC-RENTAL-005` in
-   `sbr/rtm/009-security.rtm.md`): the check was narrowed to `rt.OwnerID != userID` only,
-   matching the proto doc. Regression-locked by
-   `TestRentalService_CompleteRental > "Rejects a caller who is the renter, not the owner
-   (SEC-RENTAL-005)"` (`tests/unit/rental_test.go`) and
-   `TestRentalService_CompleteRental_Integration > "Rejects the renter — CompleteRental is
-   owner-only"` (`tests/integration/rental_ledger_test.go`), both green. This spec's FR-004 and
-   Acceptance Scenario 3 (User Story 2) were corrected 2026-07-25 to describe this as current,
-   intended behavior — they had described the pre-fix "participant" behavior as correct through
-   a `speckit-sbr-audit` re-audit pass that landed after the code fix but before this
-   correction (see `sbr/rtm/005-rentals.rtm.md` FR-004 for the full trace).
-6. **FOUND AND FIXED 2026-07-25 — `ListMyRentals`/`ListMyLendings` treated `organization_id`
-   as a mandatory exact-match filter, contrary to documentation.**
-   `docs/design/grpc_api_business_logic.md`'s "List My Rentals"/"List My Lendings" business
-   logic says: "If `organization_id` is given, filter only the requests from that
-   organization" — implying it is optional. **As found**,
-   `rentalRepository.ListByRenter`/`ListByOwner`
-   (`internal/repository/postgres/rental.go:58-61,113-116`) always built their query as
-   `WHERE renter_id = $1 AND org_id = $2` (respectively `owner_id`) with no conditional
-   branch — `org_id` was never omitted from the predicate regardless of what the caller sent,
-   so a caller who omitted `organization_id` (or sent `0`, since proto3 has no "unset" for a
-   scalar `int32`) got zero results instead of "all my orgs." **Confirmed as a real bug, not
-   intended behavior**, per product decision (2026-07-25): `organization_id` MUST be optional
-   for both RPCs — used to filter when supplied, ignored (returning across all the caller's
-   orgs) when omitted. **Fixed same day**: both queries now build their `WHERE` clause with
-   only `renter_id`/`owner_id`, and append `AND org_id = $N` only when `orgID > 0`
-   (`internal/repository/postgres/rental.go`). Regression-locked by
-   `TestRentalRepository_ListByRenterAndOwner_OrgFilter` (`tests/integration/rental_list_test.go`,
-   new file, real DB) — 4 subtests: a specific `organization_id` still filters correctly for
-   both `ListByRenter` and `ListByOwner`, and `organization_id = 0` now returns rentals/lendings
-   across two different orgs for the same caller instead of zero. The failing (red) case was
-   confirmed against the pre-fix code before the fix was applied. Full unit and integration
-   suites re-run green afterward.
 
 ## Current Test Coverage Baseline *(informational — grounds the next /speckit-tasks pass, not a requirement)*
 
@@ -306,14 +266,11 @@ Verified by inspection of `tests/unit/rental_test.go`, `tests/e2e/rental_test.go
 
 **Covered**: `CreateRentalRequest`'s happy path and cost calculation (unit); `CompleteRental`
 including ledger/balance effects, snapshot-vs-tool-price recomputation, the owner-only/status
-reject clauses (owner-only as of the 2026-07-23 fix — see Known Discrepancy 5), and the
-`charge_billsplit` gate (unit + integration — as of 2026-07-22,
-`TestRentalService_CompleteRental_Integration` calls `service.CompleteRental` directly against
-a real DB; the prior integration test under this same claim bypassed the service method
-entirely via direct repository writes, see `sbr/rtm/005-rentals.rtm.md`); `FinalizeRentalRequest`,
-`ActivateRental`, `ChangeRentalDates` (multiple sub-cases), `RejectReturnDateChange` (unit);
-a full end-to-end lifecycle including reject, an in-flight extension-request update, cancel,
-and a `charge_billsplit=false` variant (e2e).
+reject clauses, and the `charge_billsplit` gate (unit + integration —
+`TestRentalService_CompleteRental_Integration` calls `service.CompleteRental` directly
+against a real DB); `FinalizeRentalRequest`, `ActivateRental`, `ChangeRentalDates` (multiple
+sub-cases), `RejectReturnDateChange` (unit); a full end-to-end lifecycle including reject,
+an in-flight extension-request update, cancel, and a `charge_billsplit=false` variant (e2e).
 
 **Not covered anywhere**:
 
@@ -344,10 +301,9 @@ and a `charge_billsplit=false` variant (e2e).
 - **FR-003**: `FinalizeRentalRequest` MUST require the caller to be the renter and the
   rental to be `APPROVED`, and MUST set the tool's status to `RENTED` on success.
 - **FR-004**: `CompleteRental` MUST require the caller to be the tool's owner (not the
-  renter — corrected 2026-07-25; see Known Discrepancy 5) and the rental to
-  be `ACTIVE`/`SCHEDULED`/`OVERDUE`, MUST recompute cost from the rental's own price
-  snapshot (never the tool's current prices), and MUST only create ledger transactions /
-  update balances when `charge_billsplit = true`.
+  renter) and the rental to be `ACTIVE`/`SCHEDULED`/`OVERDUE`, MUST recompute cost from the
+  rental's own price snapshot (never the tool's current prices), and MUST only create
+  ledger transactions / update balances when `charge_billsplit = true`.
 - **FR-005**: Every return-date-change transition (`ChangeRentalDates` in its active-rental
   case, `ApproveReturnDateChange`, `RejectReturnDateChange`, `AcknowledgeReturnDateRejection`,
   `CancelReturnDateChange`) MUST recompute `total_cost_cents` from the rental's price
@@ -355,15 +311,11 @@ and a `charge_billsplit=false` variant (e2e).
 - **FR-006**: `GetRental` MUST grant access to the rental's renter and owner.
   **As-built, it MUST NOT be assumed to also grant access to org admins** (Known
   Discrepancy 4) despite that being documented.
-- **FR-007** *(added 2026-07-25 — previously described only in User Story 4 Acceptance
-  Scenario 2, with no FR-ID or RTM row; `spec.md`'s own "Not covered anywhere" list already
-  self-flagged the underlying test gap)*: `ListMyRentals` (scoped to the caller as renter) and
-  `ListMyLendings` (scoped to the caller as owner) MUST OR-combine a given `status` array (any
-  matching status returns the rental; an empty array returns all statuses), and MUST treat
+- **FR-007**: `ListMyRentals` (scoped to the caller as renter) and `ListMyLendings` (scoped
+  to the caller as owner) MUST OR-combine a given `status` array (any matching status
+  returns the rental; an empty array returns all statuses), and MUST treat
   `organization_id` as an optional filter — when supplied (non-zero), results are scoped to
-  that org; when omitted (`0`), results span every org the caller belongs to. **Fixed
-  2026-07-25** (Known Discrepancy 6): `organization_id` was previously a mandatory exact-match
-  filter, a confirmed bug, not intended behavior — see Known Discrepancy 6 for the fix.
+  that org; when omitted (`0`), results span every org the caller belongs to.
 - **FR-008** *(multi-org requirement from PRD 3.3, Organizations FR-012)*: When a user
   attempts to create a rental request, the rental's `org_id` **MUST be an organization
   that both the renter (caller) and the tool owner are members of**. The system MUST
@@ -387,8 +339,8 @@ and a `charge_billsplit=false` variant (e2e).
   3. **Proto**: No change. `CreateRentalRequestRequest.organization_id` (already existing)
      stays a plain, required field — there is no "current org" default to fall back to, and
      nothing to validate it "matches" other than the shared-org check above.
-     `CreateRentalRequestResponse` carries no shared-org list field (removed 2026-07-29 — see
-     point 4).
+     `CreateRentalRequestResponse` carries no shared-org list field — see point 4 for where
+     that discovery actually lives.
   4. **Org discovery happens earlier, at search time, not here**: the renter picks a tool from
      `ToolService.SearchTools`/`GetTool`, whose `Tool.owner.orgs` (populated via
      `getSharedOrganizations`, `internal/service/tool.go`) already tells them exactly which orgs

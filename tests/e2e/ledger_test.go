@@ -107,6 +107,43 @@ func TestLedgerService_E2E(t *testing.T) {
 		assert.GreaterOrEqual(t, resp.StatusCount["PENDING"], int32(1))
 	})
 
+	t.Run("GetLedgerSummary rolls up across all orgs when organization_id is omitted", func(t *testing.T) {
+		// Covers FR-004 (specs/007-ledger, multi-org): organization_id=0 MUST roll up balance
+		// and per-status rental counts across every org the caller belongs to, not fail with
+		// "no rows" (Known Discrepancy 2). Real gRPC handler + live DB, mirroring the
+		// single-org "GetLedgerSummary" subtest above but across two orgs.
+		userID := db.CreateTestUser("e2e-test-ledger-rollup-user@test.com", "Rollup User")
+		otherUserID := db.CreateTestUser("e2e-test-ledger-rollup-other@test.com", "Rollup Other")
+		orgA := db.CreateTestOrg("")
+		orgB := db.CreateTestOrg("")
+		db.AddUserToOrg(userID, orgA, "MEMBER", "ACTIVE", 4200)
+		db.AddUserToOrg(userID, orgB, "MEMBER", "ACTIVE", 800)
+		db.AddUserToOrg(otherUserID, orgA, "MEMBER", "ACTIVE", 0)
+		db.AddUserToOrg(otherUserID, orgB, "MEMBER", "ACTIVE", 0)
+
+		toolInA := db.CreateTestTool(otherUserID, "Rollup Tool A", 1000)
+		toolInB := db.CreateTestTool(userID, "Rollup Tool B", 1000)
+
+		_, err := db.Exec(`
+			INSERT INTO rentals (org_id, tool_id, renter_id, owner_id, start_date, end_date, duration_unit, daily_price_cents, weekly_price_cents, monthly_price_cents, replacement_cost_cents, total_cost_cents, status)
+			VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE + 1, 'day', 1000, 6000, 20000, 5000, 1000, 'ACTIVE')
+		`, orgA, toolInA, userID, otherUserID)
+		require.NoError(t, err)
+		_, err = db.Exec(`
+			INSERT INTO rentals (org_id, tool_id, renter_id, owner_id, start_date, end_date, duration_unit, daily_price_cents, weekly_price_cents, monthly_price_cents, replacement_cost_cents, total_cost_cents, status)
+			VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE + 1, 'day', 1000, 6000, 20000, 5000, 1000, 'ACTIVE')
+		`, orgB, toolInB, otherUserID, userID)
+		require.NoError(t, err)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+		defer cancel()
+
+		resp, err := ledgerClient.GetLedgerSummary(ctx, &pb.GetLedgerSummaryRequest{})
+		require.NoError(t, err, "organization_id omitted must roll up, not fail with a DB error")
+		assert.Equal(t, int32(5000), resp.Balance, "balance must sum across both orgs (4200+800)")
+		assert.EqualValues(t, 2, resp.StatusCount["ACTIVE"], "ACTIVE count must combine both orgs and both roles")
+	})
+
 	t.Run("Ledger Updates After Rental Completion", func(t *testing.T) {
 		// This test verifies the ledger is properly updated through the rental workflow
 		// Setup

@@ -321,6 +321,13 @@ func (m *MockLedgerRepo) GetSummary(ctx context.Context, userID, orgID int32) (*
 	}
 	return args.Get(0).(*domain.LedgerSummary), args.Error(1)
 }
+func (m *MockLedgerRepo) GetSummaryAllOrgs(ctx context.Context, userID int32) (*domain.LedgerSummary, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.LedgerSummary), args.Error(1)
+}
 
 // MockEmailService
 type MockEmailService struct {

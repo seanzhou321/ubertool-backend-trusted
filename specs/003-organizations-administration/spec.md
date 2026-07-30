@@ -4,9 +4,7 @@
 
 **Created**: 2026-07-22
 
-**Status**: Draft — **Known Discrepancy 1 (missing `AdminService` authorization) was found
-CRITICAL and fixed on 2026-07-22, same session it was discovered; see that section for what
-changed and what still needs live-environment verification.**
+**Status**: Draft
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed
 Organizations & Administration feature. Per project constitution Principle I ("Code Is
@@ -122,25 +120,22 @@ email, and push notification.
 
 ---
 
-### User Story 3 - Admin-Only Membership & Join-Request Management (Priority: P1 — was elevated for a live authorization gap; now documents the fixed behavior)
+### User Story 3 - Admin-Only Membership & Join-Request Management (Priority: P1)
 
 Org admins can: view/search their org's members, view a single member's full profile,
 block/unblock a member's renting/lending, and process (approve/reject) pending join
 requests or send fresh invitations. Every one of these actions requires the caller to hold
-`ADMIN` or `SUPER_ADMIN` in the target org. **This is now enforced as of the 2026-07-22 fix
-described in Known Discrepancy 1** — the scenarios below describe the corrected, current
-behavior; see Known Discrepancy 1 for exactly what was wrong before and what changed.
+`ADMIN` or `SUPER_ADMIN` in the target org.
 
-**Why P1**: Originally elevated because the gap was a currently-live authorization bypass
-in a deployed system. Kept at P1 post-fix because this is the highest-blast-radius
-correctness property in the whole domain and deserves the most durable regression coverage.
+**Why P1**: This is the highest-blast-radius correctness property in the whole domain and
+deserves the most durable regression coverage.
 
 **Independent Test**: As a user who is a plain `MEMBER` of Org X (or a member of no org at
 all), call each of the eight `AdminService` RPCs against an org they have no admin
 relationship with, and confirm the call is rejected before any side effect occurs. Covered
-by `tests/unit/admin_service_test.go`'s `TestAdminService_RequiresAdminRole` (added with the
-fix) for all eight methods at the service layer; still needs an equivalent e2e-level check
-through the real gRPC handlers against a live DB (see Current Test Coverage Baseline).
+by `tests/unit/admin_service_test.go`'s `TestAdminService_RequiresAdminRole` for all eight
+methods at the service layer; still needs an equivalent e2e-level check through the real
+gRPC handlers against a live DB (see Current Test Coverage Baseline).
 
 **Acceptance Scenarios**:
 
@@ -148,8 +143,7 @@ through the real gRPC handlers against a live DB (see Current Test Coverage Base
    who does not hold `ADMIN`/`SUPER_ADMIN` in `organization_id`, checked via
    `adminService.verifyAdminRights` before any repository read of member/join-request data
    occurs. The gRPC handlers (`internal/api/grpc/admin.go`) extract the caller's ID via
-   `GetUserIDFromContext` for all four (previously only two of the eight methods did this
-   at all).
+   `GetUserIDFromContext` for all four.
 2. `AdminBlockUserAccount` rejects a caller who does not hold `ADMIN`/`SUPER_ADMIN` in
    `organization_id`, checked before `adminService.BlockUser` reads or writes the target
    user's `users_orgs` row.
@@ -159,10 +153,9 @@ through the real gRPC handlers against a live DB (see Current Test Coverage Base
 4. A caller with `MEMBER` role, or no membership at all, in the target org is rejected by
    all eight methods before any of their side effects occur — verified for `MEMBER` and
    for "no `users_orgs` row exists at all" in `TestAdminService_RequiresAdminRole`.
-5. A caller with `ADMIN` or `SUPER_ADMIN` role continues to reach each method's full
-   documented business logic (creating/updating `join_requests`, `invitations`,
-   `users_orgs` blocking fields, sending emails) exactly as before the fix — the change is
-   additive (a leading guard clause), not a rewrite of existing logic.
+5. A caller with `ADMIN` or `SUPER_ADMIN` role reaches each method's full documented
+   business logic (creating/updating `join_requests`, `invitations`, `users_orgs` blocking
+   fields, sending emails).
 
 ---
 
@@ -180,68 +173,29 @@ through the real gRPC handlers against a live DB (see Current Test Coverage Base
   Known Discrepancy 2 — this endpoint gets it right.
 - `SearchOrganizations` is `SecurityPublic` (no authentication required at all, per
   `security_config.go`) and returns each matching org's admin list (names, emails) to an
-  unauthenticated caller — separate from, but adjacent to, Known Discrepancy 1; worth
-  confirming this public exposure of admin contact info is intentional.
+  unauthenticated caller — worth confirming this public exposure of admin contact info is
+  intentional.
 
 ## Known Discrepancies *(code vs. documentation, verified against source)*
 
-1. **CRITICAL, FIXED 2026-07-22 — `AdminService` enforced no caller-authorization at all,
-   contrary to documentation for all eight of its RPCs.**
-   `docs/design/grpc_api_business_logic.md` documents step 1 of every Administration
-   method (`ApproveRequestToJoin`, `RejectRequestToJoin`, `SendInvitation`,
-   `AdminBlockUserAccount`, `ListMembers`, `SearchUsers`, `ListJoinRequests`,
-   `GetMemberProfile`) as "Verify the caller has 'ADMIN' or 'SUPER_ADMIN' role in the
-   given `organization_id`." As found, none of the eight methods in
-   `internal/service/admin.go` / `internal/api/grpc/admin.go` did this — any authenticated
-   user (any valid access token; `internal/config/security_config.go` set every
-   `AdminService` endpoint to `SecurityAccess`, not an org-role-aware level) could read any
-   org's full membership/join-request data, and could block/unblock any user's
-   renting/lending or approve/reject/invite on behalf of any organization regardless of
-   their actual relationship to it.
-
-   **Fix applied same day**: added a `verifyAdminRights(ctx, adminID, orgID)` helper to
-   `adminService` (`internal/service/admin.go`), mirroring the pre-existing, already-correct
-   pattern in `billSplitService.verifyAdminRights` (`internal/service/bill_split.go`) and
-   `organizationService.UpdateOrganization`'s inline check (`internal/service/org.go`).
-   Every one of the eight methods now calls it first. For the four methods that previously
-   never accepted a caller identity (`ListMembers`, `SearchUsers`, `ListJoinRequests`,
-   `GetMemberProfile`), the `AdminService` interface (`internal/service/service.go`) and
-   `AdminHandler` (`internal/api/grpc/admin.go`) were updated to extract and pass the
-   caller's ID via the existing `GetUserIDFromContext` (same mechanism every other
-   authenticated RPC already uses).
-
-   **Verification performed in this session**: `go build ./...` and `go vet ./...` pass;
-   the full `tests/unit/...` suite passes, including a new `TestAdminService_RequiresAdminRole`
-   covering all eight methods rejecting a `MEMBER`-role and a no-membership caller, and
-   accepting both `ADMIN` and `SUPER_ADMIN`; the two pre-existing tests that called these
-   methods directly (`tests/unit/admin_service_test.go`,
-   `tests/integration/admin_join_request_test.go`) were updated to supply a real
-   admin-role caller and still pass. **Not verified in this session** (no live Postgres
-   reachable from the sandbox this spec-kit conversion ran in):
-   `tests/integration/...` and `tests/e2e/...` against a real database — run
-   `make test-integration` and `make test-e2e` (or `make test-precommit`) against your
-   Podman DB before considering this closed, since the existing e2e `admin_test.go` suite
-   already uses correctly-admin'd callers (it should pass unchanged) but has not been
-   executed since the fix.
-2. **`ApproveJoinRequest` lacks an already-a-member guard**, producing a raw database error
-   instead of a friendly rejection on a double-approval (see Edge Cases). Not
-   contradicted by documentation (the doc doesn't mention this case either), but worth
-   recording as a rough edge found during verification.
-3. **FOUND 2026-07-25 — `ListJoinRequests` does not filter by `status = 'PENDING'`, contrary
-   to documentation.** `docs/design/grpc_api_business_logic.md`'s "List Join Requests"
+1. **`ApproveJoinRequest` lacks an already-a-member guard**, producing a raw database error
+   instead of a friendly rejection on a double-approval (see Edge Cases). Not contradicted
+   by documentation (the doc doesn't mention this case either), but worth recording as a
+   rough edge.
+2. **`ListJoinRequests` does not filter by `status = 'PENDING'`, contrary to
+   documentation.** `docs/design/grpc_api_business_logic.md`'s "List Join Requests"
    business logic says: "Query `join_requests` where `org_id` matches and `status` is
    `'PENDING'`." **As-built**, `joinRequestRepository.ListByOrg`
    (`internal/repository/postgres/join_request.go:65-87`) has no `status` predicate at all —
    it returns every join request for the org created within the last 2 months, regardless of
-   `status` (`PENDING`, `INVITED`, `JOINED`, or `REJECTED`). Confirmed by
-   `tests/integration/admin_join_request_test.go`'s
-   `TestAdminService_ListJoinRequests_UsedOnField`, which creates two join requests with
-   `status = 'APPROVED'` and asserts `ListJoinRequests` returns both. **Net effect**: an admin
-   calling `ListJoinRequests` today sees the org's full recent join-request history, not just
-   applications still awaiting a decision — a UI built against the documented "pending
-   applications" framing would show stale/already-decided entries as if they were still
-   actionable. Discovered while adding FR-008 for this previously-untracked RPC; not fixed in
-   this pass (a `speckit-sbr-audit` finding, not a `speckit-sbr-bugfix` run).
+   `status` (`PENDING`, `INVITED`, `JOINED`, or `REJECTED`). No existing test actually
+   exercises this claim: `tests/integration/admin_join_request_test.go`'s
+   `TestAdminService_ListJoinRequests_UsedOnField` seeds two `'PENDING'` join requests, which
+   would return the same result whether or not a status filter existed. **Net effect**: an
+   admin calling `ListJoinRequests` today sees the org's full recent join-request history,
+   not just applications still awaiting a decision — a UI built against the documented
+   "pending applications" framing would show stale/already-decided entries as if they were
+   still actionable.
 
 ## Current Test Coverage Baseline *(informational — grounds the next /speckit-tasks pass, not a requirement)*
 
@@ -253,22 +207,20 @@ Verified by inspection of `tests/unit/admin_service_test.go`,
 **Covered**: `BlockUser`'s happy path (blocking effect on `users_orgs`), `ListMembers`
 returning the right member set, `ApproveJoinRequest`'s happy path (unit); org member-count
 correctness (integration); an admin blocking a member end-to-end (e2e); organization
-create/get/update happy paths. **As of 2026-07-22**: all eight `AdminService` methods
-rejecting a `MEMBER`-role caller and a no-membership caller, plus both `ADMIN` and
-`SUPER_ADMIN` being accepted, via `TestAdminService_RequiresAdminRole` (unit) — this is the
-test that closes Known Discrepancy 1 at the unit level.
+create/get/update happy paths; all eight `AdminService` methods rejecting a `MEMBER`-role
+caller and a no-membership caller, plus both `ADMIN` and `SUPER_ADMIN` being accepted, via
+`TestAdminService_RequiresAdminRole` (unit).
 
 **Not covered anywhere**:
 
-- **An e2e-level (real gRPC handler + live DB) non-admin-caller rejection test** — the
-  unit-level fix is verified, but nothing yet proves the same behavior through the full
-  stack (interceptors, handler, service) the way a production request would actually flow.
-  Run `make test-e2e` after adding one, ideally as a new `t.Run` alongside the existing
-  admin-caller cases in `tests/e2e/admin_test.go`.
+- **An e2e-level (real gRPC handler + live DB) non-admin-caller rejection test** — nothing
+  yet proves the same behavior through the full stack (interceptors, handler, service) the
+  way a production request would actually flow. Run `make test-e2e` after adding one,
+  ideally as a new `t.Run` alongside the existing admin-caller cases in
+  `tests/e2e/admin_test.go`.
 - `RejectJoinRequest`'s invitation-expiry side effect.
 - `SendInvitation`'s already-a-member rejection path.
-- `ApproveJoinRequest`'s double-approval / already-a-member collision (Known Discrepancy
-  2).
+- `ApproveJoinRequest`'s double-approval / already-a-member collision (Known Discrepancy 1).
 - `UpdateOrganization`'s non-member rejection and non-`SUPER_ADMIN`-price-field rejection
   (User Story 2 Scenarios 2-3) at more than a superficial level.
 - `JoinOrganizationWithInvite`'s already-a-member rejection and the admin-notification
@@ -282,7 +234,7 @@ test that closes Known Discrepancy 1 at the unit level.
 - **FR-001**: `CreateOrganization` MUST require no pre-existing role/authorization beyond
   being authenticated — any authenticated user, once the `features.allow_api_organization_creation`
   config flag is `true`, may create an org and becomes its `SUPER_ADMIN`.
-- **FR-001a** *(added 2026-07-29)*: When `features.allow_api_organization_creation` is
+- **FR-001a**: When `features.allow_api_organization_creation` is
   `false` (the production default, `config/config.ec2.prod.yaml`), the
   `OrganizationHandler.CreateOrganization` gRPC handler MUST reject every caller with
   `codes.PermissionDenied` before invoking `OrganizationService.CreateOrganization` — in
@@ -300,48 +252,44 @@ test that closes Known Discrepancy 1 at the unit level.
 - **FR-005**: Every `AdminService` RPC (`ApproveRequestToJoin`, `RejectRequestToJoin`,
   `SendInvitation`, `AdminBlockUserAccount`, `ListMembers`, `SearchUsers`,
   `ListJoinRequests`, `GetMemberProfile`) MUST require `ADMIN` or `SUPER_ADMIN` membership
-  in the target `organization_id`, checked before any other work in the method. **As of the
-  2026-07-22 fix (Known Discrepancy 1), all eight methods satisfy FR-005** — verified by
-  `TestAdminService_RequiresAdminRole` (unit) and pending live-DB confirmation via
-  `make test-integration`/`make test-e2e`.
+  in the target `organization_id`, checked before any other work in the method — verified
+  by `TestAdminService_RequiresAdminRole` (unit).
 - **FR-006**: `RejectRequestToJoin` MUST expire any invitation already linked to the
   rejected join request.
-- **FR-007** *(added 2026-07-25 — previously described only in User Story 1 Acceptance
-  Scenario 4, with no FR-ID or RTM row)*: `ListMyOrganizations` MUST return every organization
-  the caller belongs to (via `users_orgs`), each populated with that organization's member
-  count and the caller's own role and balance in it.
-- **FR-008** *(added 2026-07-25 — previously named only as one of the eight RPCs in FR-005's
-  list, with no FR-ID of its own for its distinguishing business logic)*: `ListJoinRequests`
-  (authorization already covered by FR-005) MUST return the `join_requests` rows for the given
-  `organization_id`. **As-built, it MUST NOT be assumed to filter by `status = 'PENDING'`**
-  (Known Discrepancy 3) — `docs/design/grpc_api_business_logic.md` documents this RPC as
+- **FR-007**: `ListMyOrganizations` MUST return every organization the caller belongs to
+  (via `users_orgs`), each populated with that organization's member count and the caller's
+  own role and balance in it.
+- **FR-008**: `ListJoinRequests` (authorization already covered by FR-005) MUST return the
+  `join_requests` rows for the given `organization_id`. **As-built, it MUST NOT be assumed
+  to filter by `status = 'PENDING'`** (Known Discrepancy 2) — `docs/design/grpc_api_business_logic.md` documents this RPC as
   "Query `join_requests` where `org_id` matches and `status` is `'PENDING'`," but
   `joinRequestRepository.ListByOrg` (`internal/repository/postgres/join_request.go:65-87`)
-  returns every row for the org from the last 2 months regardless of `status` — confirmed by
-  `tests/integration/admin_join_request_test.go`, which creates two join requests with
-  `status = 'APPROVED'` and asserts both are returned by `ListJoinRequests`.
+  returns every row for the org from the last 2 months regardless of `status`.
 - **FR-009** *(multi-org requirement from PRD 3.1)*: Users MUST be able to belong to multiple
   organizations simultaneously. The `users_orgs` table's composite primary key `(user_id,
   org_id)` enforces this — each row represents membership in one organization with its own
   `role` (`MEMBER`/`ADMIN`/`SUPER_ADMIN`), `status`, `balance_cents`, and blocking flags.
   A user's membership in one org is independent of their membership in another.
-- **FR-010** *(multi-org requirement from PRD 3.1, 3.3)*: The system MUST support an
-  organization context for the current user. When a user performs operations (search, rentals,
-  bill split, ledger), they MUST operate within a specific "current organization" context.
-  This context determines the default metro for searches, the organization scope for
-  rentals/billing, and which per-org balance is used.
-- **FR-011** *(multi-org requirement from PRD 3.3)*: Cross-organization search MUST be
-  supported. When a user searches for tools in their current organization's context, results
-  MUST include tools from ALL organizations the user belongs to that are in the same/compatible
-  metro area — not just tools from the current organization. The current organization's metro
-  is used as the primary filter, but tools owned by members of the user's other organizations
-  in that metro are also returned.
-- **FR-012** *(multi-org requirement from PRD 3.3, UI-Design 10.3)*: When a user attempts to
-  rent a tool owned by a member of a different organization (one the user also belongs to),
-  the system MUST prompt for organization context switch before proceeding. The prompt MUST
-  clearly indicate the target organization (e.g., "The owner of this tool is in [Church B].
-  To rent it, we need to switch your dashboard context to that organization."). The user's
-  last selected organization per session MUST be preserved.
+- **FR-010** *(multi-org requirement from PRD 3.1, 3.3)*: The server MUST NOT store, cache,
+  or derive any per-user "current organization" as session or persisted state. A user may be
+  signed in on multiple devices simultaneously, each focused on a different organization, so
+  no single server-held value could be correct for all of them — "current organization"
+  exists only as a client/device-local UI preference. Every organization-scoped RPC (search,
+  rentals, bill split, ledger) MUST receive `organization_id` as an explicit request
+  parameter, never inferred from stored state. See `docs/design/multi-org.md`.
+- **FR-011** *(multi-org requirement from PRD 3.3)*: `ToolService.SearchTools` MUST include
+  tools from ALL organizations the caller belongs to that are in the resolved metro area, not
+  just tools owned by members of the single organization identified by the request's
+  `organization_id` (which resolves the metro filter for that one request only). See
+  `specs/006-tools-image-storage/spec.md` FR-008/FR-009 for test evidence.
+- **FR-012** *(multi-org requirement from PRD 3.3, UI-Design 10.3)*: There is no server-side
+  organization-context-switch RPC and no server-persisted "last selected organization." The
+  client has every organization the caller shares with a tool's owner from `Tool.owner.orgs`
+  (FR-011), so it renders the switch prompt itself and calls `CreateRentalRequest` directly
+  with the chosen `organization_id`. `RentalService.CreateRentalRequest` validates that the
+  supplied `organization_id` is genuinely shared between renter and owner — a defensive
+  backstop, not a context-switch step. See `specs/005-rentals/spec.md` FR-008 for test
+  evidence.
 
 ### Key Entities
 
@@ -361,23 +309,17 @@ test that closes Known Discrepancy 1 at the unit level.
 
 ### Measurable Outcomes
 
-- **SC-001 (highest priority in this spec) — MET 2026-07-22 (unit), reinforced at e2e
-  2026-07-23**: Every one of the eight `AdminService` RPCs rejects a caller who does not hold
-  `ADMIN`/`SUPER_ADMIN` in the target org, verified by a dedicated automated test per
-  method (`TestAdminService_RequiresAdminRole`). An e2e-level assertion (non-admin caller
-  through the real gRPC handler against a live DB) was added 2026-07-23
-  (`TestAdminService_E2E > "AdminBlockUserAccount rejects a non-admin caller"`), confirming
-  the rejection path end-to-end for at least one representative RPC; the existing e2e suite
-  previously only ever exercised admin callers.
-- **SC-002 — MET at the unit-test level 2026-07-22**: `UpdateOrganization`'s membership/
-  role/price-field gating (already correct) has explicit regression tests locking in its
-  current correct behavior (`TestOrganizationService_UpdateOrganization`, 7 subtests
-  covering the non-member reject, plain-MEMBER reject, ADMIN-attempts-price-change reject
-  for both threshold fields, ADMIN/SUPER_ADMIN success paths, and the "submitted 0 means no
-  change" semantics), so it cannot regress silently while Known Discrepancy 1 is being fixed
-  elsewhere in the same service layer pattern. Prior to this date, this claim was not
-  substantiated by the actual test file — only the SUPER_ADMIN success path was tested; see
-  `sbr/rtm/003-organizations-administration.rtm.md` for how the gap was found.
+- **SC-001 (highest priority in this spec)**: Every one of the eight `AdminService` RPCs
+  rejects a caller who does not hold `ADMIN`/`SUPER_ADMIN` in the target org, verified by a
+  dedicated automated test per method (`TestAdminService_RequiresAdminRole`, unit). An
+  e2e-level assertion (non-admin caller through the real gRPC handler against a live DB)
+  exists for one representative RPC (`TestAdminService_E2E` > "AdminBlockUserAccount rejects
+  a non-admin caller").
+- **SC-002**: `UpdateOrganization`'s membership/role/price-field gating has explicit
+  regression tests locking in its current correct behavior
+  (`TestOrganizationService_UpdateOrganization`, 7 subtests covering the non-member reject,
+  plain-MEMBER reject, ADMIN-attempts-price-change reject for both threshold fields,
+  ADMIN/SUPER_ADMIN success paths, and the "submitted 0 means no change" semantics).
 - **SC-003**: `SearchOrganizations`'s public (unauthenticated) exposure of each org's admin
   contact list is either confirmed as an intentional product decision (and documented as
   such) or scoped down — it does not remain an undiscussed side effect of being marked
@@ -388,12 +330,6 @@ test that closes Known Discrepancy 1 at the unit level.
 
 ## Assumptions
 
-- Fixing Known Discrepancy 1 is expected to follow the exact pattern already proven correct
-  twice in this codebase: `billSplitService.verifyAdminRights` (bill_split.go) and
-  `organizationService.UpdateOrganization`'s inline role check (org.go) — both fetch the
-  caller's own `users_orgs` row for the target org and compare `Role`. This spec documents
-  the gap and the existing correct pattern; it does not itself apply the fix, consistent
-  with this being a specification, not an implementation task.
 - `RequestToJoinOrganization` (applicant side) is out of scope here — see
   `specs/002-authentication-legal-consent/spec.md`.
 - General user-profile fields (`GetUser`, `UpdateProfile`) are out of scope here — see

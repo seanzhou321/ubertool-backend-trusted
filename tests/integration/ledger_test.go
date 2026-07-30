@@ -179,6 +179,64 @@ func TestLedgerRepository_GetSummary(t *testing.T) {
 	assert.EqualValues(t, 1, summary.StatusCount["PENDING"])
 }
 
+// TestLedgerRepository_GetSummary_CrossOrgRollup covers FR-004 (specs/007-ledger, multi-org):
+// when organization_id is omitted (0), GetLedgerSummary MUST roll up balance and per-status
+// rental counts across ALL orgs the caller belongs to, not error with "no rows" (Known
+// Discrepancy 2 / RTM Gap). Prior to this test, no test anywhere called this code path with
+// organization_id=0 — this is the real-DB proof the aggregation SQL is correct, mirroring
+// TestLedgerRepository_GetSummary's renter+owner-union pattern above but across two orgs.
+func TestLedgerRepository_GetSummary_CrossOrgRollup(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	repo := postgres.NewLedgerRepository(db)
+	ctx := context.Background()
+
+	orgA := createTestOrgForLedger(t, db)
+	orgB := createTestOrgForLedger(t, db)
+	orgC := createTestOrgForLedger(t, db) // user is NOT a member here — must never leak in
+
+	user := createTestUserForLedger(t, db, "ledger-rollup-user")
+	otherUser := createTestUserForLedger(t, db, "ledger-rollup-other")
+	strangerInOrgC := createTestUserForLedger(t, db, "ledger-rollup-stranger")
+
+	addUserToOrgForLedgerWithBalance(t, db, user, orgA, 4200)
+	addUserToOrgForLedgerWithBalance(t, db, user, orgB, 800)
+	addUserToOrgForLedger(t, db, otherUser, orgA)
+	addUserToOrgForLedger(t, db, otherUser, orgB)
+	addUserToOrgForLedgerWithBalance(t, db, strangerInOrgC, orgC, 999999)
+
+	toolInA := createTestToolForLedger(t, db, otherUser)
+	toolInB := createTestToolForLedger(t, db, user)
+	toolInC := createTestToolForLedger(t, db, strangerInOrgC)
+
+	defer func() {
+		db.Exec("DELETE FROM rentals WHERE org_id IN ($1, $2, $3)", orgA, orgB, orgC)
+		db.Exec("DELETE FROM tools WHERE id IN ($1, $2, $3)", toolInA, toolInB, toolInC)
+		db.Exec("DELETE FROM users_orgs WHERE org_id IN ($1, $2, $3)", orgA, orgB, orgC)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2, $3)", user, otherUser, strangerInOrgC)
+		db.Exec("DELETE FROM orgs WHERE id IN ($1, $2, $3)", orgA, orgB, orgC)
+	}()
+
+	// Org A: user as renter, one ACTIVE.
+	createTestRentalForLedger(t, db, orgA, toolInA, user, otherUser, "ACTIVE")
+	// Org B: user as owner (lending), one ACTIVE; plus one PENDING as renter.
+	createTestRentalForLedger(t, db, orgB, toolInB, otherUser, user, "ACTIVE")
+	createTestRentalForLedger(t, db, orgB, toolInA, user, otherUser, "PENDING")
+	// Org C: a rental the user has no part in at all — must never count.
+	createTestRentalForLedger(t, db, orgC, toolInC, otherUser, strangerInOrgC, "ACTIVE")
+
+	summary, err := repo.GetSummaryAllOrgs(ctx, user)
+	require.NoError(t, err, "must roll up across orgs instead of erroring on organization_id=0")
+
+	assert.EqualValues(t, 5000, summary.Balance, "balance must sum across both of the user's orgs (4200+800)")
+	assert.EqualValues(t, 1, summary.ActiveRentalsCount, "one ACTIVE rental as renter, in org A")
+	assert.EqualValues(t, 1, summary.ActiveLendingsCount, "one ACTIVE rental as owner, in org B")
+	assert.EqualValues(t, 1, summary.PendingRequestsCount, "one PENDING rental as renter, in org B")
+	assert.EqualValues(t, 2, summary.StatusCount["ACTIVE"], "ACTIVE count must combine both orgs and both roles")
+	assert.EqualValues(t, 1, summary.StatusCount["PENDING"])
+}
+
 func createTestOrgForLedger(t *testing.T, db *sql.DB) int32 {
 	t.Helper()
 	var orgID int32

@@ -59,3 +59,26 @@ func TestLedgerService_GetLedgerSummary(t *testing.T) {
 		assert.EqualValues(t, 2, res.StatusCount["ACTIVE"])
 	})
 }
+
+// TestLedgerService_GetLedgerSummary_RollsUpAcrossOrgs covers FR-004 (specs/007-ledger,
+// multi-org): when organization_id is omitted (0), GetLedgerSummary MUST roll up across all of
+// the caller's orgs rather than querying a single org_id=0 row (which matches nothing). This is
+// the service-layer routing half of the fix — it proves the branch calls the cross-org repo
+// method instead of the single-org one; the aggregation SQL itself is proven at L2
+// (TestLedgerRepository_GetSummary_CrossOrgRollup, tests/integration/ledger_test.go).
+func TestLedgerService_GetLedgerSummary_RollsUpAcrossOrgs(t *testing.T) {
+	repo := new(MockLedgerRepo)
+	svc := service.NewLedgerService(repo)
+	ctx := context.Background()
+
+	t.Run("organization_id omitted calls the cross-org rollup, not the single-org lookup", func(t *testing.T) {
+		summary := &domain.LedgerSummary{Balance: 5000, StatusCount: map[string]int32{"ACTIVE": 3}}
+		repo.On("GetSummaryAllOrgs", ctx, int32(1)).Return(summary, nil)
+
+		res, err := svc.GetLedgerSummary(ctx, 1, 0)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(5000), res.Balance)
+		assert.EqualValues(t, 3, res.StatusCount["ACTIVE"])
+		repo.AssertNotCalled(t, "GetSummary", ctx, int32(1), int32(0))
+	})
+}

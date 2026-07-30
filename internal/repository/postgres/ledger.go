@@ -113,3 +113,61 @@ func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID int32) 
 
 	return summary, nil
 }
+
+// GetSummaryAllOrgs implements FR-004 (specs/007-ledger, multi-org): rolls up balance and
+// per-status rental counts across every org the user belongs to, for GetLedgerSummary calls
+// with organization_id omitted (0). Unlike GetSummary, rental queries here are NOT filtered by
+// org_id at all — a rental's renter_id/owner_id already implies org membership (enforced by the
+// rentals_shared_org_check constraint), so dropping the org_id filter is equivalent to summing
+// over every org the user belongs to, without needing an explicit org-list subquery.
+func (r *ledgerRepository) GetSummaryAllOrgs(ctx context.Context, userID int32) (*domain.LedgerSummary, error) {
+	summary := &domain.LedgerSummary{
+		StatusCount: make(map[string]int32),
+	}
+
+	// Balance: sum across every users_orgs row for this user.
+	err := r.db.QueryRowContext(ctx, "SELECT COALESCE(SUM(balance_cents), 0) FROM users_orgs WHERE user_id = $1", userID).Scan(&summary.Balance)
+	if err != nil {
+		return nil, err
+	}
+
+	// Active Rentals Count (all orgs)
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE renter_id = $1 AND status = 'ACTIVE'", userID).Scan(&summary.ActiveRentalsCount)
+	if err != nil {
+		return nil, err
+	}
+
+	// Active Lendings Count (all orgs)
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE owner_id = $1 AND status = 'ACTIVE'", userID).Scan(&summary.ActiveLendingsCount)
+	if err != nil {
+		return nil, err
+	}
+
+	// Pending Requests Count (all orgs)
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE (renter_id = $1 OR owner_id = $1) AND status = 'PENDING'", userID).Scan(&summary.PendingRequestsCount)
+	if err != nil {
+		return nil, err
+	}
+
+	// Detailed status counts for all rentals the user is involved in, across every org.
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT status, count(*)
+		FROM rentals
+		WHERE (renter_id = $1 OR owner_id = $1)
+		GROUP BY status`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var status string
+		var count int32
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, err
+		}
+		summary.StatusCount[status] = count
+	}
+
+	return summary, nil
+}

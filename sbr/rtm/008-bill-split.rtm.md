@@ -2,7 +2,7 @@
 
 **Source Spec**: `specs/008-bill-split/spec.md`
 **Adapter**: `sbr/README.md` (This repo's adapter)
-**Generated**: 2026-07-29 (full re-audit — see "2026-07-29 re-audit note" below)
+**Generated**: 2026-07-29
 **Mode**: retrofit audit
 
 | FR-ID | Requirement Summary | L1 Unit | L2 Integration | L3 E2E | Grounding | Boundary Status | Planned Tests | Notes |
@@ -31,6 +31,4 @@
 
 **Gaps**: FR-002 (asymmetric email-failure path — debtor-send-fails / creditor-fails-but-debtor-succeeds — untested, planned tests proposed), FR-012 (`ListResolvedDisputes`'s admin-only restriction has no rejection test at any tier, unlike its `ListDisputedPayments` sibling — planned test proposed), FR-015 (no L1/L2 test at all; the sole L3 test doesn't exercise the actual multi-org, per-org-breakdown behavior the FR requires — planned tests proposed).
 
-## 2026-07-29 re-audit note
-
-This file replaces a 2026-07-27-generated version whose citations were **entirely fabricated across all 15 rows** — every single FR cited some combination of `TestAdminService_BlockUser(_RankCheck)`, `TestAuthService_*`, `TestResolveDisputedBills`/`TestTakeBalanceSnapshots` (real tests, but reused indiscriminately for unrelated FRs), or `TestRentalRepository_ListByRenterAndOwner_OrgFilter`/`TestLedgerRepository_GetSummary` (from entirely different domains). These were real, already-existing, already-passing tests belonging to other features, not not-yet-written placeholder names for a bill-split test plan — so they were replaced with independently re-verified evidence rather than treated as a TDD plan. The prior version claimed "Complete: 15, Gaps: 0" — every citation here was independently re-verified against the actual bill-split test files (`tests/unit/bill_split_service_test.go`, `tests/unit/billing_jobs_test.go`, `tests/integration/bill_split_test.go`, `tests/integration/billing_jobs_realdb_test.go`, `tests/integration/billing_jobs_integration_test.go`, `tests/integration/bill_repository_test.go`, `tests/integration/notification_jobs_test.go`, `tests/e2e/bill_split_test.go`), and three real, narrow gaps were found in the process that spec.md's own "Covered" framing does not surface. This version adds a **Planned Tests** column (see `sbr/README.md`'s "RTM schema" section) to make the forward-looking test-pyramid plan for the three real gaps explicit and separate from backward-looking evidence. This repo also has no bill-split-table smoke/grounding coverage at all (same finding as 003/005/006/007) — `tests/smoke/smoke_test.go` covers only Orgs/Users/Invitations.
+This repo has no bill-split-table smoke/grounding coverage (`tests/smoke/smoke_test.go` covers only Orgs/Users/Invitations).
