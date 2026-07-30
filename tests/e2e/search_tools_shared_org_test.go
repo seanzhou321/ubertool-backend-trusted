@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -10,11 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSearchTools_SharedOrgFiltering tests the specific scenario:
-// - Tool ID 141, owned by user 1, in org 1
-// - Requesting user 301, also in org 1
-// - Search with org_id=0, metro="San Diego, CA", query="s"
-// - Should return tool 141 with owner.orgs containing org 1
+// TestSearchTools_SharedOrgFiltering covers FR-008/FR-009/FR-011 (specs/006-tools-image-storage,
+// specs/003-organizations-administration): SearchTools must include a tool in results (with
+// owner.orgs populated) when the searcher shares an org with the tool's owner, and must filter
+// it out otherwise.
 func TestSearchTools_SharedOrgFiltering(t *testing.T) {
 	db := PrepareDB(t)
 	defer db.Close()
@@ -26,53 +26,25 @@ func TestSearchTools_SharedOrgFiltering(t *testing.T) {
 	toolClient := pb.NewToolServiceClient(client.Conn())
 
 	t.Run("ReturnsToolWhenUsersShareOrg", func(t *testing.T) {
-		// Setup: Create org 1
-		orgID := int32(1)
-		existingOrg := db.GetOrgByID(orgID)
-		if existingOrg == nil {
-			orgID = db.CreateTestOrg("Test Org 1")
-		}
+		orgID := db.CreateTestOrg("")
+		unique := time.Now().UnixNano()
 
-		// Setup: Create or verify user 1 (tool owner)
-		user1ID := int32(1)
-		existingUser1 := db.GetUserByID(user1ID)
-		if existingUser1 == nil {
-			user1ID = db.CreateTestUser("owner1@test.com", "Owner 1")
-		}
-		// Add to org only if not already a member
-		if !db.IsUserInOrg(user1ID, orgID) {
-			db.AddUserToOrg(user1ID, orgID, "MEMBER", "ACTIVE", 0)
-		}
+		ownerID := db.CreateTestUser(fmt.Sprintf("e2e-test-shared-org-owner-%d@test.com", unique), "Shared Org Owner")
+		searcherID := db.CreateTestUser(fmt.Sprintf("e2e-test-shared-org-searcher-%d@test.com", unique), "Shared Org Searcher")
+		db.AddUserToOrg(ownerID, orgID, "MEMBER", "ACTIVE", 0)
+		db.AddUserToOrg(searcherID, orgID, "MEMBER", "ACTIVE", 0)
 
-		// Setup: Create or verify user 301 (requesting user)
-		user301ID := int32(301)
-		existingUser301 := db.GetUserByID(user301ID)
-		if existingUser301 == nil {
-			user301ID = db.CreateTestUser("user301@test.com", "User 301")
-		}
-		// Add to org only if not already a member
-		if !db.IsUserInOrg(user301ID, orgID) {
-			db.AddUserToOrg(user301ID, orgID, "MEMBER", "ACTIVE", 0)
-		}
+		metro := fmt.Sprintf("San Diego, CA %d", unique)
+		toolID := db.CreateTestToolWithMetro(ownerID, "Shared Tool", metro, 1000)
 
-		// Setup: Create or verify tool 141
-		tool141ID := int32(141)
-		existingTool := db.GetToolByID(tool141ID)
-		if existingTool == nil {
-			tool141ID = db.CreateTestToolWithMetro(user1ID, "Shared Tool", "San Diego, CA", 1000)
-		} else {
-			// Update tool to ensure correct metro and owner
-			db.UpdateToolMetro(tool141ID, "San Diego, CA")
-		}
-
-		// Test: User 301 searches without org_id (org_id=0), providing metro
-		ctx, cancel := ContextWithUserIDAndTimeout(user301ID, 5*time.Second)
+		// Test: searcher searches without org_id (org_id=0), providing metro
+		ctx, cancel := ContextWithUserIDAndTimeout(searcherID, 5*time.Second)
 		defer cancel()
 
 		req := &pb.SearchToolsRequest{
 			OrganizationId: 0, // Not specified
-			Metro:          "San Diego, CA",
-			Query:          "s", // Should match "Shared Tool"
+			Metro:          metro,
+			Query:          "Shared",
 			Page:           1,
 			PageSize:       20,
 		}
@@ -81,30 +53,27 @@ func TestSearchTools_SharedOrgFiltering(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 
-		// Verify: Should return at least one tool
-		assert.Greater(t, len(resp.Tools), 0, "Should return at least one tool")
-
-		// Find tool 141 in results
+		// Find the tool in results
 		var foundTool *pb.Tool
 		for _, tool := range resp.Tools {
-			if tool.Id == tool141ID {
+			if tool.Id == toolID {
 				foundTool = tool
 				break
 			}
 		}
 
-		require.NotNil(t, foundTool, "Should find tool ID %d in search results", tool141ID)
-		assert.Equal(t, tool141ID, foundTool.Id)
+		require.NotNil(t, foundTool, "Should find tool ID %d in search results", toolID)
+		assert.Equal(t, toolID, foundTool.Id)
 
 		// Verify: Owner field should be populated
 		require.NotNil(t, foundTool.Owner, "Tool owner should be populated")
-		assert.Equal(t, user1ID, foundTool.Owner.Id, "Owner ID should be user 1")
+		assert.Equal(t, ownerID, foundTool.Owner.Id, "Owner ID should be the tool owner")
 
 		// Verify: Owner should have shared organizations
 		require.NotNil(t, foundTool.Owner.Orgs, "Owner orgs should not be nil")
 		assert.Greater(t, len(foundTool.Owner.Orgs), 0, "Owner should have at least one shared org")
 
-		// Verify: Shared org should be org 1
+		// Verify: Shared org should be orgID
 		foundSharedOrg := false
 		for _, org := range foundTool.Owner.Orgs {
 			if org.Id == orgID {
@@ -116,13 +85,15 @@ func TestSearchTools_SharedOrgFiltering(t *testing.T) {
 	})
 
 	t.Run("FiltersOutToolWhenNoSharedOrg", func(t *testing.T) {
+		unique := time.Now().UnixNano()
+
 		// Setup: Create two separate orgs
-		org1ID := db.CreateTestOrg("Org Without User 301")
-		org2ID := db.CreateTestOrg("Org With User 301")
+		org1ID := db.CreateTestOrg("")
+		org2ID := db.CreateTestOrg("")
 
 		// Setup: Create users in different orgs
-		ownerID := db.CreateTestUser("owner_separate@test.com", "Separate Owner")
-		searcherID := db.CreateTestUser("searcher_separate@test.com", "Separate Searcher")
+		ownerID := db.CreateTestUser(fmt.Sprintf("e2e-test-noshared-owner-%d@test.com", unique), "Separate Owner")
+		searcherID := db.CreateTestUser(fmt.Sprintf("e2e-test-noshared-searcher-%d@test.com", unique), "Separate Searcher")
 
 		db.AddUserToOrg(ownerID, org1ID, "MEMBER", "ACTIVE", 0)    // Owner in org1
 		db.AddUserToOrg(searcherID, org2ID, "MEMBER", "ACTIVE", 0) // Searcher in org2 (different!)

@@ -87,6 +87,16 @@ func (s *rentalService) CreateRentalRequest(ctx context.Context, renterID, toolI
 		return nil, errors.New("end date must be after start date (minimum 1 day rental)")
 	}
 
+	// SC-001 (specs/005-rentals, Known Discrepancy 1): reject a request that overlaps an
+	// existing non-terminal rental for the same tool, closing the double-booking gap.
+	overlaps, err := s.rentalRepo.HasOverlappingRental(ctx, toolID, start.Format("2006-01-02"), end.Format("2006-01-02"))
+	if err != nil {
+		return nil, err
+	}
+	if overlaps {
+		return nil, status.Errorf(codes.FailedPrecondition, "tool is already booked for an overlapping date range")
+	}
+
 	// Build price snapshot from tool at the time of rental creation
 	snapshot := utils.RentalPriceSnapshot{
 		DurationUnit:       tool.DurationUnit,
@@ -204,6 +214,11 @@ func (s *rentalService) RejectRentalRequest(ctx context.Context, ownerID, rental
 	if rt.OwnerID != ownerID {
 		return nil, errors.New("unauthorized")
 	}
+	// Known Discrepancy 2 (specs/005-rentals): mirror ApproveRentalRequest's PENDING gate so a
+	// rental can't be rejected out of APPROVED/SCHEDULED/COMPLETED/etc.
+	if rt.Status != domain.RentalStatusPending {
+		return nil, errors.New("rental is not pending")
+	}
 
 	rt.Status = domain.RentalStatusRejected
 	if err := s.rentalRepo.Update(ctx, rt); err != nil {
@@ -241,6 +256,12 @@ func (s *rentalService) CancelRental(ctx context.Context, renterID, rentalID int
 	}
 	if rt.RenterID != renterID {
 		return nil, errors.New("unauthorized")
+	}
+	// Known Discrepancy 3 (specs/005-rentals): a rental may only be cancelled before pickup —
+	// once ACTIVE (or later), the tool is physically with the renter and "cancelled" has no
+	// sane state-machine meaning. Reuses the same pre-pickup gate as ChangeRentalDates.
+	if !isPreActive(rt.Status) {
+		return nil, errors.New("cannot cancel a rental that has already been picked up or completed")
 	}
 
 	rt.Status = domain.RentalStatusCancelled
@@ -1110,7 +1131,14 @@ func (s *rentalService) GetRental(ctx context.Context, userID, rentalID int32) (
 		return nil, err
 	}
 	if rt.RenterID != userID && rt.OwnerID != userID {
-		return nil, errors.New("unauthorized")
+		// Known Discrepancy 4 (specs/005-rentals): grant access to an admin/super-admin of the
+		// rental's own org, matching grpc_api_business_logic.md ("check user_id is either the
+		// renter, the owner, or an admin in the organization of rentals.org_id") and the
+		// precedent set by BillSplitService.GetPaymentDetail.
+		uo, uoErr := s.userRepo.GetUserOrg(ctx, userID, rt.OrgID)
+		if uoErr != nil || (uo.Role != domain.UserOrgRoleAdmin && uo.Role != domain.UserOrgRoleSuperAdmin) {
+			return nil, errors.New("unauthorized")
+		}
 	}
 	return rt, nil
 }

@@ -48,6 +48,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
 		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
 		ledgerRepo.On("GetBalance", ctx, renterID, orgID).Return(int32(5000), nil)
+		rentalRepo.On("HasOverlappingRental", ctx, toolID, mock.Anything, mock.Anything).Return(false, nil)
 		rentalRepo.On("Create", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
 
 		// Setup expectations for email notification
@@ -142,6 +143,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 			userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
 			userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive, RentingBlocked: true}, nil)
 			ledgerRepoLocal.On("GetBalance", ctx, renterID, orgID).Return(int32(5000), nil)
+			rentalRepoLocal.On("HasOverlappingRental", ctx, toolID, mock.Anything, mock.Anything).Return(false, nil)
 			rentalRepoLocal.On("Create", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
 			userRepo.On("GetByID", ctx, tool.OwnerID).Return(&domain.User{ID: tool.OwnerID, Email: "owner@test.com", Name: "Owner"}, nil)
 			userRepo.On("GetByID", ctx, renterID).Return(&domain.User{ID: renterID, Email: "renter@test.com", Name: "Renter"}, nil)
@@ -166,6 +168,7 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 			userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID, Status: domain.UserOrgStatusActive, LendingBlocked: true}, nil)
 			userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
 			ledgerRepoLocal.On("GetBalance", ctx, renterID, orgID).Return(int32(5000), nil)
+			rentalRepoLocal.On("HasOverlappingRental", ctx, toolID, mock.Anything, mock.Anything).Return(false, nil)
 			rentalRepoLocal.On("Create", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
 			userRepo.On("GetByID", ctx, tool.OwnerID).Return(&domain.User{ID: tool.OwnerID, Email: "owner@test.com", Name: "Owner"}, nil)
 			userRepo.On("GetByID", ctx, renterID).Return(&domain.User{ID: renterID, Email: "renter@test.com", Name: "Renter"}, nil)
@@ -213,6 +216,149 @@ func TestRentalService_CreateRentalRequest(t *testing.T) {
 		assert.Nil(t, res)
 		assert.Contains(t, err.Error(), "end date must be after start date")
 		rentalRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	})
+
+	// SC-001 / Known Discrepancy 1 (specs/005-rentals): CreateRentalRequest must reject a date
+	// range that overlaps an existing non-terminal rental for the same tool — the double-booking
+	// gap. Prior to this fix, no check of any kind guarded against this.
+	t.Run("Rejects an overlapping date range for the same tool (KD-1)", func(t *testing.T) {
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		rentalRepo := new(MockRentalRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
+
+		userRepo.On("GetUserOrg", ctx, renterID, orgID).Return(&domain.UserOrg{UserID: renterID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
+		userRepo.On("GetUserOrg", ctx, tool.OwnerID, orgID).Return(&domain.UserOrg{UserID: tool.OwnerID, OrgID: orgID, Status: domain.UserOrgStatusActive}, nil)
+		toolRepo.On("GetByID", ctx, toolID).Return(tool, nil)
+		rentalRepo.On("HasOverlappingRental", ctx, toolID, mock.Anything, mock.Anything).Return(true, nil)
+
+		res, err := svc.CreateRentalRequest(ctx, renterID, toolID, orgID, startDate, endDate)
+		require.Error(t, err, "an overlapping date range must be rejected")
+		assert.Nil(t, res)
+		rentalRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+	})
+}
+
+// Known Discrepancy 2 (specs/005-rentals): RejectRentalRequest previously accepted a rental in
+// any status; it must mirror ApproveRentalRequest's PENDING gate.
+func TestRentalService_RejectRentalRequest(t *testing.T) {
+	ctx := context.Background()
+	const ownerID = int32(10)
+	const otherUserID = int32(20)
+	const rentalID = int32(100)
+
+	newSvc := func() (service.RentalService, *MockRentalRepo, *MockUserRepo, *MockToolRepo) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		orgRepo := new(MockOrganizationRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
+		return svc, rentalRepo, userRepo, toolRepo
+	}
+
+	t.Run("Success on a PENDING rental", func(t *testing.T) {
+		svc, rentalRepo, userRepo, toolRepo := newSvc()
+		rt := &domain.Rental{ID: rentalID, OwnerID: ownerID, Status: domain.RentalStatusPending}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		rentalRepo.On("Update", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
+		userRepo.On("GetByID", ctx, mock.Anything).Return(nil, fmt.Errorf("not found")).Maybe()
+		toolRepo.On("GetByID", ctx, mock.Anything).Return(nil, fmt.Errorf("not found")).Maybe()
+
+		res, err := svc.RejectRentalRequest(ctx, ownerID, rentalID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.RentalStatusRejected, res.Status)
+	})
+
+	t.Run("Rejects a caller who is not the tool's owner", func(t *testing.T) {
+		svc, rentalRepo, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, OwnerID: ownerID, Status: domain.RentalStatusPending}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.RejectRentalRequest(ctx, otherUserID, rentalID)
+		require.Error(t, err)
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a rental that is not PENDING (KD-2)", func(t *testing.T) {
+		svc, rentalRepo, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, OwnerID: ownerID, Status: domain.RentalStatusApproved}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.RejectRentalRequest(ctx, ownerID, rentalID)
+		require.Error(t, err, "a non-PENDING rental must not be rejectable")
+		assert.Contains(t, err.Error(), "not pending")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+}
+
+// Known Discrepancy 3 (specs/005-rentals): CancelRental previously accepted a rental in any
+// status at all, including already-ACTIVE or COMPLETED. It must only be cancellable before
+// pickup, mirroring the isPreActive gate ChangeRentalDates already uses.
+func TestRentalService_CancelRental(t *testing.T) {
+	ctx := context.Background()
+	const renterID = int32(1)
+	const otherUserID = int32(2)
+	const rentalID = int32(100)
+
+	newSvc := func() (service.RentalService, *MockRentalRepo, *MockUserRepo, *MockToolRepo) {
+		rentalRepo := new(MockRentalRepo)
+		toolRepo := new(MockToolRepo)
+		ledgerRepo := new(MockLedgerRepo)
+		userRepo := new(MockUserRepo)
+		orgRepo := new(MockOrganizationRepo)
+		emailSvc := new(MockEmailService)
+		noteRepo := new(MockNotificationRepo)
+		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
+		return svc, rentalRepo, userRepo, toolRepo
+	}
+
+	t.Run("Success on a PENDING rental", func(t *testing.T) {
+		svc, rentalRepo, userRepo, toolRepo := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, Status: domain.RentalStatusPending}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		rentalRepo.On("Update", ctx, mock.AnythingOfType("*domain.Rental")).Return(nil)
+		userRepo.On("GetByID", ctx, mock.Anything).Return(nil, fmt.Errorf("not found")).Maybe()
+		toolRepo.On("GetByID", ctx, mock.Anything).Return(nil, fmt.Errorf("not found")).Maybe()
+
+		res, err := svc.CancelRental(ctx, renterID, rentalID, "changed my mind")
+		require.NoError(t, err)
+		assert.Equal(t, domain.RentalStatusCancelled, res.Status)
+	})
+
+	t.Run("Rejects a caller who is not the renter", func(t *testing.T) {
+		svc, rentalRepo, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, Status: domain.RentalStatusPending}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.CancelRental(ctx, otherUserID, rentalID, "not mine")
+		require.Error(t, err)
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a rental that is already ACTIVE (KD-3)", func(t *testing.T) {
+		svc, rentalRepo, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, Status: domain.RentalStatusActive}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.CancelRental(ctx, renterID, rentalID, "too late")
+		require.Error(t, err, "an ACTIVE rental must not be cancellable")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	})
+
+	t.Run("Rejects a rental that is already COMPLETED (KD-3)", func(t *testing.T) {
+		svc, rentalRepo, _, _ := newSvc()
+		rt := &domain.Rental{ID: rentalID, RenterID: renterID, Status: domain.RentalStatusCompleted}
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+
+		_, err := svc.CancelRental(ctx, renterID, rentalID, "too late")
+		require.Error(t, err, "a COMPLETED rental must not be cancellable")
+		rentalRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
 	})
 }
 
@@ -1221,10 +1367,11 @@ func TestRentalService_GetRental(t *testing.T) {
 	const renterID = int32(1)
 	const ownerID = int32(10)
 	const otherUserID = int32(999)
+	const orgID = int32(5)
 	const rentalID = int32(100)
 
 	orgRepo := new(MockOrganizationRepo)
-	newSvc := func() (service.RentalService, *MockRentalRepo) {
+	newSvc := func() (service.RentalService, *MockRentalRepo, *MockUserRepo) {
 		rentalRepo := new(MockRentalRepo)
 		toolRepo := new(MockToolRepo)
 		ledgerRepo := new(MockLedgerRepo)
@@ -1232,13 +1379,13 @@ func TestRentalService_GetRental(t *testing.T) {
 		emailSvc := new(MockEmailService)
 		noteRepo := new(MockNotificationRepo)
 		svc := service.NewRentalService(rentalRepo, toolRepo, ledgerRepo, userRepo, orgRepo, emailSvc, noteRepo)
-		return svc, rentalRepo
+		return svc, rentalRepo, userRepo
 	}
 
-	rt := &domain.Rental{ID: rentalID, RenterID: renterID, OwnerID: ownerID}
+	rt := &domain.Rental{ID: rentalID, OrgID: orgID, RenterID: renterID, OwnerID: ownerID}
 
 	t.Run("Grants access to the renter", func(t *testing.T) {
-		svc, rentalRepo := newSvc()
+		svc, rentalRepo, _ := newSvc()
 		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
 
 		res, err := svc.GetRental(ctx, renterID, rentalID)
@@ -1247,7 +1394,7 @@ func TestRentalService_GetRental(t *testing.T) {
 	})
 
 	t.Run("Grants access to the owner", func(t *testing.T) {
-		svc, rentalRepo := newSvc()
+		svc, rentalRepo, _ := newSvc()
 		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
 
 		res, err := svc.GetRental(ctx, ownerID, rentalID)
@@ -1255,13 +1402,46 @@ func TestRentalService_GetRental(t *testing.T) {
 		assert.Equal(t, rentalID, res.ID)
 	})
 
-	t.Run("Rejects a caller who is neither the renter nor the owner", func(t *testing.T) {
-		svc, rentalRepo := newSvc()
+	t.Run("Rejects a caller who is neither the renter nor the owner nor an org admin", func(t *testing.T) {
+		svc, rentalRepo, userRepo := newSvc()
 		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		userRepo.On("GetUserOrg", ctx, otherUserID, orgID).Return(&domain.UserOrg{UserID: otherUserID, OrgID: orgID, Role: domain.UserOrgRoleMember}, nil)
 
 		_, err := svc.GetRental(ctx, otherUserID, rentalID)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unauthorized")
+	})
+
+	t.Run("Rejects a caller who is not even a member of the rental's org", func(t *testing.T) {
+		svc, rentalRepo, userRepo := newSvc()
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		userRepo.On("GetUserOrg", ctx, otherUserID, orgID).Return(nil, fmt.Errorf("no rows in result set"))
+
+		_, err := svc.GetRental(ctx, otherUserID, rentalID)
+		require.Error(t, err)
+	})
+
+	// Known Discrepancy 4 (specs/005-rentals): GetRental must grant access to an ADMIN/
+	// SUPER_ADMIN of the rental's own org, matching grpc_api_business_logic.md and the
+	// precedent set by BillSplitService.GetPaymentDetail.
+	t.Run("Grants access to an admin of the rental's org who is neither renter nor owner (KD-4)", func(t *testing.T) {
+		svc, rentalRepo, userRepo := newSvc()
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		userRepo.On("GetUserOrg", ctx, otherUserID, orgID).Return(&domain.UserOrg{UserID: otherUserID, OrgID: orgID, Role: domain.UserOrgRoleAdmin}, nil)
+
+		res, err := svc.GetRental(ctx, otherUserID, rentalID)
+		require.NoError(t, err, "an org admin must be granted access even with no personal stake in the rental")
+		assert.Equal(t, rentalID, res.ID)
+	})
+
+	t.Run("Grants access to a super-admin of the rental's org who is neither renter nor owner (KD-4)", func(t *testing.T) {
+		svc, rentalRepo, userRepo := newSvc()
+		rentalRepo.On("GetByID", ctx, rentalID).Return(rt, nil)
+		userRepo.On("GetUserOrg", ctx, otherUserID, orgID).Return(&domain.UserOrg{UserID: otherUserID, OrgID: orgID, Role: domain.UserOrgRoleSuperAdmin}, nil)
+
+		res, err := svc.GetRental(ctx, otherUserID, rentalID)
+		require.NoError(t, err)
+		assert.Equal(t, rentalID, res.ID)
 	})
 }
 

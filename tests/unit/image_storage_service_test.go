@@ -164,3 +164,45 @@ func TestImageStorageService_GetDownloadUrl(t *testing.T) {
 		assert.Contains(t, err.Error(), "unauthorized")
 	})
 }
+
+// TestImageStorageService_GetToolImages covers KD-2 (sbr/rtm/006-tools-image-storage.rtm.md):
+// GetToolImages previously performed no access check at all — any authenticated user could view
+// any tool's images regardless of ownership. It must now apply the same owner-or-AVAILABLE rule
+// as its sibling GetDownloadUrl.
+func TestImageStorageService_GetToolImages(t *testing.T) {
+	ctx := context.Background()
+	const ownerID = int32(1)
+	const otherUserID = int32(2)
+	const toolID = int32(10)
+	images := []domain.ToolImage{{ID: 100, ToolID: toolID}}
+
+	t.Run("Owner can always view", func(t *testing.T) {
+		svc, toolRepo, _ := newImageStorageServiceForTest()
+		toolRepo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID, Status: domain.ToolStatusRented}, nil)
+		toolRepo.On("GetImages", ctx, toolID).Return(images, nil)
+
+		res, err := svc.GetToolImages(ctx, ownerID, toolID)
+		require.NoError(t, err, "owner must always be able to view, regardless of tool status")
+		assert.Len(t, res, 1)
+	})
+
+	t.Run("Non-owner can view when the tool is AVAILABLE", func(t *testing.T) {
+		svc, toolRepo, _ := newImageStorageServiceForTest()
+		toolRepo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID, Status: domain.ToolStatusAvailable}, nil)
+		toolRepo.On("GetImages", ctx, toolID).Return(images, nil)
+
+		res, err := svc.GetToolImages(ctx, otherUserID, toolID)
+		require.NoError(t, err, "a non-owner must be able to view when the tool is AVAILABLE")
+		assert.Len(t, res, 1)
+	})
+
+	t.Run("Non-owner is rejected when the tool is not AVAILABLE (KD-2)", func(t *testing.T) {
+		svc, toolRepo, _ := newImageStorageServiceForTest()
+		toolRepo.On("GetByID", ctx, toolID).Return(&domain.Tool{ID: toolID, OwnerID: ownerID, Status: domain.ToolStatusRented}, nil)
+
+		_, err := svc.GetToolImages(ctx, otherUserID, toolID)
+		require.Error(t, err, "a non-owner must be rejected when the tool is not AVAILABLE")
+		assert.Contains(t, err.Error(), "unauthorized")
+		toolRepo.AssertNotCalled(t, "GetImages", mock.Anything, mock.Anything)
+	})
+}

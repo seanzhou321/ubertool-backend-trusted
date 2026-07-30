@@ -235,6 +235,51 @@ func TestAdminService_ApproveJoinRequest(t *testing.T) {
 	mockEmailSvc.AssertExpectations(t)
 }
 
+// TestAdminService_ApproveJoinRequest_AlreadyMember locks in the friendly-error guard for
+// Known Discrepancy 2 (specs/todo-multi_org.md / sbr/rtm/003-organizations-administration.rtm.md):
+// approving a join request for a user who already belongs to the org must return a clear
+// "user is already a member" error instead of surfacing a raw Postgres PK-violation from
+// AddUserToOrg. The guard itself (internal/service/admin.go:76-82) already existed with zero
+// test coverage before this — this is a regression test, not a new fix.
+func TestAdminService_ApproveJoinRequest_AlreadyMember(t *testing.T) {
+	mockUserRepo := new(MockUserRepo)
+	mockOrgRepo := new(MockOrganizationRepo)
+	mockInviteRepo := new(MockInviteRepo)
+	mockJoinRepo := new(MockJoinRequestRepo)
+	mockLedgerRepo := new(MockLedgerRepo)
+
+	svc := service.NewAdminService(mockJoinRepo, mockUserRepo, mockLedgerRepo, mockOrgRepo, mockInviteRepo, nil)
+	ctx := context.Background()
+
+	adminID := int32(1)
+	orgID := int32(10)
+	joinRequestID := int32(42)
+	existingUserID := int32(99)
+	email := "already-member@test.com"
+
+	mockUserRepo.On("GetUserOrg", ctx, adminID, orgID).Return(&domain.UserOrg{
+		UserID: adminID, OrgID: orgID, Role: domain.UserOrgRoleAdmin,
+	}, nil)
+	mockJoinRepo.On("GetByID", ctx, joinRequestID).Return(&domain.JoinRequest{
+		ID:     joinRequestID,
+		OrgID:  orgID,
+		Name:   "Already Member",
+		Email:  email,
+		Status: domain.JoinRequestStatusPending,
+	}, nil)
+	mockOrgRepo.On("GetByID", ctx, orgID).Return(&domain.Organization{ID: orgID, Name: "Test Org"}, nil)
+	mockUserRepo.On("GetByEmail", ctx, email).Return(&domain.User{ID: existingUserID, Email: email}, nil)
+	mockUserRepo.On("GetUserOrg", ctx, existingUserID, orgID).Return(&domain.UserOrg{
+		UserID: existingUserID, OrgID: orgID, Role: domain.UserOrgRoleMember,
+	}, nil)
+
+	_, err := svc.ApproveJoinRequest(ctx, adminID, orgID, joinRequestID)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already a member")
+	mockUserRepo.AssertNotCalled(t, "AddUserToOrg", mock.Anything, mock.Anything)
+	mockJoinRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+}
+
 // TestAdminService_RequiresAdminRole locks in the fix for the authorization gap recorded
 // in specs/004-organizations-administration/spec.md (Known Discrepancy 1): every
 // AdminService method must reject a caller who is not ADMIN/SUPER_ADMIN in the target org,

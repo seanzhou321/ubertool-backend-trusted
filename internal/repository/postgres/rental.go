@@ -179,6 +179,23 @@ func (r *rentalRepository) ListByOwner(ctx context.Context, ownerID, orgID int32
 	return rentals, count, nil
 }
 
+// HasOverlappingRental reports whether toolID has any non-terminal rental whose [start_date,
+// end_date) range intersects [startDate, endDate). Date ranges are end-exclusive (matching
+// utils.CalculateRentalCost), so two rentals overlap iff existing.start_date < newEnd AND
+// existing.end_date > newStart.
+func (r *rentalRepository) HasOverlappingRental(ctx context.Context, toolID int32, startDate, endDate string) (bool, error) {
+	query := `SELECT EXISTS (
+		SELECT 1 FROM rentals
+		WHERE tool_id = $1
+		  AND status NOT IN ('REJECTED', 'CANCELLED', 'COMPLETED')
+		  AND start_date < $3
+		  AND end_date > $2
+	)`
+	var overlaps bool
+	err := r.db.QueryRowContext(ctx, query, toolID, startDate, endDate).Scan(&overlaps)
+	return overlaps, err
+}
+
 func (r *rentalRepository) ListByTool(ctx context.Context, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	offset := (page - 1) * pageSize
 	query := `SELECT id, org_id, tool_id, renter_id, owner_id, start_date, last_agreed_end_date, end_date, COALESCE(duration_unit, ''), COALESCE(daily_price_cents, 0), COALESCE(weekly_price_cents, 0), COALESCE(monthly_price_cents, 0), COALESCE(replacement_cost_cents, 0), COALESCE(total_cost_cents, 0), status, COALESCE(pickup_note, ''), COALESCE(rejection_reason, ''), completed_by, COALESCE(return_condition, ''), COALESCE(surcharge_or_credit_cents, 0), COALESCE(return_note, ''), COALESCE(charge_billsplit, true), created_on, updated_on

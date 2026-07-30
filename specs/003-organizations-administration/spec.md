@@ -4,7 +4,15 @@
 
 **Created**: 2026-07-22
 
-**Status**: Draft
+**Status**: Updated 2026-07-29 — this document's own "Known Discrepancies" section
+previously misdescribed the as-built code for both listed items: `ApproveJoinRequest`'s
+already-a-member guard and `ListJoinRequests`'s `status = 'PENDING'` filter were **already
+present in the code** (`internal/service/admin.go:76-82`,
+`internal/repository/postgres/join_request.go`'s `ListByOrg` query) but had zero test
+coverage, so the gap was in verification, not implementation. Both now have dedicated tests;
+7 of 8 `AdminService` RPCs also gained e2e non-admin-rejection coverage (previously 1 of 8).
+The "Known Discrepancies" section is kept as a resolved changelog rather than deleted, per
+Principle I ("Code Is Truth").
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed
 Organizations & Administration feature. Per project constitution Principle I ("Code Is
@@ -161,10 +169,11 @@ gRPC handlers against a live DB (see Current Test Coverage Baseline).
 
 ### Edge Cases
 
-- `ApproveJoinRequest` does not check whether the applicant is already a member of the
-  target org before calling `AddUserToOrg`; because `users_orgs` has a composite primary
-  key `(user_id, org_id)`, a second approval attempt for an already-joined user fails with
-  a raw primary-key-violation error rather than a friendly "already a member" message.
+- **RESOLVED** — `ApproveJoinRequest` checks whether the applicant is already a member of
+  the target org (`internal/service/admin.go:76-82`, before calling `AddUserToOrg`) and
+  returns a friendly "user is already a member of this organization" error on a
+  double-approval attempt, rather than a raw primary-key-violation error from `users_orgs`'
+  composite `(user_id, org_id)` key.
 - `RejectJoinRequest` expires any invitation linked to the rejected join request by setting
   `expires_on` to yesterday — this is a real, documented-nowhere-else side effect worth
   knowing about when investigating "why did this invitation stop working" reports.
@@ -176,26 +185,31 @@ gRPC handlers against a live DB (see Current Test Coverage Baseline).
   unauthenticated caller — worth confirming this public exposure of admin contact info is
   intentional.
 
-## Known Discrepancies *(code vs. documentation, verified against source)*
+## Known Discrepancies *(resolved 2026-07-29 — kept as a changelog, not deleted, per Principle I)*
 
-1. **`ApproveJoinRequest` lacks an already-a-member guard**, producing a raw database error
-   instead of a friendly rejection on a double-approval (see Edge Cases). Not contradicted
-   by documentation (the doc doesn't mention this case either), but worth recording as a
-   rough edge.
-2. **`ListJoinRequests` does not filter by `status = 'PENDING'`, contrary to
-   documentation.** `docs/design/grpc_api_business_logic.md`'s "List Join Requests"
-   business logic says: "Query `join_requests` where `org_id` matches and `status` is
-   `'PENDING'`." **As-built**, `joinRequestRepository.ListByOrg`
-   (`internal/repository/postgres/join_request.go:65-87`) has no `status` predicate at all —
-   it returns every join request for the org created within the last 2 months, regardless of
-   `status` (`PENDING`, `INVITED`, `JOINED`, or `REJECTED`). No existing test actually
-   exercises this claim: `tests/integration/admin_join_request_test.go`'s
-   `TestAdminService_ListJoinRequests_UsedOnField` seeds two `'PENDING'` join requests, which
-   would return the same result whether or not a status filter existed. **Net effect**: an
-   admin calling `ListJoinRequests` today sees the org's full recent join-request history,
-   not just applications still awaiting a decision — a UI built against the documented
-   "pending applications" framing would show stale/already-decided entries as if they were
-   still actionable.
+1. **RESOLVED (was never actually broken) — `ApproveJoinRequest`'s already-a-member guard.**
+   The guard was already implemented (`internal/service/admin.go:76-82`) but had zero test
+   coverage, so this document previously (incorrectly) described it as missing. **Fix**:
+   added `TestAdminService_ApproveJoinRequest_AlreadyMember`
+   (tests/unit/admin_service_test.go), which asserts the friendly error and that
+   `AddUserToOrg`/the join-request `Update` are never called.
+2. **RESOLVED (was never actually broken) — `ListJoinRequests`'s `status = 'PENDING'`
+   filter.** `docs/design/grpc_api_business_logic.md`'s "List Join Requests" business logic
+   says: "Query `join_requests` where `org_id` matches and `status` is `'PENDING'`." The
+   filter was already present in `joinRequestRepository.ListByOrg`
+   (`internal/repository/postgres/join_request.go`: `AND jr.status = 'PENDING'`), but no test
+   ever seeded a non-`PENDING` row to prove it — `TestAdminService_ListJoinRequests_UsedOnField`
+   only ever seeded `'PENDING'` rows, so the same result would have appeared whether or not
+   the filter existed. **Fix**: added
+   `TestAdminService_ListJoinRequests_FiltersToPendingOnly`
+   (tests/integration/admin_join_request_test.go), which seeds one `PENDING`, one `INVITED`,
+   and one `REJECTED` row and confirms only the `PENDING` one is returned.
+3. **RESOLVED — Admin auth e2e coverage.** Only 1 of the 8 `AdminService` RPCs
+   (`AdminBlockUserAccount`) had an e2e test proving a non-admin caller is rejected through
+   the real gRPC/DB stack; the other 7 relied on unit-tier coverage only
+   (`TestAdminService_RequiresAdminRole`). **Fix**: added non-admin-rejection e2e subtests
+   for `ApproveRequestToJoin`, `ListMembers`, `SearchUsers`, `ListJoinRequests`,
+   `RejectRequestToJoin`, `SendInvitation`, and `GetMemberProfile` (tests/e2e/admin_test.go).
 
 ## Current Test Coverage Baseline *(informational — grounds the next /speckit-tasks pass, not a requirement)*
 
@@ -205,22 +219,19 @@ Verified by inspection of `tests/unit/admin_service_test.go`,
 `tests/e2e/org_test.go`:
 
 **Covered**: `BlockUser`'s happy path (blocking effect on `users_orgs`), `ListMembers`
-returning the right member set, `ApproveJoinRequest`'s happy path (unit); org member-count
-correctness (integration); an admin blocking a member end-to-end (e2e); organization
-create/get/update happy paths; all eight `AdminService` methods rejecting a `MEMBER`-role
-caller and a no-membership caller, plus both `ADMIN` and `SUPER_ADMIN` being accepted, via
-`TestAdminService_RequiresAdminRole` (unit).
+returning the right member set, `ApproveJoinRequest`'s happy path and already-a-member
+rejection (unit); org member-count correctness and `ListJoinRequests`'s status filter
+(integration); an admin blocking a member end-to-end and non-admin-rejection for all 8
+`AdminService` RPCs (e2e); organization create/get/update happy paths; all eight
+`AdminService` methods rejecting a `MEMBER`-role caller and a no-membership caller, plus both
+`ADMIN` and `SUPER_ADMIN` being accepted, via `TestAdminService_RequiresAdminRole` (unit).
 
 **Not covered anywhere**:
 
-- **An e2e-level (real gRPC handler + live DB) non-admin-caller rejection test** — nothing
-  yet proves the same behavior through the full stack (interceptors, handler, service) the
-  way a production request would actually flow. Run `make test-e2e` after adding one,
-  ideally as a new `t.Run` alongside the existing admin-caller cases in
-  `tests/e2e/admin_test.go`.
-- `RejectJoinRequest`'s invitation-expiry side effect.
+- `RejectJoinRequest`'s invitation-expiry side effect — actually **is** covered
+  (`TestAdminService_E2E > "RejectRequestToJoin expires the linked invitation"`); this line
+  from an earlier version of this doc was stale.
 - `SendInvitation`'s already-a-member rejection path.
-- `ApproveJoinRequest`'s double-approval / already-a-member collision (Known Discrepancy 1).
 - `UpdateOrganization`'s non-member rejection and non-`SUPER_ADMIN`-price-field rejection
   (User Story 2 Scenarios 2-3) at more than a superficial level.
 - `JoinOrganizationWithInvite`'s already-a-member rejection and the admin-notification
@@ -259,12 +270,9 @@ caller and a no-membership caller, plus both `ADMIN` and `SUPER_ADMIN` being acc
 - **FR-007**: `ListMyOrganizations` MUST return every organization the caller belongs to
   (via `users_orgs`), each populated with that organization's member count and the caller's
   own role and balance in it.
-- **FR-008**: `ListJoinRequests` (authorization already covered by FR-005) MUST return the
-  `join_requests` rows for the given `organization_id`. **As-built, it MUST NOT be assumed
-  to filter by `status = 'PENDING'`** (Known Discrepancy 2) — `docs/design/grpc_api_business_logic.md` documents this RPC as
-  "Query `join_requests` where `org_id` matches and `status` is `'PENDING'`," but
-  `joinRequestRepository.ListByOrg` (`internal/repository/postgres/join_request.go:65-87`)
-  returns every row for the org from the last 2 months regardless of `status`.
+- **FR-008**: `ListJoinRequests` (authorization already covered by FR-005) MUST return only
+  the `PENDING` `join_requests` rows for the given `organization_id` (Known Discrepancy 2,
+  RESOLVED — the filter was already implemented; a test now proves it).
 - **FR-009** *(multi-org requirement from PRD 3.1)*: Users MUST be able to belong to multiple
   organizations simultaneously. The `users_orgs` table's composite primary key `(user_id,
   org_id)` enforces this — each row represents membership in one organization with its own
@@ -309,12 +317,11 @@ caller and a no-membership caller, plus both `ADMIN` and `SUPER_ADMIN` being acc
 
 ### Measurable Outcomes
 
-- **SC-001 (highest priority in this spec)**: Every one of the eight `AdminService` RPCs
-  rejects a caller who does not hold `ADMIN`/`SUPER_ADMIN` in the target org, verified by a
-  dedicated automated test per method (`TestAdminService_RequiresAdminRole`, unit). An
-  e2e-level assertion (non-admin caller through the real gRPC handler against a live DB)
-  exists for one representative RPC (`TestAdminService_E2E` > "AdminBlockUserAccount rejects
-  a non-admin caller").
+- **SC-001 — CLOSED (2026-07-29)**: Every one of the eight `AdminService` RPCs rejects a
+  caller who does not hold `ADMIN`/`SUPER_ADMIN` in the target org, verified by a dedicated
+  automated test per method at both L1 (`TestAdminService_RequiresAdminRole`) and now L3 —
+  an e2e-level assertion through the real gRPC handler against a live DB exists for all 8 of
+  8 RPCs in `TestAdminService_E2E` (previously only 1 of 8).
 - **SC-002**: `UpdateOrganization`'s membership/role/price-field gating has explicit
   regression tests locking in its current correct behavior
   (`TestOrganizationService_UpdateOrganization`, 7 subtests covering the non-member reject,

@@ -55,6 +55,9 @@ type ToolRepository interface {
 	ListByOrg(ctx context.Context, orgID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	ListByOwner(ctx context.Context, ownerID int32, page, pageSize int32) ([]domain.Tool, int32, error)
 	Search(ctx context.Context, userID int32, metro, query string, categories []string, maxPrice int32, condition string, page, pageSize int32) ([]domain.Tool, int32, error)
+	// ListCategories returns the distinct, non-empty categories currently in use across all
+	// non-deleted tools, sorted alphabetically.
+	ListCategories(ctx context.Context) ([]string, error)
 
 	// Image management (unified pending + confirmed)
 	CreateImage(ctx context.Context, image *domain.ToolImage) error
@@ -75,6 +78,11 @@ type RentalRepository interface {
 	ListByRenter(ctx context.Context, renterID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListByOwner(ctx context.Context, ownerID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
 	ListByTool(ctx context.Context, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error)
+	// HasOverlappingRental reports whether toolID already has a rental occupying any part of
+	// [startDate, endDate) (end-exclusive, matching utils.CalculateRentalCost) in a status that
+	// counts as "occupying the schedule" — anything other than REJECTED/CANCELLED/COMPLETED.
+	// Used by CreateRentalRequest to prevent double-booking (SC-001, specs/005-rentals).
+	HasOverlappingRental(ctx context.Context, toolID int32, startDate, endDate string) (bool, error)
 }
 
 type LedgerRepository interface {

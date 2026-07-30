@@ -203,6 +203,31 @@ func (r *toolRepository) Search(ctx context.Context, userID int32, metro, queryT
 	return tools, count, nil
 }
 
+// ListCategories returns the distinct, non-empty categories in use across non-deleted tools,
+// sorted alphabetically. `categories` is a TEXT[] column, so unnest() flattens it before DISTINCT.
+func (r *toolRepository) ListCategories(ctx context.Context) ([]string, error) {
+	query := `SELECT DISTINCT unnest(categories) AS category FROM tools
+	          WHERE deleted_on IS NULL AND categories IS NOT NULL
+	          ORDER BY category`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []string
+	for rows.Next() {
+		var c string
+		if err := rows.Scan(&c); err != nil {
+			return nil, err
+		}
+		if c != "" {
+			categories = append(categories, c)
+		}
+	}
+	return categories, rows.Err()
+}
+
 // CreateImage creates a new image record (can be pending or confirmed)
 func (r *toolRepository) CreateImage(ctx context.Context, img *domain.ToolImage) error {
 	query := `INSERT INTO tool_images (tool_id, user_id, file_name, file_path, thumbnail_path, 

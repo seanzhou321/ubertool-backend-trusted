@@ -52,7 +52,7 @@ type ImageStorageService interface {
 	GetUploadUrl(ctx context.Context, userID int32, filename, contentType string, toolID int32, isPrimary bool) (*domain.ToolImage, string, string, int64, error) // returns image, uploadURL, downloadURL, expiresAt, error
 	ConfirmImageUpload(ctx context.Context, userID int32, imageID int32, toolID int32, fileSize int64) (*domain.ToolImage, error)
 	GetDownloadUrl(ctx context.Context, userID int32, imageID int32, toolID int32, isThumbnail bool) (string, int64, error) // returns downloadURL, expiresAt, error
-	GetToolImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error)
+	GetToolImages(ctx context.Context, userID, toolID int32) ([]domain.ToolImage, error)
 	DeleteImage(ctx context.Context, userID int32, imageID int32, toolID int32) error
 	SetPrimaryImage(ctx context.Context, userID int32, toolID int32, imageID int32) error
 }

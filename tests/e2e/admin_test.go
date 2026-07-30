@@ -271,4 +271,138 @@ func TestAdminService_E2E(t *testing.T) {
 		require.NoError(t, err2)
 		assert.Equal(t, "ACTIVE", status, "the rejected caller's request must not have applied any block")
 	})
+
+	// FR-005 (specs/003-organizations-administration): the remaining 7 of 8 AdminService RPCs
+	// only had non-admin-rejection coverage at the L1/unit tier (TestAdminService_RequiresAdminRole)
+	// before this pass — this closes the e2e/L3 gap called out in specs/todo-multi_org.md.
+	t.Run("ApproveRequestToJoin rejects a non-admin caller", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		memberID := db.CreateTestUser("e2e-test-nonadmin-approve@test.com", "Plain Member")
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+
+		var joinRequestID int32
+		err := db.QueryRow(`
+			INSERT INTO join_requests (org_id, user_id, name, email, note, status)
+			VALUES ($1, NULL, 'Applicant', 'e2e-test-approve-applicant@test.com', 'Note', 'PENDING')
+			RETURNING id
+		`, orgID).Scan(&joinRequestID)
+		require.NoError(t, err)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(memberID, 5*time.Second)
+		defer cancel()
+
+		_, err = adminClient.ApproveRequestToJoin(ctx, &pb.ApproveRequestToJoinRequest{
+			OrganizationId: orgID,
+			JoinRequestId:  joinRequestID,
+		})
+		require.Error(t, err, "a plain MEMBER caller must be rejected")
+
+		var status string
+		err2 := db.QueryRow("SELECT status FROM join_requests WHERE id = $1", joinRequestID).Scan(&status)
+		require.NoError(t, err2)
+		assert.Equal(t, "PENDING", status, "the rejected caller's request must not have applied any change")
+	})
+
+	t.Run("ListMembers rejects a non-admin caller", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		memberID := db.CreateTestUser("e2e-test-nonadmin-listmembers@test.com", "Plain Member")
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(memberID, 5*time.Second)
+		defer cancel()
+
+		_, err := adminClient.ListMembers(ctx, &pb.ListMembersRequest{OrganizationId: orgID})
+		require.Error(t, err, "a plain MEMBER caller must be rejected")
+	})
+
+	t.Run("SearchUsers rejects a non-admin caller", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		memberID := db.CreateTestUser("e2e-test-nonadmin-searchusers@test.com", "Plain Member")
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(memberID, 5*time.Second)
+		defer cancel()
+
+		_, err := adminClient.SearchUsers(ctx, &pb.SearchUsersRequest{OrganizationId: orgID, Query: "e2e-test"})
+		require.Error(t, err, "a plain MEMBER caller must be rejected")
+	})
+
+	t.Run("ListJoinRequests rejects a non-admin caller", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		memberID := db.CreateTestUser("e2e-test-nonadmin-listjoinreq@test.com", "Plain Member")
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(memberID, 5*time.Second)
+		defer cancel()
+
+		_, err := adminClient.ListJoinRequests(ctx, &pb.ListJoinRequestsRequest{OrganizationId: orgID})
+		require.Error(t, err, "a plain MEMBER caller must be rejected")
+	})
+
+	t.Run("RejectRequestToJoin rejects a non-admin caller", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		memberID := db.CreateTestUser("e2e-test-nonadmin-rejectjoin@test.com", "Plain Member")
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+
+		var joinRequestID int32
+		err := db.QueryRow(`
+			INSERT INTO join_requests (org_id, user_id, name, email, note, status)
+			VALUES ($1, NULL, 'Applicant', 'e2e-test-reject-nonadmin-applicant@test.com', 'Note', 'PENDING')
+			RETURNING id
+		`, orgID).Scan(&joinRequestID)
+		require.NoError(t, err)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(memberID, 5*time.Second)
+		defer cancel()
+
+		_, err = adminClient.RejectRequestToJoin(ctx, &pb.RejectRequestToJoinRequest{
+			OrganizationId: orgID,
+			JoinRequestId:  joinRequestID,
+			Reason:         "should never apply",
+		})
+		require.Error(t, err, "a plain MEMBER caller must be rejected")
+
+		var status string
+		err2 := db.QueryRow("SELECT status FROM join_requests WHERE id = $1", joinRequestID).Scan(&status)
+		require.NoError(t, err2)
+		assert.Equal(t, "PENDING", status, "the rejected caller's request must not have applied any change")
+	})
+
+	t.Run("SendInvitation rejects a non-admin caller", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		memberID := db.CreateTestUser("e2e-test-nonadmin-sendinvite@test.com", "Plain Member")
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(memberID, 5*time.Second)
+		defer cancel()
+
+		_, err := adminClient.SendInvitation(ctx, &pb.SendInvitationRequest{
+			OrganizationId: orgID,
+			Email:          "e2e-test-sendinvite-target@test.com",
+			Name:           "Invitee",
+		})
+		require.Error(t, err, "a plain MEMBER caller must be rejected")
+
+		var count int
+		err2 := db.QueryRow("SELECT COUNT(*) FROM invitations WHERE email = $1 AND org_id = $2", "e2e-test-sendinvite-target@test.com", orgID).Scan(&count)
+		require.NoError(t, err2)
+		assert.Equal(t, 0, count, "the rejected caller's request must not have created an invitation")
+	})
+
+	t.Run("GetMemberProfile rejects a non-admin caller", func(t *testing.T) {
+		orgID := db.CreateTestOrg("")
+		memberID := db.CreateTestUser("e2e-test-nonadmin-getprofile@test.com", "Plain Member")
+		targetID := db.CreateTestUser("e2e-test-getprofile-target@test.com", "Target User")
+		db.AddUserToOrg(memberID, orgID, "MEMBER", "ACTIVE", 0)
+		db.AddUserToOrg(targetID, orgID, "MEMBER", "ACTIVE", 0)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(memberID, 5*time.Second)
+		defer cancel()
+
+		_, err := adminClient.GetMemberProfile(ctx, &pb.GetMemberProfileRequest{
+			OrganizationId: orgID,
+			UserId:         targetID,
+		})
+		require.Error(t, err, "a plain MEMBER caller must be rejected")
+	})
 }

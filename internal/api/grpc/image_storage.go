@@ -85,7 +85,12 @@ func (h *ImageStorageHandler) GetDownloadUrl(ctx context.Context, req *pb.GetDow
 
 // GetToolImages retrieves all images for a tool
 func (h *ImageStorageHandler) GetToolImages(ctx context.Context, req *pb.GetToolImagesRequest) (*pb.GetToolImagesResponse, error) {
-	images, err := h.storeSvc.GetToolImages(ctx, req.ToolId)
+	userID, err := GetUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	images, err := h.storeSvc.GetToolImages(ctx, userID, req.ToolId)
 	if err != nil {
 		return nil, err
 	}

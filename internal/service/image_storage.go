@@ -309,8 +309,20 @@ func (s *imageStorageService) GetDownloadUrl(
 	return downloadURL, expiresAt, nil
 }
 
-// GetToolImages retrieves all confirmed images for a tool
-func (s *imageStorageService) GetToolImages(ctx context.Context, toolID int32) ([]domain.ToolImage, error) {
+// GetToolImages retrieves all confirmed images for a tool.
+// KD-2 (sbr/rtm/006-tools-image-storage.rtm.md): previously performed no access check at all —
+// any authenticated user could view any tool's images regardless of ownership. Mirrors the
+// owner-or-AVAILABLE check GetDownloadUrl already applies to individual image downloads.
+func (s *imageStorageService) GetToolImages(ctx context.Context, userID, toolID int32) ([]domain.ToolImage, error) {
+	tool, err := s.toolRepo.GetByID(ctx, toolID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify tool: %w", err)
+	}
+	logger.Debug("GetToolImages check", "userID", userID, "toolID", toolID, "tool.OwnerID", tool.OwnerID, "tool.Status", tool.Status, "ToolStatusAvailable", domain.ToolStatusAvailable)
+	if tool.OwnerID != userID && tool.Status != domain.ToolStatusAvailable {
+		logger.Debug("GetToolImages rejecting", "userID", userID, "toolID", toolID)
+		return nil, fmt.Errorf("unauthorized: no access to this tool's images")
+	}
 	return s.toolRepo.GetImages(ctx, toolID)
 }
 
@@ -346,11 +358,11 @@ func (s *imageStorageService) DeleteImage(
 	// Delete files from storage
 	if err := s.storage.DeleteFile(ctx, image.FilePath); err != nil {
 		// Log error but continue - file might already be deleted
-		fmt.Printf("Warning: failed to delete image file: %v\n", err)
+		logger.Warn("DeleteImage: failed to delete image file", "image_id", imageID, "error", err)
 	}
 	if image.ThumbnailPath != "" && image.ThumbnailPath != image.FilePath {
 		if err := s.storage.DeleteFile(ctx, image.ThumbnailPath); err != nil {
-			fmt.Printf("Warning: failed to delete thumbnail: %v\n", err)
+			logger.Warn("DeleteImage: failed to delete thumbnail", "image_id", imageID, "error", err)
 		}
 	}
 

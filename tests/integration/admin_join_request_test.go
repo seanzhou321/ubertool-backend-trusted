@@ -133,3 +133,64 @@ func TestAdminService_ListJoinRequests_UsedOnField(t *testing.T) {
 		assert.True(t, foundReq2, "Should find join request 2")
 	})
 }
+
+// TestAdminService_ListJoinRequests_FiltersToPendingOnly closes the gap flagged in
+// sbr/rtm/003-organizations-administration.rtm.md FR-008: the repository query
+// (internal/repository/postgres/join_request.go ListByOrg) filters to `status = 'PENDING'`,
+// but no prior test ever seeded a non-PENDING row to prove that filter actually excludes it —
+// both this file's other test and the e2e test only ever seeded PENDING rows.
+func TestAdminService_ListJoinRequests_FiltersToPendingOnly(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	joinReqRepo := postgres.NewJoinRequestRepository(db)
+	userRepo := postgres.NewUserRepository(db)
+	ledgerRepo := postgres.NewLedgerRepository(db)
+	orgRepo := postgres.NewOrganizationRepository(db)
+	inviteRepo := postgres.NewInvitationRepository(db)
+	adminSvc := service.NewAdminService(joinReqRepo, userRepo, ledgerRepo, orgRepo, inviteRepo, nil)
+
+	ctx := context.Background()
+
+	var orgID int32
+	err := db.QueryRow(`INSERT INTO orgs (name, metro, admin_email, admin_phone_number, address)
+		VALUES ($1, 'San Jose', 'admin@test.com', '555-0000', '123 Test St') RETURNING id`,
+		fmt.Sprintf("Test-Join-Req-Status-Org-%d", time.Now().UnixNano())).Scan(&orgID)
+	require.NoError(t, err)
+
+	adminEmail := fmt.Sprintf("test-join-req-status-admin-%d@test.com", time.Now().UnixNano())
+	var adminUserID int32
+	err = db.QueryRow(`INSERT INTO users (email, phone_number, password_hash, name)
+		VALUES ($1, '555-3333', 'hash', 'Test Admin') RETURNING id`, adminEmail).Scan(&adminUserID)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO users_orgs (user_id, org_id, role, status) VALUES ($1, $2, 'ADMIN', 'ACTIVE')`,
+		adminUserID, orgID)
+	require.NoError(t, err)
+
+	var pendingID, approvedID, rejectedID int32
+	err = db.QueryRow(`INSERT INTO join_requests (org_id, user_id, name, email, note, status)
+		VALUES ($1, NULL, 'Pending Applicant', $2, 'note', 'PENDING') RETURNING id`,
+		orgID, fmt.Sprintf("test-join-req-status-pending-%d@test.com", time.Now().UnixNano())).Scan(&pendingID)
+	require.NoError(t, err)
+
+	err = db.QueryRow(`INSERT INTO join_requests (org_id, user_id, name, email, note, status)
+		VALUES ($1, NULL, 'Invited Applicant', $2, 'note', 'INVITED') RETURNING id`,
+		orgID, fmt.Sprintf("test-join-req-status-invited-%d@test.com", time.Now().UnixNano())).Scan(&approvedID)
+	require.NoError(t, err)
+
+	err = db.QueryRow(`INSERT INTO join_requests (org_id, user_id, name, email, note, status, reason)
+		VALUES ($1, NULL, 'Rejected Applicant', $2, 'note', 'REJECTED', 'not a fit') RETURNING id`,
+		orgID, fmt.Sprintf("test-join-req-status-rejected-%d@test.com", time.Now().UnixNano())).Scan(&rejectedID)
+	require.NoError(t, err)
+
+	reqs, err := adminSvc.ListJoinRequests(ctx, adminUserID, orgID)
+	require.NoError(t, err)
+
+	var gotIDs []int32
+	for _, r := range reqs {
+		gotIDs = append(gotIDs, r.ID)
+	}
+	assert.Contains(t, gotIDs, pendingID, "the PENDING join request must be returned")
+	assert.NotContains(t, gotIDs, approvedID, "the INVITED join request must be filtered out")
+	assert.NotContains(t, gotIDs, rejectedID, "the REJECTED join request must be filtered out")
+}

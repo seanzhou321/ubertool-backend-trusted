@@ -4,7 +4,11 @@
 
 **Created**: 2026-07-22
 
-**Status**: Draft
+**Status**: Updated 2026-07-29 — all four Known Discrepancies below (`GetToolImages` access
+check, disabled cross-org search e2e test, hardcoded `ListToolCategories`, `fmt.Printf` debug
+logging) have been **fixed and tested**; this document now describes current, correct
+behavior. The "Known Discrepancies" section below is kept as a resolved changelog rather than
+deleted, per Principle I ("Code Is Truth").
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed Tools
 and Image Storage features. Per project constitution Principle I ("Code Is Truth"), this
@@ -80,9 +84,10 @@ even if other tools match the text/metro filter.
    query already matched it.
 4. **Given** an empty `query`, **When** `SearchTools` is called, **Then** it is rejected
    ("query parameter is required and cannot be empty").
-5. **Given** no filters, **When** `ListToolCategories` is called, **Then** a static,
-   hardcoded category list is returned (not queried from `DISTINCT categories` in the
-   `tools` table as `grpc_api_business_logic.md` describes — see Known Discrepancy 3).
+5. **Given** no filters, **When** `ListToolCategories` is called, **Then** the distinct,
+   non-empty categories currently in use across all non-deleted tools are returned,
+   alphabetically sorted (`SELECT DISTINCT unnest(categories) ... ORDER BY category`) — see
+   Known Discrepancy 3 (RESOLVED).
 
 ---
 
@@ -137,10 +142,11 @@ database constraint is never violated (the repository does the swap inside a tra
 
 **Acceptance Scenarios**:
 
-1. **Given** a `tool_id`, **When** `GetToolImages` is called, **Then** all `CONFIRMED`
-   images for that tool are returned, ordered primary-first. **As-built**, this performs no
-   access check of any kind — any authenticated caller can list any tool's confirmed
-   images regardless of ownership or the tool's status (see Known Discrepancy 1).
+1. **Given** a `tool_id`, **When** `GetToolImages` is called, **Then** access is granted if
+   the caller owns the tool **or** the tool's status is `AVAILABLE` — the same rule
+   `GetDownloadUrl` applies — and, if granted, all `CONFIRMED` images for that tool are
+   returned, ordered primary-first; otherwise the call is rejected ("unauthorized: no access
+   to this tool's images") — see Known Discrepancy 1 (RESOLVED).
 2. **Given** the caller owns the tool, **When** `DeleteImage` is called, **Then** the
    image's files are best-effort deleted from cloud storage (a storage-delete failure is
    logged, not fatal), the `tool_images` row is soft-deleted, and if the deleted image was
@@ -169,38 +175,44 @@ database constraint is never violated (the repository does the swap inside a tra
   `RENTED` is **not** accessible to non-owners via this RPC, even though its images might
   still be relevant to the current renter.
 
-## Known Discrepancies *(code vs. documentation, verified against source)*
+## Known Discrepancies *(resolved 2026-07-29 — kept as a changelog, not deleted, per Principle I)*
 
-1. **`GetToolImages` performs no access check, contrary to documentation.**
+1. **RESOLVED — `GetToolImages` performed no access check, contrary to documentation.**
    `grpc_api_business_logic.md`'s "Get Tool Images" step 2 says: "Verify the tool exists
-   and user has access (same logic as Get Download URL)." **As-built**,
-   `imageStorageService.GetToolImages` (`internal/service/image_storage.go`) is a direct
-   pass-through — `return s.toolRepo.GetImages(ctx, toolID)` — with no `userID` parameter
-   at all, so it cannot apply the "owner or `AVAILABLE`" rule `GetDownloadUrl` correctly
-   implements. This is read-only metadata (image URLs are not directly returned, only
-   records used to request download URLs), and its effective exposure is similar to
-   treating every tool's image list as public — but it is still a documented check that is
-   not implemented.
-2. **A disabled test file exists for this domain, mirroring the pattern found in
+   and user has access (same logic as Get Download URL)." Previously
+   `imageStorageService.GetToolImages` (`internal/service/image_storage.go`) was a direct
+   pass-through — `return s.toolRepo.GetImages(ctx, toolID)` — with no `userID` parameter at
+   all, so any authenticated caller could list any tool's confirmed images regardless of
+   ownership or the tool's status.
+   **Fix**: `GetToolImages` now takes `userID` (added to the `ImageStorageService` interface
+   and threaded through `internal/api/grpc/image_storage.go` via `GetUserIDFromContext`) and
+   applies the same owner-or-`AVAILABLE` rule as `GetDownloadUrl`. Tests:
+   `TestImageStorageService_GetToolImages` (tests/unit/image_storage_service_test.go).
+2. **RESOLVED — A disabled test file existed for this domain, mirroring the pattern found in
    Authentication.** `tests/e2e/search_tools_shared_org_test.go_` (trailing underscore —
-   excluded from the Go build) contains `TestSearchTools_SharedOrgFiltering`. Unlike the
-   Authentication domain's disabled JWT test (which has no other coverage), this specific
-   behavior **is** covered at the unit-test tier by `TestToolService_SearchTools`'s
-   `SharedOrgFiltering_*` subtests — so the shared-org filtering logic itself (User Story 2
-   Scenario 3) is verified, just not at the e2e/full-stack level.
-3. **`ListToolCategories` returns a hardcoded list, not a database query.**
+   excluded from the Go build) contained `TestSearchTools_SharedOrgFiltering`.
+   **Fix**: renamed to `tests/e2e/search_tools_shared_org_test.go` (re-enabled) and rewritten
+   to create fresh, uniquely-named/`e2e-test-`-prefixed users/orgs/tools per run instead of
+   reusing hardcoded IDs (1, 141, 301) and non-namespaced emails — the original hardcoded-ID
+   version passed once but failed non-idempotently on a second run (`duplicate key value
+   violates unique constraint "users_email_key"`) because those identifiers aren't cleaned up
+   by `TestDB.Cleanup()`, which only deletes `e2e-test-%` emails and `E2E-Test-%` org names.
+3. **RESOLVED — `ListToolCategories` returned a hardcoded list, not a database query.**
    `grpc_api_business_logic.md` documents: "Return `DISTINCT` categories from the `tools`
-   table." **As-built**, `toolService.ListCategories` returns a fixed 8-item Go slice
-   (`"Hand Tools"`, `"Power Tools"`, etc.) regardless of what categories actually exist on
-   any `tools` row. A category used by a real tool but absent from this hardcoded list
-   would never appear as a filter option, and the list never reflects newly-introduced
-   categories.
-4. **Debug logging via `fmt.Printf` directly to stdout, inconsistent with the rest of the
-   codebase.** `toolService.SearchTools` and parts of `imageStorageService.DeleteImage`
-   use `fmt.Printf("DEBUG ...")` / `fmt.Printf("Warning: ...")` rather than the structured
-   `internal/logger` package used consistently everywhere else (including this same
-   file's sibling methods). Not a functional bug, but these lines bypass whatever log
-   level/format/destination configuration the rest of the service respects.
+   table." Previously `toolService.ListCategories` returned a fixed 8-item Go slice
+   regardless of what categories actually existed on any `tools` row.
+   **Fix**: added `ToolRepository.ListCategories(ctx)` (`internal/repository/postgres/tool.go`)
+   running `SELECT DISTINCT unnest(categories) ... WHERE deleted_on IS NULL ORDER BY category`;
+   `toolService.ListCategories` is now a thin pass-through to it. Tests:
+   `TestToolService_ListCategories` (tests/unit/tool_service_test.go).
+4. **RESOLVED — Debug logging via `fmt.Printf` directly to stdout, inconsistent with the rest
+   of the codebase.** `toolService.SearchTools`/`getSharedOrganizations` and
+   `imageStorageService.DeleteImage` used `fmt.Printf("DEBUG ...")` /
+   `fmt.Printf("Warning: ...")` rather than the structured `internal/logger` package used
+   consistently everywhere else.
+   **Fix**: replaced with `logger.Debug`/`logger.Error`/`logger.Warn` calls (dropping the
+   purely repetitive per-tool trace lines rather than converting every one 1:1), and verified
+   `go vet ./...` and the full unit/e2e suite still pass.
 
 ## Current Test Coverage Baseline *(informational — grounds the next /speckit-tasks pass, not a requirement)*
 
@@ -219,14 +231,20 @@ and `GetDownloadUrl`'s owner-or-`AVAILABLE` disjunctive boundary (FR-005), via
 `TestImageStorageService_OwnershipChecks` and `TestImageStorageService_GetDownloadUrl` in
 `tests/unit/image_storage_service_test.go` (see `sbr/rtm/006-tools-image-storage.rtm.md`).
 
+**Also covered (2026-07-29)**: `GetToolImages`'s owner-or-`AVAILABLE` access check via
+`TestImageStorageService_GetToolImages` (unit); `ListCategories`'s DB pass-through via
+`TestToolService_ListCategories` (unit); cross-org search filtering at the e2e tier via the
+now-enabled `TestSearchTools_SharedOrgFiltering` (tests/e2e/search_tools_shared_org_test.go).
+
 **Not covered anywhere**:
 
 - **An e2e-level (real gRPC handler + live DB) non-owner-caller rejection test** for
   `UpdateTool`/`DeleteTool` — nothing yet proves it through the full request stack.
-- `GetToolImages` called by a caller with no relationship to the tool (Known Discrepancy
-  1) — no test asserts what is or isn't visible.
-- `ListToolCategories` never being cross-checked against actual `tools.categories` data
-  (Known Discrepancy 3).
+- `GetToolImages`'s new access check (Known Discrepancy 1) is unit-tested but not yet
+  exercised at the e2e/full-stack tier.
+- `ListToolCategories`'s new DB query (Known Discrepancy 3) is unit-tested (with a mocked
+  repository) but not yet exercised against a real Postgres `tools.categories` column at
+  L2/L3.
 - `AddTool`'s direct image-URL ingestion path (Edge Cases) — only the presigned-upload
   pipeline is e2e-tested.
 - `SetPrimaryImage`'s validation rejection paths (image belongs to a different tool; image
@@ -251,9 +269,8 @@ and `GetDownloadUrl`'s owner-or-`AVAILABLE` disjunctive boundary (FR-005), via
   caller, only when the tool's status is `AVAILABLE`.
 - **FR-006**: Thumbnail generation MUST run asynchronously after `ConfirmImageUpload`
   returns, and MUST NOT block or fail the RPC response if generation fails.
-- **FR-007**: `GetToolImages` MUST NOT be assumed to enforce the same access rule as
-  `GetDownloadUrl` (Known Discrepancy 1) — this is the target correctness bar for a
-  follow-up task, not current behavior.
+- **FR-007**: `GetToolImages` MUST enforce the same owner-or-`AVAILABLE` access rule as
+  `GetDownloadUrl` (Known Discrepancy 1, RESOLVED).
 - **FR-008** *(multi-org requirement from PRD 3.3, Organizations FR-011)*: `SearchTools`
   MUST include tools from ALL organizations the caller belongs to that are in the resolved
   metro area. When `organization_id` is provided, its metro is used as the primary filter,
@@ -281,16 +298,16 @@ and `GetDownloadUrl`'s owner-or-`AVAILABLE` disjunctive boundary (FR-005), via
 
 ### Measurable Outcomes
 
-- **SC-001**: `GetToolImages` either gains the documented access check or the spec/doc is
-  updated to state plainly that tool images are effectively public — Known Discrepancy 1
-  does not remain a silent, undocumented gap between the two structurally similar RPCs
-  (`GetDownloadUrl` and `GetToolImages`).
-- **SC-002**: `ListToolCategories` either queries `DISTINCT categories` from `tools` as
-  documented, or the documentation is corrected to describe the static list — Known
-  Discrepancy 3 does not remain silently contradictory.
+- **SC-001 — CLOSED (2026-07-29)**: `GetToolImages` now enforces the same access check as
+  `GetDownloadUrl` — Known Discrepancy 1 closed, with a dedicated test
+  (`TestImageStorageService_GetToolImages`).
+- **SC-002 — CLOSED (2026-07-29)**: `ListToolCategories` now queries `DISTINCT categories`
+  from `tools` as documented — Known Discrepancy 3 closed, with a dedicated test
+  (`TestToolService_ListCategories`).
 - **SC-003**: An e2e-level test confirms a non-owner caller is rejected by `UpdateTool` and
   `DeleteTool` through the real gRPC handler and interceptor stack, not just at the service
   layer (`TestToolService_E2E > "UpdateTool and DeleteTool reject a non-owner caller"`).
+  *(Not addressed in this pass — carried forward as open.)*
 - **SC-004**: A developer reading only this spec can correctly state which of the eleven
   RPCs across both services require tool ownership, which allow any authenticated caller,
   and which are effectively public.

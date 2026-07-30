@@ -477,3 +477,18 @@ func TestToolService_GetSharedOrganizations_RespectsBlockedFlags(t *testing.T) {
 		assert.Len(t, res[0].Owner.Orgs, 1)
 	})
 }
+
+// TestToolService_ListCategories covers KD-4 (sbr/rtm/006-tools-image-storage.rtm.md):
+// ListCategories previously returned a hardcoded 8-item list regardless of what categories tools
+// actually used. It must now be a thin pass-through to the repository's DISTINCT query.
+func TestToolService_ListCategories(t *testing.T) {
+	ctx := context.Background()
+	repo := new(MockToolRepo)
+	svc := service.NewToolService(repo, new(MockUserRepo), new(MockOrganizationRepo))
+
+	repo.On("ListCategories", ctx).Return([]string{"Electrical", "Gardening", "Power Tools"}, nil)
+
+	cats, err := svc.ListCategories(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Electrical", "Gardening", "Power Tools"}, cats)
+}

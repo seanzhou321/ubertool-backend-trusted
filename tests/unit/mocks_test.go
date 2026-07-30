@@ -224,6 +224,13 @@ func (m *MockToolRepo) Search(ctx context.Context, userID int32, metro, query st
 	args := m.Called(ctx, userID, metro, query, categories, maxPrice, condition, page, pageSize)
 	return args.Get(0).([]domain.Tool), args.Get(1).(int32), args.Error(2)
 }
+func (m *MockToolRepo) ListCategories(ctx context.Context) ([]string, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
 func (m *MockToolRepo) CreateImage(ctx context.Context, image *domain.ToolImage) error {
 	args := m.Called(ctx, image)
 	return args.Error(0)
@@ -295,6 +302,10 @@ func (m *MockRentalRepo) ListByOwner(ctx context.Context, ownerID, orgID int32, 
 func (m *MockRentalRepo) ListByTool(ctx context.Context, toolID, orgID int32, statuses []string, page, pageSize int32) ([]domain.Rental, int32, error) {
 	args := m.Called(ctx, toolID, orgID, statuses, page, pageSize)
 	return args.Get(0).([]domain.Rental), args.Get(1).(int32), args.Error(2)
+}
+func (m *MockRentalRepo) HasOverlappingRental(ctx context.Context, toolID int32, startDate, endDate string) (bool, error) {
+	args := m.Called(ctx, toolID, startDate, endDate)
+	return args.Bool(0), args.Error(1)
 }
 
 // MockLedgerRepo

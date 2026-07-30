@@ -4,9 +4,11 @@
 
 **Created**: 2026-07-22
 
-**Status**: Draft — **contains a HIGH-severity, currently-live data-integrity gap (Known
-Discrepancy 1: no double-booking prevention); read that section before relying on schedule
-correctness elsewhere in the app.**
+**Status**: Updated 2026-07-29 — all four Known Discrepancies below (double-booking, missing
+status gates on Reject/Cancel, missing org-admin access on `GetRental`) have been **fixed and
+tested**; this document now describes current, correct behavior. The "Known Discrepancies"
+section below is kept as a resolved changelog rather than deleted, per Principle I ("Code Is
+Truth") — it records what changed and why.
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed
 Rentals feature — the largest domain in this codebase (16 RPCs). Per project constitution
@@ -58,9 +60,10 @@ and confirm the tool's status becomes `RENTED` and the rental's status becomes `
 3. **Given** a `PENDING` rental, **When** the owner calls `ApproveRentalRequest` with a
    `pickup_instructions` note, **Then** status becomes `APPROVED` and the renter is
    notified with the pickup note.
-4. **Given** a `PENDING` rental (status is **not** re-checked for `RejectRentalRequest` —
-   see Known Discrepancy 2), **When** the owner calls `RejectRentalRequest`, **Then**
-   status becomes `REJECTED` and the renter is notified.
+4. **Given** a `PENDING` rental, **When** the owner calls `RejectRentalRequest`, **Then**
+   status becomes `REJECTED` and the renter is notified. **Given** a rental that is **not**
+   `PENDING`, **When** `RejectRentalRequest` is called, **Then** it is rejected ("rental is
+   not pending") — see Known Discrepancy 2 (RESOLVED).
 5. **Given** an `APPROVED` rental, **When** the renter calls `FinalizeRentalRequest`,
    **Then** `end_date` is copied to `last_agreed_end_date`, status becomes `SCHEDULED`, the
    tool's status becomes `RENTED`, the owner is notified, and the response additionally
@@ -69,10 +72,13 @@ and confirm the tool's status becomes `RENTED` and the rental's status becomes `
 6. **Given** an `APPROVED` rental, **When** the renter calls `FinalizeRentalRequest` but
    the rental is not `APPROVED` (any other status), **Then** it is rejected ("rental is not
    approved by owner").
-7. **Given** a rental in **any** status (see Known Discrepancy 3 — status is not checked),
-   **When** the renter calls `CancelRentalRequest`, **Then** status becomes `CANCELLED` and
-   the owner is notified with the caller-supplied `reason` (used only in the
-   notification/email; not persisted as a column on the rental record itself).
+7. **Given** a rental in `PENDING`/`APPROVED`/`SCHEDULED` (pre-pickup) status, **When** the
+   renter calls `CancelRentalRequest`, **Then** status becomes `CANCELLED` and the owner is
+   notified with the caller-supplied `reason` (used only in the notification/email; not
+   persisted as a column on the rental record itself). **Given** a rental that has already
+   been picked up (`ACTIVE`/`OVERDUE`/`RETURN_DATE_CHANGED`/etc.) or `COMPLETED`, **When**
+   `CancelRentalRequest` is called, **Then** it is rejected — see Known Discrepancy 3
+   (RESOLVED).
 
 ---
 
@@ -188,9 +194,9 @@ full history for that tool, including rentals by other renters.
 
 **Acceptance Scenarios**:
 
-1. **Given** a `rental_id`, **When** `GetRental` is called by the renter or the owner,
-   **Then** the rental is returned. **As-built**, a caller who is an org admin but neither
-   party is rejected (see Known Discrepancy 4).
+1. **Given** a `rental_id`, **When** `GetRental` is called by the renter, the owner, or an
+   ADMIN/SUPER_ADMIN of the rental's `org_id`, **Then** the rental is returned; any other
+   caller is rejected — see Known Discrepancy 4 (RESOLVED).
 2. **Given** a status-filter array, **When** `ListMyRentals` (as renter) or
    `ListMyLendings` (as owner) is called, **Then** matching statuses are OR'd together (any
    match returns the rental); an empty filter returns all statuses.
@@ -202,14 +208,12 @@ full history for that tool, including rentals by other renters.
 
 ### Edge Cases
 
-- Because `CreateRentalRequest` performs no availability check (Known Discrepancy 1), two
-  different renters can each successfully create a `PENDING`/`APPROVED`/`SCHEDULED` rental
-  for the same tool over overlapping dates; nothing in the create path prevents this, and
-  nothing surfaces it to either owner before they approve.
-- `CancelRentalRequest`'s lack of a status check (Known Discrepancy 3) means it can be
-  called on an already-`ACTIVE` (picked up) or already-`COMPLETED` rental, leaving a
-  physically-in-use or already-settled tool marked `CANCELLED` with no further
-  state-machine path back to a sane status.
+- **RESOLVED** — `CreateRentalRequest` now rejects a date range that overlaps any existing
+  non-terminal (`PENDING`/`APPROVED`/`SCHEDULED`/`ACTIVE`/`OVERDUE`/return-date-negotiation)
+  rental for the same tool with `FAILED_PRECONDITION` (see Known Discrepancy 1).
+- **RESOLVED** — `CancelRentalRequest` now rejects a rental that is not
+  `PENDING`/`APPROVED`/`SCHEDULED` (see Known Discrepancy 3), so an already-`ACTIVE` or
+  `COMPLETED` rental can no longer be cancelled.
 - The renter-balance check referenced nowhere in `grpc_api_business_logic.md` but present
   as commented-out dead code in `CreateRentalRequest` (`// Check balance - DISABLED FOR
   NOW`) is confirmed genuinely disabled — a corresponding e2e test case
@@ -223,79 +227,82 @@ full history for that tool, including rentals by other renters.
   would then depend on `utils.CalculateRentalCost`'s own handling of a negative-duration
   range, which this spec does not re-verify — see the pricing algorithm's own test suite).
 
-## Known Discrepancies *(code vs. documentation, verified against source)*
+## Known Discrepancies *(resolved 2026-07-29 — kept as a changelog, not deleted, per Principle I)*
 
-1. **HIGH — No tool availability / overlap check, contrary to documented step 1 of
+1. **RESOLVED — HIGH — No tool availability / overlap check, contrary to documented step 1 of
    `CreateRentalRequest`.** `grpc_api_business_logic.md` documents step 1 as "Verify the
    tool is either available or its rental schedule is free for the specified start_date and
-   end_date." **As-built**, `rentalService.CreateRentalRequest`
-   (`internal/service/rental.go`) contains only a comment — `// Verify tool availability
-   (simplified: check status)` / `// Ideally check if tool is already rented in this
-   period.` — with no actual check following it. A repo-wide search for
-   overlap/conflict/availability logic (`overlap`, `conflict`, `schedule.*free`,
-   `IsAvailable`) found no implementation anywhere in `internal/`. **Net effect**: the
-   system currently allows unlimited overlapping rental requests for the same tool; nothing
-   prevents two renters from both getting `APPROVED`/`SCHEDULED` rentals for dates that
-   overlap. This is a data-integrity gap, not an authorization gap — recommend treating it
-   with real urgency, though it is lower severity than
-   `specs/004-organizations-administration`'s Known Discrepancy 1 since it doesn't expose
-   or corrupt other users' data, only allows a scheduling conflict the app was supposed to
-   prevent.
-2. **`RejectRentalRequest` does not check the rental is currently `PENDING`.**
-   `grpc_api_business_logic.md`'s "Reject Rental Request" doesn't explicitly restrict
-   status either, but by contrast `ApproveRentalRequest` (right above it in the same file)
-   *does* enforce `PENDING`. **As-built**, `RejectRentalRequest` can transition a rental
-   from any status (including `APPROVED`, `SCHEDULED`, or even `COMPLETED`) straight to
-   `REJECTED`. Likely an oversight given the sibling method's stricter check, not a
-   deliberate design choice.
-3. **`CancelRentalRequest` does not check rental status at all** (see Edge Cases) — same
-   category of gap as Discrepancy 2, one level more permissive since even `ApproveRentalRequest`-style
-   status gating is entirely absent here.
-4. **`GetRental` does not grant org-admin access, contrary to documentation.**
+   end_date." Previously `rentalService.CreateRentalRequest` (`internal/service/rental.go`)
+   contained only a comment with no actual check following it, so the system allowed
+   unlimited overlapping rental requests for the same tool.
+   **Fix**: added `RentalRepository.HasOverlappingRental(ctx, toolID, startDate, endDate)`
+   (`internal/repository/postgres/rental.go`), a single `EXISTS` query over `rentals` that
+   excludes only the terminal statuses `REJECTED`/`CANCELLED`/`COMPLETED` (so
+   `PENDING`/`APPROVED`/`SCHEDULED`/`ACTIVE`/`OVERDUE`/`RETURN_DATE_CHANGED`/
+   `RETURN_DATE_CHANGE_REJECTED` all count as occupying the schedule), using the same
+   end-exclusive range semantics as `utils.CalculateRentalCost`
+   (`existing.start_date < newEnd AND existing.end_date > newStart`).
+   `rentalService.CreateRentalRequest` calls it after date validation and rejects an overlap
+   with `FAILED_PRECONDITION`. Tests: `TestRentalService_CreateRentalRequest` > "Rejects an
+   overlapping date range for the same tool (KD-1)" (tests/unit/rental_test.go).
+2. **RESOLVED — `RejectRentalRequest` did not check the rental is currently `PENDING`.**
+   `ApproveRentalRequest` (right above it in the same file) enforces `PENDING`;
+   `RejectRentalRequest` did not, and could transition a rental from any status (including
+   `APPROVED`, `SCHEDULED`, or even `COMPLETED`) straight to `REJECTED`.
+   **Fix**: `rentalService.RejectRentalRequest` now mirrors `ApproveRentalRequest`'s gate —
+   rejects with "rental is not pending" unless `rt.Status == RentalStatusPending`. Tests:
+   `TestRentalService_RejectRentalRequest` (tests/unit/rental_test.go).
+3. **RESOLVED — `CancelRentalRequest` did not check rental status at all.** Same category of
+   gap as Discrepancy 2, one level more permissive since even `ApproveRentalRequest`-style
+   status gating was entirely absent.
+   **Fix**: `rentalService.CancelRental` now requires `isPreActive(rt.Status)` (the same
+   pre-pickup gate `ChangeRentalDates` already used) — `PENDING`/`APPROVED`/`SCHEDULED` may
+   be cancelled; `ACTIVE`/`OVERDUE`/`COMPLETED`/etc. may not. Tests:
+   `TestRentalService_CancelRental` (tests/unit/rental_test.go).
+4. **RESOLVED — `GetRental` did not grant org-admin access, contrary to documentation.**
    `grpc_api_business_logic.md`'s "Get Rental" business logic says: "check user_id is
-   either the renter, the owner, or an admin in the organization of rentals.org_id."
-   **As-built**, `rentalService.GetRental` checks only `rt.RenterID != userID && rt.OwnerID
-   != userID` — an org admin with no personal stake in the rental is rejected, unlike every
-   admin-scoped read elsewhere in the codebase (e.g. Bill Split's `GetPaymentDetail`, which
-   does correctly extend access to org admins).
+   either the renter, the owner, or an admin in the organization of rentals.org_id." Previously
+   `rentalService.GetRental` checked only `rt.RenterID != userID && rt.OwnerID != userID` —
+   an org admin with no personal stake in the rental was rejected, unlike every admin-scoped
+   read elsewhere in the codebase (e.g. Bill Split's `GetPaymentDetail`).
+   **Fix**: when the caller is neither renter nor owner, `GetRental` now calls
+   `userRepo.GetUserOrg(ctx, userID, rt.OrgID)` and grants access if the caller's role there
+   is `ADMIN` or `SUPER_ADMIN`. Tests: `TestRentalService_GetRental` > "Grants access to an
+   admin/super-admin of the rental's org ... (KD-4)" (tests/unit/rental_test.go).
 
 ## Current Test Coverage Baseline *(informational — grounds the next /speckit-tasks pass, not a requirement)*
 
 Verified by inspection of `tests/unit/rental_test.go`, `tests/e2e/rental_test.go`,
 `tests/e2e/rental_steps_test.go`, and `tests/integration/rental_ledger_test.go`:
 
-**Covered**: `CreateRentalRequest`'s happy path and cost calculation (unit); `CompleteRental`
-including ledger/balance effects, snapshot-vs-tool-price recomputation, the owner-only/status
-reject clauses, and the `charge_billsplit` gate (unit + integration —
-`TestRentalService_CompleteRental_Integration` calls `service.CompleteRental` directly
-against a real DB); `FinalizeRentalRequest`, `ActivateRental`, `ChangeRentalDates` (multiple
-sub-cases), `RejectReturnDateChange` (unit); a full end-to-end lifecycle including reject,
-an in-flight extension-request update, cancel, and a `charge_billsplit=false` variant (e2e).
+**Covered**: `CreateRentalRequest`'s happy path, cost calculation, and overlap rejection (unit);
+`RejectRentalRequest`/`CancelRentalRequest` status gating (unit); `GetRental`'s org-admin
+access grant (unit); `CompleteRental` including ledger/balance effects,
+snapshot-vs-tool-price recomputation, the owner-only/status reject clauses, and the
+`charge_billsplit` gate (unit + integration — `TestRentalService_CompleteRental_Integration`
+calls `service.CompleteRental` directly against a real DB); `FinalizeRentalRequest`,
+`ActivateRental`, `ChangeRentalDates` (multiple sub-cases), `RejectReturnDateChange` (unit); a
+full end-to-end lifecycle including reject, an in-flight extension-request update, cancel, and
+a `charge_billsplit=false` variant (e2e).
 
 **Not covered anywhere**:
 
-- **The double-booking gap itself (Known Discrepancy 1)** — no test creates two
-  overlapping rental requests for the same tool and asserts either rejection or acceptance;
-  this is the highest-value test to add (or, more precisely, the fix to build and then
-  test) in this entire domain.
-- `RejectRentalRequest`/`CancelRentalRequest` called against a non-`PENDING`/non-cancelable
-  status (Known Discrepancies 2 and 3) — no test exercises either misuse case.
-- `GetRental` called by an org admin who is neither renter nor owner (Known Discrepancy 4).
 - `ApproveReturnDateChange` and `AcknowledgeReturnDateRejection` at the unit-test tier
   (only reachable indirectly through e2e today).
 - `ListToolRentals`'s ownership-rejection path and its status/organization filtering.
 - `ListMyRentals`/`ListMyLendings`'s OR-combination of multiple statuses in one call.
+- The fixed KD-1/2/3/4 behaviors are unit-tested but not yet re-exercised at L2/L3 against a
+  real DB/full stack (see FR-001/FR-006 in the RTM for the specific proposed tests).
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: `CreateRentalRequest` MUST validate `end_date > start_date`, MUST snapshot the
-  tool's current price fields onto the rental record, and MUST compute
-  `total_cost_cents` from that snapshot. **As-built, it MUST NOT be assumed to reject
-  overlapping-date requests for the same tool** (Known Discrepancy 1) — this is the target
-  correctness bar for the highest-priority follow-up task in this domain, not current
-  behavior.
+  tool's current price fields onto the rental record, MUST compute `total_cost_cents` from
+  that snapshot, and MUST reject a date range that overlaps any existing non-terminal
+  (not `REJECTED`/`CANCELLED`/`COMPLETED`) rental for the same tool (Known Discrepancy 1,
+  RESOLVED).
 - **FR-002**: `ApproveRentalRequest` MUST require the caller to be the tool's owner and the
   rental to be `PENDING`.
 - **FR-003**: `FinalizeRentalRequest` MUST require the caller to be the renter and the
@@ -308,14 +315,18 @@ an in-flight extension-request update, cancel, and a `charge_billsplit=false` va
   case, `ApproveReturnDateChange`, `RejectReturnDateChange`, `AcknowledgeReturnDateRejection`,
   `CancelReturnDateChange`) MUST recompute `total_cost_cents` from the rental's price
   snapshot whenever `end_date` changes.
-- **FR-006**: `GetRental` MUST grant access to the rental's renter and owner.
-  **As-built, it MUST NOT be assumed to also grant access to org admins** (Known
-  Discrepancy 4) despite that being documented.
+- **FR-006**: `GetRental` MUST grant access to the rental's renter, the rental's owner, and
+  any caller holding ADMIN/SUPER_ADMIN role in the rental's `org_id` (Known Discrepancy 4,
+  RESOLVED); any other caller MUST be rejected.
 - **FR-007**: `ListMyRentals` (scoped to the caller as renter) and `ListMyLendings` (scoped
   to the caller as owner) MUST OR-combine a given `status` array (any matching status
   returns the rental; an empty array returns all statuses), and MUST treat
   `organization_id` as an optional filter — when supplied (non-zero), results are scoped to
   that org; when omitted (`0`), results span every org the caller belongs to.
+- **FR-009**: `RejectRentalRequest` MUST require the rental to be `PENDING` (Known
+  Discrepancy 2, RESOLVED).
+- **FR-010**: `CancelRentalRequest` MUST require the rental to be
+  `PENDING`/`APPROVED`/`SCHEDULED` (pre-pickup) (Known Discrepancy 3, RESOLVED).
 - **FR-008** *(multi-org requirement from PRD 3.3, Organizations FR-012)*: When a user
   attempts to create a rental request, the rental's `org_id` **MUST be an organization
   that both the renter (caller) and the tool owner are members of**. The system MUST
@@ -376,19 +387,21 @@ an in-flight extension-request update, cancel, and a `charge_billsplit=false` va
 
 ### Measurable Outcomes
 
-- **SC-001 (highest priority in this spec)**: `CreateRentalRequest` rejects (or the product
-  decision is made and documented to explicitly allow) a new request whose date range
-  overlaps an existing `PENDING`/`APPROVED`/`SCHEDULED`/`ACTIVE`/`OVERDUE` rental for the
-  same tool — closing Known Discrepancy 1, with a dedicated automated test.
-- **SC-002**: `RejectRentalRequest` and `CancelRentalRequest` either gain explicit status
-  gating consistent with their sibling methods, or the spec is updated to state plainly
-  that they are intentionally unrestricted — Known Discrepancies 2 and 3 do not remain
-  undocumented inconsistencies.
-- **SC-003**: `GetRental`'s org-admin access is either implemented to match documentation
-  or the documentation is corrected — Known Discrepancy 4 does not remain silently
-  contradictory.
+- **SC-001 — CLOSED (2026-07-29)**: `CreateRentalRequest` rejects a new request whose date
+  range overlaps an existing non-terminal rental for the same tool — closing Known
+  Discrepancy 1, with a dedicated automated test
+  (`TestRentalService_CreateRentalRequest` > "Rejects an overlapping date range for the
+  same tool (KD-1)").
+- **SC-002 — CLOSED (2026-07-29)**: `RejectRentalRequest` and `CancelRentalRequest` now
+  have explicit status gating consistent with their sibling methods — closing Known
+  Discrepancies 2 and 3, with dedicated tests (`TestRentalService_RejectRentalRequest`,
+  `TestRentalService_CancelRental`).
+- **SC-003 — CLOSED (2026-07-29)**: `GetRental` now grants org-admin access, matching
+  documentation — closing Known Discrepancy 4, with a dedicated test
+  (`TestRentalService_GetRental` > "Grants access to an admin/super-admin ... (KD-4)").
 - **SC-004**: Every one of the ten `RentalStatus` values has at least one automated test
-  that reaches it via the RPC(s) that are supposed to produce it.
+  that reaches it via the RPC(s) that are supposed to produce it. *(Not re-audited in this
+  pass — carried forward as open.)*
 
 ## Assumptions
 

@@ -183,13 +183,9 @@ func TestImageStorageService_E2E(t *testing.T) {
 		assert.Equal(t, "image1.jpg", resp.Images[0].FileName)
 	})
 
-	// FR-007 (specs/006-tools-image-storage): GetToolImages does not enforce the same
-	// owner-or-AVAILABLE access rule as GetDownloadUrl — internal/service/image_storage.go's
-	// GetToolImages takes no userID parameter at all. This documents the current (lack of)
-	// access boundary as a regression baseline: if access control is ever added here, this test
-	// will fail, correctly signaling the as-built behavior changed on purpose (see FR-007's own
-	// wording — it explicitly describes a target-not-current state, not a required fix).
-	t.Run("GetToolImages does not restrict access to the owner (documents current non-enforcement)", func(t *testing.T) {
+	// KD-2/FR-007 (specs/006-tools-image-storage, RESOLVED 2026-07-29): GetToolImages now
+	// enforces the same owner-or-AVAILABLE access rule as GetDownloadUrl.
+	t.Run("GetToolImages grants access to a non-owner only when the tool is AVAILABLE", func(t *testing.T) {
 		ownerID := db.CreateTestUser("e2e-test-getimages-owner@test.com", "Images Owner")
 		nonOwnerID := db.CreateTestUser("e2e-test-getimages-nonowner@test.com", "Non Owner Viewer")
 		toolID := db.CreateTestTool(ownerID, "Non-Owner-Viewable Tool", 1000)
@@ -211,9 +207,17 @@ func TestImageStorageService_E2E(t *testing.T) {
 		ctx, cancel := ContextWithUserIDAndTimeout(nonOwnerID, 5*time.Second)
 		defer cancel()
 
+		// CreateTestTool defaults the tool to AVAILABLE, so a non-owner must be granted access.
 		resp, err := imageClient.GetToolImages(ctx, &pb.GetToolImagesRequest{ToolId: toolID})
-		require.NoError(t, err, "as-built, GetToolImages currently has no access restriction to document/lock in")
+		require.NoError(t, err, "a non-owner must be able to view an AVAILABLE tool's images")
 		assert.Equal(t, 1, len(resp.Images))
+
+		// Once the tool is no longer AVAILABLE, the same non-owner must be rejected.
+		_, err = db.Exec("UPDATE tools SET status = 'RENTED' WHERE id = $1", toolID)
+		require.NoError(t, err)
+
+		_, err = imageClient.GetToolImages(ctx, &pb.GetToolImagesRequest{ToolId: toolID})
+		require.Error(t, err, "a non-owner must be rejected once the tool is no longer AVAILABLE")
 	})
 
 	t.Run("SetPrimaryImage", func(t *testing.T) {
