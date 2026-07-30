@@ -166,7 +166,7 @@ func TestLedgerRepository_GetSummary(t *testing.T) {
 	// simulated here by a rental in the same org between two unrelated participants being absent
 	// (isolation is implicit: the query only ever matches rows where the user is renter or owner).
 
-	summary, err := repo.GetSummary(ctx, user, orgID)
+	summary, err := repo.GetSummary(ctx, user, orgID, 0)
 	require.NoError(t, err)
 
 	assert.EqualValues(t, 4200, summary.Balance)
@@ -177,6 +177,58 @@ func TestLedgerRepository_GetSummary(t *testing.T) {
 	// renter, one as owner) + 1 PENDING.
 	assert.EqualValues(t, 2, summary.StatusCount["ACTIVE"], "StatusCount must combine renter-role and owner-role rentals")
 	assert.EqualValues(t, 1, summary.StatusCount["PENDING"])
+}
+
+// TestLedgerRepository_GetSummary_FiltersByMonths covers FR-003 (specs/007-ledger, Known
+// Discrepancy 2): a non-zero number_of_months MUST limit rental-activity counts to rentals
+// created within that window, while number_of_months <= 0 (the proto3 default when the field is
+// omitted) MUST preserve the pre-existing unbounded-history behavior — no prior test seeded old
+// enough rental data to distinguish filtered from unfiltered behavior (spec.md "Current Test
+// Gap"). Balance is asserted unaffected by the filter, matching FR-003's balance/activity split.
+func TestLedgerRepository_GetSummary_FiltersByMonths(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	repo := postgres.NewLedgerRepository(db)
+	ctx := context.Background()
+
+	orgID := createTestOrgForLedger(t, db)
+	user := createTestUserForLedger(t, db, "ledger-months-user")
+	otherUser := createTestUserForLedger(t, db, "ledger-months-other")
+	addUserToOrgForLedgerWithBalance(t, db, user, orgID, 1500)
+	addUserToOrgForLedger(t, db, otherUser, orgID)
+
+	tool := createTestToolForLedger(t, db, otherUser)
+
+	defer func() {
+		db.Exec("DELETE FROM rentals WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM tools WHERE id = $1", tool)
+		db.Exec("DELETE FROM users_orgs WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2)", user, otherUser)
+		db.Exec("DELETE FROM orgs WHERE id = $1", orgID)
+	}()
+
+	// Recent rental (within any positive window): created today.
+	createTestRentalForLedgerWithCreatedOn(t, db, orgID, tool, user, otherUser, "ACTIVE", "CURRENT_DATE")
+	// Old rental (10 months ago): must be excluded once number_of_months=3 is applied, but
+	// counted when number_of_months is omitted (0).
+	createTestRentalForLedgerWithCreatedOn(t, db, orgID, tool, user, otherUser, "ACTIVE", "CURRENT_DATE - INTERVAL '10 months'")
+
+	t.Run("number_of_months omitted (0) counts the entire history", func(t *testing.T) {
+		summary, err := repo.GetSummary(ctx, user, orgID, 0)
+		require.NoError(t, err)
+		assert.EqualValues(t, 1500, summary.Balance, "balance must never be affected by the filter")
+		assert.EqualValues(t, 2, summary.ActiveRentalsCount, "both old and recent rentals counted when unfiltered")
+		assert.EqualValues(t, 2, summary.StatusCount["ACTIVE"])
+	})
+
+	t.Run("number_of_months=3 excludes the 10-month-old rental", func(t *testing.T) {
+		summary, err := repo.GetSummary(ctx, user, orgID, 3)
+		require.NoError(t, err)
+		assert.EqualValues(t, 1500, summary.Balance, "balance must never be affected by the filter")
+		assert.EqualValues(t, 1, summary.ActiveRentalsCount, "only the recent rental falls within the 3-month window")
+		assert.EqualValues(t, 1, summary.StatusCount["ACTIVE"])
+	})
 }
 
 // TestLedgerRepository_GetSummary_CrossOrgRollup covers FR-004 (specs/007-ledger, multi-org):
@@ -226,7 +278,7 @@ func TestLedgerRepository_GetSummary_CrossOrgRollup(t *testing.T) {
 	// Org C: a rental the user has no part in at all — must never count.
 	createTestRentalForLedger(t, db, orgC, toolInC, otherUser, strangerInOrgC, "ACTIVE")
 
-	summary, err := repo.GetSummaryAllOrgs(ctx, user)
+	summary, err := repo.GetSummaryAllOrgs(ctx, user, 0)
 	require.NoError(t, err, "must roll up across orgs instead of erroring on organization_id=0")
 
 	assert.EqualValues(t, 5000, summary.Balance, "balance must sum across both of the user's orgs (4200+800)")
@@ -235,6 +287,57 @@ func TestLedgerRepository_GetSummary_CrossOrgRollup(t *testing.T) {
 	assert.EqualValues(t, 1, summary.PendingRequestsCount, "one PENDING rental as renter, in org B")
 	assert.EqualValues(t, 2, summary.StatusCount["ACTIVE"], "ACTIVE count must combine both orgs and both roles")
 	assert.EqualValues(t, 1, summary.StatusCount["PENDING"])
+}
+
+// TestLedgerRepository_GetSummaryAllOrgs_FiltersByMonths covers FR-004(c) (specs/007-ledger,
+// multi-org, Known Discrepancy 2): number_of_months must apply the same per-org rental-activity
+// window to the cross-org rollup as GetSummary applies to a single org — this was the specific
+// gap tracked separately in the RTM because it was blocked on the single-org fix landing first.
+func TestLedgerRepository_GetSummaryAllOrgs_FiltersByMonths(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	repo := postgres.NewLedgerRepository(db)
+	ctx := context.Background()
+
+	orgA := createTestOrgForLedger(t, db)
+	orgB := createTestOrgForLedger(t, db)
+	user := createTestUserForLedger(t, db, "ledger-rollup-months-user")
+	otherUser := createTestUserForLedger(t, db, "ledger-rollup-months-other")
+	addUserToOrgForLedgerWithBalance(t, db, user, orgA, 4200)
+	addUserToOrgForLedgerWithBalance(t, db, user, orgB, 800)
+	addUserToOrgForLedger(t, db, otherUser, orgA)
+	addUserToOrgForLedger(t, db, otherUser, orgB)
+
+	toolInA := createTestToolForLedger(t, db, otherUser)
+	toolInB := createTestToolForLedger(t, db, otherUser)
+
+	defer func() {
+		db.Exec("DELETE FROM rentals WHERE org_id IN ($1, $2)", orgA, orgB)
+		db.Exec("DELETE FROM tools WHERE id IN ($1, $2)", toolInA, toolInB)
+		db.Exec("DELETE FROM users_orgs WHERE org_id IN ($1, $2)", orgA, orgB)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2)", user, otherUser)
+		db.Exec("DELETE FROM orgs WHERE id IN ($1, $2)", orgA, orgB)
+	}()
+
+	// Org A: recent ACTIVE rental as renter.
+	createTestRentalForLedgerWithCreatedOn(t, db, orgA, toolInA, user, otherUser, "ACTIVE", "CURRENT_DATE")
+	// Org B: ACTIVE rental as renter, but 10 months old — must be excluded once filtered.
+	createTestRentalForLedgerWithCreatedOn(t, db, orgB, toolInB, user, otherUser, "ACTIVE", "CURRENT_DATE - INTERVAL '10 months'")
+
+	t.Run("number_of_months omitted (0) counts both orgs' entire history", func(t *testing.T) {
+		summary, err := repo.GetSummaryAllOrgs(ctx, user, 0)
+		require.NoError(t, err)
+		assert.EqualValues(t, 5000, summary.Balance)
+		assert.EqualValues(t, 2, summary.ActiveRentalsCount, "both the recent and old rental counted when unfiltered")
+	})
+
+	t.Run("number_of_months=3 excludes the 10-month-old rental in org B", func(t *testing.T) {
+		summary, err := repo.GetSummaryAllOrgs(ctx, user, 3)
+		require.NoError(t, err)
+		assert.EqualValues(t, 5000, summary.Balance, "balance must never be affected by the filter")
+		assert.EqualValues(t, 1, summary.ActiveRentalsCount, "only org A's recent rental falls within the 3-month window")
+	})
 }
 
 func createTestOrgForLedger(t *testing.T, db *sql.DB) int32 {
@@ -296,6 +399,24 @@ func createTestRentalForLedger(t *testing.T, db *sql.DB, orgID, toolID, renterID
 		VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE + 2, 'day', 1000, 6000, 20000, 5000, 2000, $5)
 		RETURNING id
 	`, orgID, toolID, renterID, ownerID, status).Scan(&rentalID)
+	require.NoError(t, err)
+	return rentalID
+}
+
+// createTestRentalForLedgerWithCreatedOn is like createTestRentalForLedger but backdates
+// created_on to a fixed SQL date expression (e.g. "CURRENT_DATE - INTERVAL '10 months'"), for
+// tests proving number_of_months date-window filtering (FR-003/FR-004(c)). createdOnExpr is
+// always a fixed literal supplied by the test itself, never external input.
+func createTestRentalForLedgerWithCreatedOn(t *testing.T, db *sql.DB, orgID, toolID, renterID, ownerID int32, status, createdOnExpr string) int32 {
+	t.Helper()
+	var rentalID int32
+	query := fmt.Sprintf(`
+		INSERT INTO rentals (org_id, tool_id, renter_id, owner_id, start_date, end_date, duration_unit,
+			daily_price_cents, weekly_price_cents, monthly_price_cents, replacement_cost_cents, total_cost_cents, status, created_on)
+		VALUES ($1, $2, $3, $4, CURRENT_DATE, CURRENT_DATE + 2, 'day', 1000, 6000, 20000, 5000, 2000, $5, %s)
+		RETURNING id
+	`, createdOnExpr)
+	err := db.QueryRow(query, orgID, toolID, renterID, ownerID, status).Scan(&rentalID)
 	require.NoError(t, err)
 	return rentalID
 }

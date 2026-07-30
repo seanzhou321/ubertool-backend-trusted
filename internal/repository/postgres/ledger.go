@@ -3,11 +3,24 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/repository"
 )
+
+// monthsFilterClause builds a " AND created_on >= ..." SQL fragment that limits rental-activity
+// queries to the last numberOfMonths (FR-003/FR-004(c), specs/007-ledger). numberOfMonths <= 0
+// (including the proto3 zero-value default when the field is omitted) means unbounded history —
+// existing callers that never set number_of_months must keep seeing their entire history, not a
+// window truncated to "now". argIdx is the next available Postgres placeholder position.
+func monthsFilterClause(argIdx int, numberOfMonths int32) (string, []interface{}) {
+	if numberOfMonths <= 0 {
+		return "", nil
+	}
+	return fmt.Sprintf(" AND created_on >= (CURRENT_DATE - ($%d * INTERVAL '1 month'))", argIdx), []interface{}{numberOfMonths}
+}
 
 type ledgerRepository struct {
 	db *sql.DB
@@ -61,42 +74,46 @@ func (r *ledgerRepository) ListTransactions(ctx context.Context, userID, orgID i
 	}
 	return txs, count, nil
 }
-func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error) {
+func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID, numberOfMonths int32) (*domain.LedgerSummary, error) {
 	summary := &domain.LedgerSummary{
 		StatusCount: make(map[string]int32),
 	}
 
-	// Balance
+	// Balance is not rental activity — number_of_months never filters it.
 	balance, err := r.GetBalance(ctx, userID, orgID)
 	if err != nil {
 		return nil, err
 	}
 	summary.Balance = balance
 
+	filter, filterArgs := monthsFilterClause(3, numberOfMonths)
+	baseArgs := []interface{}{userID, orgID}
+	args := append(baseArgs, filterArgs...)
+
 	// Active Rentals Count
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE renter_id = $1 AND org_id = $2 AND status = 'ACTIVE'", userID, orgID).Scan(&summary.ActiveRentalsCount)
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE renter_id = $1 AND org_id = $2 AND status = 'ACTIVE'"+filter, args...).Scan(&summary.ActiveRentalsCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// Active Lendings Count
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE owner_id = $1 AND org_id = $2 AND status = 'ACTIVE'", userID, orgID).Scan(&summary.ActiveLendingsCount)
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE owner_id = $1 AND org_id = $2 AND status = 'ACTIVE'"+filter, args...).Scan(&summary.ActiveLendingsCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// Pending Requests Count
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE (renter_id = $1 OR owner_id = $1) AND org_id = $2 AND status = 'PENDING'", userID, orgID).Scan(&summary.PendingRequestsCount)
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE (renter_id = $1 OR owner_id = $1) AND org_id = $2 AND status = 'PENDING'"+filter, args...).Scan(&summary.PendingRequestsCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// Detailed status counts for all rentals the user is involved in
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT status, count(*) 
-		FROM rentals 
-		WHERE (renter_id = $1 OR owner_id = $1) AND org_id = $2 
-		GROUP BY status`, userID, orgID)
+		SELECT status, count(*)
+		FROM rentals
+		WHERE (renter_id = $1 OR owner_id = $1) AND org_id = $2 `+filter+`
+		GROUP BY status`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +137,9 @@ func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID int32) 
 // org_id at all — a rental's renter_id/owner_id already implies org membership (enforced by the
 // rentals_shared_org_check constraint), so dropping the org_id filter is equivalent to summing
 // over every org the user belongs to, without needing an explicit org-list subquery.
-func (r *ledgerRepository) GetSummaryAllOrgs(ctx context.Context, userID int32) (*domain.LedgerSummary, error) {
+// numberOfMonths applies the same per-org rental-activity window as GetSummary (FR-004(c)); the
+// balance rollup is unaffected, matching GetSummary's balance/activity split.
+func (r *ledgerRepository) GetSummaryAllOrgs(ctx context.Context, userID, numberOfMonths int32) (*domain.LedgerSummary, error) {
 	summary := &domain.LedgerSummary{
 		StatusCount: make(map[string]int32),
 	}
@@ -131,20 +150,24 @@ func (r *ledgerRepository) GetSummaryAllOrgs(ctx context.Context, userID int32) 
 		return nil, err
 	}
 
+	filter, filterArgs := monthsFilterClause(2, numberOfMonths)
+	baseArgs := []interface{}{userID}
+	args := append(baseArgs, filterArgs...)
+
 	// Active Rentals Count (all orgs)
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE renter_id = $1 AND status = 'ACTIVE'", userID).Scan(&summary.ActiveRentalsCount)
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE renter_id = $1 AND status = 'ACTIVE'"+filter, args...).Scan(&summary.ActiveRentalsCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// Active Lendings Count (all orgs)
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE owner_id = $1 AND status = 'ACTIVE'", userID).Scan(&summary.ActiveLendingsCount)
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE owner_id = $1 AND status = 'ACTIVE'"+filter, args...).Scan(&summary.ActiveLendingsCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// Pending Requests Count (all orgs)
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE (renter_id = $1 OR owner_id = $1) AND status = 'PENDING'", userID).Scan(&summary.PendingRequestsCount)
+	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE (renter_id = $1 OR owner_id = $1) AND status = 'PENDING'"+filter, args...).Scan(&summary.PendingRequestsCount)
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +176,8 @@ func (r *ledgerRepository) GetSummaryAllOrgs(ctx context.Context, userID int32) 
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT status, count(*)
 		FROM rentals
-		WHERE (renter_id = $1 OR owner_id = $1)
-		GROUP BY status`, userID)
+		WHERE (renter_id = $1 OR owner_id = $1) `+filter+`
+		GROUP BY status`, args...)
 	if err != nil {
 		return nil, err
 	}

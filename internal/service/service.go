@@ -93,7 +93,7 @@ type RentalService interface {
 type LedgerService interface {
 	GetBalance(ctx context.Context, userID, orgID int32) (int32, error)
 	GetTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error)
-	GetLedgerSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error)
+	GetLedgerSummary(ctx context.Context, userID, orgID, numberOfMonths int32) (*domain.LedgerSummary, error)
 }
 
 type NotificationService interface {

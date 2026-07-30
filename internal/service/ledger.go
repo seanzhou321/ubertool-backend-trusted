@@ -22,12 +22,12 @@ func (s *ledgerService) GetTransactions(ctx context.Context, userID, orgID int32
 	return s.ledgerRepo.ListTransactions(ctx, userID, orgID, page, pageSize)
 }
 
-func (s *ledgerService) GetLedgerSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error) {
+func (s *ledgerService) GetLedgerSummary(ctx context.Context, userID, orgID, numberOfMonths int32) (*domain.LedgerSummary, error) {
 	// FR-004 (specs/007-ledger, multi-org): organization_id omitted (0) means "roll up across
 	// every org the caller belongs to" rather than a literal org_id=0 lookup, which matches no
 	// row and previously surfaced as an opaque "no rows" error.
 	if orgID == 0 {
-		return s.ledgerRepo.GetSummaryAllOrgs(ctx, userID)
+		return s.ledgerRepo.GetSummaryAllOrgs(ctx, userID, numberOfMonths)
 	}
-	return s.ledgerRepo.GetSummary(ctx, userID, orgID)
+	return s.ledgerRepo.GetSummary(ctx, userID, orgID, numberOfMonths)
 }

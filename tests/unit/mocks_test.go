@@ -314,15 +314,15 @@ func (m *MockLedgerRepo) ListTransactions(ctx context.Context, userID, orgID int
 	args := m.Called(ctx, userID, orgID, page, pageSize)
 	return args.Get(0).([]domain.LedgerTransaction), args.Get(1).(int32), args.Error(2)
 }
-func (m *MockLedgerRepo) GetSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error) {
-	args := m.Called(ctx, userID, orgID)
+func (m *MockLedgerRepo) GetSummary(ctx context.Context, userID, orgID, numberOfMonths int32) (*domain.LedgerSummary, error) {
+	args := m.Called(ctx, userID, orgID, numberOfMonths)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.LedgerSummary), args.Error(1)
 }
-func (m *MockLedgerRepo) GetSummaryAllOrgs(ctx context.Context, userID int32) (*domain.LedgerSummary, error) {
-	args := m.Called(ctx, userID)
+func (m *MockLedgerRepo) GetSummaryAllOrgs(ctx context.Context, userID, numberOfMonths int32) (*domain.LedgerSummary, error) {
+	args := m.Called(ctx, userID, numberOfMonths)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

@@ -52,7 +52,7 @@ func (h *LedgerHandler) GetLedgerSummary(ctx context.Context, req *pb.GetLedgerS
 	if err != nil {
 		return nil, err
 	}
-	summary, err := h.ledgerSvc.GetLedgerSummary(ctx, userID, req.OrganizationId)
+	summary, err := h.ledgerSvc.GetLedgerSummary(ctx, userID, req.OrganizationId, req.NumberOfMonths)
 	if err != nil {
 		return nil, err
 	}

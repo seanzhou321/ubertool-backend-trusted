@@ -81,10 +81,13 @@ type LedgerRepository interface {
 	CreateTransaction(ctx context.Context, tx *domain.LedgerTransaction) error
 	GetBalance(ctx context.Context, userID, orgID int32) (int32, error)
 	ListTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error)
-	GetSummary(ctx context.Context, userID, orgID int32) (*domain.LedgerSummary, error)
+	// numberOfMonths limits the rental-activity counts (not balance) to rentals created within
+	// the last N months; numberOfMonths <= 0 means unbounded history (FR-003/FR-004(c)).
+	GetSummary(ctx context.Context, userID, orgID, numberOfMonths int32) (*domain.LedgerSummary, error)
 	// GetSummaryAllOrgs rolls up balance and per-status rental counts across every org the
 	// user belongs to (FR-004, specs/007-ledger) — used when organization_id is omitted (0).
-	GetSummaryAllOrgs(ctx context.Context, userID int32) (*domain.LedgerSummary, error)
+	// numberOfMonths applies the same per-org rental-activity window as GetSummary (FR-004(c)).
+	GetSummaryAllOrgs(ctx context.Context, userID, numberOfMonths int32) (*domain.LedgerSummary, error)
 }
 
 type NotificationRepository interface {

@@ -51,12 +51,45 @@ func TestLedgerService_GetLedgerSummary(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		summary := &domain.LedgerSummary{Balance: 1000, StatusCount: map[string]int32{"ACTIVE": 2}}
-		repo.On("GetSummary", ctx, int32(1), int32(2)).Return(summary, nil)
+		repo.On("GetSummary", ctx, int32(1), int32(2), int32(0)).Return(summary, nil)
 
-		res, err := svc.GetLedgerSummary(ctx, 1, 2)
+		res, err := svc.GetLedgerSummary(ctx, 1, 2, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(1000), res.Balance)
 		assert.EqualValues(t, 2, res.StatusCount["ACTIVE"])
+	})
+}
+
+// TestLedgerService_GetLedgerSummary_FiltersByMonths covers FR-003/FR-004(c) (specs/007-ledger):
+// number_of_months must be forwarded to the repository layer unchanged, for both the single-org
+// and cross-org rollup paths — this is the service-layer routing half of the fix; the actual
+// date-window filtering SQL is proven at L2 (TestLedgerRepository_GetSummary_FiltersByMonths /
+// TestLedgerRepository_GetSummary_CrossOrgRollup_FiltersByMonths, tests/integration/ledger_test.go).
+func TestLedgerService_GetLedgerSummary_FiltersByMonths(t *testing.T) {
+	t.Run("single-org: numberOfMonths forwarded to GetSummary", func(t *testing.T) {
+		repo := new(MockLedgerRepo)
+		svc := service.NewLedgerService(repo)
+		ctx := context.Background()
+
+		summary := &domain.LedgerSummary{Balance: 1000, StatusCount: map[string]int32{"ACTIVE": 1}}
+		repo.On("GetSummary", ctx, int32(1), int32(2), int32(3)).Return(summary, nil)
+
+		_, err := svc.GetLedgerSummary(ctx, 1, 2, 3)
+		assert.NoError(t, err)
+		repo.AssertCalled(t, "GetSummary", ctx, int32(1), int32(2), int32(3))
+	})
+
+	t.Run("cross-org rollup: numberOfMonths forwarded to GetSummaryAllOrgs", func(t *testing.T) {
+		repo := new(MockLedgerRepo)
+		svc := service.NewLedgerService(repo)
+		ctx := context.Background()
+
+		summary := &domain.LedgerSummary{Balance: 5000, StatusCount: map[string]int32{"ACTIVE": 1}}
+		repo.On("GetSummaryAllOrgs", ctx, int32(1), int32(3)).Return(summary, nil)
+
+		_, err := svc.GetLedgerSummary(ctx, 1, 0, 3)
+		assert.NoError(t, err)
+		repo.AssertCalled(t, "GetSummaryAllOrgs", ctx, int32(1), int32(3))
 	})
 }
 
@@ -73,12 +106,12 @@ func TestLedgerService_GetLedgerSummary_RollsUpAcrossOrgs(t *testing.T) {
 
 	t.Run("organization_id omitted calls the cross-org rollup, not the single-org lookup", func(t *testing.T) {
 		summary := &domain.LedgerSummary{Balance: 5000, StatusCount: map[string]int32{"ACTIVE": 3}}
-		repo.On("GetSummaryAllOrgs", ctx, int32(1)).Return(summary, nil)
+		repo.On("GetSummaryAllOrgs", ctx, int32(1), int32(0)).Return(summary, nil)
 
-		res, err := svc.GetLedgerSummary(ctx, 1, 0)
+		res, err := svc.GetLedgerSummary(ctx, 1, 0, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(5000), res.Balance)
 		assert.EqualValues(t, 3, res.StatusCount["ACTIVE"])
-		repo.AssertNotCalled(t, "GetSummary", ctx, int32(1), int32(0))
+		repo.AssertNotCalled(t, "GetSummary", ctx, int32(1), int32(0), int32(0))
 	})
 }

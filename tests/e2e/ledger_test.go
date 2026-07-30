@@ -107,6 +107,38 @@ func TestLedgerService_E2E(t *testing.T) {
 		assert.GreaterOrEqual(t, resp.StatusCount["PENDING"], int32(1))
 	})
 
+	t.Run("GetLedgerSummary applies number_of_months as a real filter", func(t *testing.T) {
+		// Covers FR-003 (specs/007-ledger, Known Discrepancy 2): number_of_months must
+		// actually limit rental-activity counts to a recent window instead of being
+		// silently ignored. A rental created 10 months ago must disappear from
+		// StatusCount once number_of_months=3 is requested, but still appear when the
+		// field is omitted (0 / unbounded history).
+		userID := db.CreateTestUser("e2e-test-ledger-months-user@test.com", "Months User")
+		ownerID := db.CreateTestUser("e2e-test-ledger-months-owner@test.com", "Months Owner")
+		orgID := db.CreateTestOrg("")
+		db.AddUserToOrg(userID, orgID, "MEMBER", "ACTIVE", 0)
+		db.AddUserToOrg(ownerID, orgID, "MEMBER", "ACTIVE", 0)
+
+		toolID := db.CreateTestTool(ownerID, "Months Tool", 1000)
+
+		_, err := db.Exec(`
+			INSERT INTO rentals (org_id, tool_id, renter_id, owner_id, start_date, end_date, duration_unit, daily_price_cents, weekly_price_cents, monthly_price_cents, replacement_cost_cents, total_cost_cents, status, created_on)
+			VALUES ($1, $2, $3, $4, (CURRENT_DATE - INTERVAL '10 months')::date, (CURRENT_DATE - INTERVAL '10 months')::date + 1, 'day', 1000, 6000, 20000, 50000, 1000, 'ACTIVE', (CURRENT_DATE - INTERVAL '10 months')::date)
+		`, orgID, toolID, userID, ownerID)
+		require.NoError(t, err)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+		defer cancel()
+
+		unfiltered, err := ledgerClient.GetLedgerSummary(ctx, &pb.GetLedgerSummaryRequest{OrganizationId: orgID})
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, unfiltered.StatusCount["ACTIVE"], "number_of_months omitted must count the 10-month-old rental")
+
+		filtered, err := ledgerClient.GetLedgerSummary(ctx, &pb.GetLedgerSummaryRequest{OrganizationId: orgID, NumberOfMonths: 3})
+		require.NoError(t, err)
+		assert.EqualValues(t, 0, filtered.StatusCount["ACTIVE"], "number_of_months=3 must exclude the 10-month-old rental")
+	})
+
 	t.Run("GetLedgerSummary rolls up across all orgs when organization_id is omitted", func(t *testing.T) {
 		// Covers FR-004 (specs/007-ledger, multi-org): organization_id=0 MUST roll up balance
 		// and per-status rental counts across every org the caller belongs to, not fail with

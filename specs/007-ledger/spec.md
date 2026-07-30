@@ -88,11 +88,16 @@ omitted; confirm `balance` and `status_count` reflect the sum across both orgs.
    called, **Then** the balance returned is the sum of `balance_cents` across every
    `users_orgs` row for the caller, and the per-status rental counts are aggregated across
    every org the caller belongs to (as renter or owner).
-3. **Given** a `number_of_months` value is supplied, **When** `GetLedgerSummary` is
-   called, **Then** — **as-built** — it has **no effect whatsoever**, for either the
-   single-org or the rolled-up case: the value is read from the request by nothing in the
-   call chain, and every rental-activity count reflects the user's entire history, not a
-   recent window (see Known Discrepancy 2).
+3. **Given** a `number_of_months` value greater than zero is supplied, **When**
+   `GetLedgerSummary` is called, **Then** the rental-activity counts (`ActiveRentalsCount`,
+   `ActiveLendingsCount`, `PendingRequestsCount`, and the `status_count` map) are limited to
+   rentals with `created_on` within that many months of today — for both the single-org
+   path (`GetSummary`) and the cross-org rollup (`GetSummaryAllOrgs`), applied per-org
+   before aggregation. `balance` is never affected by this filter. **Given**
+   `number_of_months` is omitted (zero value), **When** `GetLedgerSummary` is called,
+   **Then** rental-activity counts reflect the caller's entire history, unfiltered — this
+   preserves the pre-existing behavior for every caller that does not set the field
+   (Known Discrepancy 2 resolved).
 4. **Given** the response is constructed, **When** the client expects "recent
    transactions" as part of the summary (per documentation), **Then** — **as-built** —
    none are included; `GetLedgerSummaryResponse` carries only `balance` and
@@ -124,13 +129,16 @@ omitted; confirm `balance` and `status_count` reflect the sum across both orgs.
    `balance_cents`; `LedgerHandler.GetBalance` (`internal/api/grpc/ledger.go`) constructs
    `&pb.GetBalanceResponse{Balance: balance}` with `LastUpdatedOn` never set — the field is
    always an empty string in every response, regardless of the actual database value.
-2. **`number_of_months` is accepted by the proto but read by nothing, for either the
-   single-org or cross-org path.** `grpc_api_business_logic.md`'s "Get Ledger Summary" step
-   2 says rental records should be limited to "the last `number_of_months`," for both a
-   given org and the cross-org rollup. **As-built**, neither `ledgerRepository.GetSummary`
-   (single org) nor `ledgerRepository.GetSummaryAllOrgs` (rollup across every org the
-   caller belongs to) reads the `number_of_months` field at any point in the call chain;
-   every rental-activity count reflects the user's entire history, not a recent window.
+2. ~~**`number_of_months` is accepted by the proto but read by nothing, for either the
+   single-org or cross-org path.**~~ **Resolved.** `LedgerHandler.GetLedgerSummary` now
+   forwards `req.NumberOfMonths` through `LedgerService.GetLedgerSummary` to both
+   `ledgerRepository.GetSummary` (single org) and `ledgerRepository.GetSummaryAllOrgs`
+   (cross-org rollup), each of which adds a `created_on >= (CURRENT_DATE - (N *
+   INTERVAL '1 month'))` condition to all four rental-activity queries
+   (`ActiveRentalsCount`, `ActiveLendingsCount`, `PendingRequestsCount`, `status_count`).
+   `number_of_months <= 0` (including the proto3 zero-value default when the field is
+   omitted) applies no filter, preserving full-history behavior for existing callers.
+   `balance` is unaffected in both paths.
 3. **The documented "recent transactions" output is not part of the actual response.**
    `grpc_api_business_logic.md` lists "balance, recent transactions, and activity counts"
    as the output of `GetLedgerSummary`. The proto's `GetLedgerSummaryResponse` message
@@ -149,15 +157,18 @@ before/after-settlement balance comparison exercised through the Rentals complet
 per-status rental counts across multiple orgs, at all three tiers
 (`TestLedgerService_GetLedgerSummary_RollsUpAcrossOrgs`,
 `TestLedgerRepository_GetSummary_CrossOrgRollup`, `TestLedgerService_E2E` > "GetLedgerSummary
-rolls up across all orgs when organization_id is omitted").
+rolls up across all orgs when organization_id is omitted"); `number_of_months` date-window
+filtering, both single-org and cross-org, at all three tiers
+(`TestLedgerService_GetLedgerSummary_FiltersByMonths`,
+`TestLedgerRepository_GetSummary_FiltersByMonths`,
+`TestLedgerRepository_GetSummaryAllOrgs_FiltersByMonths`, `TestLedgerService_E2E` >
+"GetLedgerSummary applies number_of_months as a real filter") — each proving both the
+`number_of_months=0` unbounded-history case and a positive window excluding old data.
 
 **Not covered anywhere**:
 
 - `GetBalance`'s `last_updated_on` field being empty (Known Discrepancy 1) — no test
   asserts on this field at all.
-- `GetLedgerSummary` called with a non-zero `number_of_months` and old rental data outside
-  that window (Known Discrepancy 2, both single-org and rollup paths) — no filtering exists
-  yet to test.
 - `GetTransactions`'s pagination boundaries (exact `total_count` across multiple pages,
   empty-result page).
 
@@ -172,15 +183,16 @@ rolls up across all orgs when organization_id is omitted").
 - **FR-002**: `GetTransactions` MUST return only the caller's own transactions in the given
   org, most recent first, with an accurate `total_count` independent of the current page.
 - **FR-003**: `GetLedgerSummary` MUST return the caller's balance and a per-status count of
-  their rentals (as renter or owner) in the given org. **As-built, it MUST NOT be assumed
-  to apply any `number_of_months` filtering, nor to include recent transactions** (Known
-  Discrepancies 2-3) — despite both being documented, neither is implemented today.
+  their rentals (as renter or owner) in the given org, limited to rentals created within
+  the last `number_of_months` months when that value is greater than zero (unbounded
+  history when omitted). **As-built, it MUST NOT be assumed to include recent
+  transactions** (Known Discrepancy 3) — that remains undocumented as dead scope.
 - **FR-004** *(multi-org requirement from PRD 3.1, `grpc_api_business_logic.md` "Get Ledger
   Summary" step 1)*: `GetLedgerSummary` MUST roll up balances and rental counts across ALL
   organizations the caller belongs to when `organization_id` is omitted (zero value): (a)
   the sum of `balance_cents` across all the caller's `users_orgs` rows, and (b) per-status
-  rental counts aggregated across all orgs. (c) The same `number_of_months` filtering
-  applied per-org before aggregation **MUST NOT be assumed** — see Known Discrepancy 2.
+  rental counts aggregated across all orgs. (c) The same `number_of_months` filtering is
+  applied per-org before aggregation, matching FR-003's single-org behavior.
 
 ### Key Entities
 
@@ -200,11 +212,12 @@ rolls up across all orgs when organization_id is omitted").
   `users_orgs.last_balance_updated_on`, or the proto/doc is corrected to remove it — Known
   Discrepancy 1 does not remain a silently-always-empty field.
 - **SC-002**: `GetLedgerSummary` implements the documented cross-org rollup (balance and
-  rental counts) for omitted `organization_id`. The `number_of_months` clause is tracked
-  separately under SC-003.
-- **SC-003**: `number_of_months` either gains real filtering behavior, or is removed from
-  the proto/doc as dead input — Known Discrepancy 2 does not remain a parameter that
-  silently does nothing.
+  rental counts) for omitted `organization_id`, including the `number_of_months` filter
+  applied per-org before aggregation (SC-003).
+- **SC-003**: ~~`number_of_months` either gains real filtering behavior, or is removed from
+  the proto/doc as dead input~~ — **Met.** `number_of_months` now filters rental-activity
+  counts by `created_on` for both the single-org and cross-org paths; Known Discrepancy 2
+  no longer applies.
 - **SC-004**: A developer reading only this spec can correctly predict every field in
   `GetBalanceResponse` and `GetLedgerSummaryResponse` without needing to read the source.
 
@@ -214,8 +227,8 @@ rolls up across all orgs when organization_id is omitted").
   that calls it — currently only `specs/006-rentals/spec.md`'s `CompleteRental` flow; a
   future Bill Split ledger-writing path, if any is added, would extend that spec, not this
   one.
-- Fixing Known Discrepancies 1-3 are independent, low-risk changes (populate an existing
-  column read, add a date filter, add a transactions field) — this spec documents them as
-  gaps but does not itself apply a fix, consistent with their lower severity relative to
-  the authorization/data-integrity findings fixed earlier in this retrofit (Organizations &
-  Administration, Tools).
+- Known Discrepancies 1 and 3 remain independent, low-risk changes (populate an existing
+  column read; add a transactions field) not yet applied — consistent with their lower
+  severity relative to the authorization/data-integrity findings fixed earlier in this
+  retrofit (Organizations & Administration, Tools). Known Discrepancy 2 (`number_of_months`
+  filtering) has been fixed as part of the FR-004(c) multi-org rollup work.
