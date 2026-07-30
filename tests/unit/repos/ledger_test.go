@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"ubertool-backend-trusted/internal/domain"
-	"ubertool-backend-trusted/internal/repository/postgres"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+	"ubertool-backend-trusted/internal/domain"
+	"ubertool-backend-trusted/internal/repository/postgres"
 )
 
 func TestLedgerRepository_CreateTransaction(t *testing.T) {
@@ -50,12 +50,24 @@ func TestLedgerRepository_GetBalance(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
-		mock.ExpectQuery("SELECT COALESCE\\(balance_cents, 0\\) FROM users_orgs").
+		mock.ExpectQuery("SELECT COALESCE\\(balance_cents, 0\\), COALESCE\\(last_balance_updated_on::text, ''\\) FROM users_orgs").
 			WithArgs(int32(1), int32(2)).
-			WillReturnRows(sqlmock.NewRows([]string{"balance_cents"}).AddRow(1000))
+			WillReturnRows(sqlmock.NewRows([]string{"balance_cents", "last_balance_updated_on"}).AddRow(1000, "2026-01-15"))
 
-		balance, err := repo.GetBalance(ctx, 1, 2)
+		balance, lastUpdated, err := repo.GetBalance(ctx, 1, 2)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(1000), balance)
+		assert.Equal(t, "2026-01-15", lastUpdated)
+	})
+
+	t.Run("empty string when never updated", func(t *testing.T) {
+		mock.ExpectQuery("SELECT COALESCE\\(balance_cents, 0\\), COALESCE\\(last_balance_updated_on::text, ''\\) FROM users_orgs").
+			WithArgs(int32(1), int32(3)).
+			WillReturnRows(sqlmock.NewRows([]string{"balance_cents", "last_balance_updated_on"}).AddRow(0, ""))
+
+		balance, lastUpdated, err := repo.GetBalance(ctx, 1, 3)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(0), balance)
+		assert.Equal(t, "", lastUpdated)
 	})
 }

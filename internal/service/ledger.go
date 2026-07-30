@@ -14,7 +14,7 @@ func NewLedgerService(ledgerRepo repository.LedgerRepository) LedgerService {
 	return &ledgerService{ledgerRepo: ledgerRepo}
 }
 
-func (s *ledgerService) GetBalance(ctx context.Context, userID, orgID int32) (int32, error) {
+func (s *ledgerService) GetBalance(ctx context.Context, userID, orgID int32) (int32, string, error) {
 	return s.ledgerRepo.GetBalance(ctx, userID, orgID)
 }
 

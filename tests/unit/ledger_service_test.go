@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestLedgerService_GetBalance(t *testing.T) {
@@ -15,11 +16,38 @@ func TestLedgerService_GetBalance(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Success", func(t *testing.T) {
-		repo.On("GetBalance", ctx, int32(1), int32(2)).Return(int32(1000), nil)
-		
-		bal, err := svc.GetBalance(ctx, 1, 2)
+		repo.On("GetBalance", ctx, int32(1), int32(2)).Return(int32(1000), "2026-01-15", nil)
+
+		bal, lastUpdated, err := svc.GetBalance(ctx, 1, 2)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(1000), bal)
+		assert.Equal(t, "2026-01-15", lastUpdated)
+	})
+}
+
+// TestLedgerService_GetBalance_ReturnsLastUpdatedOn covers FR-001 (specs/007-ledger, Known
+// Discrepancy 1 resolved): GetBalance must pass through users_orgs.last_balance_updated_on
+// alongside the balance, not silently drop it. Prior to this fix, the service signature had no
+// slot for the date at all.
+func TestLedgerService_GetBalance_ReturnsLastUpdatedOn(t *testing.T) {
+	repo := new(MockLedgerRepo)
+	svc := service.NewLedgerService(repo)
+	ctx := context.Background()
+
+	t.Run("returns the date the repository provides", func(t *testing.T) {
+		repo.On("GetBalance", ctx, int32(3), int32(4)).Return(int32(500), "2026-03-01", nil)
+
+		_, lastUpdated, err := svc.GetBalance(ctx, 3, 4)
+		assert.NoError(t, err)
+		assert.Equal(t, "2026-03-01", lastUpdated)
+	})
+
+	t.Run("empty string when the repository has never recorded an update", func(t *testing.T) {
+		repo.On("GetBalance", ctx, int32(5), int32(6)).Return(int32(0), "", nil)
+
+		_, lastUpdated, err := svc.GetBalance(ctx, 5, 6)
+		assert.NoError(t, err)
+		assert.Equal(t, "", lastUpdated)
 	})
 }
 
@@ -31,7 +59,7 @@ func TestLedgerService_GetTransactions(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		txs := []domain.LedgerTransaction{{Amount: 100}}
 		repo.On("ListTransactions", ctx, int32(1), int32(2), int32(1), int32(10)).Return(txs, int32(1), nil)
-		
+
 		res, total, err := svc.GetTransactions(ctx, 1, 2, 1, 10)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(1), total)
@@ -57,6 +85,27 @@ func TestLedgerService_GetLedgerSummary(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, int32(1000), res.Balance)
 		assert.EqualValues(t, 2, res.StatusCount["ACTIVE"])
+	})
+}
+
+// TestLedgerService_GetLedgerSummary_IncludesRecentTransactions covers FR-003 (specs/007-ledger,
+// Known Discrepancy 3 resolved): GetLedgerSummary must pass through RecentTransactions from the
+// repository unchanged — the service layer is a thin pass-through, mirroring the other
+// GetLedgerSummary unit tests above; the actual LIMIT 5/ordering SQL is proven at L2.
+func TestLedgerService_GetLedgerSummary_IncludesRecentTransactions(t *testing.T) {
+	repo := new(MockLedgerRepo)
+	svc := service.NewLedgerService(repo)
+	ctx := context.Background()
+
+	t.Run("Success", func(t *testing.T) {
+		txs := []domain.LedgerTransaction{{ID: 3, Amount: 100}, {ID: 2, Amount: 200}, {ID: 1, Amount: 300}}
+		summary := &domain.LedgerSummary{Balance: 1000, StatusCount: map[string]int32{"ACTIVE": 2}, RecentTransactions: txs}
+		repo.On("GetSummary", ctx, int32(1), int32(2), int32(0)).Return(summary, nil)
+
+		res, err := svc.GetLedgerSummary(ctx, 1, 2, 0)
+		assert.NoError(t, err)
+		require.Len(t, res.RecentTransactions, 3)
+		assert.Equal(t, int32(3), res.RecentTransactions[0].ID)
 	})
 }
 

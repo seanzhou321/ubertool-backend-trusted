@@ -37,11 +37,12 @@ func (r *ledgerRepository) CreateTransaction(ctx context.Context, tx *domain.Led
 	return r.db.QueryRowContext(ctx, query, tx.OrgID, tx.UserID, tx.Amount, tx.Type, tx.RelatedRentalID, tx.Description, now, now).Scan(&tx.ID)
 }
 
-func (r *ledgerRepository) GetBalance(ctx context.Context, userID, orgID int32) (int32, error) {
+func (r *ledgerRepository) GetBalance(ctx context.Context, userID, orgID int32) (int32, string, error) {
 	var balance int32
-	query := `SELECT COALESCE(balance_cents, 0) FROM users_orgs WHERE user_id = $1 AND org_id = $2`
-	err := r.db.QueryRowContext(ctx, query, userID, orgID).Scan(&balance)
-	return balance, err
+	var lastUpdated sql.NullString
+	query := `SELECT COALESCE(balance_cents, 0), COALESCE(last_balance_updated_on::text, '') FROM users_orgs WHERE user_id = $1 AND org_id = $2`
+	err := r.db.QueryRowContext(ctx, query, userID, orgID).Scan(&balance, &lastUpdated)
+	return balance, lastUpdated.String, err
 }
 
 func (r *ledgerRepository) ListTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error) {
@@ -80,7 +81,7 @@ func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID, number
 	}
 
 	// Balance is not rental activity — number_of_months never filters it.
-	balance, err := r.GetBalance(ctx, userID, orgID)
+	balance, _, err := r.GetBalance(ctx, userID, orgID)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +129,44 @@ func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID, number
 		summary.StatusCount[status] = count
 	}
 
+	recentTxs, err := r.getRecentTransactions(ctx, "WHERE user_id = $1 AND org_id = $2", userID, orgID)
+	if err != nil {
+		return nil, err
+	}
+	summary.RecentTransactions = recentTxs
+
 	return summary, nil
+}
+
+// getRecentTransactions fetches the 5 most-recent ledger_transactions rows matching whereClause
+// (e.g. "WHERE user_id = $1 AND org_id = $2" for a single org, or "WHERE user_id = $1" for the
+// cross-org rollup), most recent first — backs GetLedgerSummaryResponse.recent_transactions
+// (FR-003/FR-004, specs/007-ledger, Known Discrepancy 3 resolved).
+func (r *ledgerRepository) getRecentTransactions(ctx context.Context, whereClause string, args ...interface{}) ([]domain.LedgerTransaction, error) {
+	query := `
+		SELECT id, org_id, user_id, amount, type, related_rental_id, COALESCE(description, ''), charged_on, created_on
+		FROM ledger_transactions
+		` + whereClause + `
+		ORDER BY created_on DESC, id DESC
+		LIMIT 5`
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	txs := make([]domain.LedgerTransaction, 0, 5)
+	for rows.Next() {
+		var tx domain.LedgerTransaction
+		var chargedOn, createdOn time.Time
+		if err := rows.Scan(&tx.ID, &tx.OrgID, &tx.UserID, &tx.Amount, &tx.Type, &tx.RelatedRentalID, &tx.Description, &chargedOn, &createdOn); err != nil {
+			return nil, err
+		}
+		tx.ChargedOn = chargedOn.Format("2006-01-02")
+		tx.CreatedOn = createdOn.Format("2006-01-02")
+		txs = append(txs, tx)
+	}
+	return txs, nil
 }
 
 // GetSummaryAllOrgs implements FR-004 (specs/007-ledger, multi-org): rolls up balance and
@@ -191,6 +229,12 @@ func (r *ledgerRepository) GetSummaryAllOrgs(ctx context.Context, userID, number
 		}
 		summary.StatusCount[status] = count
 	}
+
+	recentTxs, err := r.getRecentTransactions(ctx, "WHERE user_id = $1", userID)
+	if err != nil {
+		return nil, err
+	}
+	summary.RecentTransactions = recentTxs
 
 	return summary, nil
 }

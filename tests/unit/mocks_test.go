@@ -306,9 +306,9 @@ func (m *MockLedgerRepo) CreateTransaction(ctx context.Context, tx *domain.Ledge
 	args := m.Called(ctx, tx)
 	return args.Error(0)
 }
-func (m *MockLedgerRepo) GetBalance(ctx context.Context, userID, orgID int32) (int32, error) {
+func (m *MockLedgerRepo) GetBalance(ctx context.Context, userID, orgID int32) (int32, string, error) {
 	args := m.Called(ctx, userID, orgID)
-	return args.Get(0).(int32), args.Error(1)
+	return args.Get(0).(int32), args.String(1), args.Error(2)
 }
 func (m *MockLedgerRepo) ListTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error) {
 	args := m.Called(ctx, userID, orgID, page, pageSize)

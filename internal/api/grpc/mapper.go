@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
 	pb "ubertool-backend-trusted/api/gen/v1"
 	"ubertool-backend-trusted/internal/domain"
 	"ubertool-backend-trusted/internal/service"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func MapDomainUserToProto(u *domain.User) *pb.User {
@@ -52,18 +52,18 @@ func MapDomainOrgToProto(o *domain.Organization, userRole string) *pb.Organizati
 	}
 
 	return &pb.Organization{
-		Id:                              o.ID,
-		Name:                            o.Name,
-		Description:                     o.Description,
-		Address:                         o.Address,
-		Metro:                           o.Metro,
-		MemberCount:                     o.MemberCount,
-		AdminEmail:                      o.AdminEmail,
-		AdminPhone:                      o.AdminPhoneNumber,
-		CreatedOn:                       o.CreatedOn,
-		UserRole:                        userRole,
-		Admins:                          protoAdmins,
-		MaxBillsplitRentalCostCents:     o.MaxBillsplitRentalCostCents,
+		Id:                                o.ID,
+		Name:                              o.Name,
+		Description:                       o.Description,
+		Address:                           o.Address,
+		Metro:                             o.Metro,
+		MemberCount:                       o.MemberCount,
+		AdminEmail:                        o.AdminEmail,
+		AdminPhone:                        o.AdminPhoneNumber,
+		CreatedOn:                         o.CreatedOn,
+		UserRole:                          userRole,
+		Admins:                            protoAdmins,
+		MaxBillsplitRentalCostCents:       o.MaxBillsplitRentalCostCents,
 		BillsplitSettlementThresholdCents: o.SettlementThresholdCents,
 	}
 }
@@ -354,9 +354,14 @@ func MapDomainLedgerSummaryToProto(s *domain.LedgerSummary) *pb.GetLedgerSummary
 	if s == nil {
 		return &pb.GetLedgerSummaryResponse{}
 	}
+	protoTxs := make([]*pb.Transaction, len(s.RecentTransactions))
+	for i := range s.RecentTransactions {
+		protoTxs[i] = MapDomainTransactionToProto(&s.RecentTransactions[i])
+	}
 	return &pb.GetLedgerSummaryResponse{
-		Balance:     s.Balance,
-		StatusCount: s.StatusCount,
+		Balance:            s.Balance,
+		StatusCount:        s.StatusCount,
+		RecentTransactions: protoTxs,
 	}
 }
 

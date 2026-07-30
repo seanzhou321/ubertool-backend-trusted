@@ -79,7 +79,9 @@ type RentalRepository interface {
 
 type LedgerRepository interface {
 	CreateTransaction(ctx context.Context, tx *domain.LedgerTransaction) error
-	GetBalance(ctx context.Context, userID, orgID int32) (int32, error)
+	// GetBalance returns the caller's balance_cents plus users_orgs.last_balance_updated_on
+	// (formatted YYYY-MM-DD, empty string if never updated) for the given org.
+	GetBalance(ctx context.Context, userID, orgID int32) (int32, string, error)
 	ListTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error)
 	// numberOfMonths limits the rental-activity counts (not balance) to rentals created within
 	// the last N months; numberOfMonths <= 0 means unbounded history (FR-003/FR-004(c)).
@@ -139,16 +141,16 @@ type BillRepository interface {
 	Create(ctx context.Context, bill *domain.Bill) error
 	GetByID(ctx context.Context, id int32) (*domain.Bill, error)
 	Update(ctx context.Context, bill *domain.Bill) error
-	
+
 	// Query bills by user involvement
 	ListByDebtor(ctx context.Context, debtorID int32, orgID int32, statuses []domain.BillStatus) ([]domain.Bill, error)
 	ListByCreditor(ctx context.Context, creditorID int32, orgID int32, statuses []domain.BillStatus) ([]domain.Bill, error)
 	ListByUser(ctx context.Context, userID int32, orgID int32, statuses []domain.BillStatus) ([]domain.Bill, error)
-	
+
 	// Query for disputed bills
 	ListDisputedByOrg(ctx context.Context, orgID int32, excludeUserID *int32) ([]domain.Bill, error)
 	ListResolvedDisputesByOrg(ctx context.Context, orgID int32) ([]domain.Bill, error)
-	
+
 	// Bill actions
 	CreateAction(ctx context.Context, action *domain.BillAction) error
 	ListActionsByBill(ctx context.Context, billID int32) ([]domain.BillAction, error)

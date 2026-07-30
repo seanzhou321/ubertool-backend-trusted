@@ -117,14 +117,53 @@ func TestLedgerRepository_GetBalance(t *testing.T) {
 	}()
 
 	t.Run("Returns the caller's balance_cents for the given org", func(t *testing.T) {
-		balance, err := repo.GetBalance(ctx, user, orgID)
+		balance, _, err := repo.GetBalance(ctx, user, orgID)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7500, balance)
 	})
 
 	t.Run("Errors for a user with no membership in the org", func(t *testing.T) {
-		_, err := repo.GetBalance(ctx, otherOrgUser, orgID)
+		_, _, err := repo.GetBalance(ctx, otherOrgUser, orgID)
 		require.Error(t, err)
+	})
+}
+
+// TestLedgerRepository_GetBalance_IncludesLastUpdatedOn covers FR-001 (specs/007-ledger, Known
+// Discrepancy 1 resolved): GetBalance must also return users_orgs.last_balance_updated_on,
+// formatted YYYY-MM-DD, and an empty string when the column is NULL (a user who has never had a
+// balance-changing transaction).
+func TestLedgerRepository_GetBalance_IncludesLastUpdatedOn(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	repo := postgres.NewLedgerRepository(db)
+	ctx := context.Background()
+
+	orgID := createTestOrgForLedger(t, db)
+	updatedUser := createTestUserForLedger(t, db, "ledger-last-updated")
+	neverUpdatedUser := createTestUserForLedger(t, db, "ledger-never-updated")
+	addUserToOrgForLedgerWithBalance(t, db, updatedUser, orgID, 2500)
+	addUserToOrgForLedger(t, db, neverUpdatedUser, orgID)
+
+	_, err := db.Exec(`UPDATE users_orgs SET last_balance_updated_on = '2026-01-15' WHERE user_id = $1 AND org_id = $2`, updatedUser, orgID)
+	require.NoError(t, err)
+
+	defer func() {
+		db.Exec("DELETE FROM users_orgs WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2)", updatedUser, neverUpdatedUser)
+		db.Exec("DELETE FROM orgs WHERE id = $1", orgID)
+	}()
+
+	t.Run("returns the seeded date", func(t *testing.T) {
+		_, lastUpdated, err := repo.GetBalance(ctx, updatedUser, orgID)
+		require.NoError(t, err)
+		assert.Equal(t, "2026-01-15", lastUpdated)
+	})
+
+	t.Run("empty string when last_balance_updated_on is NULL", func(t *testing.T) {
+		_, lastUpdated, err := repo.GetBalance(ctx, neverUpdatedUser, orgID)
+		require.NoError(t, err)
+		assert.Equal(t, "", lastUpdated)
 	})
 }
 
@@ -231,6 +270,58 @@ func TestLedgerRepository_GetSummary_FiltersByMonths(t *testing.T) {
 	})
 }
 
+// TestLedgerRepository_GetSummary_IncludesRecentTransactions covers FR-003 (specs/007-ledger,
+// Known Discrepancy 3 resolved): GetSummary must populate RecentTransactions with at most the 5
+// most-recent ledger_transactions rows for the user in that org, most recent first. Prior to
+// this fix, GetSummary never queried ledger_transactions at all.
+func TestLedgerRepository_GetSummary_IncludesRecentTransactions(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	repo := postgres.NewLedgerRepository(db)
+	ctx := context.Background()
+
+	orgID := createTestOrgForLedger(t, db)
+	user := createTestUserForLedger(t, db, "ledger-recenttx-user")
+	otherUser := createTestUserForLedger(t, db, "ledger-recenttx-other")
+	addUserToOrgForLedgerWithBalance(t, db, user, orgID, 1000)
+	addUserToOrgForLedger(t, db, otherUser, orgID)
+
+	defer func() {
+		db.Exec("DELETE FROM ledger_transactions WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM users_orgs WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2)", user, otherUser)
+		db.Exec("DELETE FROM orgs WHERE id = $1", orgID)
+	}()
+
+	// Seed 7 transactions for the user on 7 distinct dates, oldest to newest.
+	for i := 1; i <= 7; i++ {
+		date := fmt.Sprintf("2026-01-%02d", i)
+		_, err := db.Exec(`
+			INSERT INTO ledger_transactions (org_id, user_id, amount, type, description, charged_on, created_on)
+			VALUES ($1, $2, $3, 'CHARGE', $4, $5, $5)
+		`, orgID, user, i*100, fmt.Sprintf("recenttx-%d", i), date)
+		require.NoError(t, err)
+	}
+	// A transaction for another user in the same org must never appear.
+	_, err := db.Exec(`
+		INSERT INTO ledger_transactions (org_id, user_id, amount, type, description, charged_on, created_on)
+		VALUES ($1, $2, 9999, 'CHARGE', 'not-mine', '2026-01-07', '2026-01-07')
+	`, orgID, otherUser)
+	require.NoError(t, err)
+
+	summary, err := repo.GetSummary(ctx, user, orgID, 0)
+	require.NoError(t, err)
+
+	require.Len(t, summary.RecentTransactions, 5, "only the 5 most recent transactions must be returned")
+	assert.Equal(t, "2026-01-07", summary.RecentTransactions[0].CreatedOn, "newest transaction must come first")
+	assert.Equal(t, "2026-01-03", summary.RecentTransactions[4].CreatedOn, "5th-most-recent transaction must be last")
+	for _, tx := range summary.RecentTransactions {
+		assert.Equal(t, user, tx.UserID)
+		assert.NotEqual(t, "not-mine", tx.Description)
+	}
+}
+
 // TestLedgerRepository_GetSummary_CrossOrgRollup covers FR-004 (specs/007-ledger, multi-org):
 // when organization_id is omitted (0), GetLedgerSummary MUST roll up balance and per-status
 // rental counts across ALL orgs the caller belongs to, not error with "no rows" (Known
@@ -287,6 +378,67 @@ func TestLedgerRepository_GetSummary_CrossOrgRollup(t *testing.T) {
 	assert.EqualValues(t, 1, summary.PendingRequestsCount, "one PENDING rental as renter, in org B")
 	assert.EqualValues(t, 2, summary.StatusCount["ACTIVE"], "ACTIVE count must combine both orgs and both roles")
 	assert.EqualValues(t, 1, summary.StatusCount["PENDING"])
+}
+
+// TestLedgerRepository_GetSummaryAllOrgs_IncludesRecentTransactions covers FR-004 (specs/007-ledger,
+// multi-org, Known Discrepancy 3 resolved): the cross-org rollup must populate
+// RecentTransactions across ALL of the user's orgs (not just one), capped at 5, most recent
+// first — mirroring TestLedgerRepository_GetSummary_IncludesRecentTransactions but across orgs.
+func TestLedgerRepository_GetSummaryAllOrgs_IncludesRecentTransactions(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	repo := postgres.NewLedgerRepository(db)
+	ctx := context.Background()
+
+	orgA := createTestOrgForLedger(t, db)
+	orgB := createTestOrgForLedger(t, db)
+	user := createTestUserForLedger(t, db, "ledger-rollup-recenttx-user")
+	otherUser := createTestUserForLedger(t, db, "ledger-rollup-recenttx-other")
+	addUserToOrgForLedgerWithBalance(t, db, user, orgA, 1000)
+	addUserToOrgForLedgerWithBalance(t, db, user, orgB, 2000)
+	addUserToOrgForLedger(t, db, otherUser, orgA)
+
+	defer func() {
+		db.Exec("DELETE FROM ledger_transactions WHERE org_id IN ($1, $2)", orgA, orgB)
+		db.Exec("DELETE FROM users_orgs WHERE org_id IN ($1, $2)", orgA, orgB)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2)", user, otherUser)
+		db.Exec("DELETE FROM orgs WHERE id IN ($1, $2)", orgA, orgB)
+	}()
+
+	// 4 transactions in org A, 3 in org B, on distinct dates, oldest to newest.
+	for i := 1; i <= 4; i++ {
+		date := fmt.Sprintf("2026-01-%02d", i)
+		_, err := db.Exec(`
+			INSERT INTO ledger_transactions (org_id, user_id, amount, type, description, charged_on, created_on)
+			VALUES ($1, $2, $3, 'CHARGE', $4, $5, $5)
+		`, orgA, user, i*100, fmt.Sprintf("orgA-%d", i), date)
+		require.NoError(t, err)
+	}
+	for i := 5; i <= 7; i++ {
+		date := fmt.Sprintf("2026-01-%02d", i)
+		_, err := db.Exec(`
+			INSERT INTO ledger_transactions (org_id, user_id, amount, type, description, charged_on, created_on)
+			VALUES ($1, $2, $3, 'CHARGE', $4, $5, $5)
+		`, orgB, user, i*100, fmt.Sprintf("orgB-%d", i), date)
+		require.NoError(t, err)
+	}
+	// Another user's transaction in org A must never appear.
+	_, err := db.Exec(`
+		INSERT INTO ledger_transactions (org_id, user_id, amount, type, description, charged_on, created_on)
+		VALUES ($1, $2, 9999, 'CHARGE', 'not-mine', '2026-01-07', '2026-01-07')
+	`, orgA, otherUser)
+	require.NoError(t, err)
+
+	summary, err := repo.GetSummaryAllOrgs(ctx, user, 0)
+	require.NoError(t, err)
+
+	require.Len(t, summary.RecentTransactions, 5, "only the 5 most recent transactions across both orgs must be returned")
+	assert.Equal(t, "2026-01-07", summary.RecentTransactions[0].CreatedOn, "newest transaction across all orgs must come first")
+	for _, tx := range summary.RecentTransactions {
+		assert.Equal(t, user, tx.UserID)
+		assert.NotEqual(t, "not-mine", tx.Description)
+	}
 }
 
 // TestLedgerRepository_GetSummaryAllOrgs_FiltersByMonths covers FR-004(c) (specs/007-ledger,

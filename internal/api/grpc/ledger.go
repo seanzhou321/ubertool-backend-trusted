@@ -21,11 +21,11 @@ func (h *LedgerHandler) GetBalance(ctx context.Context, req *pb.GetBalanceReques
 	if err != nil {
 		return nil, err
 	}
-	balance, err := h.ledgerSvc.GetBalance(ctx, userID, req.OrganizationId)
+	balance, lastUpdated, err := h.ledgerSvc.GetBalance(ctx, userID, req.OrganizationId)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetBalanceResponse{Balance: balance}, nil
+	return &pb.GetBalanceResponse{Balance: balance, LastUpdatedOn: lastUpdated}, nil
 }
 
 func (h *LedgerHandler) GetTransactions(ctx context.Context, req *pb.GetTransactionsRequest) (*pb.GetTransactionsResponse, error) {

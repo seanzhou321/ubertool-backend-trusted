@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -37,6 +38,25 @@ func TestLedgerService_E2E(t *testing.T) {
 		resp, err := ledgerClient.GetBalance(ctx, req)
 		require.NoError(t, err)
 		assert.Equal(t, int32(5000), resp.Balance)
+	})
+
+	t.Run("GetBalance_LastUpdatedOn", func(t *testing.T) {
+		// Covers FR-001 (specs/007-ledger, Known Discrepancy 1 resolved): last_updated_on
+		// must reflect users_orgs.last_balance_updated_on instead of always coming back empty.
+		userID := db.CreateTestUser("e2e-test-ledger-lastupdated@test.com", "Last Updated User")
+		orgID := db.CreateTestOrg("")
+		db.AddUserToOrg(userID, orgID, "MEMBER", "ACTIVE", 1200)
+
+		_, err := db.Exec(`UPDATE users_orgs SET last_balance_updated_on = '2026-01-15' WHERE user_id = $1 AND org_id = $2`, userID, orgID)
+		require.NoError(t, err)
+
+		ctx, cancel := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+		defer cancel()
+
+		resp, err := ledgerClient.GetBalance(ctx, &pb.GetBalanceRequest{OrganizationId: orgID})
+		require.NoError(t, err)
+		assert.Equal(t, int32(1200), resp.Balance)
+		assert.Equal(t, "2026-01-15", resp.LastUpdatedOn)
 	})
 
 	t.Run("GetTransactions", func(t *testing.T) {
@@ -105,6 +125,31 @@ func TestLedgerService_E2E(t *testing.T) {
 		assert.GreaterOrEqual(t, resp.StatusCount["COMPLETED"], int32(1))
 		assert.GreaterOrEqual(t, resp.StatusCount["SCHEDULED"], int32(1))
 		assert.GreaterOrEqual(t, resp.StatusCount["PENDING"], int32(1))
+	})
+
+	t.Run("GetLedgerSummary_RecentTransactions", func(t *testing.T) {
+		// Covers FR-003 (specs/007-ledger, Known Discrepancy 3 resolved): recent_transactions
+		// must be populated with at most 5 entries, most recent first.
+		userID := db.CreateTestUser("e2e-test-ledger-recenttx@test.com", "Recent Tx User")
+		orgID := db.CreateTestOrg("")
+		db.AddUserToOrg(userID, orgID, "MEMBER", "ACTIVE", 0)
+
+		for i := 1; i <= 7; i++ {
+			date := fmt.Sprintf("2026-01-%02d", i)
+			_, err := db.Exec(`
+				INSERT INTO ledger_transactions (org_id, user_id, amount, type, description, charged_on, created_on)
+				VALUES ($1, $2, $3, 'CHARGE', $4, $5, $5)
+			`, orgID, userID, i*100, fmt.Sprintf("e2e-recenttx-%d", i), date)
+			require.NoError(t, err)
+		}
+
+		ctx, cancel := ContextWithUserIDAndTimeout(userID, 5*time.Second)
+		defer cancel()
+
+		resp, err := ledgerClient.GetLedgerSummary(ctx, &pb.GetLedgerSummaryRequest{OrganizationId: orgID})
+		require.NoError(t, err)
+		require.Len(t, resp.RecentTransactions, 5, "must cap recent_transactions at 5")
+		assert.Equal(t, "2026-01-07", resp.RecentTransactions[0].ChargedOn, "newest transaction must come first")
 	})
 
 	t.Run("GetLedgerSummary applies number_of_months as a real filter", func(t *testing.T) {

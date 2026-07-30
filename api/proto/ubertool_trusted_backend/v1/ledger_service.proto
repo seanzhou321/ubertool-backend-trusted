@@ -56,6 +56,7 @@ message GetLedgerSummaryRequest {
 message GetLedgerSummaryResponse {
   int32 balance = 1;
   map<string, int32> status_count = 2; // count of rentals by status
+  repeated Transaction recent_transactions = 3; // most recent transactions first, max 5
 }
 
 // Transaction message
