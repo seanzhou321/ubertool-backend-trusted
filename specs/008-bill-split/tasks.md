@@ -165,17 +165,17 @@
 - [ ] T048 [P] [US6] **Contract test**: `GetGlobalBillSplitRequest` (empty) → 4 counts + total_amount_cents in `tests/integration/bill_split_test.go`
 - [ ] T049 [P] [US6] **Contract test**: `GetOrganizationBillSplitSummaryRequest {org_id}` → 4 counts + total_amount_cents in `tests/integration/bill_split_test.go`
 - [ ] T050 [P] [US6] **Integration test**: Global summary aggregates across ALL user's active orgs (debtor OR creditor) in `tests/integration/bill_split_test.go`
-- [ ] T051 [P] [US6] **Integration test**: Org summary returns per-org breakdown (list of orgs with 4 counts each) in `tests/integration/bill_split_test.go`
-- [ ] T052 [P] [US6] **Integration test**: Org summary requires ADMIN/SUPER_ADMIN in target org in `tests/integration/bill_split_test.go`
-- [ ] T053 [P] [US6] **E2E test**: Global + per-org summary end-to-end in `tests/e2e/bill_split_test.go`
+- [ ] T051 [P] [US6] **Integration test**: Org summary returns per-org breakdown (single org with 4 counts) in `tests/integration/bill_split_test.go`
+- [ ] T052 [P] [US6] **Integration test**: Org summary requires **MEMBERSHIP** in target org (any role) in `tests/integration/bill_split_test.go`
+- [ ] T053 [P] [US6] **E2E test**: Global + per-org summary end-to-end in `tests/e2e/bill_split_test.go` (member access, not admin)
 
 ### Implementation for US6 (New FR-014, FR-015)
 
-- [ ] T054 [US6] Add `GetGlobalBillSplitSummary` + `GetOrganizationBillSplitSummary` RPCs to proto — `api/proto/ubertool_trusted_backend/v1/bill_split_service.proto`
+- [ ] T054 [US6] Add `GetGlobalBillSplitSummary` + `GetOrganizationBillSplitSummary` RPCs to proto — `api/proto/ubertool_trusted_backend/v1/bill_split_service.proto` (add `organization_id` to `GetOrganizationBillSplitSummaryRequest`)
 - [ ] T055 [US6] Implement `GetGlobalBillSplitSummary` in service: query bills WHERE (debtor=user OR creditor=user) AND org IN (user's active orgs) — `internal/service/bill_split.go`
-- [ ] T056 [US6] Implement `GetOrganizationBillSplitSummary` in service: verify admin in org, then query bills in that org — `internal/service/bill_split.go`
-- [ ] T057 [US6] Add repo methods: `GetGlobalSummary(userID)` + `GetOrgSummary(orgID)` — `internal/repository/postgres/bill_split.go`
-- [ ] T058 [US6] gRPC handlers extract userID, call service — `internal/api/grpc/bill_split.go`
+- [ ] T056 [US6] Implement `GetOrganizationBillSplitSummary` in service: **verify member in org**, then query bills in that org for the caller — `internal/service/bill_split.go`
+- [ ] T057 [US6] Add repo methods: `GetGlobalSummary(userID)` + `GetOrgSummary(userID, orgID)` — `internal/repository/postgres/bill_split.go`
+- [ ] T058 [US6] gRPC handlers extract userID, call service — `internal/api/grpc/bill_split.go` (handler: verify membership in target org, then pass org_id to service)
 - [ ] T059 [P] [US6] **Proto regeneration**: `make proto` after T054
 
 **Checkpoint**: US6 complete when T048-T053 pass (integration + e2e)
@@ -226,7 +226,7 @@
 | This Feature | Depends On | Coordination |
 |--------------|------------|--------------|
 | FR-014 (Global) | Users/Orgs FR-009 (multi-org membership) | Uses `users_orgs` for caller's active orgs |
-| FR-015 (Per-org) | Users/Orgs FR-009 + Admin auth | Requires admin check in target org |
+| FR-015 (Per-org) | Users/Orgs FR-009 | Requires **membership check** in target org (like `ListPayments`) |
 
 ### MVP Scope
 - **MVP = US1 (jobs tested) + US2 (GRACEFUL-after-dispute test) + US4 (4 outcomes tested) + US6 (FR-014, FR-015)**
@@ -245,7 +245,7 @@
 | US3 | 11-day-old notice → CheckOverdueBills → DISPUTED; month-end DISPUTED → SYSTEM_DEFAULT_ACTION + blocks |
 | US4 | DISPUTED bill → admin DEBTOR_FAULT/CREDITOR_FAULT/BOTH_FAULT/GRACEFUL → correct balances/blocks |
 | US5 | ListPayments org_id=0 → across all orgs; admin ListDisputed excludes own bills |
-| US6 | User in Org A+B → Global = sum; Admin in Org A → Org A breakdown |
+| US6 | User in Org A+B → Global = sum; Member in Org A → Org A breakdown |
 
 ---
 
@@ -255,8 +255,8 @@
 
 | ID | Gap Type | Severity | Source | Evidence | Remaining Work |
 |----|----------|----------|--------|----------|----------------|
-| C1 | missing | CRITICAL | FR-015 | `GetOrganizationBillSplitSummary` handler has NO admin auth check — any member can call per-org summary | Add admin role verification in handler |
-| C2 | missing | HIGH | FR-015 | `GetOrganizationBillSplitSummary` service iterates ALL user's orgs (not specified org) — contradicts spec which requires single org_id param | Fix service to accept org_id parameter + admin check |
+| C1 | missing | CRITICAL | FR-015 | `GetOrganizationBillSplitSummary` handler has NO membership auth check — any authenticated user can call per-org summary for any org | Add membership verification in handler |
+| C2 | missing | HIGH | FR-015 | `GetOrganizationBillSplitSummary` service iterates ALL user's orgs (not specified org) — contradicts spec which requires single org_id param | Fix service to accept org_id parameter + membership check |
 | C3 | missing | HIGH | KD-1 | `ListPayments`/`ListDisputedPayments`/`ListResolvedDisputes` return full result set; no pagination, no `settlement_month` filter, no `resolution_outcome` filter | Implement pagination + filters or document as intentional |
 | C4 | missing | MEDIUM | KD-2 | `BillActionTypeAdminComment` exists in domain but NEVER created by any code path | Remove from domain/proto OR implement admin note RPC |
 | C5 | missing | MEDIUM | FR-014 | `GetGlobalBillSplitSummary` returns 4 counts + total_amount_cents; spec FR-014 requires same 4 counts but `total_amount_cents` not in spec | Verify spec alignment or update spec |
@@ -267,12 +267,12 @@
 - Requirements checked: 15 FRs, 6 US acceptance scenarios, 4 KDs, 3 SCs
 - Constitution principles checked: 6 (I-VI)
 - Findings: 7 (1 CRITICAL auth gap, 2 HIGH spec gaps, 2 MEDIUM dead code, 2 LOW)
-- **Status**: NOT converged — FR-015 missing admin auth; FR-015 service logic contradicts spec; KD-1/KD-2 need decisions
+- **Status**: NOT converged — FR-015 missing membership auth; FR-015 service logic contradicts spec; KD-1/KD-2 need decisions
 
 ### Appended Convergence Tasks
 
-- [ ] T065 [C1] **FR-015 CRITICAL**: Add admin role check in `GetOrganizationBillSplitSummary` handler — `internal/api/grpc/bill_split.go` (missing)
-- [ ] T066 [C2] **FR-015 HIGH**: Fix `GetOrganizationBillSplitSummary` service to accept `org_id` parameter + admin verification — `internal/service/bill_split.go` (contradicts)
+- [ ] T065 [C1] **FR-015 CRITICAL**: Add membership role check in `GetOrganizationBillSplitSummary` handler — `internal/api/grpc/bill_split.go` (missing)
+- [ ] T066 [C2] **FR-015 HIGH**: Fix `GetOrganizationBillSplitSummary` service to accept `org_id` parameter + membership verification — `internal/service/bill_split.go` (contradicts)
 - [ ] T067 [C2] **FR-015 HIGH**: Update proto `GetOrganizationBillSplitSummaryRequest` to include `organization_id` — `bill_split_service.proto` (missing)
 - [ ] T068 [C1,C2] **FR-015**: Proto regeneration — `make proto` (missing)
 - [ ] T069 [C3] **KD-1**: Decision + implement: pagination + `settlement_month` + `resolution_outcome` filters on `ListPayments`/`ListDisputedPayments`/`ListResolvedDisputes` OR document — `internal/service/bill_split.go`, `internal/repository/postgres/bill_split.go` (missing)
@@ -284,6 +284,8 @@
 - [ ] T075 [C7] **SC-002**: Add e2e test for `ResolveDisputedBills` month-end force-resolve — `tests/e2e/bill_split_test.go` (missing)
 - [ ] T076 Run `make test-unit && make test-integration && make test-e2e` — all green (verify)
 - [ ] T077 Update `sbr/rtm/008-bill-split.rtm.md` after C1, C2, C3, C4 fixes
+
+---
 
 ---
 
