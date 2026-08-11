@@ -7,7 +7,7 @@
 **Status**: Draft
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed Users
-feature. Per project constitution Principle I ("Code Is Truth"), this document describes
+feature. Per project constitution Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code"), this document describes
 verified current behavior of `internal/service/user.go`, `internal/api/grpc/user.go`,
 `internal/repository/postgres/user.go`, `internal/domain/user.go`, the `users` table in
 `podman/trusted-group/postgres/ubertool_schema_trusted.sql`, and

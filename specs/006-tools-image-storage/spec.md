@@ -8,10 +8,10 @@
 check, disabled cross-org search e2e test, hardcoded `ListToolCategories`, `fmt.Printf` debug
 logging) have been **fixed and tested**; this document now describes current, correct
 behavior. The "Known Discrepancies" section below is kept as a resolved changelog rather than
-deleted, per Principle I ("Code Is Truth").
+deleted, per Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code").
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed Tools
-and Image Storage features. Per project constitution Principle I ("Code Is Truth"), this
+and Image Storage features. Per project constitution Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code"), this
 document describes verified current behavior of `internal/service/tool.go`,
 `internal/service/image_storage.go`, `internal/api/grpc/tool.go`,
 `internal/api/grpc/image_storage.go`, the `tools`/`tool_images` tables in

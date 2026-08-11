@@ -65,7 +65,7 @@ FROM rental_counts;
 
 ## Constitution Check
 
-- **Principle I (Code Is Truth)**: Verified against `internal/repository/postgres/ledger.go` — current impl filters by `org_id` in every query
+- **Principle I (Reconcile Discrepancies Among Spec, RTM, and Code)**: Verified against `internal/repository/postgres/ledger.go` — current impl filters by `org_id` in every query
 - **Principle IV (Layered Testing)**: New integration test in `tests/integration/ledger_cross_org_test.go`; e2e test in `tests/e2e/ledger_test.go`
 - **Principle V (Deployment Parity)**: Single schema change (none required); query works on both Podman and EC2 PostgreSQL
 - **Principle VI (Proto-First)**: No proto change; sentinel `org_id=0` uses existing field

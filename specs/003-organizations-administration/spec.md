@@ -12,11 +12,10 @@ present in the code** (`internal/service/admin.go:76-82`,
 coverage, so the gap was in verification, not implementation. Both now have dedicated tests;
 7 of 8 `AdminService` RPCs also gained e2e non-admin-rejection coverage (previously 1 of 8).
 The "Known Discrepancies" section is kept as a resolved changelog rather than deleted, per
-Principle I ("Code Is Truth").
+Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code").
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed
-Organizations & Administration feature. Per project constitution Principle I ("Code Is
-Truth"), this document describes verified current behavior of
+Organizations & Administration feature. Per project constitution Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code"), this document describes verified current behavior of
 `internal/service/org.go`, `internal/service/admin.go`, `internal/api/grpc/org.go`,
 `internal/api/grpc/admin.go`, `internal/config/security_config.go`, the
 `orgs`/`users_orgs`/`join_requests`/`invitations` tables in

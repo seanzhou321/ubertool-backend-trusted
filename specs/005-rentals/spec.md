@@ -7,12 +7,11 @@
 **Status**: Updated 2026-07-29 — all four Known Discrepancies below (double-booking, missing
 status gates on Reject/Cancel, missing org-admin access on `GetRental`) have been **fixed and
 tested**; this document now describes current, correct behavior. The "Known Discrepancies"
-section below is kept as a resolved changelog rather than deleted, per Principle I ("Code Is
-Truth") — it records what changed and why.
+section below is kept as a resolved changelog rather than deleted, per Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code") — it records what changed and why.
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed
 Rentals feature — the largest domain in this codebase (16 RPCs). Per project constitution
-Principle I ("Code Is Truth"), this document describes verified current behavior of
+Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code"), this document describes verified current behavior of
 `internal/service/rental.go` (1058 lines), `internal/api/grpc/rental.go`,
 `internal/domain/rental.go`, `internal/utils` (pricing calculation), the `rentals` table in
 `podman/trusted-group/postgres/ubertool_schema_trusted.sql`, and

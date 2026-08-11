@@ -55,7 +55,7 @@
 
 | Principle | Check | Result |
 |-----------|-------|--------|
-| I. Code Is Truth | Plan derived from `internal/service/ledger.go`, `internal/repository/postgres/ledger.go`, `api/proto/.../ledger_service.proto`, schema SQL | ✅ PASS |
+| I. Reconcile Discrepancies Among Spec, RTM, and Code | Plan derived from `internal/service/ledger.go`, `internal/repository/postgres/ledger.go`, `api/proto/.../ledger_service.proto`, schema SQL | ✅ PASS |
 | II. Domain Model Constraint | No status-like fields in Ledger (read-only); balance_cents uses typed domain constants in service layer | ✅ PASS |
 | III. Push Notification Pattern | Ledger is read-only — no mutations, no notifications needed | ✅ PASS (N/A) |
 | IV. Layered Testing Discipline | Tests map to existing `tests/unit`, `tests/integration`, `tests/e2e`, `tests/smoke` tiers | ✅ PASS |

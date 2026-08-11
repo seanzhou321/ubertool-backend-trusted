@@ -9,7 +9,7 @@
 **Input**: Retrofit specification for the existing, already-implemented and deployed
 Ledger feature — the smallest domain in this codebase by RPC count (3), but one that
 turned up more confirmed doc-vs-code drift per line than any other domain reviewed so far.
-Per project constitution Principle I ("Code Is Truth"), this document describes verified
+Per project constitution Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code"), this document describes verified
 current behavior of `internal/service/ledger.go`, `internal/api/grpc/ledger.go`,
 `internal/repository/postgres/ledger.go`, the `ledger_transactions` table in
 `podman/trusted-group/postgres/ubertool_schema_trusted.sql`, and

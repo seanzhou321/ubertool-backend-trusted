@@ -7,7 +7,7 @@
 **Status**: Draft
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed Bill
-Split feature. Per project constitution Principle I ("Code Is Truth"), this document
+Split feature. Per project constitution Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code"), this document
 describes verified current behavior of `internal/service/bill_split.go`,
 `internal/api/grpc/bill_split.go`, `internal/jobs/billing_jobs.go`,
 `internal/jobs/notification_jobs.go`, `internal/domain/bill.go`, the `bills`/`bill_actions`

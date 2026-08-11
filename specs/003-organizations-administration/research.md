@@ -62,7 +62,7 @@
 
 | Principle | Check |
 |-----------|-------|
-| I. Code Is Truth | Verified against `internal/service/org.go`, `admin.go`, `auth.go` (join request) |
+| I. Reconcile Discrepancies Among Spec, RTM, and Code | Verified against `internal/service/org.go`, `admin.go`, `auth.go` (join request) |
 | II. Domain Constants | `OrgRole`, `OrgMembershipStatus` constants in `internal/domain/org.go` |
 | III. Push Notifications | Org creation/join triggers notifications (handled by Auth service) |
 | IV. Layered Testing | Tests map to `tests/unit`, `tests/integration`, `tests/e2e`, `tests/smoke` |

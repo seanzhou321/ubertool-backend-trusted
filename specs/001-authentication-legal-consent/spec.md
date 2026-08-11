@@ -7,8 +7,7 @@
 **Status**: Draft
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed
-Authentication & Legal Consent feature. Per project constitution Principle I ("Code Is
-Truth"), this document describes verified current behavior of
+Authentication & Legal Consent feature. Per project constitution Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code"), this document describes verified current behavior of
 `internal/service/auth.go`, `internal/api/grpc/auth.go`,
 `internal/api/grpc/interceptor/auth_interceptor.go`,
 `internal/api/grpc/interceptor/rate_limit_interceptor.go`, `internal/security/token.go`,

@@ -8,7 +8,7 @@
 
 **Input**: Retrofit specification for the existing, already-implemented and deployed
 Notifications feature (in-app notifications + FCM push delivery). Per project constitution
-Principle I ("Code Is Truth") and Principle III (Push Notification Pattern), this document
+Principle I ("Reconcile Discrepancies Among Spec, RTM, and Code") and Principle III (Push Notification Pattern), this document
 describes verified current behavior of `internal/service/notification.go`,
 `internal/service/push_notification.go`, `internal/api/grpc/notification.go`, the
 `notifications`/`fcm_tokens` tables in

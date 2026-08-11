@@ -161,12 +161,44 @@ assuming this list stays correct):
 
 ### 5. Classify each FR's boundary status
 
+**Run the static genuineness check (Steps A-C in `sbr/README.md` → "Posthoc test-genuineness
+check") on every piece of evidence before it can back a `Complete` classification.** A
+plausibly-named test match from Step 4 is a candidate, not yet evidence: derive what a correct
+test should assert from the FR/Acceptance-Scenario prose alone (Step A), then compare that
+against what the test actually asserts (Step B), and classify it Spec-Aligned /
+Implementation-Coupled / Vacuous (Step C). This audit runs Steps A-C only — it never executes
+tests or mutates code (Step D is `speckit-sbr-bugfix`'s to run, when it writes a new test) — so
+record in Notes that the row's evidence cleared "genuineness: static only," not the stronger
+"static + mutation-confirmed" level a bugfix run can certify.
+
+**Check for an SBR-Trace annotation on every cited test** (see `sbr/README.md` → "SBR-Trace test
+annotations"). Three outcomes, all recorded in Notes, none of them altering Boundary Status on
+their own:
+
+- **Present and matches Step B's reading** — no finding; this is the strongest form of static
+  evidence this audit can produce, since the claim was already checked against the code once
+  when it was written and again now.
+- **Present but contradicts Step B's reading** (the annotation claims coverage the test's actual
+  assertions don't support, or vice versa) — this is itself an Implementation-Coupled/Vacuous
+  signal per Step C, not a separate category; note explicitly that the annotation is stale so a
+  future bugfix/upgrade run touching this test knows to correct it (this audit never edits test
+  files itself, per the Operating Constraints above).
+- **Absent** — most existing tests predate this convention; note "no SBR-Trace annotation" so the
+  gap is visible and greppable, but do not downgrade an otherwise Spec-Aligned `Complete` row for
+  its absence alone — annotation coverage is adopted incrementally by `speckit-sbr-bugfix`/
+  `speckit-sbr-feature-upgrade` as they touch tests, not retrofitted by this audit.
+
 Using the vocabulary defined in `sbr/README.md`:
 
 - **`Complete`** if the requirement has citable evidence at the tier(s) appropriate to its
-  nature. Not every FR needs every tier populated — judge per-requirement (e.g. a pure
-  data-shape requirement may only need L1 + L3 evidence) and record the reasoning in Notes.
-- **`Gap — <tier>`** naming every tier where evidence should reasonably exist but does not.
+  nature, and that evidence classified **Spec-Aligned** under the genuineness check above. Not
+  every FR needs every tier populated — judge per-requirement (e.g. a pure data-shape
+  requirement may only need L1 + L3 evidence) and record the reasoning in Notes.
+- **`Gap — <tier>`** naming every tier where evidence should reasonably exist but does not —
+  including a tier where a test exists but classified **Implementation-Coupled** or
+  **Vacuous**. Say explicitly in Notes which of the two it was and what the test actually
+  checks versus what the FR requires; this is a different (and more informative) gap than "no
+  test found at all," and must not be silently merged with it.
 - **`Unclassified`** where confidence is too low to call it either way — never force a
   guess into `Complete`.
 

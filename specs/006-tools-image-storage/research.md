@@ -71,7 +71,7 @@ JOIN users_orgs uo_owner ON uo_owner.org_id = o.id
 
 | Principle | Check |
 |-----------|-------|
-| I. Code Is Truth | Verified against `internal/service/tool.go`, `internal/api/grpc/tool.go` |
+| I. Reconcile Discrepancies Among Spec, RTM, and Code | Verified against `internal/service/tool.go`, `internal/api/grpc/tool.go` |
 | II. Domain Constants | `ToolStatus` constants in `internal/domain/tool.go` |
 | III. Push Notifications | AddTool/UpdateTool/DeleteTool → notify owner + shared org members? (N/A for search) |
 | IV. Layered Testing | New integration test for cross-org search |

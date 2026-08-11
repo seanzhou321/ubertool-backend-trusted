@@ -54,7 +54,7 @@
 
 | Principle | Check | Result |
 |-----------|-------|--------|
-| I. Code Is Truth | Plan derived from `internal/service/rental.go`, `internal/api/grpc/rental.go`, `rental_service.proto`, schema | ✅ PASS |
+| I. Reconcile Discrepancies Among Spec, RTM, and Code | Plan derived from `internal/service/rental.go`, `internal/api/grpc/rental.go`, `rental_service.proto`, schema | ✅ PASS |
 | II. Domain Model Constraint | `RentalStatus` constants in `internal/domain/rental.go`; no raw strings | ✅ PASS |
 | III. Push Notification Pattern | Create/Approve/Finalize/Complete/Cancel all trigger notifications + email + push | ✅ PASS |
 | IV. Layered Testing Discipline | Tests in existing tier directories | ✅ PASS |

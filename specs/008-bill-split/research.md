@@ -47,7 +47,7 @@ WHERE org_id = $1;
 
 | Principle | Check |
 |-----------|-------|
-| I. Code Is Truth | Verified against `internal/service/bill_split.go`, `billing_jobs.go` |
+| I. Reconcile Discrepancies Among Spec, RTM, and Code | Verified against `internal/service/bill_split.go`, `billing_jobs.go` |
 | II. Domain Constants | `BillStatus` constants used |
 | III. Push Notifications | Summary reads don't trigger notifications |
 | IV. Layered Testing | New integration + e2e tests |

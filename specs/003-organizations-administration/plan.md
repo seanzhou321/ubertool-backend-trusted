@@ -55,7 +55,7 @@
 
 | Principle | Check | Result |
 |-----------|-------|--------|
-| I. Code Is Truth | Plan derived from `internal/service/org.go`, `internal/service/admin.go`, `internal/api/grpc/org.go`, `internal/api/grpc/admin.go`, `api/proto/.../organization_service.proto`, `admin_service.proto`, schema SQL | ✅ PASS |
+| I. Reconcile Discrepancies Among Spec, RTM, and Code | Plan derived from `internal/service/org.go`, `internal/service/admin.go`, `internal/api/grpc/org.go`, `internal/api/grpc/admin.go`, `api/proto/.../organization_service.proto`, `admin_service.proto`, schema SQL | ✅ PASS |
 | II. Domain Model Constraint | `users_orgs.role`/`status` use domain constants; new FR-009 `balance_cents` per-membership | ✅ PASS |
 | III. Push Notification Pattern | Mutations (CreateOrg, JoinOrg, Approve/RejectRequest, SendInvite, BlockUser) → notifications + email + push | ✅ PASS |
 | IV. Layered Testing Discipline | Tests map to existing `tests/unit`, `tests/integration`, `tests/e2e`, `tests/smoke` tiers | ✅ PASS |

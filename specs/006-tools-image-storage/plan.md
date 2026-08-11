@@ -54,7 +54,7 @@
 
 | Principle | Check | Result |
 |-----------|-------|--------|
-| I. Code Is Truth | Plan derived from `internal/service/tool.go`, `image_storage.go`, `tool_service.proto`, schema | ✅ PASS |
+| I. Reconcile Discrepancies Among Spec, RTM, and Code | Plan derived from `internal/service/tool.go`, `image_storage.go`, `tool_service.proto`, schema | ✅ PASS |
 | II. Domain Model Constraint | `ToolStatus` constants in `internal/domain/tool.go`; no raw strings | ✅ PASS |
 | III. Push Notification Pattern | AddTool, UpdateTool, DeleteTool, ConfirmUpload → notifications + email + push | ✅ PASS |
 | IV. Layered Testing Discipline | Tests in existing tier directories | ✅ PASS |

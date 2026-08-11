@@ -1,4 +1,4 @@
-.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-e2e-rate-limit test-smoke-ec2 cronjob-build cronjob-push deploy-cronjob cronjob-logs cronjob-status cronjob-restart grpc-start grpc-stop grpc-use-precommit grpc-use-uitest grpc-use-manual db-deploy db-teardown db-schema-install db-schema-teardown setup-data-local wipe-db-local reset-db-local ec2-deploy ec2-reinstall-schema ec2-setup-data ec2-wipe-data ec2-reset-data ec2-use-prod ec2-use-uitest my-ip help
+.PHONY: proto-gen build build-server build-cronjob run tidy clean test-unit test-integration test-e2e test-e2e-rate-limit test-smoke-ec2 check-sbr-trace cronjob-build cronjob-push deploy-cronjob cronjob-logs cronjob-status cronjob-restart grpc-start grpc-stop grpc-use-precommit grpc-use-uitest grpc-use-manual db-deploy db-teardown db-schema-install db-schema-teardown setup-data-local wipe-db-local reset-db-local ec2-deploy ec2-reinstall-schema ec2-setup-data ec2-wipe-data ec2-reset-data ec2-use-prod ec2-use-uitest my-ip help
 
 # GNU Make on Windows executes recipes via cmd.exe unless it finds a POSIX sh.exe
 # on PATH (which Git Bash / WSL put there), in which case it uses that instead.
@@ -122,6 +122,11 @@ test-ext-integration-all:
 # Ensure config/config.ec2.apitest.yaml exists (see deploy/ec2-mvp/docs/handoff.md Phase 2b)
 test-smoke-ec2:
 	go test -v -count=1 -timeout 30s ./tests/smoke/ -args -config=config/config.ec2.apitest.yaml
+
+# Advisory only — reports which test functions lack an SBR-Trace annotation, never fails.
+# See sbr/README.md -> "SBR-Trace test annotations" and sbr/scripts/check-sbr-trace.ps1.
+check-sbr-trace:
+	powershell -NoProfile -ExecutionPolicy Bypass -File sbr/scripts/check-sbr-trace.ps1
 
 
 # Docker commands
@@ -276,6 +281,9 @@ help:
 	$(ECHO_BLANK)
 	@echo --- Tests [EC2] ---
 	@echo   test-smoke-ec2            Run smoke tests against live EC2 deployment [TLS and FCM enabled, real 2FA]
+	$(ECHO_BLANK)
+	@echo --- SBR ---
+	@echo   check-sbr-trace           Report test functions missing an SBR-Trace annotation [advisory, never fails]
 	$(ECHO_BLANK)
 	@echo --- Local Podman Deployment ---
 	@echo   cronjob-build             Build the cronjob image [podman/trusted-group/cronjob/Dockerfile]

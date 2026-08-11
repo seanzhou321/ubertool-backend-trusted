@@ -80,7 +80,7 @@ across a multi-org membership.
 
 | Principle | Check |
 |-----------|-------|
-| I. Code Is Truth | Verified against `internal/service/rental.go` `CreateRentalRequest`/`isSharedOrganization`/`getSharedOrganizations` |
+| I. Reconcile Discrepancies Among Spec, RTM, and Code | Verified against `internal/service/rental.go` `CreateRentalRequest`/`isSharedOrganization`/`getSharedOrganizations` |
 | II. Domain Constants | `RentalStatus` constants used; no new status needed |
 | III. Push Notifications | Rejection doesn't trigger notifications (rental not created yet) |
 | IV. Layered Testing | Unit coverage in `tests/unit/rental_test.go` (`TestRentalService_CreateRentalRequest`); L2/L3 coverage still needed (see `sbr/rtm/005-rentals.rtm.md` FR-008) |
