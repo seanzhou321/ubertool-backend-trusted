@@ -2,5 +2,6 @@
   "skills": [
     "../.claude/skills",
     ".pi/skills"
-  ]
+  ],
+  "sessionDir": "H:\\github\\projects\\ubertool\\siharness\\ubertool-backend-trusted-skills-repo\\pi-sessions"
 }
