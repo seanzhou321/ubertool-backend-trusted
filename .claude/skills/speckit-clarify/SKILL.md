@@ -63,12 +63,17 @@ Note: This clarification workflow is expected to run (and be completed) BEFORE i
 
 Execution steps:
 
-1. Run `.specify/scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly` from repo root **once** (combined `--json --paths-only` mode / `-Json -PathsOnly`). Parse minimal JSON payload fields:
-   - `FEATURE_DIR`
-   - `FEATURE_SPEC`
-   - (Optionally capture `IMPL_PLAN`, `TASKS` for future chained flows.)
-   - If JSON parsing fails, abort and instruct user to re-run `/speckit-specify` or verify feature branch environment.
-   - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Resolve which feature to clarify**, then confirm paths.
+   - **Check `$ARGUMENTS` for an explicit feature reference** — a numeric prefix (e.g. `003`, `008`) or a slug fragment (e.g. `organizations-administration`, `bill-split`) matching a `specs/<NNN-slug>/` directory name.
+     - **Matches exactly one directory**: use it as the target `FEATURE_DIR` for this invocation (e.g. `specs/003-organizations-administration`) — this overrides whatever `.specify/feature.json` currently holds; do not silently prefer the file over an explicit request.
+     - **Matches nothing** (empty `$ARGUMENTS`, or generic wording with no module identifier): list every `specs/*/` directory (e.g. `ls specs/`), with a one-line status per entry — `spec.md`'s last-modified date, and, if `sbr/rtm/<slug>.rtm.md` exists, its open-gap count. Present this as a numbered list and **stop to ask the user which feature to target** before doing anything else. Do not guess and do not fall back to `.specify/feature.json` silently — that file can be stale relative to what the user wants clarified right now.
+     - **Matches more than one directory** (ambiguous number or slug fragment): list only the matching candidates and ask the user to disambiguate before proceeding.
+   - **Confirm paths**: run `.specify/scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly` from repo root **once** (combined `--json --paths-only` mode / `-Json -PathsOnly`), setting the `SPECIFY_FEATURE_DIRECTORY` environment variable to the feature directory resolved above before invoking it. Parse minimal JSON payload fields:
+     - `FEATURE_DIR`
+     - `FEATURE_SPEC`
+     - (Optionally capture `IMPL_PLAN`, `TASKS` for future chained flows.)
+     - If the script itself fails to run (e.g. `pwsh` unavailable in this environment) or its JSON fails to parse, fall back to the `FEATURE_DIR`/`FEATURE_SPEC` (`<FEATURE_DIR>/spec.md`) already resolved in the step above — the feature was already identified independently of this script, so its failure alone shouldn't block progress. Only abort and instruct the user to re-run `/speckit-specify` if **no** feature could be resolved by either method.
+     - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. **IF EXISTS**: Load `.specify/memory/constitution.md` for project principles and governance constraints.
 

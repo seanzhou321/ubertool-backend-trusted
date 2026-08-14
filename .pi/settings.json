@@ -1,14 +1,13 @@
 {
   "skills": [
-    "../.claude/skills",
-    ".pi/skills"
+    "../.claude/skills"
   ],
   "sessionDir": "H:\\github\\projects\\ubertool\\siharness\\si-skills\\skills-logs-repo\\ubertool-bkndt\\nemotron_ultra\\pi-sessions",
   "extensions": [
-    "H:\\github\\projects\\ubertool\\siharness\\si-skills-pi-plugin\\src\\index.ts"
+    "H:\\github\\projects\\ubertool\\siharness\\si-skills-pi-plugin\\index.ts"
   ],
   "siSkillsPlugin": {
-    "mode": "capture",
+    "mode": "linkage",
     "outputDir": "H:\\github\\projects\\ubertool\\siharness\\si-skills\\skills-logs-repo\\ubertool-bkndt\\nemotron_ultra\\rollouts",
     "modelSlug": "nemotron_ultra",
     "retry": {
