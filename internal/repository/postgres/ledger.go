@@ -31,7 +31,7 @@ func NewLedgerRepository(db *sql.DB) repository.LedgerRepository {
 }
 
 func (r *ledgerRepository) CreateTransaction(ctx context.Context, tx *domain.LedgerTransaction) error {
-	query := `INSERT INTO ledger_transactions (org_id, user_id, amount, type, related_rental_id, description, charged_on, created_on) 
+	query := `INSERT INTO ledger_transactions (org_id, user_id, amount, type, related_rental_id, description, charged_on, created_on)
 	          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
 	now := time.Now().Format("2006-01-02")
 	return r.db.QueryRowContext(ctx, query, tx.OrgID, tx.UserID, tx.Amount, tx.Type, tx.RelatedRentalID, tx.Description, now, now).Scan(&tx.ID)
@@ -47,7 +47,7 @@ func (r *ledgerRepository) GetBalance(ctx context.Context, userID, orgID int32) 
 
 func (r *ledgerRepository) ListTransactions(ctx context.Context, userID, orgID int32, page, pageSize int32) ([]domain.LedgerTransaction, int32, error) {
 	offset := (page - 1) * pageSize
-	query := `SELECT id, org_id, user_id, amount, type, related_rental_id, COALESCE(description, ''), charged_on, created_on 
+	query := `SELECT id, org_id, user_id, amount, type, related_rental_id, COALESCE(description, ''), charged_on, created_on
 	          FROM ledger_transactions WHERE user_id = $1 AND org_id = $2 ORDER BY created_on DESC LIMIT $3 OFFSET $4`
 	rows, err := r.db.QueryContext(ctx, query, userID, orgID, pageSize, offset)
 	if err != nil {
@@ -75,6 +75,79 @@ func (r *ledgerRepository) ListTransactions(ctx context.Context, userID, orgID i
 	}
 	return txs, count, nil
 }
+
+// getRentalSummaryStats runs a single CTE-based query to compute all rental-activity stats
+// for a single org — replacing the previous 4 separate queries. This is the primary
+// performance fix for GetLedgerSummary's N-query bottleneck.
+//
+// The CTE computes per-status counts with role-specific breakdowns (as_renter, as_owner).
+// The outer SELECT uses max(case...) to pick role-specific values from the ACTIVE status
+// row, and the pending total from the PENDING row — all without GROUP BY.
+func (r *ledgerRepository) getRentalSummaryStats(ctx context.Context, userID, orgID int32, numberOfMonths int32) (activeRentals, activeLendings, pendingRequests int32, statusCount map[string]int32, err error) {
+	statusCount = make(map[string]int32)
+
+	filter, filterArgs := monthsFilterClause(3, numberOfMonths)
+	baseArgs := []interface{}{userID, orgID}
+	args := append(baseArgs, filterArgs...)
+
+	// Single CTE query replaces the previous 4 separate rental queries.
+	// The CTE computes per-status counts. The outer SELECT computes whole-table
+	// aggregates from that small materialized set (one row per status). We use
+	// a nested CTE so the outer SELECT has no non-aggregated columns.
+	query := `
+		WITH rental_stats AS (
+			SELECT
+				status,
+				count(*)                                       AS cnt,
+				count(*) FILTER (WHERE renter_id = $1)         AS as_renter,
+				count(*) FILTER (WHERE owner_id = $1)          AS as_owner
+			FROM rentals
+			WHERE (renter_id = $1 OR owner_id = $1) AND org_id = $2 ` + filter + `
+			GROUP BY status
+		),
+		totals AS (
+			SELECT
+				max(case when status = 'ACTIVE' then as_renter else 0 end) AS active_rentals,
+				max(case when status = 'ACTIVE' then as_owner else 0 end)  AS active_lendings,
+				max(case when status = 'PENDING' then cnt else 0 end)      AS pending_requests
+			FROM rental_stats
+		)
+		SELECT totals.active_rentals, totals.active_lendings, totals.pending_requests,
+		       rental_stats.status, rental_stats.cnt
+		FROM rental_stats, totals`
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return 0, 0, 0, nil, err
+	}
+	defer rows.Close()
+
+	first := true
+	for rows.Next() {
+		var ar, al, pr int32
+		var status string
+		var cnt int32
+		if err := rows.Scan(&ar, &al, &pr, &status, &cnt); err != nil {
+			return 0, 0, 0, nil, err
+		}
+		if first {
+			activeRentals = ar
+			activeLendings = al
+			pendingRequests = pr
+			first = false
+		}
+		statusCount[status] = cnt
+	}
+
+	if err := rows.Err(); err != nil {
+		return 0, 0, 0, nil, err
+	}
+
+	// If there were no rows at all (no rentals matching the filter), all counts are 0
+	// and statusCount is an empty map — both already correct.
+	return activeRentals, activeLendings, pendingRequests, statusCount, nil
+}
+
 func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID, numberOfMonths int32) (*domain.LedgerSummary, error) {
 	summary := &domain.LedgerSummary{
 		StatusCount: make(map[string]int32),
@@ -87,47 +160,15 @@ func (r *ledgerRepository) GetSummary(ctx context.Context, userID, orgID, number
 	}
 	summary.Balance = balance
 
-	filter, filterArgs := monthsFilterClause(3, numberOfMonths)
-	baseArgs := []interface{}{userID, orgID}
-	args := append(baseArgs, filterArgs...)
-
-	// Active Rentals Count
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE renter_id = $1 AND org_id = $2 AND status = 'ACTIVE'"+filter, args...).Scan(&summary.ActiveRentalsCount)
+	// Single CTE query replaces the previous 4 separate rental queries (performance fix).
+	activeRentals, activeLendings, pendingRequests, statusCount, err := r.getRentalSummaryStats(ctx, userID, orgID, numberOfMonths)
 	if err != nil {
 		return nil, err
 	}
-
-	// Active Lendings Count
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE owner_id = $1 AND org_id = $2 AND status = 'ACTIVE'"+filter, args...).Scan(&summary.ActiveLendingsCount)
-	if err != nil {
-		return nil, err
-	}
-
-	// Pending Requests Count
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE (renter_id = $1 OR owner_id = $1) AND org_id = $2 AND status = 'PENDING'"+filter, args...).Scan(&summary.PendingRequestsCount)
-	if err != nil {
-		return nil, err
-	}
-
-	// Detailed status counts for all rentals the user is involved in
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT status, count(*)
-		FROM rentals
-		WHERE (renter_id = $1 OR owner_id = $1) AND org_id = $2 `+filter+`
-		GROUP BY status`, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var status string
-		var count int32
-		if err := rows.Scan(&status, &count); err != nil {
-			return nil, err
-		}
-		summary.StatusCount[status] = count
-	}
+	summary.ActiveRentalsCount = activeRentals
+	summary.ActiveLendingsCount = activeLendings
+	summary.PendingRequestsCount = pendingRequests
+	summary.StatusCount = statusCount
 
 	recentTxs, err := r.getRecentTransactions(ctx, "WHERE user_id = $1 AND org_id = $2", userID, orgID)
 	if err != nil {
@@ -169,6 +210,69 @@ func (r *ledgerRepository) getRecentTransactions(ctx context.Context, whereClaus
 	return txs, nil
 }
 
+// getRentalSummaryStatsAllOrgs runs a single CTE-based query to compute all rental-activity
+// stats across every org the user belongs to. Unlike getRentalSummaryStats, this does NOT
+// filter by org_id — a rental's renter_id/owner_id already implies org membership (enforced
+// by the rentals_shared_org_check constraint).
+func (r *ledgerRepository) getRentalSummaryStatsAllOrgs(ctx context.Context, userID, numberOfMonths int32) (activeRentals, activeLendings, pendingRequests int32, statusCount map[string]int32, err error) {
+	statusCount = make(map[string]int32)
+
+	filter, filterArgs := monthsFilterClause(2, numberOfMonths)
+	baseArgs := []interface{}{userID}
+	args := append(baseArgs, filterArgs...)
+
+	query := `
+		WITH rental_stats AS (
+			SELECT
+				status,
+				count(*)                                       AS cnt,
+				count(*) FILTER (WHERE renter_id = $1)         AS as_renter,
+				count(*) FILTER (WHERE owner_id = $1)          AS as_owner
+			FROM rentals
+			WHERE (renter_id = $1 OR owner_id = $1) ` + filter + `
+			GROUP BY status
+		),
+		totals AS (
+			SELECT
+				max(case when status = 'ACTIVE' then as_renter else 0 end) AS active_rentals,
+				max(case when status = 'ACTIVE' then as_owner else 0 end)  AS active_lendings,
+				max(case when status = 'PENDING' then cnt else 0 end)      AS pending_requests
+			FROM rental_stats
+		)
+		SELECT totals.active_rentals, totals.active_lendings, totals.pending_requests,
+		       rental_stats.status, rental_stats.cnt
+		FROM rental_stats, totals`
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return 0, 0, 0, nil, err
+	}
+	defer rows.Close()
+
+	first := true
+	for rows.Next() {
+		var ar, al, pr int32
+		var status string
+		var cnt int32
+		if err := rows.Scan(&ar, &al, &pr, &status, &cnt); err != nil {
+			return 0, 0, 0, nil, err
+		}
+		if first {
+			activeRentals = ar
+			activeLendings = al
+			pendingRequests = pr
+			first = false
+		}
+		statusCount[status] = cnt
+	}
+
+	if err := rows.Err(); err != nil {
+		return 0, 0, 0, nil, err
+	}
+
+	return activeRentals, activeLendings, pendingRequests, statusCount, nil
+}
+
 // GetSummaryAllOrgs implements FR-004 (specs/007-ledger, multi-org): rolls up balance and
 // per-status rental counts across every org the user belongs to, for GetLedgerSummary calls
 // with organization_id omitted (0). Unlike GetSummary, rental queries here are NOT filtered by
@@ -188,47 +292,15 @@ func (r *ledgerRepository) GetSummaryAllOrgs(ctx context.Context, userID, number
 		return nil, err
 	}
 
-	filter, filterArgs := monthsFilterClause(2, numberOfMonths)
-	baseArgs := []interface{}{userID}
-	args := append(baseArgs, filterArgs...)
-
-	// Active Rentals Count (all orgs)
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE renter_id = $1 AND status = 'ACTIVE'"+filter, args...).Scan(&summary.ActiveRentalsCount)
+	// Single CTE query replaces the previous 4 separate rental queries (performance fix).
+	activeRentals, activeLendings, pendingRequests, statusCount, err := r.getRentalSummaryStatsAllOrgs(ctx, userID, numberOfMonths)
 	if err != nil {
 		return nil, err
 	}
-
-	// Active Lendings Count (all orgs)
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE owner_id = $1 AND status = 'ACTIVE'"+filter, args...).Scan(&summary.ActiveLendingsCount)
-	if err != nil {
-		return nil, err
-	}
-
-	// Pending Requests Count (all orgs)
-	err = r.db.QueryRowContext(ctx, "SELECT count(*) FROM rentals WHERE (renter_id = $1 OR owner_id = $1) AND status = 'PENDING'"+filter, args...).Scan(&summary.PendingRequestsCount)
-	if err != nil {
-		return nil, err
-	}
-
-	// Detailed status counts for all rentals the user is involved in, across every org.
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT status, count(*)
-		FROM rentals
-		WHERE (renter_id = $1 OR owner_id = $1) `+filter+`
-		GROUP BY status`, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var status string
-		var count int32
-		if err := rows.Scan(&status, &count); err != nil {
-			return nil, err
-		}
-		summary.StatusCount[status] = count
-	}
+	summary.ActiveRentalsCount = activeRentals
+	summary.ActiveLendingsCount = activeLendings
+	summary.PendingRequestsCount = pendingRequests
+	summary.StatusCount = statusCount
 
 	recentTxs, err := r.getRecentTransactions(ctx, "WHERE user_id = $1", userID)
 	if err != nil {

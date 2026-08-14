@@ -47,12 +47,13 @@ func TestBillSplitService_GetGlobalBillSplitSummary(t *testing.T) {
 				{ID: 5, DebtorUserID: 1, Status: domain.BillStatusPending, DebtorAcknowledgedAt: nil}, // Payment to make
 			}, nil).Once()
 
-		paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, err := svc.GetGlobalBillSplitSummary(ctx, 1)
+		paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, billsCreatedCount, err := svc.GetGlobalBillSplitSummary(ctx, 1)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(2), paymentsToMake)
 		assert.Equal(t, int32(1), receiptsToVerify)
 		assert.Equal(t, int32(1), paymentsInDispute)
 		assert.Equal(t, int32(1), receiptsInDispute)
+		assert.Equal(t, int32(5), billsCreatedCount, "total bills across all orgs: 4 in org1 + 1 in org2")
 		mockBillRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 	})
@@ -61,9 +62,141 @@ func TestBillSplitService_GetGlobalBillSplitSummary(t *testing.T) {
 		mockUserRepo.On("ListUserOrgs", ctx, int32(1)).
 			Return([]domain.UserOrg(nil), errors.New("db error")).Once()
 
-		_, _, _, _, err := svc.GetGlobalBillSplitSummary(ctx, 1)
+		_, _, _, _, _, err := svc.GetGlobalBillSplitSummary(ctx, 1)
 		assert.Error(t, err)
 		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("BillsCreatedCount_allStatuses", func(t *testing.T) {
+		// bills_created_count should count bills across ALL statuses, not just PENDING/DISPUTED
+		mockUserRepo.On("ListUserOrgs", ctx, int32(1)).
+			Return([]domain.UserOrg{{UserID: 1, OrgID: 1}}, nil).Once()
+
+		now := time.Now()
+		mockBillRepo.On("ListByUser", ctx, int32(1), int32(1), []domain.BillStatus(nil)).
+			Return([]domain.Bill{
+				{ID: 1, DebtorUserID: 1, Status: domain.BillStatusPending, DebtorAcknowledgedAt: nil},
+				{ID: 2, DebtorUserID: 1, Status: domain.BillStatusPaid, DebtorAcknowledgedAt: &now, CreditorAcknowledgedAt: &now},
+				{ID: 3, CreditorUserID: 1, Status: domain.BillStatusDisputed},
+				{ID: 4, DebtorUserID: 1, Status: domain.BillStatusAdminResolved},
+				{ID: 5, CreditorUserID: 1, Status: domain.BillStatusSystemDefaultAction},
+			}, nil).Once()
+
+		paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, billsCreatedCount, err := svc.GetGlobalBillSplitSummary(ctx, 1)
+		assert.NoError(t, err)
+		// 4-category counts: only PENDING/DISPUTED contribute
+		assert.Equal(t, int32(1), paymentsToMake) // bill 1: PENDING debtor not ack'd
+		assert.Equal(t, int32(0), receiptsToVerify)
+		assert.Equal(t, int32(0), paymentsInDispute)
+		assert.Equal(t, int32(1), receiptsInDispute) // bill 3: DISPUTED creditor
+		// bills_created_count counts ALL statuses
+		assert.Equal(t, int32(5), billsCreatedCount, "should count bills across all 5 statuses")
+		mockBillRepo.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+	})
+}
+
+// SBR-Trace: FR-015 — asserts GetOrganizationBillSplitSummary returns per-org breakdown with
+// correct organization_id/organization_name and independent four-count categories per org;
+// uses 2 orgs with different bill compositions to prove per-org (not aggregated) results.
+func TestBillSplitService_GetOrganizationBillSplitSummary(t *testing.T) {
+	mockBillRepo := new(MockBillRepo)
+	mockUserRepo := new(MockUserRepo)
+	mockOrgRepo := new(MockOrganizationRepo)
+	svc := service.NewBillSplitService(mockBillRepo, mockUserRepo, mockOrgRepo, nil, nil)
+	ctx := context.Background()
+
+	t.Run("Success", func(t *testing.T) {
+		// Mock ListUserOrgs to return user's organizations (2 orgs)
+		mockUserRepo.On("ListUserOrgs", ctx, int32(1)).
+			Return([]domain.UserOrg{{UserID: 1, OrgID: 10}, {UserID: 1, OrgID: 20}}, nil).Once()
+
+		// Mock orgRepo.GetByID for each org — organization_id and organization_name must match
+		mockOrgRepo.On("GetByID", ctx, int32(10)).
+			Return(&domain.Organization{ID: 10, Name: "Org Alpha"}, nil).Once()
+		mockOrgRepo.On("GetByID", ctx, int32(20)).
+			Return(&domain.Organization{ID: 20, Name: "Org Beta"}, nil).Once()
+
+		// Mock ListByUser for org 10 — returns bills for counting
+		now := time.Now()
+		mockBillRepo.On("ListByUser", ctx, int32(1), int32(10), []domain.BillStatus(nil)).
+			Return([]domain.Bill{
+				{ID: 1, DebtorUserID: 1, Status: domain.BillStatusPending, DebtorAcknowledgedAt: nil},    // Payment to make
+				{ID: 2, CreditorUserID: 1, Status: domain.BillStatusPending, DebtorAcknowledgedAt: &now}, // Receipt to verify
+				{ID: 3, DebtorUserID: 1, Status: domain.BillStatusDisputed},                              // Payment in dispute
+			}, nil).Once()
+
+		// Mock ListByUser for org 20 — different bill composition
+		mockBillRepo.On("ListByUser", ctx, int32(1), int32(20), []domain.BillStatus(nil)).
+			Return([]domain.Bill{
+				{ID: 4, CreditorUserID: 1, Status: domain.BillStatusDisputed}, // Receipt in dispute
+			}, nil).Once()
+
+		orgs, paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, err := svc.GetOrganizationBillSplitSummary(ctx, 1)
+		assert.NoError(t, err)
+
+		// Assert 2 org summaries returned
+		assert.Equal(t, 2, len(orgs), "FR-015: must return one entry per org the user belongs to")
+		assert.Equal(t, 2, len(paymentsToMake))
+		assert.Equal(t, 2, len(receiptsToVerify))
+		assert.Equal(t, 2, len(paymentsInDispute))
+		assert.Equal(t, 2, len(receiptsInDispute))
+
+		// Assert Org Alpha (org 10) — organization_id/organization_name and per-org counts
+		assert.Equal(t, int32(10), orgs[0].ID, "FR-015: organization_id must match the org")
+		assert.Equal(t, "Org Alpha", orgs[0].Name, "FR-015: organization_name must match the org")
+		assert.Equal(t, int32(1), paymentsToMake[0], "Org Alpha: 1 payment to make")
+		assert.Equal(t, int32(1), receiptsToVerify[0], "Org Alpha: 1 receipt to verify")
+		assert.Equal(t, int32(1), paymentsInDispute[0], "Org Alpha: 1 payment in dispute")
+		assert.Equal(t, int32(0), receiptsInDispute[0], "Org Alpha: 0 receipts in dispute")
+
+		// Assert Org Beta (org 20) — independent counts, not aggregated
+		assert.Equal(t, int32(20), orgs[1].ID, "FR-015: organization_id must match the org")
+		assert.Equal(t, "Org Beta", orgs[1].Name, "FR-015: organization_name must match the org")
+		assert.Equal(t, int32(0), paymentsToMake[1], "Org Beta: 0 payments to make")
+		assert.Equal(t, int32(0), receiptsToVerify[1], "Org Beta: 0 receipts to verify")
+		assert.Equal(t, int32(0), paymentsInDispute[1], "Org Beta: 0 payments in dispute")
+		assert.Equal(t, int32(1), receiptsInDispute[1], "Org Beta: 1 receipt in dispute")
+
+		mockBillRepo.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+		mockOrgRepo.AssertExpectations(t)
+	})
+
+	t.Run("Error_ListUserOrgs", func(t *testing.T) {
+		mockUserRepo.On("ListUserOrgs", ctx, int32(1)).
+			Return([]domain.UserOrg(nil), errors.New("db error")).Once()
+
+		orgs, paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, err := svc.GetOrganizationBillSplitSummary(ctx, 1)
+		assert.Error(t, err)
+		assert.Nil(t, orgs)
+		assert.Nil(t, paymentsToMake)
+		assert.Nil(t, receiptsToVerify)
+		assert.Nil(t, paymentsInDispute)
+		assert.Nil(t, receiptsInDispute)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("Success_OrgRepoErrorSkipped", func(t *testing.T) {
+		// When orgRepo.GetByID fails for one org, that org is skipped but others still returned
+		mockUserRepo.On("ListUserOrgs", ctx, int32(1)).
+			Return([]domain.UserOrg{{UserID: 1, OrgID: 10}, {UserID: 1, OrgID: 20}}, nil).Once()
+
+		// Org 10 succeeds
+		mockOrgRepo.On("GetByID", ctx, int32(10)).
+			Return(&domain.Organization{ID: 10, Name: "Org Alpha"}, nil).Once()
+		mockBillRepo.On("ListByUser", ctx, int32(1), int32(10), []domain.BillStatus(nil)).
+			Return([]domain.Bill{}, nil).Once()
+
+		// Org 20 fails — should be skipped
+		mockOrgRepo.On("GetByID", ctx, int32(20)).
+			Return((*domain.Organization)(nil), errors.New("org not found")).Once()
+
+		orgs, paymentsToMake, _, _, _, err := svc.GetOrganizationBillSplitSummary(ctx, 1)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(orgs), "Only the healthy org should be returned")
+		assert.Equal(t, int32(10), orgs[0].ID)
+		assert.Equal(t, 1, len(paymentsToMake))
 	})
 }
 
@@ -479,6 +612,18 @@ func TestBillSplitService_ListResolvedDisputes(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(result))
 		mockBillRepo.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	// SBR-Trace: FR-012 — non-admin caller (UserOrgRoleMember) calling ListResolvedDisputes
+	// is rejected with an "unauthorized" error, matching the admin-only requirement.
+	t.Run("Error_NotAdmin", func(t *testing.T) {
+		userOrg := &domain.UserOrg{UserID: 1, OrgID: 1, Role: domain.UserOrgRoleMember}
+		mockUserRepo.On("GetUserOrg", ctx, int32(1), int32(1)).Return(userOrg, nil).Once()
+
+		_, err := svc.ListResolvedDisputes(ctx, 1, 1)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unauthorized")
 		mockUserRepo.AssertExpectations(t)
 	})
 }

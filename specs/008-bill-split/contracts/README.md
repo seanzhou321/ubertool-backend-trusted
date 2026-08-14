@@ -44,6 +44,7 @@ message GetGlobalBillSplitSummaryResponse {
   int32 disputed_count = 3;
   int32 resolved_count = 4;
   int64 total_amount_cents = 5;  // Sum of non-resolved bills
+  int32 bills_created_count = 2; // Total bills (all statuses) where caller is debtor or creditor, across all orgs
 }
 ```
 

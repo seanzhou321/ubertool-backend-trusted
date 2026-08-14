@@ -188,6 +188,14 @@ CREATE TABLE rentals (
         )
     );
 
+-- Indexes for GetLedgerSummary rental-activity queries: single scan with conditional
+-- aggregation over (renter_id OR owner_id, org_id, status, created_on) — see
+-- internal/repository/postgres/ledger.go getRentalSummaryStats / getRentalSummaryStatsAllOrgs.
+CREATE INDEX idx_rentals_renter_org_status ON rentals(renter_id, org_id, status);
+CREATE INDEX idx_rentals_owner_org_status ON rentals(owner_id, org_id, status);
+CREATE INDEX idx_rentals_renter_status_created ON rentals(renter_id, status, created_on);
+CREATE INDEX idx_rentals_owner_status_created ON rentals(owner_id, status, created_on);
+
 CREATE TABLE rental_disputes (
     id SERIAL PRIMARY KEY,
     rental_id INTEGER REFERENCES rentals(id) ON DELETE CASCADE,
@@ -218,6 +226,11 @@ CREATE TABLE ledger_transactions (
     charged_on DATE DEFAULT CURRENT_DATE,
     created_on DATE DEFAULT CURRENT_DATE
 );
+
+-- Indexes for ledger transaction lookups: GetLedgerSummary (recent_transactions, LIMIT 5)
+-- and GetTransactions (paginated list by user+org, ordered by created_on DESC).
+CREATE INDEX idx_ledger_txns_user_org_created ON ledger_transactions(user_id, org_id, created_on DESC);
+CREATE INDEX idx_ledger_txns_user_created ON ledger_transactions(user_id, created_on DESC);
 
 -- 6. Notifications
 CREATE TABLE notifications (

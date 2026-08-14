@@ -356,6 +356,12 @@ outcomes), unauthorized-access rejection, the `CalculateTransactions` netting al
   `GetGlobalBillSplitSummary`, but broken down PER ORGANIZATION the caller belongs to.
   Each entry in the list MUST include the `organization_id`, `organization_name`, and the
   four counts for that specific org. This enables per-org drill-down from the global summary.
+- **FR-016** *(feature extension)*:
+  `GetGlobalBillSplitSummary` MUST return `bills_created_count` — the total number of bills
+  across **all statuses** (not just PENDING/DISPUTED) where the caller is either debtor or
+  creditor, summed across all organizations the caller belongs to. This provides a single
+  number representing the caller's total bill activity, distinct from the four category
+  counts which only cover active (PENDING/DISPUTED) bills.
 
 ### Key Entities
 

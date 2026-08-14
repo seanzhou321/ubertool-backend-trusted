@@ -104,15 +104,16 @@ func TestBillSplitService_Integration(t *testing.T) {
 		// Debtor should have payments to make: 1
 
 		// For Creditor
-		p, r, pd, rd, err := billSvc.GetGlobalBillSplitSummary(ctx, creditor.ID)
+		p, r, pd, rd, bc, err := billSvc.GetGlobalBillSplitSummary(ctx, creditor.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(0), p)
 		assert.Equal(t, int32(0), r) // Only counts when debtor acknowledges? Let's check logic later or assume based on names
 		assert.Equal(t, int32(0), pd)
 		assert.Equal(t, int32(0), rd)
+		assert.Equal(t, int32(1), bc) // One bill exists for this month
 
 		// For Debtor
-		p, r, pd, rd, err = billSvc.GetGlobalBillSplitSummary(ctx, debtor.ID)
+		p, r, pd, rd, bc, err = billSvc.GetGlobalBillSplitSummary(ctx, debtor.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, int32(1), p)
 		assert.Equal(t, int32(0), r)

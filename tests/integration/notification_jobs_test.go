@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -129,6 +130,137 @@ func TestSendBillReminders(t *testing.T) {
 	assert.True(t, emailSvc.emailedTo(oldCreditorEmail), "a bill overdue by more than 72 hours must remind the creditor")
 	assert.False(t, emailSvc.emailedTo(freshDebtorEmail), "a bill whose notice was sent recently must not be reminded")
 	assert.False(t, emailSvc.emailedTo(freshCreditorEmail), "a bill whose notice was sent recently must not be reminded")
+}
+
+// conditionalFailingEmailService wraps MockEmailService and returns a configurable error
+// only for SendAdminNotification calls targeting a specific recipient email. For all other
+// methods (and for emails not in the fail set) it behaves as a no-op.
+//
+// This is used by the FR-002 asymmetric-failure tests to exercise the code paths where the
+// debtor's or creditor's notice email bounces.
+type conditionalFailingEmailService struct {
+	MockEmailService
+	mu           sync.Mutex
+	failForEmail map[string]error // recipient email → error to return (nil = no-op for clarity)
+	calls        []adminNotificationCall
+}
+
+func newConditionalFailingEmailService() *conditionalFailingEmailService {
+	return &conditionalFailingEmailService{
+		failForEmail: make(map[string]error),
+	}
+}
+
+func (m *conditionalFailingEmailService) setFailFor(email string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failForEmail[email] = err
+}
+
+func (m *conditionalFailingEmailService) SendAdminNotification(ctx context.Context, adminEmail, subject, message string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	err, ok := m.failForEmail[adminEmail]
+	if ok {
+		return err
+	}
+	m.calls = append(m.calls, adminNotificationCall{Email: adminEmail, Subject: subject, Message: message})
+	return nil
+}
+
+func (m *conditionalFailingEmailService) emailedTo(email string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, c := range m.calls {
+		if c.Email == email {
+			return true
+		}
+	}
+	return false
+}
+
+// getNoticedBillNoticeSentAt queries the notice_sent_at for a bill, returning nil if NULL.
+func getNoticedBillNoticeSentAt(t *testing.T, db *sql.DB, billID int32) *time.Time {
+	t.Helper()
+	var noticeSentAt *time.Time
+	require.NoError(t, db.QueryRow("SELECT notice_sent_at FROM bills WHERE id = $1", billID).Scan(&noticeSentAt))
+	return noticeSentAt
+}
+
+// SBR-Trace: FR-002 — debtor email failure leaves notice_sent_at NULL (the bill is skipped
+// via `continue` and remains eligible for retry on the next job run);
+// does not assert creditor email behavior in this scenario.
+func TestSendBillSplittingNotices_DebtorEmailFailure_NoticeSentAtStaysNull(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	emailSvc := newConditionalFailingEmailService()
+	jr := jobs.NewJobRunner(db, postgres.NewStore(db), &jobs.Services{Email: emailSvc}, &config.Config{})
+
+	orgID := createTestOrgForLedger(t, db)
+	debtor := createTestUserForLedger(t, db, "fail-debtor")
+	creditor := createTestUserForLedger(t, db, "fail-creditor")
+	defer func() {
+		db.Exec("DELETE FROM bills WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2)", debtor, creditor)
+		db.Exec("DELETE FROM orgs WHERE id = $1", orgID)
+	}()
+
+	billID := createTestBill(t, db, orgID, debtor, creditor, "2026-05", "PENDING")
+
+	debtorEmail := getUserEmail(t, db, debtor)
+	creditorEmail := getUserEmail(t, db, creditor)
+
+	// Force the debtor's email to fail; creditor email succeeds normally.
+	emailSvc.setFailFor(debtorEmail, fmt.Errorf("smtp bounce: mail for %s rejected", debtorEmail))
+
+	jr.SendBillSplittingNotices()
+
+	// notice_sent_at must remain NULL — the job skips the bill via `continue` when
+	// the debtor's send fails.
+	noticeSentAt := getNoticedBillNoticeSentAt(t, db, billID)
+	assert.Nil(t, noticeSentAt, "notice_sent_at must stay NULL when the debtor's email send fails")
+
+	// The creditor must never have been emailed (the debtor send short-circuits before it).
+	assert.False(t, emailSvc.emailedTo(creditorEmail), "creditor must not be emailed when debtor send fails")
+}
+
+// SBR-Trace: FR-002 — debtor email succeeds but creditor email fails: notice_sent_at is still
+// stamped because the spec's rule is "only once the debtor's send succeeds";
+// does not assert debtor email content.
+func TestSendBillSplittingNotices_CreditorFailsDebtorSucceeds(t *testing.T) {
+	db := prepareDB(t)
+	defer db.Close()
+
+	emailSvc := newConditionalFailingEmailService()
+	jr := jobs.NewJobRunner(db, postgres.NewStore(db), &jobs.Services{Email: emailSvc}, &config.Config{})
+
+	orgID := createTestOrgForLedger(t, db)
+	debtor := createTestUserForLedger(t, db, "cred-fail-debtor")
+	creditor := createTestUserForLedger(t, db, "cred-fail-creditor")
+	defer func() {
+		db.Exec("DELETE FROM bills WHERE org_id = $1", orgID)
+		db.Exec("DELETE FROM users WHERE id IN ($1, $2)", debtor, creditor)
+		db.Exec("DELETE FROM orgs WHERE id = $1", orgID)
+	}()
+
+	billID := createTestBill(t, db, orgID, debtor, creditor, "2026-06", "PENDING")
+
+	debtorEmail := getUserEmail(t, db, debtor)
+	creditorEmail := getUserEmail(t, db, creditor)
+
+	// Debtor email succeeds; force the creditor's email to fail.
+	emailSvc.setFailFor(creditorEmail, fmt.Errorf("smtp bounce: mail for %s rejected", creditorEmail))
+
+	jr.SendBillSplittingNotices()
+
+	// notice_sent_at must be set — the spec says it is stamped only once the debtor's
+	// send succeeds; a failed creditor email does not block it.
+	noticeSentAt := getNoticedBillNoticeSentAt(t, db, billID)
+	assert.NotNil(t, noticeSentAt, "notice_sent_at must be set when debtor email succeeds, even if creditor email fails")
+
+	// The debtor must have been emailed successfully.
+	assert.True(t, emailSvc.emailedTo(debtorEmail), "debtor must be emailed")
 }
 
 func getUserEmail(t *testing.T, db *sql.DB, userID int32) string {

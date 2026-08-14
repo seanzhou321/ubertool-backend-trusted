@@ -34,20 +34,20 @@ func NewBillSplitService(
 	}
 }
 
-func (s *billSplitService) GetGlobalBillSplitSummary(ctx context.Context, userID int32) (int32, int32, int32, int32, error) {
+func (s *billSplitService) GetGlobalBillSplitSummary(ctx context.Context, userID int32) (int32, int32, int32, int32, int32, error) {
 	logger.EnterMethod("billSplitService.GetGlobalBillSplitSummary", "userID", userID)
 
 	// Get all organizations for the user
 	userOrgs, err := s.userRepo.ListUserOrgs(ctx, userID)
 	if err != nil {
 		logger.ExitMethodWithError("billSplitService.GetGlobalBillSplitSummary", err, "userID", userID)
-		return 0, 0, 0, 0, err
+		return 0, 0, 0, 0, 0, err
 	}
 
-	var paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute int32
+	var paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, billsCreatedCount int32
 
 	for _, userOrg := range userOrgs {
-		p, r, pd, rd, err := s.getOrgSummary(ctx, userID, userOrg.OrgID)
+		p, r, pd, rd, total, err := s.getOrgSummary(ctx, userID, userOrg.OrgID)
 		if err != nil {
 			continue // Skip this org if there's an error
 		}
@@ -55,13 +55,15 @@ func (s *billSplitService) GetGlobalBillSplitSummary(ctx context.Context, userID
 		receiptsToVerify += r
 		paymentsInDispute += pd
 		receiptsInDispute += rd
+		billsCreatedCount += total
 	}
 
 	logger.ExitMethod("billSplitService.GetGlobalBillSplitSummary", "userID", userID,
 		"paymentsToMake", paymentsToMake, "receiptsToVerify", receiptsToVerify,
-		"paymentsInDispute", paymentsInDispute, "receiptsInDispute", receiptsInDispute)
+		"paymentsInDispute", paymentsInDispute, "receiptsInDispute", receiptsInDispute,
+		"billsCreatedCount", billsCreatedCount)
 
-	return paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, nil
+	return paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, billsCreatedCount, nil
 }
 
 func (s *billSplitService) GetOrganizationBillSplitSummary(ctx context.Context, userID int32) ([]domain.Organization, []int32, []int32, []int32, []int32, error) {
@@ -86,7 +88,7 @@ func (s *billSplitService) GetOrganizationBillSplitSummary(ctx context.Context, 
 			continue
 		}
 
-		p, r, pd, rd, err := s.getOrgSummary(ctx, userID, userOrg.OrgID)
+		p, r, pd, rd, _, err := s.getOrgSummary(ctx, userID, userOrg.OrgID)
 		if err != nil {
 			continue
 		}
@@ -102,11 +104,11 @@ func (s *billSplitService) GetOrganizationBillSplitSummary(ctx context.Context, 
 	return orgs, paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, nil
 }
 
-func (s *billSplitService) getOrgSummary(ctx context.Context, userID, orgID int32) (int32, int32, int32, int32, error) {
+func (s *billSplitService) getOrgSummary(ctx context.Context, userID, orgID int32) (int32, int32, int32, int32, int32, error) {
 	// Get all bills for this user in this org
 	bills, err := s.billRepo.ListByUser(ctx, userID, orgID, nil)
 	if err != nil {
-		return 0, 0, 0, 0, err
+		return 0, 0, 0, 0, 0, err
 	}
 
 	var paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute int32
@@ -131,7 +133,7 @@ func (s *billSplitService) getOrgSummary(ctx context.Context, userID, orgID int3
 		}
 	}
 
-	return paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, nil
+	return paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, int32(len(bills)), nil
 }
 
 func (s *billSplitService) ListPayments(ctx context.Context, userID, orgID int32, showHistory bool) ([]domain.Bill, error) {

@@ -137,7 +137,7 @@ type AdminService interface {
 }
 
 type BillSplitService interface {
-	GetGlobalBillSplitSummary(ctx context.Context, userID int32) (paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute int32, err error)
+	GetGlobalBillSplitSummary(ctx context.Context, userID int32) (paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, billsCreatedCount int32, err error)
 	GetOrganizationBillSplitSummary(ctx context.Context, userID int32) ([]domain.Organization, []int32, []int32, []int32, []int32, error)
 	ListPayments(ctx context.Context, userID, orgID int32, showHistory bool) ([]domain.Bill, error)
 	GetPaymentDetail(ctx context.Context, userID, paymentID int32) (*domain.Bill, []domain.BillAction, bool, error)

@@ -26,7 +26,7 @@ func (h *BillSplitHandler) GetGlobalBillSplitSummary(ctx context.Context, req *p
 		return nil, err
 	}
 
-	paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, err := h.billSplitSvc.GetGlobalBillSplitSummary(ctx, userID)
+	paymentsToMake, receiptsToVerify, paymentsInDispute, receiptsInDispute, billsCreatedCount, err := h.billSplitSvc.GetGlobalBillSplitSummary(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +38,7 @@ func (h *BillSplitHandler) GetGlobalBillSplitSummary(ctx context.Context, req *p
 			PaymentsInDispute: paymentsInDispute,
 			ReceiptsInDispute: receiptsInDispute,
 		},
+		BillsCreatedCount: billsCreatedCount,
 	}, nil
 }
 

@@ -382,6 +382,8 @@ func TestBillSplitService_GetGlobalBillSplitSummary(t *testing.T) {
 	// User owes 1000 (payment to make) and is owed 500 (receipt to verify)
 	assert.GreaterOrEqual(t, summaryResp.Summary.PaymentsToMake, int32(1), "Should have at least 1 payment to make")
 	assert.GreaterOrEqual(t, summaryResp.Summary.ReceiptsToVerify, int32(1), "Should have at least 1 receipt to verify")
+	// bills_created_count = total bills across all statuses where user is debtor or creditor
+	assert.Equal(t, int32(2), summaryResp.BillsCreatedCount, "Should have 2 total bills (1 as debtor + 1 as creditor)")
 }
 
 // TestBillSplitService_GetOrganizationBillSplitSummary tests organization-specific summary
@@ -393,8 +395,9 @@ func TestBillSplitService_GetOrganizationBillSplitSummary(t *testing.T) {
 	defer client.Close()
 	billClient := pb.NewBillSplitServiceClient(client.Conn())
 
-	// Create test organization
-	orgID := db.CreateTestOrg("E2E-Test-OrgSummary-" + t.Name())
+	// Create test organizations (2 orgs for multi-org per-org breakdown)
+	orgID1 := db.CreateTestOrg("E2E-OrgAlpha-" + t.Name())
+	orgID2 := db.CreateTestOrg("E2E-OrgBeta-" + t.Name())
 
 	// Create test users
 	userEmail := "e2e-test-user-org-summary-" + t.Name() + "@test.com"
@@ -403,40 +406,77 @@ func TestBillSplitService_GetOrganizationBillSplitSummary(t *testing.T) {
 	userID := db.CreateTestUser(userEmail, "John OrgSummary")
 	otherID := db.CreateTestUser(otherEmail, "Jane OrgOther")
 
-	// Add users to org
-	db.AddUserToOrg(userID, orgID, "MEMBER", "ACTIVE", 0)
-	db.AddUserToOrg(otherID, orgID, "MEMBER", "ACTIVE", 0)
+	// Add users to both orgs
+	db.AddUserToOrg(userID, orgID1, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(otherID, orgID1, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(userID, orgID2, "MEMBER", "ACTIVE", 0)
+	db.AddUserToOrg(otherID, orgID2, "MEMBER", "ACTIVE", 0)
 
-	// Create bills
-	db.CreateTestBill(userID, otherID, orgID, 2000, "2024-01", "PENDING")
-	db.CreateTestBill(userID, otherID, orgID, 1500, "2024-02", "PAID")
+	// --- Bills for Org Alpha ---
+	// Bill 1: PENDING, user is debtor, debtor NOT ack'd -> paymentsToMake
+	db.CreateTestBill(userID, otherID, orgID1, 2000, "2024-01", "PENDING")
+	// Bill 2: PENDING, user is creditor, debtor ACK'd -> receiptsToVerify
+	billID2 := db.CreateTestBill(otherID, userID, orgID1, 1500, "2024-01", "PENDING")
+	_, err := db.Exec("UPDATE bills SET debtor_acknowledged_at = NOW() WHERE id = $1", billID2)
+	require.NoError(t, err)
+	// Bill 3: DISPUTED, user is debtor -> paymentsInDispute
+	db.CreateTestBill(userID, otherID, orgID1, 800, "2024-02", "DISPUTED")
 
-	// Set balance
-	db.SetUserBalance(userID, orgID, -3500)
-	db.SetUserBalance(otherID, orgID, 3500)
+	// --- Bills for Org Beta ---
+	// Bill 4: DISPUTED, user is creditor -> receiptsInDispute
+	db.CreateTestBill(otherID, userID, orgID2, 1200, "2024-01", "DISPUTED")
+
+	// Set balances (needed for org lookup)
+	db.SetUserBalance(userID, orgID1, -3500)
+	db.SetUserBalance(otherID, orgID1, 3500)
+	db.SetUserBalance(userID, orgID2, -1200)
+	db.SetUserBalance(otherID, orgID2, 1200)
 
 	// Get organization summary
 	userCtx, cancelUser := ContextWithUserIDAndTimeout(userID, 5*time.Second)
 	defer cancelUser()
 
+	// SBR-Trace: FR-015 — asserts GetOrganizationBillSplitSummary returns per-org breakdown with
+	// correct organization_id/organization_name and independent four-count categories across 2 orgs.
+	// Org Alpha: user is debtor (PENDING) + creditor (PENDING, debtor ack'd) + debtor (DISPUTED)
+	// Org Beta: user is creditor (DISPUTED) only.
 	orgSummaryResp, err := billClient.GetOrganizationBillSplitSummary(userCtx, &pb.GetOrganizationBillSplitSummaryRequest{})
 	require.NoError(t, err, "GetOrganizationBillSplitSummary should succeed")
 
 	assert.NotNil(t, orgSummaryResp, "Org summary response should not be nil")
+	require.Equal(t, 2, len(orgSummaryResp.OrgSummaries), "FR-015: must return one entry per org the user belongs to")
 
-	// Find our org in the list
-	var foundOrgSummary *pb.OrganizationBillSplitSummary
+	// Build a map by org_id for assertions
+	orgMap := make(map[int32]*pb.OrganizationBillSplitSummary)
 	for _, s := range orgSummaryResp.OrgSummaries {
-		if s.OrganizationId == orgID {
-			foundOrgSummary = s
-			break
-		}
+		orgMap[s.OrganizationId] = s
 	}
-	require.NotNil(t, foundOrgSummary, "Should find summary for test organization")
 
-	// Check summary counts
-	// 1 PENDING bill where user is debtor -> 1 Payment To Make
-	assert.Equal(t, int32(1), foundOrgSummary.Summary.PaymentsToMake, "Should have 1 payment to make")
+	// --- Org Alpha (orgID1) assertions ---
+	alphaSummary, ok := orgMap[orgID1]
+	require.True(t, ok, "Should find summary for Org Alpha")
+	assert.Equal(t, orgID1, alphaSummary.OrganizationId, "FR-015: organization_id must match")
+	assert.Equal(t, "E2E-OrgAlpha-"+t.Name(), alphaSummary.OrganizationName, "FR-015: organization_name must match")
+	// Org Alpha bills:
+	//   Bill 1: PENDING, user is debtor, debtor NOT ack'd -> paymentsToMake
+	//   Bill 2: PENDING, user is creditor, debtor ACK'd -> receiptsToVerify
+	//   Bill 3: DISPUTED, user is debtor -> paymentsInDispute
+	assert.Equal(t, int32(1), alphaSummary.Summary.PaymentsToMake, "Org Alpha: 1 payment to make")
+	assert.Equal(t, int32(1), alphaSummary.Summary.ReceiptsToVerify, "Org Alpha: 1 receipt to verify")
+	assert.Equal(t, int32(1), alphaSummary.Summary.PaymentsInDispute, "Org Alpha: 1 payment in dispute")
+	assert.Equal(t, int32(0), alphaSummary.Summary.ReceiptsInDispute, "Org Alpha: 0 receipts in dispute")
+
+	// --- Org Beta (orgID2) assertions ---
+	betaSummary, ok := orgMap[orgID2]
+	require.True(t, ok, "Should find summary for Org Beta")
+	assert.Equal(t, orgID2, betaSummary.OrganizationId, "FR-015: organization_id must match")
+	assert.Equal(t, "E2E-OrgBeta-"+t.Name(), betaSummary.OrganizationName, "FR-015: organization_name must match")
+	// Org Beta bills:
+	//   Bill 4: DISPUTED, user is creditor -> receiptsInDispute
+	assert.Equal(t, int32(0), betaSummary.Summary.PaymentsToMake, "Org Beta: 0 payments to make")
+	assert.Equal(t, int32(0), betaSummary.Summary.ReceiptsToVerify, "Org Beta: 0 receipts to verify")
+	assert.Equal(t, int32(0), betaSummary.Summary.PaymentsInDispute, "Org Beta: 0 payments in dispute")
+	assert.Equal(t, int32(1), betaSummary.Summary.ReceiptsInDispute, "Org Beta: 1 receipt in dispute")
 }
 
 // TestBillSplitService_ListPayments tests listing payments for a user
