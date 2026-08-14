@@ -1,0 +1,729 @@
+---
+Metadata:
+  AWSToolsMetrics:
+    IaC_Generator: "arn:aws:cloudformation:us-west-2:975868896209:generatedTemplate/1e1020a3-d012-43a5-87ce-9097176f0f10"
+Parameters:
+  KeyName:
+    Default: "ixorashare-ec2-key"
+    Type: "String"
+    Description: "Name of an existing EC2 KeyPair to enable SSH access"
+Resources:
+  EC2SubnetNetworkAclAssociationM4:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      NetworkAclId: "acl-043f9387801beeccd"
+      SubnetId: "subnet-0cec1acfc4b68eea2"
+  EC2VPCGatewayAttachmentIGW:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    DeletionPolicy: "Retain"
+    Properties:
+      InternetGatewayId: "igw-0eb243d10316a7940"
+      VpcId: "vpc-02005517b88aa9420"
+  IAMInstanceProfileUbertoolec2profile:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::IAM::InstanceProfile"
+    DeletionPolicy: "Retain"
+    Properties:
+      Path: "/"
+      Roles:
+      - "ubertool-ec2-s3-role"
+      InstanceProfileName: "ubertool-ec2-profile"
+  EC2EIP35160176235:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::EIP"
+    DeletionPolicy: "Retain"
+    Properties:
+      PublicIpv4Pool: "amazon"
+      Domain: "vpc"
+      InstanceId: "i-023402e9ce97c0c86"
+      Tags: []
+      NetworkBorderGroup: "us-west-2"
+  EC2SubnetNetworkAclAssociation:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      NetworkAclId: "acl-043f9387801beeccd"
+      SubnetId: "subnet-071df497e50d64adb"
+  EC2SubnetRouteTableAssociationPw:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      RouteTableId: "rtb-0774f3a957b4649da"
+      SubnetId: "subnet-02c0d5579a98ea198"
+  EC2SecurityGroupSv:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Retain"
+    Properties:
+      GroupDescription: "Ubertool EC2 SSH and gRPC"
+      GroupName: "ubertool-backend-trusted-ec2-sg"
+      VpcId: "vpc-02005517b88aa9420"
+      SecurityGroupIngress:
+      - CidrIp: "0.0.0.0/0"
+        IpProtocol: "tcp"
+        FromPort: 50052
+        ToPort: 50052
+      - CidrIp: "0.0.0.0/0"
+        IpProtocol: "tcp"
+        FromPort: 80
+        ToPort: 80
+      - CidrIp: "172.56.240.7/32"
+        IpProtocol: "tcp"
+        FromPort: 22
+        ToPort: 22
+      - CidrIp: "0.0.0.0/0"
+        IpProtocol: "tcp"
+        FromPort: 443
+        ToPort: 443
+      SecurityGroupEgress:
+      - CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+      - CidrIpv6: "::/0"
+        IpProtocol: "-1"
+  EC2SubnetJv:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Retain"
+    Properties:
+      MapPublicIpOnLaunch: true
+      EnableDns64: false
+      VpcId: "vpc-02005517b88aa9420"
+      AvailabilityZoneId: "usw2-az4"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      AvailabilityZone: "us-west-2d"
+      CidrBlock: "172.31.48.0/20"
+      Ipv6Native: false
+      Tags: []
+  EC2SubnetWb:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Retain"
+    Properties:
+      MapPublicIpOnLaunch: true
+      EnableDns64: false
+      VpcId: "vpc-02005517b88aa9420"
+      AvailabilityZoneId: "usw2-az1"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      AvailabilityZone: "us-west-2b"
+      CidrBlock: "172.31.16.0/20"
+      Ipv6Native: false
+      Tags: []
+  EC2RouteTableEf:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::RouteTable"
+    DeletionPolicy: "Retain"
+    Properties:
+      VpcId: "vpc-02005517b88aa9420"
+      Tags:
+      - Value: "RDS-Pvt-rt"
+        Key: "Name"
+  NeptuneDBSubnetGroupUbertoolbackendtrustedsubnetgroup:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::Neptune::DBSubnetGroup"
+    DeletionPolicy: "Retain"
+    Properties:
+      DBSubnetGroupDescription: "Ubertool RDS subnet group"
+      SubnetIds:
+      - "subnet-05697e6b44233b956"
+      - "subnet-0d93c6259aca9a6d9"
+      DBSubnetGroupName: "ubertool-backend-trusted-subnet-group"
+  EC2SubnetNetworkAclAssociationTC:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      NetworkAclId: "acl-043f9387801beeccd"
+      SubnetId: "subnet-08e584f647b32f545"
+  EC2EIPAssociation:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::EIPAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      PrivateIpAddress: "172.31.3.56"
+      NetworkInterfaceId: "eni-0394e5af6ace16612"
+      InstanceId: "i-023402e9ce97c0c86"
+      EIP:
+        Fn::GetAtt:
+        - "EC2EIP35160176235"
+        - "PublicIp"
+      AllocationId: "eipalloc-06a997fafd4bc4d65"
+  EC2Instance:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Instance"
+    DeletionPolicy: "Retain"
+    Properties:
+      Tenancy: "default"
+      PrivateIpAddress: "172.31.3.56"
+      MetadataOptions:
+        HttpPutResponseHopLimit: 2
+        HttpProtocolIpv6: "disabled"
+        HttpTokens: "required"
+        InstanceMetadataTags: "disabled"
+        HttpEndpoint: "enabled"
+      UserData: "IyEvdXNyL2Jpbi9lbnYgYmFzaAojID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiMgZWMyX3VzZXJkYXRhLnNoCiMgUnVucyBhdXRvbWF0aWNhbGx5IG9uIEVDMiBmaXJzdCBib290IChwYXNzZWQgYXMgLS11c2VyLWRhdGEgaW4gMDFfY3JlYXRlX2luZnJhLnNoKS4KIyBJbnN0YWxscyBydW50aW1lIGRlcGVuZGVuY2llcyBhbmQgcHJlcGFyZXMgdGhlIGZpbGVzeXN0ZW0gbGF5b3V0LgojID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CgpzZXQgLWV1byBwaXBlZmFpbAoKZXhlYyA+IC92YXIvbG9nL3ViZXJ0b29sLWluaXQubG9nIDI+JjEKZWNobyAiPT09IFViZXJ0b29sIEVDMiBCb290c3RyYXA6ICQoZGF0ZSkgPT09IgoKIyDDouKAneKCrMOi4oCd4oKsIFN5c3RlbSB1cGRhdGVzIMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrAphcHQtZ2V0IHVwZGF0ZSAtcXEKYXB0LWdldCB1cGdyYWRlIC15IC1xcQphcHQtZ2V0IGluc3RhbGwgLXkgLXFxIFwKICBjdXJsIFwKICB3Z2V0IFwKICB1bnppcCBcCiAgZ2l0IFwKICBwb3N0Z3Jlc3FsLWNsaWVudCBcCiAgZG5zdXRpbHMgXAogIGh0b3AgXAogIGZhaWwyYmFuCgojIMOi4oCd4oKsw6LigJ3igqwgRGlyZWN0b3J5IGxheW91dCDDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrApta2RpciAtcCAvZXRjL3ViZXJ0b29sL2NlcnRzCm1rZGlyIC1wIC92YXIvbG9nL3ViZXJ0b29sCm1rZGlyIC1wIC92YXIvbGliL3ViZXJ0b29sCgojIMOi4oCd4oKsw6LigJ3igqwgQXBwIHVzZXIgw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsCmlkIC11IHViZXJ0b29sICY+L2Rldi9udWxsIHx8IHVzZXJhZGQgLXIgLXMgL2Jpbi9mYWxzZSB1YmVydG9vbApjaG93biB1YmVydG9vbDp1YmVydG9vbCAvdmFyL2xvZy91YmVydG9vbApjaG93biB1YmVydG9vbDp1YmVydG9vbCAvdmFyL2xpYi91YmVydG9vbAoKIyDDouKAneKCrMOi4oCd4oKsIGZhaWwyYmFuIChiYXNpYyBTU0ggcHJvdGVjdGlvbikgw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsw6LigJ3igqzDouKAneKCrMOi4oCd4oKsCnN5c3RlbWN0bCBlbmFibGUgZmFpbDJiYW4Kc3lzdGVtY3RsIHN0YXJ0IGZhaWwyYmFuCgplY2hvICI9PT0gQm9vdHN0cmFwIGNvbXBsZXRlOiAkKGRhdGUpID09PSIK"
+      InstanceInitiatedShutdownBehavior: "stop"
+      BlockDeviceMappings:
+      - Ebs:
+          SnapshotId: "snap-02a1b9b20343ee067"
+          VolumeType: "gp3"
+          Iops: 3000
+          VolumeSize: 8
+          Encrypted: false
+          DeleteOnTermination: true
+        DeviceName: "/dev/sda1"
+      PrivateDnsNameOptions:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      SecurityGroupIds:
+      - "sg-0604272042828172f"
+      EbsOptimized: false
+      DisableApiTermination: false
+      SourceDestCheck: true
+      PlacementGroupName: ""
+      NetworkInterfaces:
+      - Ipv6Addresses:
+        - Ipv6Address: "2600:1f14:2cbd:6800:cedc:8a79:5f43:7f9e"
+        SecondaryPrivateIpAddressCount: 0
+        NetworkInterfaceId: "eni-0394e5af6ace16612"
+        DeviceIndex: "0"
+      ImageId: "ami-0650f6c65227d92b1"
+      InstanceType: "t3.micro"
+      Monitoring: false
+      Tags:
+      - Value: "ubertool-backend-trusted-api"
+        Key: "Name"
+      CreditSpecification:
+        CPUCredits: "unlimited"
+  EC2SubnetUi:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Retain"
+    Properties:
+      MapPublicIpOnLaunch: true
+      EnableDns64: false
+      VpcId: "vpc-02005517b88aa9420"
+      AvailabilityZoneId: "usw2-az3"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      AvailabilityZone: "us-west-2c"
+      CidrBlock: "172.31.0.0/20"
+      Ipv6Native: false
+      Ipv6CidrBlock: "2600:1f14:2cbd:6800::/64"
+      Tags: []
+  EC2DHCPOptions:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::DHCPOptions"
+    DeletionPolicy: "Retain"
+    Properties:
+      DomainName: "us-west-2.compute.internal"
+      DomainNameServers:
+      - "AmazonProvidedDNS"
+      Tags: []
+  EC2SubnetNetworkAclAssociationR1:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      NetworkAclId: "acl-043f9387801beeccd"
+      SubnetId: "subnet-02c0d5579a98ea198"
+  EC2SecurityGroupJh:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Retain"
+    Properties:
+      GroupDescription: "Security group attached to ubertool-db-mvp to allow EC2 instances\
+        \ with specific security groups attached to connect to the database. Modification\
+        \ could lead to connection loss."
+      GroupName: "rds-ec2-1"
+      VpcId: "vpc-02005517b88aa9420"
+      SecurityGroupIngress:
+      - IpProtocol: "tcp"
+        Description: "Rule to allow connections from EC2 instances with sg-0269b35fbd3959dd4\
+          \ attached"
+        FromPort: 5432
+        SourceSecurityGroupId: "sg-0269b35fbd3959dd4"
+        ToPort: 5432
+        SourceSecurityGroupOwnerId: "975868896209"
+  EC2SecurityGroupWT:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Retain"
+    Properties:
+      GroupDescription: "default VPC security group"
+      GroupName: "default"
+      VpcId: "vpc-02005517b88aa9420"
+      SecurityGroupIngress:
+      - SourceSecurityGroupId: "sg-0f3d1c4fa9e1f9896"
+        IpProtocol: "-1"
+        SourceSecurityGroupOwnerId: "975868896209"
+      SecurityGroupEgress:
+      - CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+      - CidrIpv6: "::/0"
+        IpProtocol: "-1"
+  EC2SubnetNetworkAclAssociationLc:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      NetworkAclId: "acl-043f9387801beeccd"
+      SubnetId: "subnet-05697e6b44233b956"
+  EC2VPCCidrBlockUP:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::VPCCidrBlock"
+    DeletionPolicy: "Retain"
+    Properties:
+      VpcId: "vpc-02005517b88aa9420"
+      CidrBlock: "172.31.0.0/16"
+  RDSDBInstance:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::RDS::DBInstance"
+    DeletionPolicy: "Retain"
+    Properties:
+      DatabaseInsightsMode: "standard"
+      StorageEncrypted: false
+      AssociatedRoles: []
+      Port: "5432"
+      AdditionalStorageVolumes: []
+      ProcessorFeatures: []
+      StorageThroughput: 0
+      PreferredBackupWindow: "08:06-08:36"
+      MonitoringInterval: 0
+      DBParameterGroupName: "default.postgres17"
+      NetworkType: "IPV4"
+      DedicatedLogVolume: false
+      CopyTagsToSnapshot: false
+      MultiAZ: false
+      Engine: "postgres"
+      Tags: []
+      EngineLifecycleSupport: "open-source-rds-extended-support"
+      LicenseModel: "postgresql-license"
+      EngineVersion: "17.9"
+      StorageType: "gp2"
+      DBInstanceClass: "db.t3.micro"
+      AvailabilityZone: "us-west-2d"
+      OptionGroupName: "default:postgres-17"
+      PreferredMaintenanceWindow: "sat:12:12-sat:12:42"
+      EnablePerformanceInsights: false
+      AutoMinorVersionUpgrade: true
+      DBSubnetGroupName: "ubertool-backend-trusted-subnet-group"
+      DeletionProtection: true
+      DBInstanceIdentifier: "ubertool-backend-trusted-db"
+      AllocatedStorage: "20"
+      BackupTarget: "region"
+      CACertificateIdentifier: "rds-ca-rsa2048-g1"
+      ManageMasterUserPassword: false
+      MasterUserSecret: {}
+      VPCSecurityGroups:
+      - "sg-021afe5cac92c767e"
+      DBSecurityGroups: []
+      MasterUsername: "ubertool_db_prod"
+      DBName: "ubertool"
+      EnableIAMDatabaseAuthentication: false
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 0
+      EnableCloudwatchLogsExports: []
+  NeptuneDBInstance:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::Neptune::DBInstance"
+    DeletionPolicy: "Retain"
+    Properties:
+      DBParameterGroupName: "default.postgres17"
+      DBInstanceClass: "db.t3.micro"
+      AvailabilityZone: "us-west-2d"
+      PreferredMaintenanceWindow: "sat:12:12-sat:12:42"
+      AutoMinorVersionUpgrade: true
+      PubliclyAccessible: false
+      DBSubnetGroupName: "ubertool-backend-trusted-subnet-group"
+      DBInstanceIdentifier: "ubertool-backend-trusted-db"
+      Tags: []
+  EC2VPCCidrBlock:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::VPCCidrBlock"
+    DeletionPolicy: "Retain"
+    Properties:
+      Ipv6CidrBlockNetworkBorderGroup: "us-west-2"
+      VpcId: "vpc-02005517b88aa9420"
+      Ipv6CidrBlock: "2600:1f14:2cbd:6800::/56"
+      AmazonProvidedIpv6CidrBlock: true
+  EC2SecurityGroupRy:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Retain"
+    Properties:
+      GroupDescription: "Security group attached to instances to securely connect\
+        \ to ubertool-db-mvp. Modification could lead to connection loss."
+      GroupName: "ec2-rds-1"
+      VpcId: "vpc-02005517b88aa9420"
+      SecurityGroupEgress:
+      - IpProtocol: "tcp"
+        DestinationSecurityGroupId: "sg-063b50ba5ff5ccfd3"
+        Description: "Rule to allow connections to ubertool-db-mvp from any instances\
+          \ this security group is attached to"
+        FromPort: 5432
+        ToPort: 5432
+  EC2VPCDHCPOptionsAssociation:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::VPCDHCPOptionsAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      VpcId: "vpc-02005517b88aa9420"
+      DhcpOptionsId: "dopt-026970df53152681c"
+  S3BucketUbertoolimagesprod:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: "Retain"
+    Properties:
+      AbacStatus: "Disabled"
+      PublicAccessBlockConfiguration:
+        RestrictPublicBuckets: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        BlockPublicAcls: true
+      BucketName: "ubertool-images-prod"
+      OwnershipControls:
+        Rules:
+        - ObjectOwnership: "BucketOwnerEnforced"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - BucketKeyEnabled: false
+          BlockedEncryptionTypes:
+            EncryptionType:
+            - "SSE-C"
+          ServerSideEncryptionByDefault:
+            SSEAlgorithm: "AES256"
+  EC2NetworkInterface:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::NetworkInterface"
+    DeletionPolicy: "Retain"
+    Properties:
+      Description: ""
+      PrivateIpAddresses:
+      - PrivateIpAddress: "172.31.3.56"
+        Primary: true
+      Ipv6PrefixCount: 0
+      Ipv4Prefixes: []
+      Ipv4PrefixCount: 0
+      EnablePrimaryIpv6: false
+      GroupSet:
+      - "sg-0604272042828172f"
+      Ipv6Addresses:
+      - Ipv6Address: "2600:1f14:2cbd:6800:cedc:8a79:5f43:7f9e"
+      Ipv6Prefixes: []
+      SubnetId: "subnet-05697e6b44233b956"
+      SourceDestCheck: true
+      Ipv6AddressCount: 1
+      Tags: []
+  EC2InternetGateway:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::InternetGateway"
+    DeletionPolicy: "Retain"
+    Properties:
+      Tags: []
+  EC2SubnetRouteTableAssociation:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      RouteTableId: "rtb-0774f3a957b4649da"
+      SubnetId: "subnet-0cec1acfc4b68eea2"
+  EC2NetworkAcl:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::NetworkAcl"
+    DeletionPolicy: "Retain"
+    Properties:
+      VpcId: "vpc-02005517b88aa9420"
+      Tags: []
+  RDSDBSubnetGroupUbertoolbackendtrustedsubnetgroup:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::RDS::DBSubnetGroup"
+    DeletionPolicy: "Retain"
+    Properties:
+      DBSubnetGroupDescription: "Ubertool RDS subnet group"
+      SubnetIds:
+      - "subnet-05697e6b44233b956"
+      - "subnet-0d93c6259aca9a6d9"
+      DBSubnetGroupName: "ubertool-backend-trusted-subnet-group"
+  EC2SubnetNetworkAclAssociationBI:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      NetworkAclId: "acl-043f9387801beeccd"
+      SubnetId: "subnet-0d93c6259aca9a6d9"
+  Route53ResolverResolverRuleAssociation:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::Route53Resolver::ResolverRuleAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      VPCId: "vpc-02005517b88aa9420"
+      ResolverRuleId: "rslvr-autodefined-rr-internet-resolver"
+      Name: "System Rule Association"
+  EC2Subnet:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Retain"
+    Properties:
+      MapPublicIpOnLaunch: false
+      EnableDns64: false
+      VpcId: "vpc-02005517b88aa9420"
+      AvailabilityZoneId: "usw2-az3"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      AvailabilityZone: "us-west-2c"
+      CidrBlock: "172.31.65.128/25"
+      Ipv6Native: false
+      Tags:
+      - Value: "RDS-Pvt-subnet-4"
+        Key: "Name"
+  EC2SecurityGroup:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SecurityGroup"
+    DeletionPolicy: "Retain"
+    Properties:
+      GroupDescription: "Ubertool RDS PostgreSQL from EC2 only"
+      GroupName: "ubertool-backend-trusted-rds-sg"
+      VpcId: "vpc-02005517b88aa9420"
+      SecurityGroupIngress:
+      - IpProtocol: "tcp"
+        FromPort: 5432
+        SourceSecurityGroupId: "sg-0604272042828172f"
+        ToPort: 5432
+        SourceSecurityGroupOwnerId: "975868896209"
+      SecurityGroupEgress:
+      - CidrIp: "0.0.0.0/0"
+        IpProtocol: "-1"
+      - CidrIpv6: "::/0"
+        IpProtocol: "-1"
+  EC2SubnetCy:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Retain"
+    Properties:
+      MapPublicIpOnLaunch: false
+      EnableDns64: false
+      VpcId: "vpc-02005517b88aa9420"
+      AvailabilityZoneId: "usw2-az1"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      AvailabilityZone: "us-west-2b"
+      CidrBlock: "172.31.64.128/25"
+      Ipv6Native: false
+      Tags:
+      - Value: "RDS-Pvt-subnet-2"
+        Key: "Name"
+  IAMRoleUbertoolec2s3role:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Retain"
+    Properties:
+      Path: "/"
+      MaxSessionDuration: 3600
+      RoleName: "ubertool-ec2-s3-role"
+      Policies:
+      - PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Resource: "*"
+            Action:
+            - "ses:SendEmail"
+            - "ses:SendRawEmail"
+            - "ses:SendTemplatedEmail"
+            - "ses:GetSendQuota"
+            - "ses:GetSendStatistics"
+            Effect: "Allow"
+        PolicyName: "SESAccessPolicy"
+      - PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Resource: "arn:aws:s3:::ubertool-images-prod/*"
+            Action:
+            - "s3:PutObject"
+            - "s3:GetObject"
+            - "s3:DeleteObject"
+            - "s3:HeadObject"
+            Effect: "Allow"
+        PolicyName: "ubertool-s3-access"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Action: "sts:AssumeRole"
+          Effect: "Allow"
+          Principal:
+            Service: "ec2.amazonaws.com"
+  EC2SubnetNetworkAclAssociationEf:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      NetworkAclId: "acl-043f9387801beeccd"
+      SubnetId: "subnet-0e8b763599b52eed0"
+  EC2SubnetVA:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Retain"
+    Properties:
+      MapPublicIpOnLaunch: false
+      EnableDns64: false
+      VpcId: "vpc-02005517b88aa9420"
+      AvailabilityZoneId: "usw2-az2"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      AvailabilityZone: "us-west-2a"
+      CidrBlock: "172.31.64.0/25"
+      Ipv6Native: false
+      Tags:
+      - Value: "RDS-Pvt-subnet-1"
+        Key: "Name"
+  EC2VolumeAttachment:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::VolumeAttachment"
+    DeletionPolicy: "Retain"
+    Properties:
+      VolumeId: "vol-08fe9e1f837161954"
+      InstanceId: "i-023402e9ce97c0c86"
+      Device: "/dev/sda1"
+      EbsCardIndex: 0
+  EC2SubnetN5:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Retain"
+    Properties:
+      MapPublicIpOnLaunch: true
+      EnableDns64: false
+      VpcId: "vpc-02005517b88aa9420"
+      AvailabilityZoneId: "usw2-az2"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      AvailabilityZone: "us-west-2a"
+      CidrBlock: "172.31.32.0/20"
+      Ipv6Native: false
+      Tags: []
+  EC2SubnetNetworkAclAssociationET:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetNetworkAclAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      NetworkAclId: "acl-043f9387801beeccd"
+      SubnetId: "subnet-0123f11c6ffe2a9db"
+  RDSDBParameterGroupDefaultpostgres17:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::RDS::DBParameterGroup"
+    DeletionPolicy: "Retain"
+    Properties:
+      DBParameterGroupName: "default.postgres17"
+      Family: "postgres17"
+      Description: "Default parameter group for postgres17"
+      Parameters: {}
+  EC2SubnetRouteTableAssociationMA:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      RouteTableId: "rtb-0774f3a957b4649da"
+      SubnetId: "subnet-0123f11c6ffe2a9db"
+  EC2Volume:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Volume"
+    DeletionPolicy: "Retain"
+    Properties:
+      MultiAttachEnabled: false
+      SnapshotId: "snap-02a1b9b20343ee067"
+      VolumeType: "gp3"
+      Encrypted: false
+      Size: 8
+      AutoEnableIO: true
+      AvailabilityZoneId: "usw2-az3"
+      AvailabilityZone: "us-west-2c"
+      Throughput: 125
+      Iops: 3000
+      Tags: []
+  EC2SubnetPB:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::Subnet"
+    DeletionPolicy: "Retain"
+    Properties:
+      MapPublicIpOnLaunch: false
+      EnableDns64: false
+      VpcId: "vpc-02005517b88aa9420"
+      AvailabilityZoneId: "usw2-az4"
+      PrivateDnsNameOptionsOnLaunch:
+        EnableResourceNameDnsARecord: false
+        HostnameType: "ip-name"
+        EnableResourceNameDnsAAAARecord: false
+      AvailabilityZone: "us-west-2d"
+      CidrBlock: "172.31.65.0/25"
+      Ipv6Native: false
+      Tags:
+      - Value: "RDS-Pvt-subnet-3"
+        Key: "Name"
+  EC2VPC:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::VPC"
+    DeletionPolicy: "Retain"
+    Properties:
+      CidrBlock: "172.31.0.0/16"
+      EnableDnsSupport: true
+      InstanceTenancy: "default"
+      EnableDnsHostnames: true
+      Tags: []
+  EC2SubnetRouteTableAssociationPQ:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    DeletionPolicy: "Retain"
+    Properties:
+      RouteTableId: "rtb-0774f3a957b4649da"
+      SubnetId: "subnet-0e8b763599b52eed0"
+  EC2RouteTable:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::RouteTable"
+    DeletionPolicy: "Retain"
+    Properties:
+      VpcId: "vpc-02005517b88aa9420"
+  IAMRoleAWSServiceRoleForRDS:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::IAM::Role"
+    DeletionPolicy: "Retain"
+    Properties:
+      Path: "/aws-service-role/rds.amazonaws.com/"
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/aws-service-role/AmazonRDSServiceRolePolicy"
+      MaxSessionDuration: 3600
+      RoleName: "AWSServiceRoleForRDS"
+      Description: "Allows Amazon RDS to manage AWS resources on your behalf"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Action: "sts:AssumeRole"
+          Effect: "Allow"
+          Principal:
+            Service: "rds.amazonaws.com"
+  EC2SubnetCidrBlock:
+    UpdateReplacePolicy: "Retain"
+    Type: "AWS::EC2::SubnetCidrBlock"
+    DeletionPolicy: "Retain"
+    Properties:
+      Ipv6CidrBlock: "2600:1f14:2cbd:6800::/64"
+      SubnetId: "subnet-05697e6b44233b956"

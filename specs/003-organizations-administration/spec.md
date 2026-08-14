@@ -180,9 +180,22 @@ gRPC handlers against a live DB (see Current Test Coverage Baseline).
   *not* subject to the same case-sensitivity gap identified in the Users domain spec's
   Known Discrepancy 2 — this endpoint gets it right.
 - `SearchOrganizations` is `SecurityPublic` (no authentication required at all, per
-  `security_config.go`) and returns each matching org's admin list (names, emails) to an
-  unauthenticated caller — worth confirming this public exposure of admin contact info is
-  intentional.
+  `security_config.go:41`) and returns each matching org's admin list (names, emails) to an
+  unauthenticated caller (`internal/service/org.go:65-90`). **Forward requirement FR-013**
+  mandates scoping this down: admin contact info MUST only be returned to authenticated
+  callers who are members of the target org.
+- `JoinOrganizationWithInvite` does **not** update the linked `join_requests` row to
+  `JOINED` when an invitation is accepted. The `invitations` row is updated (`UsedOn`,
+  `UsedByUserID`) but the `join_requests` row (linked via `invitations.join_request_id`)
+  remains at `INVITED` status. Domain defines `JOINED` (`internal/domain/join_request.go:8`)
+  but it is never set. **Needs Verification:** Clarification 3 claimed the row is updated
+  to `JOINED`; this is not implemented.
+- `AdminBlockUserAccount` (via `BlockUser`) **can** be called on a user who holds `ADMIN`
+  or `SUPER_ADMIN`, but **only if the caller is `SUPER_ADMIN`** (`internal/service/admin.go:149-156`).
+  A caller with `ADMIN` role attempting to block another `ADMIN` or `SUPER_ADMIN` is rejected.
+  The block only sets `renting_blocked`/`lending_blocked` and `status = BLOCK`; the target's
+  `role` on `users_orgs` is unchanged, so admin RPC permissions (`verifyAdminRights`) are
+  unaffected — consistent with Clarification 5's intent, but with the SUPER_ADMIN gate.
 
 ## Known Discrepancies *(resolved 2026-07-29 — kept as a changelog, not deleted, per Principle I)*
 
@@ -297,18 +310,40 @@ rejection (unit); org member-count correctness and `ListJoinRequests`'s status f
   supplied `organization_id` is genuinely shared between renter and owner — a defensive
   backstop, not a context-switch step. See `specs/005-rentals/spec.md` FR-008 for test
   evidence.
+- **FR-013** *(from Clarification 1)*: `SearchOrganizations` MUST NOT return admin names and emails to unauthenticated callers. Admin contact information MUST only be included in the response for authenticated callers who are members of the target organization. (Current implementation: `SecurityPublic` endpoint returns full admin `User` objects — `internal/config/security_config.go:41`, `internal/service/org.go:65-90`)
 
 ### Key Entities
 
 - **Organization**: `orgs` table — profile fields, `max_replacement_cost_cents`,
   `max_billsplit_rental_cost_cents`, `billsplit_settlement_threshold_cents`.
+  - *Note on threshold fields*: The proto (`organization_service.proto:52-53`) defines
+    `billsplit_settlement_threshold_cents` and `max_billsplit_rental_cost_cents` as `int32`,
+    **not** `Int64Value` wrappers. The gRPC handler directly copies these values; the service
+    treats `0` as "keep existing" (`internal/service/org.go:135-141`).
+    **Needs Verification:** Clarification 2 claimed `Int64Value` wrappers with `null` = no change;
+    this does not match the actual proto. If `null` semantics are desired, the proto would need
+    to be changed to use wrappers.
 - **UserOrg (membership)**: `users_orgs` — composite PK `(user_id, org_id)`, `role`
   (`MEMBER`/`ADMIN`/`SUPER_ADMIN`), `status`, blocking fields. This is the record every
   `AdminService` method is documented to check the caller's own row of, and currently does
   not.
+  - *Status values* (from `internal/domain/user.go:17-22`): `ACTIVE` (default, gets threshold
+    broadcasts), `SUSPEND`, `BLOCK` (blocked from rent/lend, retains role, gets admin
+    broadcasts). **No `LEFT` value exists in code** — database has `status TEXT NOT NULL
+    DEFAULT 'ACTIVE'` with no enum constraint (`podman/trusted-group/postgres/ubertool_schema_trusted.sql:43-56`).
+    **Needs Verification:** Clarification 4 claimed a `LEFT` (soft delete) value; this is not
+    present in the domain or enforced by the schema. If soft-delete semantics are needed, a
+    `LEFT` status and corresponding logic would need to be added.
 - **JoinRequest**: `join_requests` — an applicant's pending request to join an org, with
   `status` (`PENDING`/`INVITED`/`JOINED`/`REJECTED`), optional `reason`, and
   `rejected_by_user_id`.
+  - *Note on `JOINED` status*: Domain defines `JOINED` (`internal/domain/join_request.go:8`)
+    but **current implementation does not set it**. `JoinOrganizationWithInvite` updates the
+    `invitations` row only; the linked `join_requests` row (via `invitations.join_request_id`)
+    remains `INVITED`.
+    **Needs Verification:** Clarification 3 claimed the row is updated to `JOINED`; this is not
+    implemented. If the `JOINED` status is intended for audit/analytics, the service would
+    need to update the join request on invitation acceptance.
 - **Invitation**: shared with the Authentication domain spec — see
   `specs/002-authentication-legal-consent/spec.md`.
 
@@ -333,6 +368,30 @@ rejection (unit); org member-count correctness and `ListJoinRequests`'s status f
 - **SC-004**: A developer reading only this spec can correctly state, for each of the
   thirteen RPCs across both services, exactly who is allowed to call it successfully today
   — not who the documentation says should be allowed.
+
+## Clarifications
+
+### Session 2026-08-13
+
+- Q: Is the unauthenticated exposure of org admin names and emails via `SearchOrganizations` an intentional product decision, or should this be scoped down (e.g., only return admin info to authenticated members, or redact contact details)? → A: Scope down — only show admin names/emails to authenticated callers who are members of the org
+- Q: How does the current implementation distinguish "caller explicitly wants to set threshold to 0" from "caller omitted the field / means no change"? Does the proto use `Int64Value` wrappers, a separate `update_mask`, or is "set to zero" simply not a supported operation? → A: Proto uses `Int64Value` wrappers — `null` = no change, `0` = explicit zero (but logic treats `0` as "no change" as a safeguard)
+- Q: When a user accepts an invitation via `JoinOrganizationWithInvite`, what happens to the associated `INVITED`-status `join_requests` row — is it updated to `JOINED`, deleted, left as `INVITED`, or something else? → A: Updated to `JOINED` — invitation acceptance mirrors the approve path, closing the join-request loop
+- Q: What are the complete, exhaustive `users_orgs.status` enum values and their semantics? Specifically, which statuses count as "active member" for notifications/broadcasts (User Story 2), and can a `BLOCK`ed user retain `ADMIN`/`SUPER_ADMIN` role? → A: Three values: `ACTIVE` (default, gets notifications), `BLOCK` (blocked from rent/lend, retains role, gets admin broadcasts), `LEFT` (soft delete, excluded from all)
+- Q: Can `AdminBlockUserAccount` be called on a user who holds `ADMIN` or `SUPER_ADMIN` in the target org? If yes, does the block suspend their admin capabilities (RPCs requiring admin role), or only rent/lend actions? → A: Allowed — block only affects `can_rent`/`can_lend` flags; admin RPC permissions unchanged
+
+---
+
+**Verification Log (from speckit-clarify-integrate):**
+
+1. **SearchOrganizations admin exposure** — *Claim in answer:* "Scope down — only show admin names/emails to authenticated callers who are members of the org." → **Verified as forward requirement** (not current state). Current implementation: `SearchOrganizations` is `SecurityPublic` (`internal/config/security_config.go:41`) and returns full admin `User` objects (names, emails) for every matching org (`internal/service/org.go:65-90`). No authentication or membership check occurs. **Action:** Added **FR-013** as a forward-looking requirement to scope down this exposure.
+
+2. **UpdateOrganization zero/null handling** — *Claim in answer:* "Proto uses `Int64Value` wrappers — `null` = no change, `0` = explicit zero." → **Verified FALSE.** Actual proto (`api/proto/ubertool_trusted_backend/v1/organization_service.proto:52-53`) defines `billsplit_settlement_threshold_cents` and `max_billsplit_rental_cost_cents` as `int32`, not `google.protobuf.Int64Value`. The gRPC handler (`internal/api/grpc/org.go:92-93`) directly copies these `int32` values to the domain. The service (`internal/service/org.go:135-141`) treats `0` as "keep existing" for both fields. **Action:** Added **Needs Verification** note under Key Entities; corrected the proto description to reflect actual `int32` fields.
+
+3. **JoinOrganizationWithInvite join_request update** — *Claim in answer:* "Updated to `JOINED` — invitation acceptance mirrors the approve path, closing the join-request loop." → **Verified FALSE.** `JoinOrganizationWithInvite` (`internal/service/org.go:285-380`) updates the `invitations` row (`UsedOn`, `UsedByUserID`) but does **not** update any linked `join_requests` row to `JOINED`. The `join_requests` row (linked via `invitations.join_request_id`) remains at `INVITED` status. **Action:** Added **Needs Verification** note under Edge Cases; documented actual current behavior.
+
+4. **users_orgs.status enum values** — *Claim in answer:* "Three values: `ACTIVE`, `BLOCK`, `LEFT`." → **Verified PARTIALLY FALSE.** Domain (`internal/domain/user.go:17-22`) defines `ACTIVE`, `SUSPEND`, `BLOCK` — no `LEFT` value. Database (`podman/trusted-group/postgres/ubertool_schema_trusted.sql:43-56`) has `status TEXT NOT NULL DEFAULT 'ACTIVE'` with no enum constraint. Broadcast logic (`internal/service/org.go:188-190`) excludes only `BLOCK` status; `SUSPEND` is not explicitly handled. `BLOCK`ed users retain their role (`internal/service/admin.go:149-156` allows blocking ADMIN/SUPER_ADMIN). **Action:** Updated Key Entities with actual enum values; added **Needs Verification** note for the `LEFT` discrepancy.
+
+5. **AdminBlockUserAccount on admins** — *Claim in answer:* "Allowed — block only affects `can_rent`/`can_lend` flags; admin RPC permissions unchanged." → **Verified PARTIALLY TRUE with nuance.** `BlockUser` (`internal/service/admin.go:137-176`) allows blocking ADMIN/SUPER_ADMIN **only if caller is SUPER_ADMIN** (caller ADMIN cannot block ADMIN/SUPER_ADMIN). The block sets `renting_blocked`/`lending_blocked` and `status = BLOCK`; `verifyAdminRights` checks role on `users_orgs` row, which is unchanged by blocking. **Action:** Updated Edge Cases with precise behavior.
 
 ## Assumptions
 
