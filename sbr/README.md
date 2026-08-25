@@ -98,7 +98,7 @@ asked to write a test from a spec, knowing it will also write (or has just writt
 implementation in the same session, has no guaranteed separation between "what the spec says"
 and "what I already believe the code does or will do." Until that changes, this project treats
 write-after-code as the default for AI-assisted test authoring — both for
-`speckit-sbr-bugfix`'s posthoc test-writing and for ordinary test-writing during
+`sbr-bugfix`'s posthoc test-writing and for ordinary test-writing during
 `speckit-implement` — rather than claim gating mode's guarantees while the discipline that
 earns them (a genuinely blind author) isn't actually in place. This is a deliberate,
 revisitable choice: reinstate gating mode for any workflow where blind test authorship is
@@ -118,7 +118,7 @@ fails.
 **Two parts, with different operating constraints:**
 
 - **Static spec-fidelity check (Steps A-C)** — pure reading and comparison; no code execution,
-  no file modification. Any read-only skill may run this, including `speckit-sbr-audit`.
+  no file modification. Any read-only skill may run this, including `sbr-audit`.
   - **A. Blind derivation.** Before re-reading the test's own assertions in detail, read only
     the FR/Acceptance-Scenario prose (and the proto/contract definition, if the FR is
     API-shaped) for the behavior under test. From that alone, write down what a correct test
@@ -137,13 +137,13 @@ fails.
       Cannot count as `Complete` evidence even though a plausibly-named test exists; route to
       the tier's `Gap` with a note naming what the test actually checks versus what the FR
       requires. If the "internal" detail turns out to be a real hidden requirement, that's a
-      candidate for `speckit-sbr-bugfix`'s "missing requirements" root-cause category — not a
+      candidate for `sbr-bugfix`'s "missing requirements" root-cause category — not a
       reason to accept the test as-is.
     - **Vacuous** — the test doesn't actually assert the behavior in question (weak or missing
       assertion, swallowed error, assertion on the wrong field). Cannot count as evidence.
 - **Dynamic discriminative check (Step D)** — requires running the test suite and a temporary,
   reverted code change; reserved for skills that already execute tests under the adapter's run
-  commands (`speckit-sbr-bugfix`). Never `speckit-sbr-audit`, which stays strictly read-only
+  commands (`sbr-bugfix`). Never `sbr-audit`, which stays strictly read-only
   per its own operating constraints.
   - **D. Mutate and confirm red.** Temporarily break the specific behavior the test claims to
     assert — the minimal reversible change (invert a condition, comment out a guard, change a
@@ -153,9 +153,9 @@ fails.
     before it can close a `Gap`.
 
 A test may only back a `Complete` boundary status once it has cleared Step C as **Spec-Aligned**.
-`speckit-sbr-bugfix`, which can execute code, additionally requires Step D before accepting a
+`sbr-bugfix`, which can execute code, additionally requires Step D before accepting a
 newly-written test as the evidence that flips a row from `Gap`/`Unclassified` to `Complete`.
-`speckit-sbr-audit` runs Steps A-C only, against whatever tests already exist — it cannot run
+`sbr-audit` runs Steps A-C only, against whatever tests already exist — it cannot run
 Step D, so record which check level a row's evidence actually cleared in the RTM's Notes column
 (e.g. "genuineness: static only" vs. "genuineness: static + mutation-confirmed") rather than
 treating every `Complete` row as equally certain.
@@ -179,13 +179,13 @@ meaningful evidence.
   conventions for tracing FR-IDs to tests" for this project's concrete Go form and copy-paste
   templates.
 - **Adoption is incremental, not a retrofit, but the requirement is forward-universal.**
-  `speckit-sbr-bugfix` and `speckit-sbr-feature-upgrade` enforce it themselves at write time.
+  `sbr-bugfix` and `sbr-feature-upgrade` enforce it themselves at write time.
   Ordinary `speckit-implement` work is bound to the same requirement through Constitution
   Principle IV — both `speckit-implement` and `speckit-tasks` load the constitution as governance
   context on every run — reinforced concretely by a project override at
   `.specify/templates/overrides/tasks-template.md` that bakes the reminder onto every generated
   test task. The pre-existing suite is the one thing this does not reach backward onto:
-  `speckit-sbr-audit` is the backfill mechanism there, noting per cited evidence whether an
+  `sbr-audit` is the backfill mechanism there, noting per cited evidence whether an
   annotation exists without downgrading an otherwise-`Complete` row on that basis alone (that
   would fail the entire pre-existing suite against a bar it was never asked to meet at write
   time). Coverage is expected to compound over time, the same way RTM coverage itself did.
@@ -198,7 +198,7 @@ meaningful evidence.
 - **Mechanical presence check**: `make check-sbr-trace` (`sbr/scripts/check-sbr-trace.ps1`) scans
   the adapter's test tiers and reports which `func TestXxx(t *testing.T)` declarations lack an
   `// SBR-Trace:` comment directly above them — a fast, deterministic *presence* check, run
-  before the more expensive semantic reasoning in `speckit-sbr-audit` Step 4/5. It is
+  before the more expensive semantic reasoning in `sbr-audit` Step 4/5. It is
   **advisory only and always exits 0** — it never fails a build or blocks a commit, matching
   Principle IV's forward-only, non-retroactive scope; it also cannot judge whether an existing
   annotation is *accurate* (drift), only whether one is present — that judgment stays with the
@@ -244,7 +244,7 @@ process because each has a different trigger and a different reliable red-test b
   gating. There is no prior implementation to be red against, which is exactly why gating mode
   isn't trustworthy here without a genuinely blind author.
 - **Feature upgrade** — a *deliberate* change to already-intended behavior: the requirement
-  itself is changing, not just its implementation. Handled by `speckit-sbr-feature-upgrade`.
+  itself is changing, not just its implementation. Handled by `sbr-feature-upgrade`.
   Unlike extension, there **is** a reliable baseline here — the current implementation is known,
   working, previous-requirement behavior — so a test asserting the *new* intended behavior can be
   run against the *old* code and trusted to go red for a real reason. This project therefore
@@ -253,7 +253,7 @@ process because each has a different trigger and a different reliable red-test b
   steps.
 - **Bugfix** — an *undiagnosed* symptom or coverage gap: nobody decided to change the
   requirement, something (or nothing, in the pure-gap case) is already wrong relative to intent
-  that was never properly verified. Handled by `speckit-sbr-bugfix`, which needs a diagnostic
+  that was never properly verified. Handled by `sbr-bugfix`, which needs a diagnostic
   root-cause step the other two don't, because unlike a feature upgrade, what's actually broken
   isn't known going in.
 
@@ -265,7 +265,7 @@ when a bugfix is allowed to do that).
 ### Bug-fix step order: reproduce before diagnose
 
 The Appendix B paper's literal cycle runs root-cause analysis (its Step 1) before any test is
-written (its Step 2). `speckit-sbr-bugfix` deliberately inverts that ordering: it writes and runs
+written (its Step 2). `sbr-bugfix` deliberately inverts that ordering: it writes and runs
 a reproduction test *first*, then performs root-cause analysis informed by that test's concrete
 pass/fail result, then writes any additional root-cause-isolating test the diagnosis calls for.
 
@@ -286,7 +286,7 @@ test tiers. A fix categorized as **missing requirements** is a claim that `spec.
 incomplete — if the gap is generalizable (any future implementer would need to know this rule,
 not just this one caller), the fix must update the owning `spec.md` (new or amended `FR-XXX`,
 plus its Acceptance Scenario) and the corresponding row in that feature's
-`sbr/rtm/<feature-slug>.rtm.md`, exactly as a `speckit-sbr-audit` gap-closure would. This is the
+`sbr/rtm/<feature-slug>.rtm.md`, exactly as a `sbr-audit` gap-closure would. This is the
 one case where a bug-fixing skill is allowed to touch `spec.md` — the audit skills never do, but
 a bug fix that reveals an actually-missing requirement has to be recorded where every other
 requirement lives, or the next audit pass will silently miss it again.
@@ -392,7 +392,7 @@ the e2e/smoke Go tests are expected to realize.
   one yet (`grep -r "SBR-Trace:" tests/` returns few results) — traces in existing RTM rows were
   established by matching requirement prose to test/function intent, not by following this
   convention. Coverage grows incrementally per "Adoption is incremental, not a retrofit" above;
-  `speckit-sbr-audit` never edits test files to add annotations itself (it stays read-only), so
+  `sbr-audit` never edits test files to add annotations itself (it stays read-only), so
   a bare function-name/subtest-string search, as described above, remains necessary for any test
   that doesn't have one yet. Run `make check-sbr-trace` for an instant, mechanical list of which
   test functions currently lack one — advisory only, never fails the build (see the Portable
@@ -450,7 +450,7 @@ re-derive them by ad hoc searching on every run:
 
 ### Bug-fix RTM
 
-Corner-case defects fixed via `speckit-sbr-bugfix` (see Portable section above, "Bug-fix
+Corner-case defects fixed via `sbr-bugfix` (see Portable section above, "Bug-fix
 traceability: spec update vs. bug-fix RTM") that don't warrant a `spec.md`/FR change live in
 `sbr/rtm/bugfix-*.rtm.md` — currently a single file, `sbr/rtm/bugfix-general.rtm.md`, but the
 glob (not a fixed name or the `001`/`009`-style numeric prefix used by feature and security RTMs)
@@ -463,7 +463,7 @@ never go in a bugfix RTM.
 ### Constitution cross-reference
 
 - Principle I (Reconcile Discrepancies Among Spec, RTM, and Code) — the discrepancy-diagnosis
-  discipline `speckit-sbr-bugfix` and `speckit-sbr-feature-upgrade` implement (see "Feature
+  discipline `sbr-bugfix` and `sbr-feature-upgrade` implement (see "Feature
   extension vs. feature upgrade vs. bugfix" above); note that audit mode being the default here
   is a separate, practical fact (code predates the specs in this retrofit project), not a
   normative claim that code outranks spec/RTM when they disagree.

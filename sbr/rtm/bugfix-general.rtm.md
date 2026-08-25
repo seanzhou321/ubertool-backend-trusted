@@ -1,7 +1,7 @@
 # Bug-fix RTM — Corner-Case Defects (Appendix B)
 
 - **Source**: no single `spec.md` — this RTM tracks defects fixed via
-  `.claude/skills/speckit-sbr-bugfix/SKILL.md` whose root cause is a pure architecture/
+  `.claude/skills/sbr-bugfix/SKILL.md` whose root cause is a pure architecture/
   implementation gap against an already-correct requirement, or a missing-requirement gap too
   narrow/corner-case to generalize into a new formal `FR-XXX`. Generalizable missing-requirement
   fixes go to the owning feature's `spec.md` + `sbr/rtm/<feature-slug>.rtm.md` instead — see
@@ -26,6 +26,6 @@
 - Total defects tracked: 1
 - Fixed: 1
 
-*Rows are appended by `speckit-sbr-bugfix`, never rewritten wholesale — each run adds exactly the
+*Rows are appended by `sbr-bugfix`, never rewritten wholesale — each run adds exactly the
 row(s) for the defect(s) it closed in this file. A fix that instead updated a feature's `spec.md`
 and per-feature RTM is recorded there, not here — cross-reference by FR-ID if needed.*

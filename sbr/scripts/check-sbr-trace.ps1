@@ -5,7 +5,7 @@
 .DESCRIPTION
   Mechanical presence check only — never a judgment of whether an annotation's claim is
   accurate. That judgment (does the comment actually describe what the test asserts?) is
-  speckit-sbr-audit's job, not this script's: it requires reading spec.md and the test body,
+  sbr-audit's job, not this script's: it requires reading spec.md and the test body,
   which only the audit skill's reasoning can do. This script exists to make the *presence*
   question instant instead of something the audit skill has to notice incidentally per FR.
 

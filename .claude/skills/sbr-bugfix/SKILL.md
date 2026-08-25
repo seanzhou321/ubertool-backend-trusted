@@ -1,5 +1,5 @@
 ---
-name: "speckit-sbr-bugfix"
+name: "sbr-bugfix"
 description: "Fix a single bug, RTM gap, or security finding using the SBR framework's Appendix B bug-fix discipline: interview for reproduction detail, reproduce, diagnostic root-cause analysis, failing tests before the fix, verification, hidden-problem review, and a post-fix spec/RTM re-examination."
 argument-hint: "<bug description | FR-ID | AV-ID | file:line> — required, the single defect to fix"
 compatibility: "Requires spec-kit project structure with sbr/README.md's adapter, including its test-tier run commands"
@@ -107,7 +107,7 @@ Refinements this skill applies on top of the paper's literal cycle:
   was ambiguous or under-detailed rather than simply "already correct" — is sometimes only
   legible in hindsight, after seeing what the correct behavior actually had to be.
 
-This is **not** an audit. `speckit-sbr-audit` and `speckit-security-audit` are strictly
+This is **not** an audit. `sbr-audit` and `sbr-security-audit` are strictly
 read-only and document gaps without touching code. This skill is the deliberate, code-writing
 complement: it exists specifically to close one gap those audits found, or to fix a bug reported
 some other way. Running it is a real, reversible-but-consequential change to test files and
@@ -116,7 +116,7 @@ as a report-generation step.
 
 This skill is also **not** the tool for a deliberate change to existing intended behavior — a
 feature *upgrade* (spec says the behavior should now work differently, no defect involved).
-That has its own skill, `speckit-sbr-feature-upgrade`, because its trigger (a planned decision,
+That has its own skill, `sbr-feature-upgrade`, because its trigger (a planned decision,
 not a diagnosed symptom) and traceability (always the feature RTM, never the bug-fix RTM) are
 structurally different from a bugfix's. See that skill's Goal for the boundary between the two,
 and `sbr/README.md` → "Feature extension vs. feature upgrade vs. bugfix" for the taxonomy.
@@ -160,14 +160,14 @@ hard limits:
   explicitly.
 - **RTM updates are scoped to the row(s) this fix actually closes**, and go in the file the root
   cause actually belongs to (see Step 11) — never rewrite an entire RTM file as a side effect of
-  one bug fix; that is `speckit-sbr-audit`'s and `speckit-security-audit`'s job, run separately
+  one bug fix; that is `sbr-audit`'s and `sbr-security-audit`'s job, run separately
   if a full re-audit is wanted afterward. This skill only ever appends/updates the specific
   row(s) for the defect it just closed, in exactly one of: an existing feature RTM row, a new
   feature RTM row (paired with a `spec.md` change), or the bug-fix RTM.
 - **`spec.md` may be edited, but only for a generalizable missing-requirement root cause
   (identified in Step 4 or, in hindsight, in Step 10), and only the specific FR(s)/Acceptance
-  Scenario(s) implicated.** This is a deliberate difference from `speckit-sbr-audit`/
-  `speckit-security-audit`, which never touch `spec.md` — a bug fix that proves a requirement was
+  Scenario(s) implicated.** This is a deliberate difference from `sbr-audit`/
+  `sbr-security-audit`, which never touch `spec.md` — a bug fix that proves a requirement was
   actually missing has to correct the record, not just patch around it. Never touch unrelated
   parts of `spec.md`, and never add a new FR for a defect judged to be a corner case (that goes in
   the bug-fix RTM instead, per Step 5).
@@ -455,7 +455,7 @@ Route the record to exactly one place, based on Steps 4, 5, and 10:
 - **Step 5 fired, or Step 10 concluded a generalizable missing requirement** (either way,
   `spec.md` was updated): add the corresponding row to that feature's
   `sbr/rtm/<feature-slug>.rtm.md` for the new/amended FR, citing the new test(s), exactly as
-  `speckit-sbr-audit` would for a freshly-closed gap. If Step 10 was the trigger, note in this
+  `sbr-audit` would for a freshly-closed gap. If Step 10 was the trigger, note in this
   row too that the requirement change was discovered post-fix.
 - **None of the above** (corner case, or an architecture/implementation gap with no pre-existing
   RTM row, and Step 10 found nothing generalizable): resolve the target bug-fix RTM file by
@@ -516,7 +516,7 @@ After producing the result, check if `.specify/extensions.yml` exists in the pro
   - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
 - Report the fix outcome (target, root cause, tests added, suite verification result) before
   listing any hooks, so users can decide whether to run optional follow-up commands (e.g.
-  re-running `speckit-sbr-audit`/`speckit-security-audit` to confirm the RTM reflects the fix
+  re-running `sbr-audit`/`sbr-security-audit` to confirm the RTM reflects the fix
   project-wide, or dispatching a follow-up fix for a flagged hidden-problem candidate).
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`).
 - For each executable hook, output the same optional/mandatory blocks used in Pre-Execution

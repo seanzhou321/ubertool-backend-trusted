@@ -137,7 +137,7 @@
 - [ ] T039 [P] Update `specs/007-ledger/spec.md`: Resolve Known Discrepancies 1-4 (mark as fixed or explicitly document remaining gaps)
 - [ ] T040 [P] Run full test suite: `make test` (unit + integration + e2e + smoke)
 - [ ] T041 [P] Verify `quickstart.md` validation steps pass against updated implementation
-- [ ] T042 [P] Update `sbr/rtm/007-ledger.rtm.md` if new tests added (re-run `/speckit-sbr-audit`)
+- [ ] T042 [P] Update `sbr/rtm/007-ledger.rtm.md` if new tests added (re-run `/sbr-audit`)
 
 ---
 

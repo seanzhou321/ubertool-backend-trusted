@@ -226,7 +226,7 @@ If running the interactive clarification, these 5 questions would be asked (in p
 1. **Run `/speckit-clarify`** with this analysis as context — it will ask the top 5 questions interactively and write answers to `spec.md` under `## Clarifications`
 2. **Run `/speckit-plan`** — will generate `plan.md` incorporating clarified requirements
 3. **Run `/speckit-tasks`** — will produce `tasks.md` with implementation tasks for gaps (especially concurrency, observability, email retry)
-4. **Consider `/speckit-sbr-audit`** — current RTM shows gaps in `CheckOverdueBills`, `ResolveDisputedBills`, graceful-dispute-acknowledgment; these align with concurrency/observability gaps
+4. **Consider `/sbr-audit`** — current RTM shows gaps in `CheckOverdueBills`, `ResolveDisputedBills`, graceful-dispute-acknowledgment; these align with concurrency/observability gaps
 
 ---
 

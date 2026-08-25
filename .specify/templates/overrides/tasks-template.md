@@ -15,7 +15,7 @@ description: "Task list template for feature implementation"
 Every test task in this file, when completed, MUST add or update an `// SBR-Trace: <FR-ID> —
 <behavior>` doc comment directly above the test function it introduces or changes — a one-line
 claim of the specific behavior the test locks down, not full statement coverage. This is a
-constitutional requirement (Principle IV), not a style preference; `speckit-sbr-audit` will
+constitutional requirement (Principle IV), not a style preference; `sbr-audit` will
 surface any test cited as RTM evidence that lacks one. See `sbr/README.md` → "SBR-Trace test
 annotations" for the convention and this project's adapter for the exact comment format.
 

@@ -337,7 +337,7 @@ After all fixes, update RTMs to reflect closed gaps:
 2. **Proto-First** (Constitution VI): Any new fields require `make proto-gen` before implementation.
 3. **Push Notifications** (Constitution III): Background jobs must launch notifications async.
 4. **No Redis/Server-Side Context** (Multi-Org Design): `organization_id` is always explicit in requests — no "current org" fallback.
-5. **Test Mappings Need Cleanup**: The 001/002/004 RTMs have mismatched citations; a `speckit-sbr-audit` re-run after fixes would correct this.
+5. **Test Mappings Need Cleanup**: The 001/002/004 RTMs have mismatched citations; a `sbr-audit` re-run after fixes would correct this.
 6. **Write Tests First (TDD)**: For all gap fixes, write the failing test first, then implement the fix.
 7. **Parallel Execution**: Tasks marked `[P]` can run in parallel (different files).
 

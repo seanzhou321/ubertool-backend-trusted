@@ -1,5 +1,5 @@
 ---
-name: "speckit-sbr-feature-upgrade"
+name: "sbr-feature-upgrade"
 description: "Change existing intended behavior under true pre-implementation gating: update the requirement, design, and tests first, confirm the updated tests fail against the old implementation, then implement."
 argument-hint: "<FR-ID> [description of the behavior change] — required, an existing requirement whose intended behavior is changing"
 compatibility: "Requires spec-kit project structure with sbr/README.md's adapter"
@@ -20,7 +20,7 @@ $ARGUMENTS
 You **MUST** consider the user input before proceeding. This skill requires a single, concrete
 target: an existing `FR-XXX` whose *intended* behavior is deliberately changing. If `$ARGUMENTS`
 is empty, STOP and ask what requirement is changing and how, rather than guessing — like
-`speckit-sbr-bugfix`, this skill writes code and edits `spec.md`, so it must never invent its own
+`sbr-bugfix`, this skill writes code and edits `spec.md`, so it must never invent its own
 scope.
 
 ## Pre-Execution Checks
@@ -83,7 +83,7 @@ where nothing exists yet to be red against.
   test-genuineness check"), not this skill.
 - **An undiagnosed symptom or coverage gap** — nobody decided the requirement should change;
   something is (or might be) already wrong relative to intent that was never properly verified.
-  That is a bugfix, handled by `speckit-sbr-bugfix`, which performs a diagnostic root-cause step
+  That is a bugfix, handled by `sbr-bugfix`, which performs a diagnostic root-cause step
   this skill deliberately never does. The dividing question: *did anyone decide this should
   change, or did we just discover it's wrong?* A deliberate decision is an upgrade; a discovery
   is a bugfix, even if the fix also ends up touching `spec.md`.
@@ -98,7 +98,7 @@ rather than forcing this skill's gating process onto the wrong kind of change.
 its purpose.** It still has hard limits:
 
 - **`spec.md` (and any affected design artifact) MUST be updated first, unconditionally** — this
-  is a deliberate contrast with `speckit-sbr-bugfix`, where the spec update is conditional on the
+  is a deliberate contrast with `sbr-bugfix`, where the spec update is conditional on the
   root-cause category. Here it is never conditional: a feature upgrade *is* a requirement change
   by definition, so Step 2 always runs.
 - **Never skip the red step, and never fake it with a synthetic mutation.** The updated/new
@@ -108,7 +108,7 @@ its purpose.** It still has hard limits:
   mutation substitute (`sbr/README.md`'s Step D) — a real red against real old code is always
   available and always required.
 - **Modifying an existing test's assertions to reflect the new behavior is expected here, not a
-  red flag** — the deliberate opposite of `speckit-sbr-bugfix`'s rule against silently changing
+  red flag** — the deliberate opposite of `sbr-bugfix`'s rule against silently changing
   an existing test. Record the exact diff (old assertion → new assertion) for every test touched
   this way, so the change stays auditable.
 - **The rest of the existing suite must stay green after the change.** Any test outside the ones
@@ -209,7 +209,7 @@ Ask, and answer explicitly in the report:
 
 List findings as follow-up candidates (file:line, what to check) rather than automatically
 expanding this run's scope — fold in a fix only if it's trivially the same one-line change applied
-to a true sibling, and say explicitly that this happened, mirroring `speckit-sbr-bugfix` Step 8's
+to a true sibling, and say explicitly that this happened, mirroring `sbr-bugfix` Step 8's
 discipline.
 
 ### 7. Update traceability
@@ -242,7 +242,7 @@ After producing the result, check if `.specify/extensions.yml` exists in the pro
   - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
 - Report the upgrade outcome (FR changed, tests updated, suite verification result) before
   listing any hooks, so users can decide whether to run optional follow-up commands (e.g.
-  re-running `speckit-sbr-audit` to confirm the RTM reflects the change project-wide).
+  re-running `sbr-audit` to confirm the RTM reflects the change project-wide).
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`).
 - For each executable hook, output the same optional/mandatory blocks used in Pre-Execution
   Checks, substituting the after-hook framing, and actually invoke mandatory hooks before

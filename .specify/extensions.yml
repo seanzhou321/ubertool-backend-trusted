@@ -1,4 +1,4 @@
-# SBR extension hooks — wires speckit-sbr-audit and speckit-sbr-close-gaps into
+# SBR extension hooks — wires sbr-audit and sbr-close-gaps into
 # spec-kit's native lifecycle. This file only registers triggers; the actual
 # behavior lives in each skill's own SKILL.md, and the RTM schema/vocabulary in
 # sbr/README.md. See sbr/README.md -> "Audit mode vs. gating mode" and
@@ -9,7 +9,7 @@
 # Hook entry fields:
 #   extension    display name shown in the pre/post-hook block
 #   command      dotted command id; consuming skills replace "." with "-" to
-#                form the slash command (speckit.sbr.audit -> /speckit-sbr-audit)
+#                form the slash command (sbr.audit -> /sbr-audit)
 #   description  one-line summary shown for optional hooks
 #   prompt       suggested framing shown for optional hooks before they're run
 #   optional     true = offered, requires explicit confirmation before running;
@@ -19,31 +19,31 @@
 hooks:
   after_implement:
     - extension: "sbr-extension"
-      command: "speckit.sbr.audit"
+      command: "sbr.audit"
       description: "Refresh the RTM for the current feature against the code just implemented."
       optional: false
       enabled: true
 
   after_sbr_audit:
     - extension: "sbr-extension"
-      command: "speckit.sbr.close-gaps"
-      description: "Close every Gap/Unclassified row this audit just found, dispatching speckit-sbr-bugfix once per row."
-      prompt: "The audit above found one or more gaps. Run speckit-sbr-close-gaps to write the missing tests and update the RTM for each one?"
+      command: "sbr.close-gaps"
+      description: "Close every Gap/Unclassified row this audit just found, dispatching sbr-bugfix once per row."
+      prompt: "The audit above found one or more gaps. Run sbr-close-gaps to write the missing tests and update the RTM for each one?"
       optional: true
       enabled: true
 
   after_sbr_bugfix:
     - extension: "sbr-extension"
-      command: "speckit.sbr.audit"
+      command: "sbr.audit"
       description: "Re-run the audit for the affected feature to confirm the RTM reflects this fix (and hasn't drifted elsewhere)."
-      prompt: "A defect was just fixed. Re-run speckit-sbr-audit against the affected feature to confirm the RTM is current?"
+      prompt: "A defect was just fixed. Re-run sbr-audit against the affected feature to confirm the RTM is current?"
       optional: true
       enabled: true
 
   after_sbr_feature_upgrade:
     - extension: "sbr-extension"
-      command: "speckit.sbr.audit"
+      command: "sbr.audit"
       description: "Re-run the audit for the affected feature to confirm the RTM reflects the changed requirement (and hasn't drifted elsewhere)."
-      prompt: "A requirement was just upgraded. Re-run speckit-sbr-audit against the affected feature to confirm the RTM is current?"
+      prompt: "A requirement was just upgraded. Re-run sbr-audit against the affected feature to confirm the RTM is current?"
       optional: true
       enabled: true

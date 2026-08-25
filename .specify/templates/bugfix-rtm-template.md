@@ -1,7 +1,7 @@
 # Bug-fix RTM — Corner-Case Defects (Appendix B)
 
 - **Source**: no single `spec.md` — this RTM tracks defects fixed via `[BUGFIX_SKILL_PATH]`
-  (this project: `.claude/skills/speckit-sbr-bugfix/SKILL.md`) whose root cause is a pure
+  (this project: `.claude/skills/sbr-bugfix/SKILL.md`) whose root cause is a pure
   architecture/implementation gap against an already-correct requirement, or a
   missing-requirement gap too narrow/corner-case to generalize into a new formal `FR-XXX`.
   Generalizable missing-requirement fixes go to the owning feature's `spec.md` + its feature RTM
@@ -18,20 +18,20 @@
 <!--
   ============================================================================
   IMPORTANT: This is the empty-state template for a project's bug-fix RTM — the traceability
-  file `speckit-sbr-bugfix` appends to for defects that don't warrant a spec.md/FR change.
+  file `sbr-bugfix` appends to for defects that don't warrant a spec.md/FR change.
 
-  When first adopting the speckit-sbr-bugfix skill in a project:
+  When first adopting the sbr-bugfix skill in a project:
   1. Copy this file to sbr/rtm/bugfix-<descriptive-slug>.rtm.md — e.g. bugfix-general.rtm.md
      for a single project-wide log, or a domain-scoped name (e.g. bugfix-<area>.rtm.md) if the
      project later chooses to split it. The file MUST match the glob sbr/rtm/bugfix-*.rtm.md —
-     this is how speckit-sbr-bugfix discovers it, deliberately independent of the numeric
+     this is how sbr-bugfix discovers it, deliberately independent of the numeric
      001/009-style prefixes used by feature and security RTMs, so it never collides with or
      needs renumbering when a new feature spec is added.
   2. Fill in the bracketed placeholders above from sbr/README.md's adapter section (tier
      mapping, test directories, run commands).
   3. Delete this comment block.
 
-  The speckit-sbr-bugfix skill appends rows to the copied file going forward — it never
+  The sbr-bugfix skill appends rows to the copied file going forward — it never
   regenerates the whole file from this template on a later run, and this template itself is
   never filled in with real defect rows. If sbr/rtm/bugfix-*.rtm.md ever matches more than one
   file, the skill asks which one to use rather than guessing — see SKILL.md Step 8.

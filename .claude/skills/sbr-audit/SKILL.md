@@ -1,5 +1,5 @@
 ---
-name: "speckit-sbr-audit"
+name: "sbr-audit"
 description: "Audit a feature spec's functional requirements against the project's test tiers and write/update its SBR Requirements Traceability Matrix (RTM)."
 argument-hint: "<feature-slug|all> (optional — defaults to the current ambient feature)"
 compatibility: "Requires spec-kit project structure with .specify/ directory and an sbr/README.md adapter"
@@ -167,7 +167,7 @@ plausibly-named test match from Step 4 is a candidate, not yet evidence: derive 
 test should assert from the FR/Acceptance-Scenario prose alone (Step A), then compare that
 against what the test actually asserts (Step B), and classify it Spec-Aligned /
 Implementation-Coupled / Vacuous (Step C). This audit runs Steps A-C only — it never executes
-tests or mutates code (Step D is `speckit-sbr-bugfix`'s to run, when it writes a new test) — so
+tests or mutates code (Step D is `sbr-bugfix`'s to run, when it writes a new test) — so
 record in Notes that the row's evidence cleared "genuineness: static only," not the stronger
 "static + mutation-confirmed" level a bugfix run can certify.
 
@@ -185,8 +185,8 @@ their own:
   files itself, per the Operating Constraints above).
 - **Absent** — most existing tests predate this convention; note "no SBR-Trace annotation" so the
   gap is visible and greppable, but do not downgrade an otherwise Spec-Aligned `Complete` row for
-  its absence alone — annotation coverage is adopted incrementally by `speckit-sbr-bugfix`/
-  `speckit-sbr-feature-upgrade` as they touch tests, not retrofitted by this audit.
+  its absence alone — annotation coverage is adopted incrementally by `sbr-bugfix`/
+  `sbr-feature-upgrade` as they touch tests, not retrofitted by this audit.
 
 Using the vocabulary defined in `sbr/README.md`:
 

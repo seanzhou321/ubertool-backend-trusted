@@ -31,10 +31,10 @@ Net changes from 1.0.0:
    `.specify/templates/overrides/tasks-template.md` that bakes an SBR-Trace reminder into every
    generated test task, resolved via spec-kit's own project-override-over-shared-core template
    stack (see `.specify/scripts/powershell/common.ps1`'s `Resolve-Template`). The pre-existing
-   suite remains excluded (surfaced by `speckit-sbr-audit` as a gap, not a violation) — only the
+   suite remains excluded (surfaced by `sbr-audit` as a gap, not a violation) — only the
    *forward* scope changed.
-4. Development Workflow gained one bullet naming the SBR skills (`speckit-sbr-audit`,
-   `speckit-sbr-bugfix`, `speckit-sbr-feature-upgrade`, `speckit-sbr-close-gaps`) and pointing to
+4. Development Workflow gained one bullet naming the SBR skills (`sbr-audit`,
+   `sbr-bugfix`, `sbr-feature-upgrade`, `sbr-close-gaps`) and pointing to
    `sbr/README.md` as their authoritative detail, in the same style as the existing
    `/speckit-converge` bullet.
 
@@ -44,7 +44,7 @@ Removed sections: none
 Templates checked: plan-template.md, spec-template.md — no changes needed. tasks-template.md —
 project override added at .specify/templates/overrides/tasks-template.md (base template under
 .specify/templates/ left untouched, so a future `specify upgrade` doesn't conflict with it).
-sbr/README.md and .claude/skills/speckit-sbr-{audit,bugfix,feature-upgrade}/SKILL.md already
+sbr/README.md and .claude/skills/sbr-{audit,bugfix,feature-upgrade}/SKILL.md already
 carry the enforcement detail this amendment points to.
 Follow-up TODOs: none.
 -->
@@ -69,9 +69,9 @@ to be diagnosed and resolved**, not a signal to silently defer to whichever one 
 production behavior. Any of the three can be the one that's wrong: the spec can be missing or
 ambiguous, the RTM can cite a test that doesn't actually verify what it claims to (see
 `sbr/README.md` → "Posthoc test-genuineness check"), or the code can simply be buggy. The
-mechanism for resolving this is the SBR discipline: `speckit-sbr-bugfix`'s root-cause
+mechanism for resolving this is the SBR discipline: `sbr-bugfix`'s root-cause
 categorization decides whether a defect traces to a missing/ambiguous requirement (spec is wrong)
-or an architecture/implementation gap (code is wrong), and `speckit-sbr-feature-upgrade` handles
+or an architecture/implementation gap (code is wrong), and `sbr-feature-upgrade` handles
 the case where the requirement is being deliberately changed. No spec-kit document produced under
 this constitution may resolve a spec/RTM/code disagreement by silent preference for any one of
 the three — it must be diagnosed.
@@ -142,7 +142,7 @@ Every new or modified test — regardless of which command wrote it — MUST car
 annotation: a persisted claim of which requirement/finding it verifies and the specific behavior
 it locks down, checked against drift by the static genuineness check on every later run that
 touches it (see `sbr/README.md` → "SBR-Trace test annotations" for the convention). This applies
-to `speckit-sbr-bugfix` and `speckit-sbr-feature-upgrade` directly — they enforce it themselves,
+to `sbr-bugfix` and `sbr-feature-upgrade` directly — they enforce it themselves,
 at write time, as part of their own steps — and to ordinary `speckit-implement` work through this
 constitution: `speckit-implement` and `speckit-tasks` both unconditionally load this file as
 governance context before acting, the same channel Principles II and III already rely on to bind
@@ -150,7 +150,7 @@ a vendored, unedited command to a project-specific rule. `.specify/templates/ove
 reinforces this concretely by adding the requirement directly to every generated test task, so it
 reaches `speckit-implement` as a literal item on the plan it already executes task-by-task, not
 only as prose it has to remember to apply. This requirement does not reach *backward*: the
-pre-existing suite is not retroactively in violation for lacking annotations — `speckit-sbr-audit`
+pre-existing suite is not retroactively in violation for lacking annotations — `sbr-audit`
 surfaces those as a visible gap for incremental pickup, not a CRITICAL finding, and coverage is
 expected to compound the same way RTM coverage itself did, not appear complete on day one.
 
@@ -220,9 +220,9 @@ not in the handler layer.
 - Generated code (`api/gen/v1`) and vendored/third-party code are out of scope for
   constitution compliance review.
 - Bug fixes, RTM gap-closure, and deliberate changes to already-implemented behavior follow the
-  SBR (Stratified Behavioral Refinement) discipline in `sbr/README.md`, via `speckit-sbr-audit`
-  (read-only RTM tracing), `speckit-sbr-bugfix` (diagnosed defects), `speckit-sbr-feature-upgrade`
-  (deliberate requirement changes), and `speckit-sbr-close-gaps` (batch gap-closure) —
+  SBR (Stratified Behavioral Refinement) discipline in `sbr/README.md`, via `sbr-audit`
+  (read-only RTM tracing), `sbr-bugfix` (diagnosed defects), `sbr-feature-upgrade`
+  (deliberate requirement changes), and `sbr-close-gaps` (batch gap-closure) —
   `sbr/README.md` is the authoritative detail, not this constitution.
 
 ## Governance

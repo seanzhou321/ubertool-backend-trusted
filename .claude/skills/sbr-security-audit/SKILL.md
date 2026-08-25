@@ -1,5 +1,5 @@
 ---
-name: "speckit-security-audit"
+name: "sbr-security-audit"
 description: "Run an adversarial, endpoint-by-endpoint security audit of the API surface against OWASP API Security Top 10 categories and write/update the project's unified security RTM."
 argument-hint: "<service-slug|endpoint-name|all> (optional — defaults to 'all')"
 compatibility: "Requires spec-kit project structure with sbr/README.md's adapter, including its 'Security audit inputs' subsection"
@@ -91,7 +91,7 @@ follow-up, not to make the fix itself.
   `sbr/rtm/` besides the one named in the adapter's "Security audit inputs".
 
 Its **only** write is creating or updating the security RTM file named in the adapter (this
-project: `sbr/rtm/009-security.rtm.md`). Unlike `speckit-sbr-audit`'s per-feature RTMs (one file,
+project: `sbr/rtm/009-security.rtm.md`). Unlike `sbr-audit`'s per-feature RTMs (one file,
 fully rewritten per feature), this file is a single document with one section per service — a
 scoped run (a specific service or endpoint) rewrites only that section and the header/footer
 summary counts; only an `all` run rewrites the whole file end to end.
