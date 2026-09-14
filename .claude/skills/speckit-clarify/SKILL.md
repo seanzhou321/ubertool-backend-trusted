@@ -193,6 +193,24 @@ Execution steps:
        - Non-functional constraint → Add/modify measurable criteria in Success Criteria > Measurable Outcomes (convert vague adjective to metric or explicit target).
        - Edge case / negative flow → Add a new bullet under Edge Cases / Error Handling (or create such subsection if template provides placeholder for it).
        - Terminology conflict → Normalize term across spec; retain original only if necessary by adding `(formerly referred to as "X")` once.
+    - **Before writing anything to User Stories/Actors, Data Model, or Edge Cases/Error
+      Handling (sections that describe *existing* system behavior) — as opposed to
+      Functional Requirements, which is inherently forward-looking — check whether the
+      answer, or your own phrasing of it, asserts anything about current/existing system
+      state: a specific column, table, message, RPC, function, or file said to exist or
+      behave a certain way right now.**
+      - If it does: either (a) actually read or grep the specific cited artifact with your
+        tools and confirm it before writing the claim as present-tense fact — never rely on
+        the question's framing, the answer's confidence, or general best-practice knowledge
+        as a substitute for looking; or (b) if you have not verified it, confine that
+        answer's integration to Functional Requirements only, phrased with forward-looking
+        `MUST` language (e.g. "System MUST ..."), never as present-tense fact in Edge Cases,
+        Key Entities, User Stories, or elsewhere.
+      - If `.specify/memory/constitution.md` was loaded (see Outline step 2) and its
+        principles describe specs as documenting verified current/as-built behavior — not a
+        proposal for new behavior — this is a **hard rule, not a suggestion**: do not write
+        an unverified current-state claim into any as-built section under any circumstance,
+        even a plausible-sounding one.
     - If the clarification invalidates an earlier ambiguous statement, replace that statement instead of duplicating; leave no obsolete contradictory text.
     - Save the spec file AFTER each integration to minimize risk of context loss (atomic overwrite).
     - Preserve formatting: do not reorder unrelated sections; keep heading hierarchy intact.
